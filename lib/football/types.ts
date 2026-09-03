@@ -11,7 +11,9 @@ export type FixtureState =
     | 'penalties'
     | 'finished'
     | 'postponed'
-    | 'cancelled';
+    | 'cancelled'
+    | 'abandoned'
+    | 'unknown';
 
 export interface TeamSummary {
     id: number;

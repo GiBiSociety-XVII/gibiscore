@@ -31,6 +31,17 @@ export async function createClient() {
 }
 
 /**
+ * Anonymous client with no session. Use it for public, cacheable reads
+ * (fixtures, standings): it never touches cookies, so pages that use it
+ * can stay static and revalidate on a timer.
+ */
+export function createPublicClient() {
+    return createSupabaseClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: {persistSession: false, autoRefreshToken: false},
+    });
+}
+
+/**
  * Service-role client for cron jobs and sync workers. Bypasses RLS: never
  * import this from anything that runs in response to a user request.
  */

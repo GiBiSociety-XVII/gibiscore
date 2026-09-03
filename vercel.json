@@ -1,8 +1,20 @@
 {
   "crons": [
     {
+      "path": "/api/cron/sync-competitions",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/sync-fixtures",
-      "schedule": "*/5 * * * *"
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-standings",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-live",
+      "schedule": "* * * * *"
     }
   ]
 }

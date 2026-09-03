@@ -29,6 +29,9 @@ homepage mostra dati di esempio (badge "Dati di esempio").
 | `pnpm dev` | server di sviluppo |
 | `pnpm build` | build di produzione |
 | `pnpm lint` | ESLint |
+| `pnpm test` | test unitari (vitest) dei mapper Sportmonks |
+| `pnpm probe:sportmonks` | scarica payload grezzi da Sportmonks in `scratch/` per verificarne la forma |
+| `pnpm cron <job>` | lancia un job di sync (serve `CRON_SECRET`, opzionale `BASE_URL`) |
 
 ## Struttura
 
@@ -43,6 +46,31 @@ lib/sportmonks/      wrapper server-only dell'API Sportmonks
 lib/football/        tipi di lettura, query per le pagine, dati di esempio
 supabase/migrations/ schema `football.*`
 ```
+
+## Sincronizzazione dati (Sportmonks)
+
+I job stanno in `lib/football/sync/` e sono esposti come route cron protette
+da `CRON_SECRET` (`vercel.json` definisce gli orari):
+
+| Job | Frequenza | Cosa fa |
+|---|---|---|
+| `sync-competitions` | ogni giorno | leghe configurate, stagione corrente, squadre, rose |
+| `sync-fixtures` | ogni ora | calendario e risultati da ieri a +14 giorni |
+| `sync-standings` | ogni 30 min | classifiche di ogni stagione corrente |
+| `sync-live` | ogni minuto | partite in corso: punteggio, minuto, eventi, statistiche, formazioni |
+
+Le competizioni seguite sono in `lib/football/competitions.ts`.
+
+Primo avvio su un database vuoto, nell'ordine:
+
+```bash
+CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-competitions
+CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-fixtures
+CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-standings
+```
+
+Ogni esecuzione scrive una riga in `football.sync_runs` con contatori,
+richieste usate e avvisi: è il primo posto dove guardare se qualcosa manca.
 
 ## Database
 

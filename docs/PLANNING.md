@@ -200,7 +200,11 @@ potrebbe diventare Premium se un giorno si decidera' di introdurlo.
 2. Attivare il trial Sportmonks e verificare la copertura di Serie B e Coppa Italia.
 3. ~~Confermare la strada per il login condiviso~~ fatto: progetto Supabase separato.
 4. ~~Definire cosa e' Premium~~ fatto: tutto gratis per ora.
-5. Scaffolding del progetto Next.js (prossimo passo, su richiesta).
+5. ~~Scaffolding del progetto Next.js~~ fatto (3 settembre 2026).
+6. ~~Job di sincronizzazione Sportmonks~~ scritti e testati sui mapper; da
+   validare con il token reale (`pnpm probe:sportmonks`, poi i cron).
+7. Pagine: partita, squadra, giocatore, classifiche, calendario per competizione.
+8. Login facoltativo con Supabase Auth.
 
 ## 9. Fase 2 (in seguito): analisi, previsioni, scommesse, fantacalcio
 
