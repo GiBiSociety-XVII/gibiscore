@@ -1,0 +1,12 @@
+{
+  "sectionsLabel": "Sezioni del sito",
+  "search": "Cerca squadra o giocatore",
+  "login": "Accedi",
+  "nav": {
+    "live": "Live",
+    "serieA": "Serie A",
+    "teams": "Squadre",
+    "players": "Giocatori",
+    "rankings": "Classifiche"
+  }
+}

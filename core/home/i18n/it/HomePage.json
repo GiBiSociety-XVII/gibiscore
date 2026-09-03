@@ -1,0 +1,45 @@
+{
+  "liveBadge": "{count, plural, =0 {Nessuna partita in corso} one {# partita in corso} other {# partite in corso}}",
+  "heroPrefix": "Tutto il ",
+  "heroAccent": "calcio",
+  "heroSuffix": " in numeri.",
+  "subtitle": "Risultati live, classifiche e statistiche di squadre e giocatori. Studia il campionato, non solo il punteggio.",
+  "matchday": "Giornata {round}",
+  "status": {
+    "live": "LIVE {minute}'",
+    "halfTime": "INTERVALLO",
+    "finished": "FINALE",
+    "today": "OGGI {time}",
+    "scheduled": "{date} {time}"
+  },
+  "stats": {
+    "possession": "Possesso {value}%",
+    "shots": "Tiri {home} – {away}",
+    "xg": "xG {home} – {away}",
+    "form": "Ultimi 5: {form}"
+  },
+  "standings": {
+    "title": "Classifica {league}",
+    "full": "Completa",
+    "played": "G",
+    "won": "V",
+    "drawn": "N",
+    "lost": "P",
+    "goalDiff": "DR",
+    "points": "PT",
+    "team": "Squadra"
+  },
+  "spotlight": {
+    "title": "Giocatore della settimana",
+    "goals": "Gol",
+    "assists": "Assist",
+    "rating": "Voto medio",
+    "age": "{age} anni"
+  },
+  "adSlot": "Spazio pubblicitario (opzionale)",
+  "freeBand": {
+    "title": "Tutto gratis, per tutti.",
+    "description": "Risultati, statistiche e xG senza abbonamento. Accedi con lo stesso account di GiBiArena per salvare le squadre preferite.",
+    "cta": "Vai a GiBiArena"
+  }
+}

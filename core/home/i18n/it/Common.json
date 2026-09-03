@@ -1,0 +1,18 @@
+{
+  "siteName": "GiBiScore",
+  "tagline": "Tutto il calcio in numeri.",
+  "sampleData": "Dati di esempio",
+  "loading": "Caricamento…",
+  "notFound": {
+    "title": "Pagina non trovata",
+    "description": "La pagina che cerchi non esiste o è stata spostata.",
+    "backHome": "Torna alla home"
+  },
+  "footer": {
+    "about": "GiBiScore è il sito di risultati e statistiche calcio di GiBiSociety: partite live, classifiche, xG e schede di squadre e giocatori.",
+    "explore": "Esplora",
+    "network": "GiBiSociety",
+    "gibiarena": "GiBiArena",
+    "rights": "Tutti i diritti riservati."
+  }
+}

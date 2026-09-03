@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/* Force light mode globally — dark: variants never apply. */
+@variant dark (&:where(.dark, .dark *));
+
+/* Opt out of mobile browser auto-dark (Android Chrome/Brave "Darken websites"). */
+:root,
+html,
+body {
+  color-scheme: light only;
+}
+
+/* "Bold Blocks" design tokens — shared with GiBiArena.
+   Single accent, ink borders, hard offset shadows. */
+:root {
+  --background: 245 243 238;
+  --foreground: 20 19 26;
+  --card: 255 255 255;
+  --card-foreground: 20 19 26;
+  --muted: 237 234 225;
+  --muted-foreground: 107 105 118;
+  --accent: 182 255 60;
+  --accent-foreground: 20 19 26;
+  --border: 20 19 26;
+  --ring: 20 19 26;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+}
+
+@theme inline {
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+  --color-border: rgb(var(--border));
+  --color-ring: rgb(var(--ring));
+  --radius-lg: var(--radius-lg);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  scrollbar-color: rgb(var(--muted)) rgb(var(--background));
+  scrollbar-width: thin;
+}
+
+body {
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: rgb(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--muted-foreground));
+}
+
+/* ---------------------------------------------------------------------- */
+/* Bold Blocks — shared component primitives                              */
+/* Thick ink borders, flat colors, hard offset shadows that shrink/press  */
+/* on interaction. Consumed by components/shared/ui/*.                    */
+/* ---------------------------------------------------------------------- */
+
+@layer components {
+  .bb-border {
+    border: 2.5px solid rgb(var(--foreground));
+  }
+
+  .bb-surface {
+    background-color: rgb(var(--card));
+    border: 2.5px solid rgb(var(--foreground));
+    border-radius: var(--radius-lg);
+  }
+
+  .bb-press {
+    box-shadow: 6px 6px 0 rgb(var(--foreground));
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+  .bb-press:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0 rgb(var(--foreground));
+  }
+
+  .bb-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 800;
+    line-height: 1;
+    border: 2.5px solid rgb(var(--foreground));
+    border-radius: var(--radius);
+    box-shadow: 5px 5px 0 rgb(var(--foreground));
+    transition: transform 120ms ease, box-shadow 120ms ease;
+    cursor: pointer;
+  }
+  .bb-btn:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 3px 3px 0 rgb(var(--foreground));
+  }
+  .bb-btn:active {
+    transform: translate(5px, 5px);
+    box-shadow: 0 0 0 rgb(var(--foreground));
+  }
+  .bb-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 5px 5px 0 rgb(var(--foreground));
+  }
+
+  .bb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 800;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    border: 2px solid rgb(var(--foreground));
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.65rem;
+    line-height: 1;
+  }
+
+  .bb-input {
+    background-color: rgb(var(--card));
+    border: 2.5px solid rgb(var(--foreground));
+    border-radius: var(--radius);
+    color: rgb(var(--foreground));
+    transition: box-shadow 120ms ease;
+  }
+  .bb-input:focus,
+  .bb-input:focus-within {
+    outline: none;
+    box-shadow: 3px 3px 0 rgb(var(--foreground));
+  }
+}
