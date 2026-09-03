@@ -1,7 +1,7 @@
 import 'server-only';
 import {NextResponse, type NextRequest} from 'next/server';
 import {isAuthorizedCron} from '@/lib/cron';
-import {SportmonksError} from '@/lib/sportmonks/client';
+import {ApiFootballError, lastRateLimit} from '@/lib/api-football/client';
 import type {SyncRun} from './context';
 
 /**
@@ -22,19 +22,21 @@ export function cronRoute(job: () => Promise<SyncRun>) {
                 run_id: run.id,
                 ms: Date.now() - startedAt,
                 requests: run.requests,
+                quota: lastRateLimit,
                 counters: run.counters,
                 warnings: run.warnings,
             });
         } catch (error) {
-            const err = error as Error & {status?: number; path?: string; details?: unknown};
+            const err = error as Error & {status?: number; path?: string; kind?: string; details?: unknown};
             console.error('[cron] job failed', err);
-            const status = error instanceof SportmonksError ? 502 : 500;
+            const status = error instanceof ApiFootballError ? 502 : 500;
             return NextResponse.json(
                 {
                     ok: false,
                     error: err.message,
                     kind: err.name,
-                    sportmonks: error instanceof SportmonksError ? {status: err.status, path: err.path} : undefined,
+                    api_football: error instanceof ApiFootballError ? {status: err.status, path: err.path, kind: err.kind} : undefined,
+                    quota: lastRateLimit,
                     details: err.details ?? undefined,
                     at: err.stack?.split('\n').slice(1, 4).map((l) => l.trim()),
                     ms: Date.now() - startedAt,

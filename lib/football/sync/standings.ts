@@ -1,43 +1,41 @@
 import 'server-only';
-import {sportmonksPages} from '@/lib/sportmonks/client';
-import {mapStanding} from '@/lib/sportmonks/mappers';
-import type {SmStanding} from '@/lib/sportmonks/types';
-import {ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
+import {apiFootballGet} from '@/lib/api-football/client';
+import {mapStandings} from '@/lib/api-football/mappers';
+import type {AfStandingsResponse} from '@/lib/api-football/types';
+import {currentSeasons, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /**
  * sync-standings (every 30 minutes)
  *
- * One request per current season. Cups without a table simply return no
- * rows and are skipped.
+ * One request per current season. Cups without a table return nothing and
+ * are skipped. Group stages (Champions League league phase, cup groups)
+ * keep their group name; a plain league table is stored with group ''.
  */
 export async function syncStandings(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-standings');
     try {
-        const {data: seasons, error} = await db.from('seasons').select('id,sportmonks_id,name').eq('is_current', true);
-        if (error) failSync('seasons.select', error);
-
-        for (const season of seasons ?? []) {
-            const standings: SmStanding[] = [];
-            for await (const page of sportmonksPages<SmStanding>(`standings/seasons/${season.sportmonks_id}`, {
-                include: 'participant;details.type;form;stage;group',
-            })) {
-                run.requests += 1;
-                standings.push(...page);
-            }
-            if (standings.length === 0) {
+        for (const season of await currentSeasons(db)) {
+            const {response} = await apiFootballGet<AfStandingsResponse[]>('standings', {league: season.leagueProviderId, season: season.year});
+            run.requests += 1;
+            const league = response[0]?.league;
+            if (!league || !league.standings || league.standings.length === 0) {
                 run.bump('seasons_without_table');
                 continue;
             }
 
-            const teams = await ensureTeams(db, standings.flatMap((s) => (s.participant ? [s.participant] : [])));
-            const rows = standings
-                .map(mapStanding)
-                .filter((s) => teams.has(s.sportmonksTeamId))
+            const rows = mapStandings(league.standings, league.name);
+            const teams = await ensureTeams(
+                db,
+                league.standings.flat().map((s) => ({id: s.team.id, name: s.team.name, logo: s.team.logo})),
+            );
+
+            const dbRows = rows
+                .filter((s) => teams.has(s.providerTeamId))
                 .map((s) => ({
-                    season_id: season.id as number,
-                    team_id: teams.get(s.sportmonksTeamId)!,
-                    stage: s.stage,
+                    season_id: season.id,
+                    team_id: teams.get(s.providerTeamId)!,
+                    stage: 'regular',
                     group: s.group,
                     position: s.position,
                     played: s.played,
@@ -50,13 +48,9 @@ export async function syncStandings(): Promise<SyncRun> {
                     form: s.form,
                 }));
 
-            if (rows.every((r) => r.played === 0 && r.points === 0)) {
-                run.warn(`season ${season.name}: every standing row is zero, check the details.type mapping`);
-            }
-
-            const {error: upsertError} = await db.from('standings').upsert(rows, {onConflict: 'season_id,stage,group,team_id'});
-            if (upsertError) failSync('standings.upsert', upsertError);
-            run.bump('standing_rows', rows.length);
+            const {error} = await db.from('standings').upsert(dbRows, {onConflict: 'season_id,stage,group,team_id'});
+            if (error) failSync('standings.upsert', error);
+            run.bump('standing_rows', dbRows.length);
         }
 
         await finishRun(db, run, 'ok');

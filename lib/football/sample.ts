@@ -1,7 +1,7 @@
 import type {HomeData} from './types';
 
 /**
- * SAMPLE DATA. Used only until the Sportmonks sync fills the database.
+ * SAMPLE DATA. Used only until the API-Football sync fills the database.
  * Every value here is invented for layout purposes; the UI shows a
  * "Dati di esempio" badge whenever `isSample` is true.
  */

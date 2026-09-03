@@ -10,8 +10,8 @@ const nextConfig: NextConfig = {
     },
     images: {
         remotePatterns: [
-            // Sportmonks CDN (team logos, player photos, league badges)
-            {protocol: 'https', hostname: 'cdn.sportmonks.com'},
+            // API-Football CDN (team logos, player photos, league badges)
+            {protocol: 'https', hostname: 'media.api-sports.io'},
         ],
     },
 };

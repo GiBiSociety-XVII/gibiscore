@@ -6,7 +6,7 @@ import type {FixtureState, FixtureSummary, HomeData, StandingRow, TeamSummary} f
 
 /**
  * Data access for pages. Pages call these functions and never touch
- * Sportmonks directly. Reads go through the public anon client (RLS: public
+ * API-Football directly. Reads go through the public anon client (RLS: public
  * read, no cookies so pages stay cacheable), which requires the `football`
  * schema to be exposed in the Supabase Data API settings.
  *

@@ -1,12 +1,12 @@
 # GiBiScore: attivazione con dati reali
 
-Procedura una tantum per passare dai dati di esempio ai dati Sportmonks.
+Procedura una tantum per passare dai dati di esempio ai dati API-Football.
 Tempo stimato: 20-30 minuti, di cui la maggior parte in attesa dei job.
 
 ## 0. Prerequisiti gia' fatti
 
 - Repo `GiBiSociety-XVII/gibiscore` collegato al progetto Vercel, branch `master` = produzione.
-- Progetto Supabase "GiBiScore" creato, migrazione `0001_football_schema.sql` gia' applicata.
+- Progetto Supabase "GiBiScore" creato, migrazioni `0001` e `0002` gia' applicate.
 
 ## 1. Supabase (5 minuti)
 
@@ -21,18 +21,20 @@ Tempo stimato: 20-30 minuti, di cui la maggior parte in attesa dei job.
 4. Nella stessa pagina trovi il **Project URL**
    (`https://hhszficxmvfbbodpupxl.supabase.co`).
 
-## 2. Sportmonks (5 minuti)
+## 2. API-Football (5 minuti)
 
-1. Registrati su sportmonks.com e attiva il **trial di 14 giorni** del piano
-   **European Plan**. Se il trial lo consente, aggiungi l'add-on **xG**.
-2. **My Sportmonks → API tokens**: crea un token e copialo.
-3. Facoltativo ma consigliato: dal tuo computer, con il repo clonato,
+1. Registrati su **dashboard.api-football.com** (accesso diretto, non RapidAPI).
+2. Il piano **Free** (100 richieste al giorno, tutti gli endpoint e tutte le
+   leghe) basta per la prima validazione. Per la produzione serve **Pro**
+   (7.500 richieste al giorno) o **Ultra** (75.000).
+3. Nella dashboard, sezione **My Access**, copia la **API Key**.
+4. Facoltativo ma consigliato: dal tuo computer, con il repo clonato,
    ```bash
-   SPORTMONKS_API_TOKEN=iltuotoken pnpm probe:sportmonks
+   API_FOOTBALL_KEY=latuachiave pnpm probe:api-football
    ```
-   scarica in `scratch/sportmonks/` i payload grezzi di stati, leghe, calendario
-   e partite live. Se una lega risponde con un nome inatteso o con 403
-   (non inclusa nel piano), si vede subito da qui.
+   scarica in `scratch/api-football/` stato account, leghe, squadre, calendario,
+   live, classifica e infortuni della Serie A (~8 richieste). Se qualcosa risponde
+   con `errors` non vuoto, si vede subito da qui.
 
 ## 3. Variabili d'ambiente su Vercel (5 minuti)
 
@@ -45,8 +47,15 @@ Progetto `gibiscore` → **Settings → Environment Variables**. Aggiungile per
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://hhszficxmvfbbodpupxl.supabase.co` | |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | dal passo 1.3 |
 | `SUPABASE_SECRET_KEY` | `sb_secret_...` | dal passo 1.3, mai pubblica |
-| `SPORTMONKS_API_TOKEN` | il token del passo 2.2 | mai pubblico |
+| `API_FOOTBALL_KEY` | la chiave del passo 2.3 | mai pubblica |
 | `CRON_SECRET` | una stringa casuale lunga | vedi sotto |
+
+Facoltative, utili con il piano Free durante i test:
+
+| Nome | Valore | Effetto |
+|---|---|---|
+| `API_FOOTBALL_LEAGUE_IDS` | `135` | segue solo la Serie A invece delle 6 competizioni |
+| `API_FOOTBALL_SKIP_SQUADS` | `1` | il job competizioni non scarica le rose (~120 richieste in meno) |
 
 Per generare `CRON_SECRET` da terminale:
 
@@ -60,7 +69,7 @@ chiamata cron quando questa variabile esiste; le route rifiutano tutto il resto.
 Dopo aver salvato le variabili: **Deployments → ultimo deploy → Redeploy**.
 Le variabili d'ambiente entrano in vigore solo con un nuovo deploy.
 
-## 4. Verifica del deploy e dell'abbonamento Sportmonks (2 minuti)
+## 4. Verifica del deploy e della chiave (2 minuti)
 
 Sostituisci `<deploy>` con il dominio del deploy di produzione
 (es. `gibiscore.vercel.app` o `gibiscore.com`).
@@ -68,32 +77,16 @@ Sostituisci `<deploy>` con il dominio del deploy di produzione
 - `https://<deploy>/api/health` deve rispondere `{"ok":true,...}`.
 - `https://<deploy>/api/cron/sync-live` aperta dal browser deve rispondere
   `401 unauthorized`: e' corretto, significa che il segreto protegge le route.
-- Controlla cosa vede il token Sportmonks **prima** di lanciare i job:
+- Controlla piano, quota e copertura per lega:
 
   ```bash
-  curl -H "Authorization: Bearer $CRON_SECRET" "https://<deploy>/api/cron/sportmonks-status"
+  curl -H "Authorization: Bearer $CRON_SECRET" "https://<deploy>/api/cron/api-football-status"
   ```
 
-  La risposta elenca piano, add-on, fine del trial e, per ogni competizione
-  configurata, `accessible: true/false`. Se la Serie A risulta `false` il
-  token e' sul piano free (solo Superliga danese e Premiership scozzese):
-  attiva il trial dell'European Plan su My Sportmonks e ricontrolla.
-
-### 4b. Modalita' di validazione (trial non ancora attivo)
-
-Se il token e' ancora sul piano free puoi comunque provare tutta la pipeline
-con le leghe incluse (Superliga danese #271, Premiership scozzese #501):
-
-1. Su Vercel aggiungi la variabile `SPORTMONKS_LEAGUE_IDS` con valore `271,501`
-   e fai un Redeploy.
-2. Lancia i job del passo 5: i dati danesi e scozzesi entrano nel database e la
-   homepage li mostra al posto dell'esempio.
-3. Quando il trial European Plan e' attivo: rimuovi la variabile, Redeploy,
-   rilancia `sync-competitions`. Le leghe di prova restano nel database ma non
-   vengono piu' aggiornate; si possono cancellare in un secondo momento.
-
-`/api/cron/sportmonks-status` mostra `validation_mode: true` quando la
-variabile e' impostata.
+  La risposta elenca il piano, le richieste usate oggi e, per ogni competizione
+  configurata, nome trovato, stagione corrente e copertura dichiarata
+  (eventi, formazioni, statistiche squadra e giocatore, classifiche, infortuni).
+  Costa 7 richieste.
 
 ## 5. Primo caricamento dati (10-15 minuti)
 
@@ -104,11 +97,15 @@ nell'ordine giusto. Dal tuo computer, nella cartella del repo:
 export CRON_SECRET=ilsegreto
 export BASE_URL=https://<deploy>
 
-pnpm cron sync-competitions   # leghe, stagioni correnti, squadre, rose (~130 richieste, fino a 5 min)
-pnpm cron sync-fixtures       # calendario e risultati da ieri a +14 giorni
-pnpm cron sync-standings      # classifiche
+pnpm cron sync-competitions   # leghe, stagioni correnti, squadre, rose (~130 richieste; 12 con API_FOOTBALL_SKIP_SQUADS=1)
+pnpm cron sync-fixtures       # calendario e risultati da ieri a +14 giorni (6 richieste)
+pnpm cron sync-standings      # classifiche (6)
+pnpm cron sync-injuries       # infortuni e squalifiche (6)
 pnpm cron sync-live           # partite in corso, se ce ne sono adesso
 ```
+
+Con il piano **Free** (100 richieste al giorno) imposta prima
+`API_FOOTBALL_SKIP_SQUADS=1`: l'intero primo giro costa circa 30 richieste.
 
 Senza `pnpm` va bene anche `curl`:
 
@@ -119,16 +116,17 @@ curl -H "Authorization: Bearer $CRON_SECRET" "$BASE_URL/api/cron/sync-competitio
 Ogni job risponde con un JSON tipo:
 
 ```json
-{"ok":true,"job":"sync-competitions","requests":131,"counters":{"leagues":6,"seasons":6,"teams":112,"players":2900},"warnings":[]}
+{"ok":true,"job":"sync-competitions","requests":12,"quota":{"dayLimit":100,"dayRemaining":81},"counters":{"leagues":6,"seasons":6,"teams":112},"warnings":[]}
 ```
 
 Cosa controllare:
 
-- `ok: true` e `warnings` vuoto o quasi.
-- Nei **log di Vercel** (Deployments → deploy → Logs, oppure Observability → Logs)
-  il job competizioni stampa una riga per lega: `serie-a: Sportmonks #384 = "Serie A"`.
-  Se un nome non corrisponde alla lega attesa, l'id in
-  `lib/football/competitions.ts` va corretto.
+- `ok: true` e `warnings` vuoto o quasi. Un avviso "partial coverage" su una
+  lega significa che API-Football non fornisce, per quella stagione, uno tra
+  eventi, formazioni o statistiche giocatore: il sito mostra quello che c'e'.
+- Nei **log di Vercel** il job competizioni stampa una riga per lega:
+  `serie-a: API-Football #135 = "Serie A" (Italy)`. Se un nome non
+  corrisponde, l'id in `lib/football/competitions.ts` va corretto.
 - Su Supabase, **Table Editor → schema `football`**: `leagues`, `teams`,
   `fixtures`, `standings` devono avere righe; `sync_runs` ha una riga per ogni
   esecuzione con `status`, contatori e avvisi.
@@ -141,18 +139,21 @@ rigenera ogni 60 secondi, quindi il live ha al massimo un minuto di ritardo.
 
 ## 7. Cron automatici
 
-Su Vercel, **Settings → Cron Jobs** deve elencare i quattro job di `vercel.json`:
+Su Vercel, **Settings → Cron Jobs** deve elencare i cinque job di `vercel.json`:
 
 | Job | Orario (UTC) |
 |---|---|
 | `sync-competitions` | ogni giorno alle 04:00 |
 | `sync-fixtures` | ogni ora al minuto 15 |
 | `sync-standings` | ogni 30 minuti |
+| `sync-injuries` | ogni 6 ore al minuto 45 |
 | `sync-live` | ogni minuto |
 
 I cron girano **solo sul deploy di produzione** (branch `master`), non sulle
-preview. Il job live ogni minuto usa 1-3 richieste: ben dentro i limiti del
-piano (3000 richieste per entita' all'ora).
+preview. Consumo tipico: 2.000-2.500 richieste al giorno, dentro il piano Pro.
+Con il piano Free i cron automatici esauriscono la quota in poche ore:
+attivali solo dopo il passaggio a Pro, oppure lascia i cron e accetta che i
+job falliscano con `quota` finche' non aggiorni il piano.
 
 ## 8. Dominio
 
@@ -175,7 +176,8 @@ CRON_SECRET=... pnpm cron sync-fixtures   # BASE_URL predefinito: localhost:3000
 |---|---|---|
 | Homepage sempre con "Dati di esempio" | schema `football` non esposto, oppure tabelle vuote | passo 1.2, poi passo 5 |
 | Job risponde `401` | `CRON_SECRET` mancante o diverso | passo 3, poi Redeploy |
-| Job risponde `502` con messaggio Sportmonks | token errato, lega non inclusa nel piano, limite richieste | leggi il messaggio: contiene il codice HTTP e l'endpoint |
-| `No result(s) found ... via your current subscription` | la lega non e' nel piano del token (tipico: piano free senza trial European) | `/api/cron/sportmonks-status`, poi attiva il trial European Plan |
-| Classifica tutta a zero | nomi dei dettagli di classifica diversi da quelli attesi | l'avviso compare in `sync_runs`; passami il payload di `pnpm probe:sportmonks standings/seasons/<id> "participant;details.type"` |
-| Partita live senza statistiche | il piano non include quell'include, o la lega non ha statistiche live | controlla `warnings` in `sync_runs` |
+| Job risponde `502` con `kind: "auth"` | chiave API-Football errata o assente | passo 2.3 e 3, poi Redeploy |
+| Job risponde `502` con `kind: "quota"` | richieste giornaliere esaurite | aspetta la mezzanotte UTC o passa a Pro; nel frattempo `API_FOOTBALL_SKIP_SQUADS=1` |
+| Avviso "partial coverage" per una lega | API-Football non copre eventi/formazioni/statistiche per quella stagione | nessuna azione: il sito mostra i dati disponibili |
+| Classifica assente per una coppa | la competizione non ha una tabella in quella fase | normale, `seasons_without_table` nei contatori |
+| Partita live senza statistiche | statistiche pubblicate a fine partita da API-Football per quella lega | arrivano con il job live dopo il fischio finale |
