@@ -56,7 +56,7 @@ export default async function HomePage({params}: PageProps<"/[locale]">) {
                     <StandingsTable
                         leagueName={data.standings.leagueName}
                         rows={data.standings.rows}
-                        fullHref="/serie-a"
+                        fullHref="/competitions/serie-a"
                     />
                     <div className="flex flex-col gap-6 min-w-0">
                         {data.spotlight && <PlayerSpotlight player={data.spotlight} />}

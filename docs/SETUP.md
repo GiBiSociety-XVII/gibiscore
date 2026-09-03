@@ -54,8 +54,9 @@ Facoltative, utili con il piano Free durante i test:
 
 | Nome | Valore | Effetto |
 |---|---|---|
-| `API_FOOTBALL_LEAGUE_IDS` | `135` | segue solo la Serie A invece delle 6 competizioni |
-| `API_FOOTBALL_SKIP_SQUADS` | `1` | il job competizioni non scarica le rose (~120 richieste in meno) |
+| `API_FOOTBALL_SCOPE` | `featured` | segue solo le leghe in evidenza invece di tutte le ~1.100 |
+| `API_FOOTBALL_FEATURED_LEAGUE_IDS` | `135,2` | cambia la lista delle leghe in evidenza senza toccare il codice |
+| `API_FOOTBALL_SKIP_SQUADS` | `1` | il job competizioni non scarica le rose (~260 richieste in meno) |
 
 Per generare `CRON_SECRET` da terminale:
 
@@ -97,15 +98,15 @@ nell'ordine giusto. Dal tuo computer, nella cartella del repo:
 export CRON_SECRET=ilsegreto
 export BASE_URL=https://<deploy>
 
-pnpm cron sync-competitions   # leghe, stagioni correnti, squadre, rose (~130 richieste; 12 con API_FOOTBALL_SKIP_SQUADS=1)
-pnpm cron sync-fixtures       # calendario e risultati da ieri a +14 giorni (6 richieste)
-pnpm cron sync-standings      # classifiche (6)
-pnpm cron sync-injuries       # infortuni e squalifiche (6)
-pnpm cron sync-live           # partite in corso, se ce ne sono adesso
+pnpm cron sync-competitions                 # tutte le leghe e stagioni; squadre e rose delle leghe in evidenza (~275 richieste)
+pnpm cron "sync-fixtures?window=month"      # tutte le partite da ieri a +30 giorni (32 richieste)
+pnpm cron "sync-standings?scope=all"        # classifiche di ogni competizione attiva (~300)
+pnpm cron sync-injuries                     # infortuni e squalifiche delle leghe in evidenza (~13)
+pnpm cron sync-live                         # partite in corso, se ce ne sono adesso
 ```
 
 Con il piano **Free** (100 richieste al giorno) imposta prima
-`API_FOOTBALL_SKIP_SQUADS=1`: l'intero primo giro costa circa 30 richieste.
+`API_FOOTBALL_SCOPE=featured` e `API_FOOTBALL_SKIP_SQUADS=1`.
 
 Senza `pnpm` va bene anche `curl`:
 
@@ -139,18 +140,20 @@ rigenera ogni 60 secondi, quindi il live ha al massimo un minuto di ritardo.
 
 ## 7. Cron automatici
 
-Su Vercel, **Settings → Cron Jobs** deve elencare i cinque job di `vercel.json`:
+Su Vercel, **Settings → Cron Jobs** deve elencare i sette job di `vercel.json`:
 
 | Job | Orario (UTC) |
 |---|---|
 | `sync-competitions` | ogni giorno alle 04:00 |
+| `sync-fixtures?window=month` | ogni giorno alle 04:30 |
+| `sync-standings?scope=all` | ogni giorno alle 05:00 |
 | `sync-fixtures` | ogni ora al minuto 15 |
 | `sync-standings` | ogni 30 minuti |
 | `sync-injuries` | ogni 6 ore al minuto 45 |
 | `sync-live` | ogni minuto |
 
 I cron girano **solo sul deploy di produzione** (branch `master`), non sulle
-preview. Consumo tipico: 2.000-2.500 richieste al giorno, dentro il piano Pro.
+preview. Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro.
 Con il piano Free i cron automatici esauriscono la quota in poche ore:
 attivali solo dopo il passaggio a Pro, oppure lascia i cron e accetta che i
 job falliscano con `quota` finche' non aggiorni il piano.

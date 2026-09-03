@@ -1,0 +1,101 @@
+{
+  "status": {
+    "live": "LIVE {minute}'",
+    "liveNoMinute": "LIVE",
+    "halfTime": "INTERVALLO",
+    "extraTime": "SUPPL. {minute}'",
+    "penalties": "RIGORI",
+    "finished": "FINALE",
+    "postponed": "RINVIATA",
+    "cancelled": "ANNULLATA",
+    "abandoned": "SOSPESA",
+    "today": "OGGI {time}",
+    "scheduled": "{date} {time}"
+  },
+  "positions": {
+    "goalkeeper": "Portiere",
+    "defender": "Difensore",
+    "midfielder": "Centrocampista",
+    "attacker": "Attaccante",
+    "unknown": "Ruolo n.d."
+  },
+  "positionsShort": {
+    "goalkeeper": "P",
+    "defender": "D",
+    "midfielder": "C",
+    "attacker": "A",
+    "unknown": "-"
+  },
+  "events": {
+    "goal": "Gol",
+    "own_goal": "Autogol",
+    "penalty": "Rigore",
+    "missed_penalty": "Rigore sbagliato",
+    "yellow_card": "Ammonizione",
+    "red_card": "Espulsione",
+    "yellow_red_card": "Seconda ammonizione",
+    "substitution": "Sostituzione",
+    "var": "VAR",
+    "assist": "assist {name}",
+    "subIn": "entra {name}",
+    "subOut": "esce {name}"
+  },
+  "stats": {
+    "possession": "Possesso palla",
+    "shotsTotal": "Tiri totali",
+    "shotsOnTarget": "Tiri in porta",
+    "corners": "Calci d'angolo",
+    "fouls": "Falli",
+    "yellowCards": "Ammonizioni",
+    "redCards": "Espulsioni",
+    "passesTotal": "Passaggi",
+    "passAccuracy": "Precisione passaggi",
+    "xg": "xG"
+  },
+  "table": {
+    "position": "#",
+    "team": "Squadra",
+    "played": "G",
+    "won": "V",
+    "drawn": "N",
+    "lost": "P",
+    "goalsFor": "GF",
+    "goalsAgainst": "GS",
+    "goalDiff": "DR",
+    "points": "PT",
+    "form": "Forma"
+  },
+  "playerTable": {
+    "player": "Giocatore",
+    "minutes": "Min",
+    "rating": "Voto",
+    "fantasy": "FV",
+    "goals": "Gol",
+    "assists": "Ast",
+    "shots": "Tiri",
+    "keyPasses": "Pass. chiave",
+    "cards": "Cart.",
+    "fantasyHint": "Fantavoto GiBi: voto della partita più bonus e malus (gol +3, assist +1, ammonizione -0,5, espulsione -1, rigore sbagliato -3, rigore parato +3, autogol -2, gol subito -1 e porta inviolata +1 per i portieri). Stima basata sul rating del fornitore dati, non sul voto dei giornali."
+  },
+  "empty": {
+    "noFixtures": "Nessuna partita in questo periodo.",
+    "noStandings": "Classifica non ancora disponibile.",
+    "noLineups": "Formazioni non ancora disponibili.",
+    "noEvents": "Nessun evento registrato.",
+    "noStats": "Statistiche non ancora disponibili.",
+    "noPlayers": "Statistiche giocatori non ancora disponibili.",
+    "noSquad": "Rosa non ancora disponibile.",
+    "notFound": "Contenuto non trovato."
+  },
+  "labels": {
+    "round": "Giornata {round}",
+    "season": "Stagione {season}",
+    "venue": "Stadio",
+    "referee": "Arbitro",
+    "halfTimeScore": "Primo tempo {home}–{away}",
+    "formation": "Modulo {formation}",
+    "bench": "Panchina",
+    "starters": "Titolari",
+    "estimated": "stimato"
+  }
+}

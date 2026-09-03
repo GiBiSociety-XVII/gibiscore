@@ -1,6 +1,6 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {isAuthorizedCron} from '@/lib/cron';
-import {getCompetitions, isOverrideActive} from '@/lib/football/competitions';
+import {basicScope, getFeaturedCompetitions} from '@/lib/football/competitions';
 import {apiFootballGet, ApiFootballError, lastRateLimit} from '@/lib/api-football/client';
 import {currentSeason} from '@/lib/api-football/mappers';
 import type {AfLeagueResponse, AfStatusResponse} from '@/lib/api-football/types';
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         const account = status.response;
 
         const competitions = [];
-        for (const comp of getCompetitions()) {
+        for (const comp of getFeaturedCompetitions()) {
             try {
                 const {response} = await apiFootballGet<AfLeagueResponse[]>('leagues', {id: comp.providerId});
                 const entry = response[0];
@@ -53,8 +53,9 @@ export async function GET(request: NextRequest) {
             plan: account?.subscription ?? null,
             requests_today: account?.requests ?? null,
             quota_headers: lastRateLimit,
-            league_ids_override: isOverrideActive() ? process.env.API_FOOTBALL_LEAGUE_IDS : null,
-            competitions,
+            scope: basicScope(),
+            featured_override: process.env.API_FOOTBALL_FEATURED_LEAGUE_IDS ?? null,
+            featured: competitions,
         });
     } catch (error) {
         const err = error as Error;

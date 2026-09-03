@@ -3,10 +3,10 @@
   "search": "Cerca squadra o giocatore",
   "login": "Accedi",
   "nav": {
+    "home": "Home",
     "live": "Live",
+    "competitions": "Competizioni",
     "serieA": "Serie A",
-    "teams": "Squadre",
-    "players": "Giocatori",
-    "rankings": "Classifiche"
+    "championsLeague": "Champions League"
   }
 }

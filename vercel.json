@@ -5,6 +5,14 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/sync-fixtures?window=month",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-standings?scope=all",
+      "schedule": "0 5 * * *"
+    },
+    {
       "path": "/api/cron/sync-fixtures",
       "schedule": "15 * * * *"
     },

@@ -70,9 +70,10 @@ function toFixtureSummary(row: FixtureRow): FixtureSummary | null {
     };
 }
 
+// Home page: featured competitions only (the inner join filters on tier).
 const FIXTURE_SELECT =
     'id,round,starting_at,state,minute,home_score,away_score,' +
-    'league:leagues(name,slug),' +
+    'league:leagues!inner(name,slug,tier),' +
     'home:teams!fixtures_home_team_id_fkey(id,name,short_code,logo_url),' +
     'away:teams!fixtures_away_team_id_fkey(id,name,short_code,logo_url),' +
     'stats:fixture_team_stats(team_id,possession,shots_total,xg)';
@@ -88,10 +89,11 @@ export async function getHomeData(): Promise<HomeData> {
         const {data, error: fixturesError} = await db
             .from('fixtures')
             .select(FIXTURE_SELECT)
+            .eq('leagues.tier', 'featured')
             .gte('starting_at', from)
             .lte('starting_at', to)
             .order('starting_at', {ascending: true})
-            .limit(60);
+            .limit(80);
         if (fixturesError) throw fixturesError;
         const fixtureRows = (data ?? []) as unknown as FixtureRow[];
 

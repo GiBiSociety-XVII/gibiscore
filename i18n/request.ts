@@ -13,13 +13,19 @@ export default getRequestConfig(async ({requestLocale}) => {
     const Common = (await import(`../core/home/i18n/${locale}/Common.json`)).default;
     const AppBar = (await import(`../core/home/i18n/${locale}/AppBar.json`)).default;
     const HomePage = (await import(`../core/home/i18n/${locale}/HomePage.json`)).default;
+    const Football = (await import(`../core/football/i18n/${locale}/Football.json`)).default;
+    const Pages = (await import(`../core/football/i18n/${locale}/Pages.json`)).default;
 
     return {
         locale,
+        // Kick-off times are shown in Italian time regardless of the server.
+        timeZone: 'Europe/Rome',
         messages: {
             Common,
             AppBar,
             HomePage,
+            Football,
+            Pages,
         },
     };
 });

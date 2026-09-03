@@ -12,6 +12,8 @@ import {slugify} from '@/lib/api-football/mappers';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type FootballClient = SupabaseClient<any, 'football', any>;
 
+export type LeagueTier = 'featured' | 'basic';
+
 export class SyncError extends Error {
     constructor(message: string, public readonly details?: unknown) {
         super(message);
@@ -93,8 +95,58 @@ async function selectIdMap(db: FootballClient, table: string, providerIds: numbe
     return map;
 }
 
-export async function leagueIdMap(db: FootballClient, providerIds: number[]): Promise<IdMap> {
-    return selectIdMap(db, 'leagues', providerIds);
+export interface LeagueRef {
+    id: number;
+    providerId: number;
+    tier: LeagueTier;
+}
+
+/** Leagues by provider id, with tier. */
+export async function leagueMap(db: FootballClient, providerIds: number[]): Promise<Map<number, LeagueRef>> {
+    const map = new Map<number, LeagueRef>();
+    for (let i = 0; i < providerIds.length; i += 500) {
+        const chunk = providerIds.slice(i, i + 500);
+        const {data, error} = await db.from('leagues').select('id,provider_id,tier').in('provider_id', chunk);
+        if (error) fail('leagues.select', error);
+        for (const row of data ?? []) map.set(row.provider_id as number, {id: row.id as number, providerId: row.provider_id as number, tier: row.tier as LeagueTier});
+    }
+    return map;
+}
+
+export interface MinimalLeague {
+    id: number;
+    name: string;
+    country?: string | null;
+    logo?: string | null;
+    type?: string | null;
+}
+
+/** Create leagues we have never seen (basic tier) so no fixture is dropped. */
+export async function ensureLeagues(db: FootballClient, leagues: MinimalLeague[], tierOf: (providerId: number) => LeagueTier): Promise<Map<number, LeagueRef>> {
+    const unique = new Map<number, MinimalLeague>();
+    for (const l of leagues) if (l.id) unique.set(l.id, l);
+    if (unique.size === 0) return new Map();
+    const ids = [...unique.keys()];
+    const existing = await leagueMap(db, ids);
+    const missing = ids.filter((id) => !existing.has(id));
+    if (missing.length > 0) {
+        const rows = missing.map((id) => {
+            const l = unique.get(id)!;
+            return {
+                provider_id: id,
+                name: l.name,
+                country: l.country ?? null,
+                type: l.type?.toLowerCase() ?? null,
+                logo_url: l.logo ?? null,
+                slug: slugify(`${l.name} ${l.country ?? ''}`.trim(), id),
+                is_active: true,
+                tier: tierOf(id),
+            };
+        });
+        const {error} = await db.from('leagues').upsert(rows, {onConflict: 'provider_id', ignoreDuplicates: true});
+        if (error) fail('leagues.upsert', error);
+    }
+    return leagueMap(db, ids);
 }
 
 export interface SeasonRef {
@@ -102,28 +154,56 @@ export interface SeasonRef {
     leagueId: number;
     leagueProviderId: number;
     leagueSlug: string;
+    tier: LeagueTier;
     year: number;
     name: string;
 }
 
-/** Every season flagged current, with its league. */
-export async function currentSeasons(db: FootballClient): Promise<SeasonRef[]> {
-    const {data, error} = await db
+/** Every season flagged current, with its league; optionally one tier only. */
+export async function currentSeasons(db: FootballClient, tier?: LeagueTier): Promise<SeasonRef[]> {
+    let query = db
         .from('seasons')
-        .select('id,year,name,league:leagues!inner(id,provider_id,slug)')
+        .select('id,year,name,league:leagues!inner(id,provider_id,slug,tier)')
         .eq('is_current', true);
+    if (tier) query = query.eq('leagues.tier', tier);
+    const {data, error} = await query.limit(5000);
     if (error) fail('seasons.select', error);
     return (data ?? []).map((row) => {
-        const league = row.league as unknown as {id: number; provider_id: number; slug: string};
+        const league = row.league as unknown as {id: number; provider_id: number; slug: string; tier: LeagueTier};
         return {
             id: row.id as number,
             leagueId: league.id,
             leagueProviderId: league.provider_id,
             leagueSlug: league.slug,
+            tier: league.tier,
             year: row.year as number,
             name: row.name as string,
         };
     });
+}
+
+/** Seasons keyed by "leagueDbId:year", creating placeholders for unknown ones. */
+export async function ensureSeasons(db: FootballClient, wanted: Array<{leagueId: number; year: number}>, run?: SyncRun): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    const leagueIds = [...new Set(wanted.map((w) => w.leagueId))];
+    for (let i = 0; i < leagueIds.length; i += 300) {
+        const {data, error} = await db.from('seasons').select('id,league_id,year').in('league_id', leagueIds.slice(i, i + 300));
+        if (error) fail('seasons.select', error);
+        for (const r of data ?? []) map.set(`${r.league_id}:${r.year}`, r.id as number);
+    }
+    const missing = new Map<string, {league_id: number; year: number}>();
+    for (const w of wanted) {
+        const key = `${w.leagueId}:${w.year}`;
+        if (!map.has(key)) missing.set(key, {league_id: w.leagueId, year: w.year});
+    }
+    if (missing.size > 0) {
+        const rows = [...missing.values()].map((m) => ({...m, name: String(m.year), is_current: true}));
+        const {data, error} = await db.from('seasons').upsert(rows, {onConflict: 'league_id,year'}).select('id,league_id,year');
+        if (error) fail('seasons.upsert', error);
+        for (const r of data ?? []) map.set(`${r.league_id}:${r.year}`, r.id as number);
+        run?.bump('seasons_created', rows.length);
+    }
+    return map;
 }
 
 export interface MinimalTeam {
@@ -166,9 +246,9 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
         );
         if (error) fail('teams.upsert', error);
     }
-    if (minimalRows.length > 0) {
+    for (let i = 0; i < minimalRows.length; i += 500) {
         const {error} = await db.from('teams').upsert(
-            minimalRows.map((t) => ({provider_id: t.id, name: t.name, logo_url: t.logo ?? null, slug: slugify(t.name, t.id)})),
+            minimalRows.slice(i, i + 500).map((t) => ({provider_id: t.id, name: t.name, logo_url: t.logo ?? null, slug: slugify(t.name, t.id)})),
             {onConflict: 'provider_id', ignoreDuplicates: true},
         );
         if (error) fail('teams.upsert', error);

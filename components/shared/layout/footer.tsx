@@ -3,11 +3,11 @@ import {Link} from "@/i18n/navigation";
 import {LogoMark} from "./logo";
 
 const EXPLORE_LINKS = [
-    {key: 'live', href: '/'},
-    {key: 'serieA', href: '/serie-a'},
-    {key: 'teams', href: '/squadre'},
-    {key: 'players', href: '/giocatori'},
-    {key: 'rankings', href: '/classifiche'},
+    {key: 'home', href: '/'},
+    {key: 'live', href: '/live'},
+    {key: 'competitions', href: '/competitions'},
+    {key: 'serieA', href: '/competitions/serie-a'},
+    {key: 'championsLeague', href: '/competitions/champions-league'},
 ] as const;
 
 export default function Footer() {

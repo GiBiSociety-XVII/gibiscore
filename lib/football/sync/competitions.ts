@@ -1,124 +1,122 @@
 import 'server-only';
-import {getCompetitions, isOverrideActive} from '@/lib/football/competitions';
+import {basicScope, getFeaturedCompetitions} from '@/lib/football/competitions';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {currentSeason, positionName, seasonName, slugify} from '@/lib/api-football/mappers';
 import type {AfLeagueResponse, AfSquadResponse, AfTeamResponse} from '@/lib/api-football/types';
-import {ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type FootballClient, type SyncRun} from './context';
+import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type FootballClient, type SyncRun} from './context';
 
 /**
  * sync-competitions (daily)
  *
- * 1. For every configured league: upsert the league and its current season.
- * 2. For every current season: upsert the teams taking part.
- * 3. For every team: upsert the squad (players + squad_members), unless
- *    API_FOOTBALL_SKIP_SQUADS=1 (players are still created lazily from
- *    lineups and events).
+ * 1. GET /leagues once: every competition API-Football publishes, with its
+ *    seasons and coverage. Upsert them all (tier basic) or only the featured
+ *    ones when API_FOOTBALL_SCOPE=featured.
+ * 2. Mark the current season of each league.
+ * 3. Featured leagues only: teams of the season and, unless
+ *    API_FOOTBALL_SKIP_SQUADS=1, their squads.
  *
- * Request budget: 6 leagues + 6 team lists + ~120 squads = ~130 requests.
- * With squads skipped: 12 requests, which fits the free plan while testing.
+ * Request budget: 1 + featured teams (~13) + squads (~260) = ~275 requests.
  */
 export async function syncCompetitions(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-competitions');
 
     try {
-        const competitions = getCompetitions();
-        if (isOverrideActive()) {
-            run.warn(`API_FOOTBALL_LEAGUE_IDS=${process.env.API_FOOTBALL_LEAGUE_IDS} overrides the configured competitions`);
-        }
+        const featured = getFeaturedCompetitions();
+        const featuredIds = new Set(featured.map((c) => c.providerId));
+        const scope = basicScope();
         const skipSquads = process.env.API_FOOTBALL_SKIP_SQUADS === '1';
 
-        const seasons: Array<{leagueDbId: number; leagueProviderId: number; slug: string; year: number}> = [];
+        const {response: all} = await apiFootballGet<AfLeagueResponse[]>('leagues');
+        run.requests += 1;
+        const entries = scope === 'all' ? all : all.filter((e) => featuredIds.has(e.league.id));
+        run.bump('leagues_in_api', all.length);
 
-        for (const comp of competitions) {
-            const label = comp.slug ?? `league-${comp.providerId}`;
-            let entry: AfLeagueResponse | undefined;
+        for (const comp of featured) {
+            const found = all.find((e) => e.league.id === comp.providerId);
+            console.info(`[sync-competitions] ${comp.slug ?? comp.providerId}: API-Football #${comp.providerId} = ${found ? `"${found.league.name}" (${found.country?.name})` : 'NOT FOUND'}`);
+            if (!found) run.warn(`featured league #${comp.providerId} (${comp.slug ?? '?'}) not found in API-Football, check the id`);
+        }
+
+        // Leagues
+        const leagueRows = entries.map((e) => {
+            const comp = featured.find((c) => c.providerId === e.league.id);
+            const season = currentSeason(e.seasons);
+            return {
+                provider_id: e.league.id,
+                name: e.league.name,
+                short_code: null,
+                country: e.country?.name ?? null,
+                country_code: e.country?.code ?? null,
+                type: e.league.type?.toLowerCase() ?? null,
+                logo_url: e.league.logo ?? null,
+                slug: comp?.slug ?? slugify(`${e.league.name} ${e.country?.name ?? ''}`.trim(), e.league.id),
+                is_active: true,
+                tier: featuredIds.has(e.league.id) ? 'featured' : 'basic',
+                season_coverage: season?.coverage ?? null,
+            };
+        });
+        for (const rows of chunk(leagueRows, 200)) {
+            const {error} = await db.from('leagues').upsert(rows, {onConflict: 'provider_id'});
+            if (error) failSync('leagues.upsert', error);
+        }
+        run.bump('leagues', leagueRows.length);
+
+        // Demote leagues no longer featured, promote the featured ones.
+        await db.from('leagues').update({tier: 'basic'}).eq('tier', 'featured').not('provider_id', 'in', `(${[...featuredIds].join(',')})`);
+
+        const {data: leagueIdRows, error: leagueIdError} = await db.from('leagues').select('id,provider_id').in('provider_id', entries.map((e) => e.league.id));
+        if (leagueIdError) failSync('leagues.select', leagueIdError);
+        const leagueDbId = new Map<number, number>((leagueIdRows ?? []).map((r) => [r.provider_id as number, r.id as number]));
+
+        // Seasons: upsert the current one per league, then flag it.
+        const seasonRows = [];
+        for (const e of entries) {
+            const leagueId = leagueDbId.get(e.league.id);
+            const season = currentSeason(e.seasons);
+            if (!leagueId || !season) continue;
+            seasonRows.push({
+                league_id: leagueId,
+                year: season.year,
+                name: seasonName(season),
+                is_current: true,
+                starting_at: season.start ?? null,
+                ending_at: season.end ?? null,
+            });
+        }
+        for (const rows of chunk(seasonRows, 200)) {
+            const {error} = await db.from('seasons').upsert(rows, {onConflict: 'league_id,year'});
+            if (error) failSync('seasons.upsert', error);
+        }
+        run.bump('seasons', seasonRows.length);
+        // Older seasons of the same leagues are no longer current.
+        for (const rows of chunk(seasonRows, 200)) {
+            for (const r of rows) {
+                await db.from('seasons').update({is_current: false}).eq('league_id', r.league_id).neq('year', r.year).eq('is_current', true);
+            }
+        }
+
+        // Featured leagues: teams and squads.
+        const {data: featuredSeasons, error: fsError} = await db
+            .from('seasons')
+            .select('id,year,league:leagues!inner(id,provider_id,name,tier)')
+            .eq('is_current', true)
+            .eq('leagues.tier', 'featured');
+        if (fsError) failSync('seasons.select', fsError);
+
+        for (const s of featuredSeasons ?? []) {
+            const league = s.league as unknown as {id: number; provider_id: number; name: string};
+            let teamEntries: AfTeamResponse[] = [];
             try {
-                const envelope = await apiFootballGet<AfLeagueResponse[]>('leagues', {id: comp.providerId});
-                entry = envelope.response[0];
+                const {response} = await apiFootballGet<AfTeamResponse[]>('teams', {league: league.provider_id, season: s.year});
+                teamEntries = response;
             } catch (error) {
-                if (error instanceof ApiFootballError && error.kind === 'api') {
-                    run.warn(`league ${label} (#${comp.providerId}): ${error.message}`);
-                    continue;
-                }
-                throw error;
+                run.warn(`teams of ${league.name}: ${(error as Error).message}`);
+                if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
+                continue;
             } finally {
                 run.requests += 1;
             }
-            if (!entry) {
-                run.warn(`league ${label} (#${comp.providerId}) not found in API-Football, check the id`);
-                continue;
-            }
-
-            const slug = comp.slug ?? slugify(entry.league.name, entry.league.id);
-            const {data: leagueRow, error} = await db
-                .from('leagues')
-                .upsert(
-                    {
-                        provider_id: entry.league.id,
-                        name: entry.league.name,
-                        short_code: null,
-                        country: entry.country?.name ?? null,
-                        type: entry.league.type?.toLowerCase() ?? null,
-                        logo_url: entry.league.logo ?? null,
-                        slug,
-                        is_active: true,
-                    },
-                    {onConflict: 'provider_id'},
-                )
-                .select('id')
-                .single();
-            if (error) failSync('leagues.upsert', error);
-            run.bump('leagues');
-            console.info(`[sync-competitions] ${slug}: API-Football #${entry.league.id} = "${entry.league.name}" (${entry.country?.name})`);
-
-            const season = currentSeason(entry.seasons);
-            if (!season) {
-                run.warn(`league ${slug} (#${entry.league.id}) has no seasons in the payload`);
-                continue;
-            }
-            const coverage = season.coverage?.fixtures;
-            if (coverage && (!coverage.events || !coverage.lineups || !coverage.statistics_players)) {
-                run.warn(
-                    `league ${slug} season ${season.year}: partial coverage (events=${coverage.events}, lineups=${coverage.lineups}, ` +
-                        `team stats=${coverage.statistics_fixtures}, player stats=${coverage.statistics_players})`,
-                );
-            }
-
-            await db.from('seasons').update({is_current: false}).eq('league_id', leagueRow.id as number);
-            const {error: seasonError} = await db.from('seasons').upsert(
-                {
-                    league_id: leagueRow.id as number,
-                    year: season.year,
-                    name: seasonName(season),
-                    is_current: true,
-                    starting_at: season.start ?? null,
-                    ending_at: season.end ?? null,
-                },
-                {onConflict: 'league_id,year'},
-            );
-            if (seasonError) failSync('seasons.upsert', seasonError);
-            run.bump('seasons');
-            seasons.push({leagueDbId: leagueRow.id as number, leagueProviderId: entry.league.id, slug, year: season.year});
-        }
-
-        if (seasons.length === 0) {
-            throw new SyncError('no configured league could be loaded from API-Football; check API_FOOTBALL_KEY and the league ids');
-        }
-
-        const {data: seasonRows, error: seasonSelectError} = await db
-            .from('seasons')
-            .select('id,league_id,year')
-            .eq('is_current', true);
-        if (seasonSelectError) failSync('seasons.select', seasonSelectError);
-        const seasonDbId = new Map<string, number>((seasonRows ?? []).map((r) => [`${r.league_id}:${r.year}`, r.id as number]));
-
-        for (const season of seasons) {
-            const dbSeasonId = seasonDbId.get(`${season.leagueDbId}:${season.year}`);
-            if (!dbSeasonId) continue;
-
-            const {response: teamEntries} = await apiFootballGet<AfTeamResponse[]>('teams', {league: season.leagueProviderId, season: season.year});
-            run.requests += 1;
             const teamIds = await ensureTeams(
                 db,
                 teamEntries.map((t) => ({
@@ -138,12 +136,16 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 const dbTeamId = teamIds.get(t.team.id);
                 if (!dbTeamId) continue;
                 try {
-                    await syncSquad(db, run, dbSeasonId, t.team.id, dbTeamId);
+                    await syncSquad(db, run, s.id as number, t.team.id, dbTeamId);
                 } catch (error) {
                     run.warn(`squad ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
                     if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
                 }
             }
+        }
+
+        if (leagueRows.length === 0) {
+            throw new SyncError('no league could be loaded from API-Football; check API_FOOTBALL_KEY');
         }
 
         await finishRun(db, run, 'ok');
