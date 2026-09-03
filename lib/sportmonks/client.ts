@@ -69,16 +69,31 @@ export async function sportmonksGet<T>(
         cache,
     });
 
+    const body = await response.text().catch(() => '');
     if (!response.ok) {
-        const body = await response.text().catch(() => '');
         throw new SportmonksError(
-            `Sportmonks ${response.status} on ${path}: ${body.slice(0, 200)}`,
+            `Sportmonks ${response.status} on ${path}: ${body.slice(0, 300)}`,
             response.status,
             path,
         );
     }
 
-    return (await response.json()) as SportmonksResponse<T>;
+    let json: unknown;
+    try {
+        json = JSON.parse(body);
+    } catch {
+        throw new SportmonksError(`Sportmonks returned non-JSON for ${path}: ${body.slice(0, 200)}`, response.status, path);
+    }
+
+    // Sportmonks answers 200 with only a `message` when the token has no
+    // access to the requested league/include. Surface that instead of
+    // letting callers trip over a missing `data`.
+    if (!json || typeof json !== 'object' || !('data' in json)) {
+        const message = (json as {message?: string} | null)?.message ?? JSON.stringify(json).slice(0, 300);
+        throw new SportmonksError(`Sportmonks returned no data for ${path}: ${message}`, response.status, path);
+    }
+
+    return json as SportmonksResponse<T>;
 }
 
 /** Iterate every page of a paginated endpoint. */
