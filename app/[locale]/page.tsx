@@ -41,7 +41,7 @@ export default async function HomePage({params}: PageProps<"/[locale]">) {
                             </h1>
                             <p className="text-lg text-muted-foreground max-w-2xl text-pretty">{t('subtitle')}</p>
                         </div>
-                        {data.isSample && <Badge variant="outline">{tCommon('sampleData')}</Badge>}
+                        {data.isSample && <Badge variant="outline" className="self-start md:self-auto">{tCommon('sampleData')}</Badge>}
                     </div>
 
                     <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
@@ -58,7 +58,7 @@ export default async function HomePage({params}: PageProps<"/[locale]">) {
                         rows={data.standings.rows}
                         fullHref="/serie-a"
                     />
-                    <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-6 min-w-0">
                         {data.spotlight && <PlayerSpotlight player={data.spotlight} />}
                         <div className="border-[2.5px] border-dashed border-muted-foreground rounded-2xl h-[120px] flex items-center justify-center text-[13px] font-bold text-muted-foreground">
                             {t('adSlot')}

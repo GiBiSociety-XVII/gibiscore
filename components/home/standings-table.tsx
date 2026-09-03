@@ -10,7 +10,7 @@ export function StandingsTable({leagueName, rows, fullHref}: {leagueName: string
     const t = useTranslations('HomePage.standings');
 
     return (
-        <Card className="p-6 flex flex-col gap-4">
+        <Card className="p-6 flex flex-col gap-4 min-w-0">
             <div className="flex items-center justify-between">
                 <h2 className="text-[22px] font-extrabold tracking-tight">{t('title', {league: leagueName})}</h2>
                 <Link href={fullHref} className="text-sm font-extrabold underline decoration-accent decoration-[2px] underline-offset-4">
