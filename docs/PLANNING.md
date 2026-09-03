@@ -191,7 +191,7 @@ potrebbe diventare Premium se un giorno si decidera' di introdurlo.
 
 - **Supabase**: vedi sezione 5 (strada 1 consigliata).
 - **Vercel**: nuovo progetto `gibiscore` collegato a questo repo, dominio `gibiscore.com`.
-- **Branching**: `main` = produzione; branch `claude/*` per il lavoro assistito, PR verso `main`.
+- **Branching**: `master` = produzione (come GiBiArena); branch `claude/*` per il lavoro assistito, PR verso `master`.
 - **Env**: `.env*` mai committati. Chiave API-Football solo lato server.
 
 ## 8. Prossimi passi
