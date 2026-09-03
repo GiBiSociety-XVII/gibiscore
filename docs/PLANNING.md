@@ -14,18 +14,23 @@ Nulla di quanto scritto qui e' ancora implementato.
   (stesso Supabase Auth, vedi sezione 5)
 - Lingua: **solo italiano** all'inizio, inglese in seguito. Si parte comunque
   con la struttura `app/[locale]` per non dover rifare le route dopo.
-- Monetizzazione: **pubblicita' per gli utenti free**; **abbonamento** che
-  toglie la pubblicita' e sblocca tutte le funzioni (Stripe, come GiBiArena)
+- Monetizzazione: **per ora tutto gratis**, nessun abbonamento. Premium e
+  abbonamenti si valutano in futuro. La pubblicita' resta possibile fin da
+  subito (componenti Adsterra di GiBiArena) ma non e' un requisito del lancio.
+- Fornitore dati: **Sportmonks** (European Plan + add-on xG), confermato.
+- Infrastruttura: **progetto Supabase dedicato a GiBiScore**, separato da
+  GiBiArena. Al massimo si condivide l'autenticazione (sezione 5).
 - Repo: `GiBiSociety-XVII/gibiscore` (pubblico), partito vuoto, costruito da zero
 
 ## 2. Ancora da decidere
 
-1. Conferma del fornitore dati (sezione 3): Sportmonks European Plan + xG,
-   dopo il trial di 14 giorni. Campionati al lancio proposti in sezione 3.
-2. Quali funzioni sono Premium e quali free (sezione 6).
-3. Prezzo dell'abbonamento e se e' lo stesso abbonamento di GiBiArena o uno separato.
+Nessuna decisione bloccante. Lo studio e' chiuso il 3 settembre 2026.
+Restano da verificare in fase di sviluppo:
+1. Copertura reale di Serie B e Coppa Italia durante il trial Sportmonks.
+2. Come condividere l'autenticazione tra due progetti Supabase (sezione 5),
+   solo quando il login diventera' davvero utile.
 
-## 3. Fonti dati: DECISO l'obiettivo, da confermare il fornitore
+## 3. Fonti dati: DECISO, Sportmonks European Plan + add-on xG
 
 Obiettivo dichiarato: **pacchetto completo**, non il minimo per partire.
 Servono, per ogni partita: pre-match (formazioni probabili, infortuni,
@@ -78,7 +83,7 @@ integrazioni da mantenere.
 e scraping di siti come FBref, Understat o Fantacalcio.it (vietato dai loro
 termini, fragile, rischio legale per un sito commerciale).
 
-Decisione da confermare: **Sportmonks European Plan + xG**. Prima del
+Decisione presa: **Sportmonks European Plan + xG**. Prima del
 contratto faremo il trial di 14 giorni controllando sul campo la copertura
 reale di Serie B e Coppa Italia (le pagine di copertura dichiarano gli id
 delle leghe, ma la completezza puo' variare per stagione).
@@ -128,26 +133,32 @@ il sito ha dati live, login, abbonamenti e cron: un sito statico non basta.
 | Framework | Next.js 16 App Router + React 19 + TypeScript | uguale a GiBiArena |
 | Stile | Tailwind CSS 4 + lucide-react | uguale a GiBiArena |
 | i18n | next-intl, `app/[locale]`, solo `it` attivo all'inizio | inglese si aggiunge senza rifare le route |
-| DB + Auth | Supabase, **progetto dedicato** `gibiscore` | dati calcio separati da GiBiArena |
-| Account condiviso | stesso Supabase Auth di GiBiArena? Due strade (sotto) | l'utente ha chiesto login condiviso |
-| Pagamenti | Stripe | uguale a GiBiArena |
+| DB + Auth | Supabase, **progetto dedicato** `gibiscore` (deciso) | dati calcio separati da GiBiArena |
+| Account condiviso | progetto separato; condivisione dell'auth in un secondo momento (sotto) | deciso: al massimo si condivide l'auth |
+| Pagamenti | nessuno al lancio; Stripe in futuro se arrivera' il Premium | deciso: tutto gratis per ora |
 | Hosting | Vercel, nuovo progetto `gibiscore`, cron in `vercel.json` | uguale a GiBiArena |
 | Ads | Adsterra (gia' usato in GiBiArena) | componenti riutilizzabili |
 | Package manager | pnpm | uguale a GiBiArena |
 
-### Login condiviso con GiBiArena: due strade
+### Login e condivisione con GiBiArena (deciso: progetto separato)
 
-1. **Stesso progetto Supabase di GiBiArena** (schema `gibiscore` separato per
-   le tabelle calcio). Login condiviso "gratis": stessa tabella `auth.users`,
-   stesso abbonamento visibile da entrambi i siti.
-   Contro: i due siti condividono il DB, un problema su uno tocca l'altro.
-2. **Progetto Supabase separato** + Auth federata (l'utente si logga su
-   GiBiScore con un provider OAuth e si collega l'email). Piu' pulito ma
-   l'abbonamento condiviso va sincronizzato a mano via Stripe webhook.
+Il progetto Supabase di GiBiScore e' separato. Il login e' facoltativo e
+al lancio serve a poco (tutto e' gratis), quindi non blocca nulla.
 
-Consiglio: **strada 1**, perche' il login condiviso e l'eventuale abbonamento
-unico sono il valore che l'utente ha chiesto. I dati calcio stanno in uno
-schema Postgres separato (`football.*`) con le loro RLS.
+Piano in due tempi:
+1. **Lancio**: Supabase Auth del progetto GiBiScore con gli stessi provider
+   di GiBiArena (email + gli stessi OAuth). Chi ha un account GiBiArena si
+   registra con la stessa email: account tecnicamente distinti, esperienza
+   simile. Nessuna dipendenza tra i due progetti.
+2. **Quando servira' davvero un account unico** (preferiti, notifiche,
+   eventuale Premium): valutare la funzione "third-party auth" di Supabase
+   per far accettare al progetto GiBiScore i token emessi dal progetto
+   GiBiArena, oppure un piccolo servizio di collegamento account via email
+   verificata. Da studiare nel dettaglio in quel momento, non ora.
+
+Nel DB di GiBiScore i dati calcio vanno in uno schema dedicato (`football.*`)
+e i dati utente in `public.*`, cosi' la parte calcio resta indipendente
+dall'autenticazione qualunque strada si scelga.
 
 ### Flusso dati
 
@@ -162,17 +173,19 @@ Next.js (Server Components + SWR per il live)  -->  utente
 
 ## 6. Mappa del sito (prima versione)
 
-| Route | Contenuto | Free / Premium |
+Tutto gratis al lancio (deciso). La colonna "in futuro" indica cosa
+potrebbe diventare Premium se un giorno si decidera' di introdurlo.
+
+| Route | Contenuto | In futuro |
 |---|---|---|
-| `/` | Partite live, classifica breve, giocatore in evidenza | free |
-| `/live` | Tutte le partite di oggi con aggiornamento automatico | free |
-| `/serie-a` (per competizione) | Calendario, risultati, classifica completa | free |
-| `/squadre/[slug]` | Rosa, forma, statistiche stagionali | base free, avanzate premium |
-| `/giocatori/[slug]` | Scheda giocatore, statistiche per partita | base free, confronti e storico premium |
-| `/partita/[id]` | Dettaglio partita: eventi, formazioni, statistiche | free, xG e heatmap premium |
-| `/classifiche` | Marcatori, assist, cartellini | free |
-| `/premium` | Pagina abbonamento | - |
-| `/account` | Profilo, abbonamento | login |
+| `/` | Partite live, classifica breve, giocatore in evidenza | - |
+| `/live` | Tutte le partite di oggi con aggiornamento automatico | - |
+| `/serie-a` (per competizione) | Calendario, risultati, classifica completa | - |
+| `/squadre/[slug]` | Rosa, forma, statistiche stagionali, xG | - |
+| `/giocatori/[slug]` | Scheda giocatore, statistiche per partita, storico | confronti tra giocatori |
+| `/partita/[id]` | Dettaglio partita: eventi, formazioni, statistiche, xG live | - |
+| `/classifiche` | Marcatori, assist, cartellini, xG | - |
+| `/account` | Profilo, preferiti (solo se loggato) | - |
 
 ## 7. Decisioni infrastrutturali
 
@@ -185,9 +198,9 @@ Next.js (Server Components + SWR per il live)  -->  utente
 
 1. ~~Scegliere la direzione grafica~~ fatto: opzione A.
 2. Attivare il trial Sportmonks e verificare la copertura di Serie B e Coppa Italia.
-3. Confermare la strada per il login condiviso (sezione 5).
-4. Definire cosa e' Premium (sezione 6).
-5. Solo dopo: scaffolding del progetto Next.js.
+3. ~~Confermare la strada per il login condiviso~~ fatto: progetto Supabase separato.
+4. ~~Definire cosa e' Premium~~ fatto: tutto gratis per ora.
+5. Scaffolding del progetto Next.js (prossimo passo, su richiesta).
 
 ## 9. Fase 2 (in seguito): analisi, previsioni, scommesse, fantacalcio
 
@@ -241,7 +254,7 @@ Il governo sta valutando allentamenti nel 2026, da seguire.
   squalifiche, calendario delle prossime 5 giornate per squadra (difficolta'),
   "chi schierare" basato sulle previsioni della sezione 9.1, storico
   fantavoto per giocatore.
-- Buon candidato Premium per differenziarsi dai siti gratuiti di voti.
+- Se un giorno si introdurra' il Premium, e' il candidato naturale.
 
 ### 9.4 Cosa fare gia' nella fase 1 per non chiudersi porte
 
