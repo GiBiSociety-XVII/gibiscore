@@ -17,9 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
 function CompetitionCard({c, seasonLabel}: {c: CompetitionListItem; seasonLabel: string | null}) {
     return (
         <Link href={`/competitions/${c.slug}`} className="block">
-            <Card press className="p-4 flex items-center gap-3 h-full">
-                <span className="flex w-12 h-12 items-center justify-center rounded-xl border-[2.5px] border-foreground bg-card overflow-hidden shrink-0">
-                    {c.logoUrl ? <Image src={c.logoUrl} alt="" width={34} height={34} className="object-contain" /> : null}
+            <Card press className="p-3 flex items-center gap-2.5 h-full">
+                <span className="flex w-10 h-10 items-center justify-center rounded-xl border-[2.5px] border-foreground bg-card overflow-hidden shrink-0">
+                    {c.logoUrl ? <Image src={c.logoUrl} alt="" width={28} height={28} className="object-contain" /> : null}
                 </span>
                 <span className="flex flex-col gap-0.5 min-w-0">
                     <span className="font-extrabold truncate">{c.name}</span>
@@ -47,23 +47,23 @@ export default async function CompetitionsPage({params}: PageProps<"/[locale]/co
                 <>
                     {list.featured.length > 0 && (
                         <section className="flex flex-col gap-3">
-                            <h2 className="text-[22px] font-extrabold tracking-tight">{t('featured')}</h2>
-                            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                            <h2 className="text-lg font-extrabold tracking-tight">{t('featured')}</h2>
+                            <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                                 {list.featured.map((c) => <CompetitionCard key={c.id} c={c} seasonLabel={seasonLabel(c)} />)}
                             </div>
                         </section>
                     )}
                     {list.countries.length > 0 && (
                         <section className="flex flex-col gap-3">
-                            <h2 className="text-[22px] font-extrabold tracking-tight">{t('byCountry')}</h2>
+                            <h2 className="text-lg font-extrabold tracking-tight">{t('byCountry')}</h2>
                             <div className="flex flex-col gap-2">
                                 {list.countries.map((block) => (
                                     <details key={block.country} className="bb-surface overflow-hidden">
-                                        <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 md:px-5 py-3 font-extrabold hover:bg-muted/60">
+                                        <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-3 md:px-4 py-2 font-extrabold text-[14px] hover:bg-muted/60">
                                             <span>{block.country}</span>
                                             <span className="text-xs font-bold text-muted-foreground">{t('count', {count: block.competitions.length})}</span>
                                         </summary>
-                                        <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 p-4 border-t-[2.5px] border-foreground bg-background/60">
+                                        <div className="grid gap-2.5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 p-3 border-t-[2.5px] border-foreground bg-background/60">
                                             {block.competitions.map((c) => <CompetitionCard key={c.id} c={c} seasonLabel={seasonLabel(c)} />)}
                                         </div>
                                     </details>

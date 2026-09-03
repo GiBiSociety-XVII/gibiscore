@@ -27,11 +27,11 @@ export default function AppBar() {
     return (
         <header className="sticky top-0 z-50 w-full bg-background border-b-[2.5px] border-foreground">
             <div className="w-full px-4 md:px-8">
-                <div className="flex h-20 items-center justify-between gap-3">
+                <div className="flex h-16 items-center justify-between gap-3">
                     <div className="flex items-center gap-4 min-w-0">
                         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
                             <LogoMark className="group-hover:opacity-80 transition-opacity" />
-                            <span className="text-[22px] font-black tracking-tight">GiBiScore</span>
+                            <span className="text-lg font-black tracking-tight">GiBiScore</span>
                         </Link>
 
                         <nav aria-label={t('sectionsLabel')} className="hidden lg:flex items-center gap-1 ml-2">
@@ -40,7 +40,7 @@ export default function AppBar() {
                                     key={key}
                                     href={href}
                                     className={cn(
-                                        "px-4 py-2.5 rounded-[10px] text-base font-bold transition-colors hover:bg-muted whitespace-nowrap",
+                                        "px-3 py-2 rounded-[8px] text-sm font-bold transition-colors hover:bg-muted whitespace-nowrap",
                                         isActive(href) ? "bg-muted text-foreground" : "text-foreground/70 hover:text-foreground",
                                     )}
                                 >
@@ -51,7 +51,7 @@ export default function AppBar() {
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
-                        <label className="hidden md:flex items-center gap-2 bb-input px-3.5 py-2.5 w-[220px] text-sm text-muted-foreground cursor-text">
+                        <label className="hidden md:flex items-center gap-2 bb-input px-3 py-2 w-[200px] text-[13px] text-muted-foreground cursor-text">
                             <Search className="w-4 h-4 text-foreground shrink-0" />
                             <input
                                 type="search"
@@ -60,10 +60,10 @@ export default function AppBar() {
                                 aria-label={t('search')}
                             />
                         </label>
-                        <Link href="/live" className={cn(buttonClasses('primary', 'default'), "lg:hidden")}>
+                        <Link href="/live" className={cn(buttonClasses('primary', 'sm'), "lg:hidden")}>
                             {t('nav.live')}
                         </Link>
-                        <Link href="/account" className={cn(buttonClasses('secondary', 'default'), "hidden lg:inline-flex")}>
+                        <Link href="/account" className={cn(buttonClasses('secondary', 'sm'), "hidden lg:inline-flex")}>
                             {t('login')}
                         </Link>
                     </div>

@@ -27,24 +27,24 @@ export function TeamStats({home, away, title}: {home: TeamMatchStats | null; awa
     const rows = ROWS.filter((r) => (home?.[r.key] ?? null) !== null || (away?.[r.key] ?? null) !== null);
 
     return (
-        <Card className="p-4 md:p-6 flex flex-col gap-4">
-            <h2 className="text-[22px] font-extrabold tracking-tight">{title}</h2>
+        <Card className="p-3 md:p-4 flex flex-col gap-3">
+            <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
             {rows.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{tEmpty('noStats')}</p>
             ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
                     {rows.map(({key, percent, decimals}) => {
                         const h = home?.[key] ?? 0;
                         const a = away?.[key] ?? 0;
                         const total = h + a || 1;
                         return (
                             <div key={key} className="flex flex-col gap-1">
-                                <div className="flex items-center justify-between text-sm font-bold">
+                                <div className="flex items-center justify-between text-[13px] font-bold">
                                     <span className="font-mono tabular-nums">{fmt(home?.[key] ?? null, percent, decimals)}</span>
-                                    <span className="text-xs font-extrabold uppercase tracking-wide text-muted-foreground">{t(key)}</span>
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t(key)}</span>
                                     <span className="font-mono tabular-nums">{fmt(away?.[key] ?? null, percent, decimals)}</span>
                                 </div>
-                                <div className="flex gap-1 h-2.5 rounded-full overflow-hidden border-2 border-foreground">
+                                <div className="flex gap-1 h-2 rounded-full overflow-hidden border-2 border-foreground">
                                     <div className="bg-accent" style={{width: `${(h / total) * 100}%`}} />
                                     <div className="bg-foreground" style={{width: `${(a / total) * 100}%`}} />
                                 </div>

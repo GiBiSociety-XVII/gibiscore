@@ -11,7 +11,7 @@ export function MatchCard({fixture}: {fixture: FixtureSummary}) {
 
     return (
         <Link href={`/matches/${fixture.id}`} className="block">
-            <Card press className="p-5 flex flex-col gap-4 h-full">
+            <Card press className="p-4 flex flex-col gap-3 h-full">
                 <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-muted-foreground">
                         {fixture.leagueName}{fixture.round ? ` · ${t('matchday', {round: fixture.round.replace(/^Regular Season\s*-\s*/i, '')})}` : ''}
@@ -21,10 +21,10 @@ export function MatchCard({fixture}: {fixture: FixtureSummary}) {
 
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-                        <TeamCrest team={fixture.home} />
-                        <span className="font-extrabold text-[15px] truncate max-w-full">{fixture.home.name}</span>
+                        <TeamCrest team={fixture.home} size={36} />
+                        <span className="font-extrabold text-[14px] truncate max-w-full">{fixture.home.name}</span>
                     </div>
-                    <div className="font-mono text-[40px] font-bold tracking-tight tabular-nums">
+                    <div className="font-mono text-[32px] font-bold tracking-tight tabular-nums">
                         {hasScore ? (
                             <>{fixture.homeScore} – {fixture.awayScore}</>
                         ) : (
@@ -32,12 +32,12 @@ export function MatchCard({fixture}: {fixture: FixtureSummary}) {
                         )}
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-                        <TeamCrest team={fixture.away} />
-                        <span className="font-extrabold text-[15px] truncate max-w-full">{fixture.away.name}</span>
+                        <TeamCrest team={fixture.away} size={36} />
+                        <span className="font-extrabold text-[14px] truncate max-w-full">{fixture.away.name}</span>
                     </div>
                 </div>
 
-                <div className="flex justify-between gap-2 text-[13px] font-semibold text-muted-foreground border-t-2 border-muted pt-3">
+                <div className="flex justify-between gap-2 text-xs font-semibold text-muted-foreground border-t-2 border-muted pt-2">
                     {fixture.stats ? (
                         <>
                             <span>{t('stats.possession', {value: fixture.stats.homePossession ?? 0})}</span>

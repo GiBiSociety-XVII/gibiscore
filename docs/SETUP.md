@@ -102,6 +102,7 @@ pnpm cron sync-competitions                 # tutte le leghe e stagioni; squadre
 pnpm cron "sync-fixtures?window=month"      # tutte le partite da ieri a +30 giorni (32 richieste)
 pnpm cron "sync-standings?scope=all"        # classifiche di ogni competizione attiva (~300)
 pnpm cron sync-injuries                     # infortuni e squalifiche delle leghe in evidenza (~13)
+pnpm cron "sync-backfill?limit=1000"       # eventi, formazioni e voti delle partite gia' giocate (~50 richieste)
 pnpm cron sync-live                         # partite in corso, se ce ne sono adesso
 ```
 
@@ -140,7 +141,7 @@ rigenera ogni 60 secondi, quindi il live ha al massimo un minuto di ritardo.
 
 ## 7. Cron automatici
 
-Su Vercel, **Settings → Cron Jobs** deve elencare i sette job di `vercel.json`:
+Su Vercel, **Settings → Cron Jobs** deve elencare gli otto job di `vercel.json`:
 
 | Job | Orario (UTC) |
 |---|---|
@@ -150,6 +151,7 @@ Su Vercel, **Settings → Cron Jobs** deve elencare i sette job di `vercel.json`
 | `sync-fixtures` | ogni ora al minuto 15 |
 | `sync-standings` | ogni 30 minuti |
 | `sync-injuries` | ogni 6 ore al minuto 45 |
+| `sync-backfill` | ogni ora al minuto 20 |
 | `sync-live` | ogni minuto |
 
 I cron girano **solo sul deploy di produzione** (branch `master`), non sulle
@@ -184,3 +186,4 @@ CRON_SECRET=... pnpm cron sync-fixtures   # BASE_URL predefinito: localhost:3000
 | Avviso "partial coverage" per una lega | API-Football non copre eventi/formazioni/statistiche per quella stagione | nessuna azione: il sito mostra i dati disponibili |
 | Classifica assente per una coppa | la competizione non ha una tabella in quella fase | normale, `seasons_without_table` nei contatori |
 | Partita live senza statistiche | statistiche pubblicate a fine partita da API-Football per quella lega | arrivano con il job live dopo il fischio finale |
+| Giocatore con 0 gol o pagina partita vuota per una gara gia' giocata | dettaglio mai scaricato (partita precedente all'attivazione) | `sync-backfill?limit=1000`, poi il cron orario tiene il passo |

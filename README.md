@@ -75,6 +75,7 @@ da `CRON_SECRET` (`vercel.json` definisce gli orari):
 | `sync-standings` | ogni 30 min | ~13 | classifiche delle leghe in evidenza |
 | `sync-standings?scope=all` | ogni giorno | ~300 | classifiche di ogni competizione attiva |
 | `sync-injuries` | ogni 6 ore | ~13 | infortuni e squalifiche, leghe in evidenza |
+| `sync-backfill` | ogni ora | fino a 10 | dettaglio (eventi, formazioni, voti) delle partite finite delle leghe in evidenza mai scaricato: recupera il pregresso |
 | `sync-live` | ogni minuto | 1 + 1 ogni 20 partite in evidenza | punteggi ed eventi di tutte le partite in corso; formazioni, statistiche e voti per quelle in evidenza |
 
 Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro (7.500).
@@ -87,6 +88,7 @@ CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-competitions
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-fixtures?window=month"
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-standings?scope=all"
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-injuries
+CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-backfill?limit=1000"   # dettaglio delle partite gia' giocate (~50 richieste)
 ```
 
 Diagnostica del piano e della copertura per lega in evidenza:

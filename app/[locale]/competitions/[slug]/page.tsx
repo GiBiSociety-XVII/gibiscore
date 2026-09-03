@@ -45,8 +45,8 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
                 title={
                     <span className="inline-flex items-center gap-3">
                         {competition.logoUrl && (
-                            <span className="inline-flex w-12 h-12 items-center justify-center rounded-xl border-[2.5px] border-foreground bg-card overflow-hidden">
-                                <Image src={competition.logoUrl} alt="" width={36} height={36} className="object-contain" />
+                            <span className="inline-flex w-10 h-10 items-center justify-center rounded-xl border-[2.5px] border-foreground bg-card overflow-hidden">
+                                <Image src={competition.logoUrl} alt="" width={30} height={30} className="object-contain" />
                             </span>
                         )}
                         {competition.name}
@@ -57,19 +57,19 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
 
             {page.live.length > 0 && <MatchList title={t('live')} fixtures={page.live} />}
 
-            <div className="grid gap-6 grid-cols-1 xl:grid-cols-[7fr_5fr] items-start">
+            <div className="grid gap-4 grid-cols-1 xl:grid-cols-[7fr_5fr] items-start">
                 <StandingsTable groups={page.standings} title={t('standings')} />
-                <div className="flex flex-col gap-6 min-w-0">
-                    <section className="flex flex-col gap-3">
-                        <h2 className="text-[22px] font-extrabold tracking-tight">{t('upcoming')}</h2>
+                <div className="flex flex-col gap-4 min-w-0">
+                    <section className="flex flex-col gap-2">
+                        <h2 className="text-lg font-extrabold tracking-tight">{t('upcoming')}</h2>
                         {page.upcoming.length === 0 ? (
                             <MatchList fixtures={[]} />
                         ) : (
                             page.upcoming.map((r) => <MatchList key={r.round} title={roundLabel(r.round) || undefined} fixtures={r.fixtures} />)
                         )}
                     </section>
-                    <section className="flex flex-col gap-3">
-                        <h2 className="text-[22px] font-extrabold tracking-tight">{t('results')}</h2>
+                    <section className="flex flex-col gap-2">
+                        <h2 className="text-lg font-extrabold tracking-tight">{t('results')}</h2>
                         {page.results.length === 0 ? (
                             <MatchList fixtures={[]} />
                         ) : (

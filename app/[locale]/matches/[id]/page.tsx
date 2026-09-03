@@ -63,18 +63,18 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
             </div>
 
             {/* Scoreboard */}
-            <Card press className="p-5 md:p-8 flex flex-col gap-5">
+            <Card press className="p-4 md:p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
                     <span>{format.dateTime(start, {weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})}</span>
                     <StatusBadge fixture={fixture} />
                 </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 md:gap-6">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 md:gap-4">
                     <Link href={`/teams/${fixture.home.slug}`} className="flex flex-col items-center gap-3 min-w-0 group">
-                        <TeamCrest team={fixture.home} size={72} />
-                        <span className="text-lg md:text-2xl font-extrabold text-center truncate max-w-full group-hover:underline decoration-accent decoration-[3px] underline-offset-4">{fixture.home.name}</span>
+                        <TeamCrest team={fixture.home} size={56} />
+                        <span className="text-base md:text-xl font-extrabold text-center truncate max-w-full group-hover:underline decoration-accent decoration-[3px] underline-offset-4">{fixture.home.name}</span>
                     </Link>
                     <div className="flex flex-col items-center gap-1">
-                        <span className="font-mono text-5xl md:text-7xl font-bold tracking-tight tabular-nums">
+                        <span className="font-mono text-4xl md:text-6xl font-bold tracking-tight tabular-nums">
                             {hasScore ? `${fixture.homeScore} – ${fixture.awayScore}` : <span className="text-muted-foreground text-4xl">vs</span>}
                         </span>
                         {fixture.homeScoreHt !== null && fixture.awayScoreHt !== null && (
@@ -82,24 +82,24 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                         )}
                     </div>
                     <Link href={`/teams/${fixture.away.slug}`} className="flex flex-col items-center gap-3 min-w-0 group">
-                        <TeamCrest team={fixture.away} size={72} />
-                        <span className="text-lg md:text-2xl font-extrabold text-center truncate max-w-full group-hover:underline decoration-accent decoration-[3px] underline-offset-4">{fixture.away.name}</span>
+                        <TeamCrest team={fixture.away} size={56} />
+                        <span className="text-base md:text-xl font-extrabold text-center truncate max-w-full group-hover:underline decoration-accent decoration-[3px] underline-offset-4">{fixture.away.name}</span>
                     </Link>
                 </div>
                 {(fixture.venue || fixture.referee) && (
-                    <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs font-semibold text-muted-foreground border-t-2 border-muted pt-4">
+                    <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs font-semibold text-muted-foreground border-t-2 border-muted pt-3">
                         {fixture.venue && <span>{tFootball('labels.venue')}: {fixture.venue}</span>}
                         {fixture.referee && <span>{tFootball('labels.referee')}: {fixture.referee}</span>}
                     </div>
                 )}
             </Card>
 
-            <div className="grid gap-6 grid-cols-1 xl:grid-cols-[5fr_7fr] items-start">
-                <div className="flex flex-col gap-6 min-w-0">
+            <div className="grid gap-4 grid-cols-1 xl:grid-cols-[5fr_7fr] items-start">
+                <div className="flex flex-col gap-4 min-w-0">
                     <EventsTimeline events={page.events} title={t('events')} />
                     <TeamStats home={page.stats.home} away={page.stats.away} title={t('stats')} />
                 </div>
-                <div className="flex flex-col gap-6 min-w-0">
+                <div className="flex flex-col gap-4 min-w-0">
                     <Lineups home={page.lineups.home} away={page.lineups.away} title={t('lineups')} />
                 </div>
             </div>

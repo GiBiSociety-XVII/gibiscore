@@ -20,8 +20,8 @@ export async function generateMetadata({params}: PageProps<"/[locale]/players/[s
 
 function Stat({value, label, accent = false}: {value: string | number; label: string; accent?: boolean}) {
     return (
-        <div className={cn("border-2 border-foreground rounded-xl p-3 flex flex-col gap-1", accent ? "bg-accent" : "bg-background")}>
-            <span className="font-mono text-[26px] font-bold leading-none tabular-nums">{value}</span>
+        <div className={cn("border-2 border-foreground rounded-xl p-2.5 flex flex-col gap-0.5", accent ? "bg-accent" : "bg-background")}>
+            <span className="font-mono text-[22px] font-bold leading-none tabular-nums">{value}</span>
             <span className="text-xs font-bold text-muted-foreground">{label}</span>
         </div>
     );
@@ -54,8 +54,8 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                     .join(' · ')}
                 title={
                     <span className="inline-flex items-center gap-4">
-                        <span className="inline-flex w-16 h-16 rounded-xl border-[2.5px] border-foreground bg-muted overflow-hidden shrink-0">
-                            {player.imageUrl && <Image src={player.imageUrl} alt="" width={64} height={64} className="object-cover" />}
+                        <span className="inline-flex w-12 h-12 rounded-xl border-[2.5px] border-foreground bg-muted overflow-hidden shrink-0">
+                            {player.imageUrl && <Image src={player.imageUrl} alt="" width={48} height={48} className="object-cover" />}
                         </span>
                         <span className="flex flex-col gap-1">
                             <span>{player.name}</span>
@@ -70,9 +70,9 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                 }
             />
 
-            <Card press className="p-5 md:p-6 flex flex-col gap-4">
-                <h2 className="text-[22px] font-extrabold tracking-tight">{t('totals')}</h2>
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+            <Card press className="p-3 md:p-4 flex flex-col gap-3">
+                <h2 className="text-lg font-extrabold tracking-tight">{t('totals')}</h2>
+                <div className="grid gap-2 grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
                     <Stat value={totals.matches} label={t('matchesPlayed')} />
                     <Stat value={totals.minutes} label={t('minutes')} />
                     <Stat value={totals.goals} label={t('goals')} />
@@ -84,13 +84,13 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                 <p className="text-xs font-semibold text-muted-foreground">{tFootball('playerTable.fantasyHint')}</p>
             </Card>
 
-            <Card className="p-4 md:p-6 flex flex-col gap-4 min-w-0">
-                <h2 className="text-[22px] font-extrabold tracking-tight">{t('matches')}</h2>
+            <Card className="p-3 md:p-4 flex flex-col gap-3 min-w-0">
+                <h2 className="text-lg font-extrabold tracking-tight">{t('matches')}</h2>
                 {page.matches.length === 0 ? (
                     <p className="text-sm font-semibold text-muted-foreground">{t('noMatches')}</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="w-full text-[13px]">
                             <thead>
                                 <tr className="text-muted-foreground text-[11px] font-extrabold tracking-wider">
                                     <th className="px-1.5 py-1 text-left">DATA</th>
@@ -110,8 +110,8 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                     const score = m.fixture.homeScore !== null && m.fixture.awayScore !== null ? `${m.fixture.homeScore}–${m.fixture.awayScore}` : '';
                                     return (
                                         <tr key={m.fixture.id} className="border-t-2 border-muted font-semibold">
-                                            <td className="px-1.5 py-2 whitespace-nowrap text-muted-foreground">{format.dateTime(new Date(m.fixture.startingAt), {day: 'numeric', month: 'short'})}</td>
-                                            <td className="px-1.5 py-2">
+                                            <td className="px-1.5 py-1 whitespace-nowrap text-muted-foreground">{format.dateTime(new Date(m.fixture.startingAt), {day: 'numeric', month: 'short'})}</td>
+                                            <td className="px-1.5 py-1">
                                                 <Link href={`/matches/${m.fixture.id}`} className="inline-flex items-center gap-2 hover:underline decoration-accent decoration-[3px] underline-offset-4">
                                                     <span className="text-xs text-muted-foreground w-4">{isHome ? 'C' : 'T'}</span>
                                                     <TeamCrest team={opponent} size={20} />
@@ -119,12 +119,12 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                                     <span className="font-mono tabular-nums">{score}</span>
                                                 </Link>
                                             </td>
-                                            <td className="px-1.5 py-2 text-right font-mono tabular-nums">{m.minutes ?? '–'}</td>
-                                            <td className="px-1.5 py-2 text-right font-mono tabular-nums">{m.rating !== null ? m.rating.toFixed(1) : '–'}</td>
-                                            <td className="px-1.5 py-2 text-right font-mono tabular-nums font-extrabold">{m.fantasy !== null ? m.fantasy.toFixed(1) : '–'}</td>
-                                            <td className="px-1.5 py-2 text-right font-mono tabular-nums">{m.goals || ''}</td>
-                                            <td className="px-1.5 py-2 text-right font-mono tabular-nums">{m.assists || ''}</td>
-                                            <td className="px-1.5 py-2 text-right">
+                                            <td className="px-1.5 py-1 text-right font-mono tabular-nums">{m.minutes ?? '–'}</td>
+                                            <td className="px-1.5 py-1 text-right font-mono tabular-nums">{m.rating !== null ? m.rating.toFixed(1) : '–'}</td>
+                                            <td className="px-1.5 py-1 text-right font-mono tabular-nums font-extrabold">{m.fantasy !== null ? m.fantasy.toFixed(1) : '–'}</td>
+                                            <td className="px-1.5 py-1 text-right font-mono tabular-nums">{m.goals || ''}</td>
+                                            <td className="px-1.5 py-1 text-right font-mono tabular-nums">{m.assists || ''}</td>
+                                            <td className="px-1.5 py-1 text-right">
                                                 {m.yellowCards > 0 && <span className="inline-block w-2.5 h-3.5 bg-yellow-300 border border-foreground rounded-[2px] mr-0.5" />}
                                                 {m.redCards > 0 && <span className="inline-block w-2.5 h-3.5 bg-red-500 border border-foreground rounded-[2px]" />}
                                             </td>

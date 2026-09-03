@@ -5,7 +5,7 @@ import {cn} from "@/components/shared/ui/cn";
 import type {MatchEvent} from "@/lib/football/types";
 
 function EventIcon({type}: {type: MatchEvent['type']}) {
-    const base = "inline-flex w-7 h-7 items-center justify-center rounded-lg border-2 border-foreground text-[11px] font-extrabold shrink-0";
+    const base = "inline-flex w-6 h-6 items-center justify-center rounded-lg border-2 border-foreground text-[10px] font-extrabold shrink-0";
     switch (type) {
         case 'goal':
         case 'penalty':
@@ -36,8 +36,8 @@ export function EventsTimeline({events, title}: {events: MatchEvent[]; title: st
     const tEmpty = useTranslations('Football.empty');
 
     return (
-        <Card className="p-4 md:p-6 flex flex-col gap-4">
-            <h2 className="text-[22px] font-extrabold tracking-tight">{title}</h2>
+        <Card className="p-3 md:p-4 flex flex-col gap-3">
+            <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
             {events.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{tEmpty('noEvents')}</p>
             ) : (
@@ -54,21 +54,21 @@ export function EventsTimeline({events, title}: {events: MatchEvent[]; title: st
                             <li
                                 key={e.id}
                                 className={cn(
-                                    "flex items-center gap-3 py-2.5 border-t-2 border-muted first:border-t-0",
+                                    "flex items-center gap-2.5 py-1.5 border-t-2 border-muted first:border-t-0",
                                     e.side === 'away' && "flex-row-reverse text-right",
                                 )}
                             >
-                                <span className="font-mono text-sm font-bold tabular-nums w-12 shrink-0">{minute}</span>
+                                <span className="font-mono text-xs font-bold tabular-nums w-10 shrink-0">{minute}</span>
                                 <EventIcon type={e.type} />
                                 <div className="flex flex-col min-w-0">
-                                    <span className="font-bold text-[15px] truncate">
+                                    <span className="font-bold text-[13px] truncate">
                                         {e.type === 'substitution' ? t('substitution') : <PlayerName p={e.player} />}
                                         {e.type !== 'substitution' && e.type !== 'goal' && e.type !== 'penalty' && e.type !== 'var' && (
                                             <span className="text-muted-foreground font-semibold"> · {t(e.type)}</span>
                                         )}
                                         {e.type === 'var' && <span>{t('var')}</span>}
                                     </span>
-                                    {detail && <span className="text-xs font-semibold text-muted-foreground truncate">{detail}</span>}
+                                    {detail && <span className="text-[11px] font-semibold text-muted-foreground truncate">{detail}</span>}
                                 </div>
                             </li>
                         );

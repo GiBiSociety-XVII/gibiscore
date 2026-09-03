@@ -8,7 +8,7 @@ export function PageShell({children, className}: {children: ReactNode; className
     return (
         <div className="min-h-screen flex flex-col bg-background">
             <AppBar />
-            <main className={cn("flex-1 flex flex-col gap-6 md:gap-8 px-4 md:px-8 py-8 pb-12 w-full max-w-[1440px] mx-auto", className)}>{children}</main>
+            <main className={cn("flex-1 flex flex-col gap-4 md:gap-5 px-3 md:px-6 py-5 pb-10 w-full max-w-[1440px] mx-auto", className)}>{children}</main>
             <Footer />
         </div>
     );
@@ -18,8 +18,8 @@ export function PageTitle({eyebrow, title, aside}: {eyebrow?: ReactNode; title: 
     return (
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
             <div className="flex flex-col gap-2 min-w-0">
-                {eyebrow && <div className="text-xs font-extrabold uppercase tracking-wide text-muted-foreground">{eyebrow}</div>}
-                <h1 className="text-3xl md:text-[44px] font-extrabold tracking-tight leading-[1.05] text-balance">{title}</h1>
+                {eyebrow && <div className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{eyebrow}</div>}
+                <h1 className="text-2xl md:text-[30px] font-extrabold tracking-tight leading-[1.05] text-balance">{title}</h1>
             </div>
             {aside && <div className="shrink-0">{aside}</div>}
         </div>

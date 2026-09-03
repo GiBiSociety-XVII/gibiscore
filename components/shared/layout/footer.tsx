@@ -17,8 +17,8 @@ export default function Footer() {
 
     return (
         <footer className="mt-auto w-full bg-background border-t-[2.5px] border-foreground">
-            <div className="max-w-6xl mx-auto px-4 py-12 md:py-16">
-                <div className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr] gap-8 md:gap-6 mb-8">
+            <div className="max-w-6xl mx-auto px-4 py-8 md:py-10">
+                <div className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr] gap-6 md:gap-5 mb-6">
                     <div className="flex flex-col items-start gap-4 col-span-2 md:col-span-1">
                         <div className="flex items-center gap-3">
                             <LogoMark />
