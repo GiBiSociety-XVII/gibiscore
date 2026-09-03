@@ -1,0 +1,67 @@
+{
+  "live": {
+    "title": "Partite di oggi",
+    "metaTitle": "Live e partite di oggi",
+    "metaDescription": "Risultati in tempo reale e programma di oggi di Serie A, Serie B, Coppa Italia e coppe europee.",
+    "liveBadge": "{count, plural, =0 {Nessuna partita in corso} one {# partita in corso} other {# partite in corso}}",
+    "yesterday": "Ieri",
+    "today": "Oggi",
+    "tomorrow": "Domani",
+    "empty": "Nessuna partita in programma oggi nelle competizioni seguite."
+  },
+  "competitions": {
+    "title": "Competizioni",
+    "metaTitle": "Competizioni",
+    "metaDescription": "Classifiche, calendario e risultati delle competizioni seguite da GiBiScore.",
+    "open": "Apri",
+    "season": "Stagione {season}",
+    "empty": "Le competizioni compaiono dopo la prima sincronizzazione dei dati."
+  },
+  "competition": {
+    "standings": "Classifica",
+    "results": "Risultati",
+    "upcoming": "Prossime partite",
+    "live": "In corso",
+    "notFound": "Competizione non trovata",
+    "backToList": "Tutte le competizioni",
+    "metaDescription": "{name}: classifica aggiornata, risultati e calendario della stagione {season}."
+  },
+  "match": {
+    "notFound": "Partita non trovata",
+    "backToCompetition": "Torna a {name}",
+    "events": "Cronaca",
+    "lineups": "Formazioni",
+    "stats": "Statistiche",
+    "players": "Voti e statistiche giocatori",
+    "metaTitle": "{home} – {away}",
+    "metaDescription": "{home} contro {away}, {competition}: risultato, cronaca, formazioni, statistiche e voti dei giocatori."
+  },
+  "team": {
+    "notFound": "Squadra non trovata",
+    "standings": "Posizione in classifica",
+    "recent": "Ultime partite",
+    "upcoming": "Prossime partite",
+    "live": "In campo adesso",
+    "squad": "Rosa",
+    "sidelined": "Indisponibili",
+    "position": "{position}ª su {total}",
+    "founded": "Fondata nel {year}",
+    "metaDescription": "{name}: risultati, prossime partite, classifica, rosa e indisponibili."
+  },
+  "player": {
+    "notFound": "Giocatore non trovato",
+    "totals": "Stagione in corso",
+    "matches": "Partita per partita",
+    "matchesPlayed": "Presenze",
+    "minutes": "Minuti",
+    "goals": "Gol",
+    "assists": "Assist",
+    "cards": "Cartellini",
+    "averageRating": "Voto medio",
+    "averageFantasy": "Fantamedia",
+    "years": "{age} anni",
+    "height": "{cm} cm",
+    "noMatches": "Nessuna partita con statistiche in questa stagione.",
+    "metaDescription": "{name}: statistiche partita per partita, voti e fantavoto stimato."
+  }
+}

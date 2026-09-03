@@ -189,21 +189,22 @@ Next.js (Server Components + SWR per il live)  -->  utente
 - Le pagine leggono **solo dal nostro DB**, mai dall'API esterna.
 - Cache HTTP breve (`revalidate`) per le pagine live, lunga per storico.
 
-## 6. Mappa del sito (prima versione)
+## 6. Mappa del sito (aggiornata al 3 settembre 2026)
 
-Tutto gratis al lancio (deciso). La colonna "in futuro" indica cosa
-potrebbe diventare Premium se un giorno si decidera' di introdurlo.
+URL in inglese come su GiBiArena, testi in italiano. Tutto gratis al lancio.
 
-| Route | Contenuto | In futuro |
+| Route | Contenuto | Stato |
 |---|---|---|
-| `/` | Partite live, classifica breve, giocatore in evidenza | - |
-| `/live` | Tutte le partite di oggi con aggiornamento automatico | - |
-| `/serie-a` (per competizione) | Calendario, risultati, classifica completa | - |
-| `/squadre/[slug]` | Rosa, forma, statistiche stagionali, xG | - |
-| `/giocatori/[slug]` | Scheda giocatore, statistiche per partita, storico | confronti tra giocatori |
-| `/partita/[id]` | Dettaglio partita: eventi, formazioni, statistiche, xG live | - |
-| `/classifiche` | Marcatori, assist, cartellini, xG | - |
-| `/account` | Profilo, preferiti (solo se loggato) | - |
+| `/` | Partite del momento, classifica Serie A, giocatore in evidenza | fatta |
+| `/live` | Partite di ieri, oggi e domani per competizione, live in cima | fatta |
+| `/competitions` | Elenco competizioni seguite | fatta |
+| `/competitions/[slug]` | Classifica completa (con gironi), prossime partite e risultati per giornata, live | fatta |
+| `/matches/[id]` | Scoreboard, cronaca, formazioni, statistiche squadra, voti e fantavoto giocatori | fatta |
+| `/teams/[slug]` | Posizione in classifica, ultime e prossime partite, rosa, indisponibili | fatta |
+| `/players/[slug]` | Scheda, totali stagionali, partita per partita con voto e fantavoto | fatta |
+| `/account` | Profilo, preferiti (solo se loggato) | da fare |
+| ricerca squadre/giocatori | dalla barra in alto | da fare |
+| classifiche marcatori, assist, cartellini | per competizione | da fare |
 
 ## 7. Decisioni infrastrutturali
 
@@ -222,7 +223,8 @@ potrebbe diventare Premium se un giorno si decidera' di introdurlo.
 5. ~~Scaffolding del progetto Next.js~~ fatto (3 settembre 2026).
 6. ~~Job di sincronizzazione~~ riscritti per API-Football, testati sui mapper; da
    validare con la chiave reale (`pnpm probe:api-football`, poi i cron).
-7. Pagine: partita, squadra, giocatore, classifiche, calendario per competizione.
+7. ~~Pagine: partita, squadra, giocatore, calendario per competizione~~ fatte (3 settembre 2026).
+   Restano: ricerca, classifiche marcatori/assist, account.
 8. Login facoltativo con Supabase Auth.
 
 ## 9. Fase 2 (in seguito): analisi, previsioni, scommesse, fantacalcio

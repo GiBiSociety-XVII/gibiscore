@@ -7,17 +7,22 @@ import {buttonClasses} from "@/components/shared/ui/button";
 import {cn} from "@/components/shared/ui/cn";
 import {LogoMark} from "./logo";
 
+// URLs are English like on GiBiArena; labels come from AppBar.json.
 const NAV_ITEMS = [
-    {key: 'live', href: '/'},
-    {key: 'serieA', href: '/serie-a'},
-    {key: 'teams', href: '/squadre'},
-    {key: 'players', href: '/giocatori'},
-    {key: 'rankings', href: '/classifiche'},
+    {key: 'live', href: '/live'},
+    {key: 'competitions', href: '/competitions', exact: false},
+    {key: 'serieA', href: '/competitions/serie-a'},
+    {key: 'championsLeague', href: '/competitions/champions-league'},
 ] as const;
 
 export default function AppBar() {
     const path = usePathname();
     const t = useTranslations("AppBar");
+
+    const isActive = (href: string) => {
+        if (href === '/competitions') return path === '/competitions';
+        return path === href || path.startsWith(`${href}/`);
+    };
 
     return (
         <header className="sticky top-0 z-50 w-full bg-background border-b-[2.5px] border-foreground">
@@ -30,21 +35,18 @@ export default function AppBar() {
                         </Link>
 
                         <nav aria-label={t('sectionsLabel')} className="hidden lg:flex items-center gap-1 ml-2">
-                            {NAV_ITEMS.map(({key, href}) => {
-                                const active = href === '/' ? path === '/' : path.startsWith(href);
-                                return (
-                                    <Link
-                                        key={key}
-                                        href={href}
-                                        className={cn(
-                                            "px-4 py-2.5 rounded-[10px] text-base font-bold transition-colors hover:bg-muted",
-                                            active ? "bg-muted text-foreground" : "text-foreground/70 hover:text-foreground",
-                                        )}
-                                    >
-                                        {t(`nav.${key}`)}
-                                    </Link>
-                                );
-                            })}
+                            {NAV_ITEMS.map(({key, href}) => (
+                                <Link
+                                    key={key}
+                                    href={href}
+                                    className={cn(
+                                        "px-4 py-2.5 rounded-[10px] text-base font-bold transition-colors hover:bg-muted whitespace-nowrap",
+                                        isActive(href) ? "bg-muted text-foreground" : "text-foreground/70 hover:text-foreground",
+                                    )}
+                                >
+                                    {t(`nav.${key}`)}
+                                </Link>
+                            ))}
                         </nav>
                     </div>
 
@@ -58,7 +60,10 @@ export default function AppBar() {
                                 aria-label={t('search')}
                             />
                         </label>
-                        <Link href="/account" className={buttonClasses('secondary', 'default')}>
+                        <Link href="/live" className={cn(buttonClasses('primary', 'default'), "lg:hidden")}>
+                            {t('nav.live')}
+                        </Link>
+                        <Link href="/account" className={cn(buttonClasses('secondary', 'default'), "hidden lg:inline-flex")}>
                             {t('login')}
                         </Link>
                     </div>
