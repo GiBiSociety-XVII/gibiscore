@@ -20,11 +20,10 @@ Nulla di quanto scritto qui e' ancora implementato.
 
 ## 2. Ancora da decidere
 
-1. Direzione grafica (sezione 4). Bozze visive in lavorazione.
-2. Quale API calcio (sezione 3) e quali campionati coprire al lancio.
+1. Quale API calcio (sezione 3) e quali campionati coprire al lancio.
    Proposta: Serie A + Serie B + Champions League, poi le altre top 5.
-3. Quali funzioni sono Premium e quali free (sezione 6).
-4. Prezzo dell'abbonamento e se e' lo stesso abbonamento di GiBiArena o uno separato.
+2. Quali funzioni sono Premium e quali free (sezione 6).
+3. Prezzo dell'abbonamento e se e' lo stesso abbonamento di GiBiArena o uno separato.
 
 ## 3. Fonti dati: API calcio a confronto
 
@@ -44,9 +43,19 @@ piu' fini (xG, heatmap) valutare Sportmonks o l'add-on di API-Football.
 Regola importante: **mai chiamare l'API dal browser**. Le chiamate passano
 sempre dal server (cron + cache in DB) per proteggere la chiave e la quota.
 
-## 4. Direzione grafica: tre opzioni
+## 4. Direzione grafica: DECISO, opzione A (Bold Blocks, stile GiBiArena)
 
-Bozze su canvas (link nella chat). Tutte mostrano la stessa homepage
+Scelta il 3 settembre 2026. GiBiScore riprende i token e i componenti
+`bb-*` di GiBiArena: sfondo #f5f3ee, inchiostro #14131a, card bianche,
+bordi 2.5px, ombre piene, accento lime #b6ff3c, font Geist, radius 12/16px.
+La B e' stata scartata perche' troppo simile agli altri siti di live score;
+B e C restano come riferimento (tema scuro futuro, pagine di analisi).
+
+Da affinare in fase di implementazione: nelle tabelle dense (classifica
+completa, statistiche giocatore) usare bordi interni piu' leggeri per non
+perdere leggibilita'.
+
+Bozze su canvas (link nella chat). Tutte mostravano la stessa homepage
 (partite live, classifica, giocatore in evidenza, spazio ads, banner Premium)
 per un confronto onesto.
 
@@ -56,11 +65,6 @@ per un confronto onesto.
 | Pro | Un solo ecosistema riconoscibile, componenti `bb-*` riutilizzabili subito | Linguaggio delle app di live score e delle grafiche TV, ottimo di sera e su mobile | Valorizza analisi e lettura, differenzia GiBiScore come sito "di studio" |
 | Contro | Bordi spessi mangiano spazio nelle tabelle dense | Si allontana da GiBiArena, contrasti e ads da curare | Meno adatto a scorrere partite live in fretta |
 
-Consiglio: **A** se vuoi che GiBiArena e GiBiScore si riconoscano come
-fratelli e riusare componenti. Se invece vuoi che GiBiScore abbia una sua
-identita', **B** e' la scelta piu' naturale per un sito di risultati.
-Una via di mezzo possibile: struttura e componenti di A con un tema scuro
-opzionale preso da B.
 
 ## 5. Stack e architettura proposti
 
@@ -127,7 +131,7 @@ Next.js (Server Components + SWR per il live)  -->  utente
 
 ## 8. Prossimi passi
 
-1. Scegliere la direzione grafica (A, B, C o mix).
+1. ~~Scegliere la direzione grafica~~ fatto: opzione A.
 2. Confermare API-Football e i campionati del lancio.
 3. Confermare la strada per il login condiviso (sezione 5).
 4. Definire cosa e' Premium (sezione 6).
