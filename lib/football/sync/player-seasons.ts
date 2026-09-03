@@ -1,6 +1,6 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet, lastRateLimit} from '@/lib/api-football/client';
+import {apiFootballGet, waitForMinuteWindow} from '@/lib/api-football/client';
 import {mapPlayerProfile, mapPlayerSeason} from '@/lib/api-football/mappers';
 import type {AfPlayerResponse} from '@/lib/api-football/types';
 import {
@@ -19,8 +19,9 @@ import {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-/** Pages fetched concurrently after the first one told us the total. */
-const PAGE_CONCURRENCY = 5;
+/** No new season is started after this, well inside the route's maxDuration. */
+const DEADLINE_MS = 200_000;
+const RETRY = {retryOnMinuteLimit: true};
 
 export type PlayerSeasonsScope = 'auto' | 'current' | 'history' | 'all';
 
@@ -56,6 +57,7 @@ export interface PlayerSeasonsOptions {
 export async function syncPlayerSeasons(options: PlayerSeasonsOptions = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-player-seasons');
+    const startedAt = Date.now();
     try {
         const budget = options.budget ?? 500;
         const scope = options.scope ?? 'auto';
@@ -72,7 +74,7 @@ export async function syncPlayerSeasons(options: PlayerSeasonsOptions = {}): Pro
         run.bump('seasons_due', due.length);
 
         for (const s of due) {
-            if (run.requests >= budget) {
+            if (run.requests >= budget || Date.now() - startedAt > DEADLINE_MS) {
                 run.bump('seasons_deferred');
                 continue;
             }
@@ -107,18 +109,12 @@ async function currentSeasonDue(db: FootballClient, s: SeasonRow): Promise<boole
     return (count ?? 0) > 0;
 }
 
+/** One page, sequentially: the per-minute allowance of the plan is shared with the live job. */
 async function fetchPage(run: SyncRun, s: SeasonRow, page: number) {
-    await respectMinuteLimit();
-    const envelope = await apiFootballGet<AfPlayerResponse[]>('players', {league: s.leagueProviderId, season: s.year, page});
+    await waitForMinuteWindow();
+    const envelope = await apiFootballGet<AfPlayerResponse[]>('players', {league: s.leagueProviderId, season: s.year, page}, RETRY);
     run.requests += 1;
     return envelope;
-}
-
-/** Plans below ~30 requests/minute would otherwise fail mid-season: wait for the window to reset. */
-async function respectMinuteLimit() {
-    if (lastRateLimit.minuteRemaining !== null && lastRateLimit.minuteRemaining <= 1 && (lastRateLimit.minuteLimit ?? 0) < 60) {
-        await new Promise((resolve) => setTimeout(resolve, 61_000));
-    }
 }
 
 /** Every page of one league-season; returns the number of players stored. */
@@ -126,9 +122,9 @@ async function syncSeason(db: FootballClient, run: SyncRun, s: SeasonRow): Promi
     const first = await fetchPage(run, s, 1);
     const pages: AfPlayerResponse[][] = [first.response];
     const total = first.paging?.total ?? 1;
-    for (const group of chunk(Array.from({length: Math.max(0, total - 1)}, (_, i) => i + 2), PAGE_CONCURRENCY)) {
-        const results = await Promise.all(group.map((page) => fetchPage(run, s, page)));
-        for (const r of results) pages.push(r.response);
+    for (let page = 2; page <= total; page += 1) {
+        const envelope = await fetchPage(run, s, page);
+        pages.push(envelope.response);
     }
     const entries = pages.flat();
     const unique = new Map<number, AfPlayerResponse>();

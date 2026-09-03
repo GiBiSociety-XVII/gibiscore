@@ -16,7 +16,7 @@ import type {AfEnvelope} from './types';
 
 const BASE_URL = 'https://v3.football.api-sports.io';
 
-export type ApiFootballErrorKind = 'http' | 'api' | 'quota' | 'auth' | 'invalid_json';
+export type ApiFootballErrorKind = 'http' | 'api' | 'quota' | 'rate_minute' | 'auth' | 'invalid_json';
 
 export class ApiFootballError extends Error {
     constructor(
@@ -66,8 +66,48 @@ function readInt(headers: Headers, name: string): number | null {
     return Number.isFinite(n) ? n : null;
 }
 
+export interface GetOptions {
+    /**
+     * When the per-minute limit of the plan is hit, wait for the window to
+     * reset and retry (at most twice). Only for batch jobs that can afford a
+     * minute of waiting, never for the live job.
+     */
+    retryOnMinuteLimit?: boolean;
+}
+
+const MINUTE_WINDOW_MS = 61_000;
+
+export function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Wait when the plan's per-minute allowance is about to run out, as told by
+ * the headers of the previous response. Cheap insurance for batch jobs.
+ */
+export async function waitForMinuteWindow(): Promise<void> {
+    if (lastRateLimit.minuteRemaining !== null && lastRateLimit.minuteRemaining <= 1) {
+        await sleep(MINUTE_WINDOW_MS);
+        lastRateLimit = {...lastRateLimit, minuteRemaining: null};
+    }
+}
+
 /** GET one endpoint and return the full envelope (response + paging). */
-export async function apiFootballGet<T>(path: string, params: Params = {}): Promise<AfEnvelope<T>> {
+export async function apiFootballGet<T>(path: string, params: Params = {}, options: GetOptions = {}): Promise<AfEnvelope<T>> {
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            return await apiFootballGetOnce<T>(path, params);
+        } catch (error) {
+            if (options.retryOnMinuteLimit && error instanceof ApiFootballError && error.kind === 'rate_minute' && attempt < 2) {
+                await sleep(MINUTE_WINDOW_MS);
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
+async function apiFootballGetOnce<T>(path: string, params: Params): Promise<AfEnvelope<T>> {
     const url = new URL(`${BASE_URL}/${path.replace(/^\//, '')}`);
     for (const [key, value] of Object.entries(params)) {
         if (value !== undefined) url.searchParams.set(key, String(value));
@@ -103,9 +143,11 @@ export async function apiFootballGet<T>(path: string, params: Params = {}): Prom
         const lower = text.toLowerCase();
         const kind: ApiFootballErrorKind = lower.includes('token') || lower.includes('key')
             ? 'auth'
-            : lower.includes('request limit') || lower.includes('rate limit') || lower.includes('reached')
-              ? 'quota'
-              : 'api';
+            : lower.includes('per minute')
+              ? 'rate_minute'
+              : lower.includes('request limit') || lower.includes('rate limit') || lower.includes('reached')
+                ? 'quota'
+                : 'api';
         throw new ApiFootballError(`API-Football error on ${path} (${text})`, response.status, path, kind, json.errors);
     }
 

@@ -1,11 +1,14 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet} from '@/lib/api-football/client';
+import {apiFootballGet, waitForMinuteWindow} from '@/lib/api-football/client';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {chunk, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
 import {upsertFixtures} from './fixtures';
 
 const DAY = 86_400_000;
+/** Stop starting new requests after this, well inside the route's maxDuration. */
+const DEADLINE_MS = 230_000;
+const RETRY = {retryOnMinuteLimit: true};
 
 /**
  * sync-backfill (hourly, and by hand with a bigger limit after the install)
@@ -25,6 +28,8 @@ const DAY = 86_400_000;
 export async function syncBackfill(limit = 400): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-backfill');
+    const startedAt = Date.now();
+    const outOfTime = () => Date.now() - startedAt > DEADLINE_MS;
     try {
         const seasons = await featuredSeasons(db, historySeasonCount(), run);
 
@@ -33,7 +38,12 @@ export async function syncBackfill(limit = 400): Promise<SyncRun> {
             const listedAt = s.fixturesListedAt ? Date.parse(s.fixturesListedAt) : null;
             const stale = listedAt === null || (s.isCurrent && Date.now() - listedAt > 7 * DAY);
             if (!stale) continue;
-            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {league: s.leagueProviderId, season: s.year});
+            if (outOfTime()) {
+                run.bump('seasons_deferred');
+                continue;
+            }
+            await waitForMinuteWindow();
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {league: s.leagueProviderId, season: s.year}, RETRY);
             run.requests += 1;
             await upsertFixtures(db, run, response);
             const {error} = await db.from('seasons').update({fixtures_listed_at: new Date().toISOString()}).eq('id', s.id);
@@ -56,16 +66,21 @@ export async function syncBackfill(limit = 400): Promise<SyncRun> {
         run.bump('pending', ids.length);
 
         const fixtures: AfFixtureResponse[] = [];
+        const requested: number[] = [];
         for (const group of chunk(ids, 20)) {
-            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')});
+            if (outOfTime()) break;
+            await waitForMinuteWindow();
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')}, RETRY);
             run.requests += 1;
+            requested.push(...group);
             fixtures.push(...response);
         }
+        run.bump('detailed', fixtures.length);
         await upsertFixtures(db, run, fixtures, {withDetails: true});
 
         // Fixtures the API no longer returns would be retried forever: mark them.
         const returned = new Set(fixtures.map((f) => f.fixture.id));
-        const missing = ids.filter((id) => !returned.has(id));
+        const missing = requested.filter((id) => !returned.has(id));
         if (missing.length > 0) {
             await db.from('fixtures').update({details_synced_at: new Date().toISOString()}).in('provider_id', missing);
             run.warn(`${missing.length} fixture(s) not returned by the API, marked as synced: ${missing.slice(0, 10).join(',')}`);

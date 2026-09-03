@@ -243,6 +243,12 @@ export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures:
     }
 }
 
+function uniqueBy<T>(rows: T[], key: (row: T) => string): T[] {
+    const map = new Map<string, T>();
+    for (const row of rows) map.set(key(row), row);
+    return [...map.values()];
+}
+
 async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureResponse, fixtureId: number, teams: IdMap, eventsOnly: boolean, league?: LeagueRef) {
     const events = mapEvents(f.events);
     const lineups = eventsOnly ? [] : mapLineups(f.lineups);
@@ -295,7 +301,10 @@ async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureRespo
     }
 
     // Lineups
-    const lineupRows = lineups
+    // The feed sometimes lists a player twice (bench and pitch, or in both
+    // teams' blocks): one row per key, last one wins, or Postgres rejects
+    // the whole upsert ("cannot affect row a second time").
+    const lineupRows = uniqueBy(lineups
         .filter((l) => teams.has(l.providerTeamId) && players.has(l.providerPlayerId))
         .map((l) => ({
             fixture_id: fixtureId,
@@ -306,7 +315,7 @@ async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureRespo
             formation: l.formation,
             formation_position: l.formationPosition,
             jersey_number: l.jerseyNumber,
-        }));
+        })), (r) => `${r.team_id}:${r.player_id}`);
     if (lineupRows.length > 0) {
         const {error} = await db.from('lineups').upsert(lineupRows, {onConflict: 'fixture_id,team_id,player_id,is_expected'});
         if (error) failSync('lineups.upsert', error);
@@ -314,12 +323,12 @@ async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureRespo
     }
 
     // Player statistics
-    const playerStatRows = playerStats
+    const playerStatRows = uniqueBy(playerStats
         .filter((s) => teams.has(s.providerTeamId) && players.has(s.providerPlayerId))
         .map(({providerPlayerId, providerTeamId, playerName: _name, ...s}) => {
             void _name;
             return {fixture_id: fixtureId, player_id: players.get(providerPlayerId)!, team_id: teams.get(providerTeamId)!, ...s};
-        });
+        }), (r) => String(r.player_id));
     if (playerStatRows.length > 0) {
         const {error} = await db.from('fixture_player_stats').upsert(playerStatRows, {onConflict: 'fixture_id,player_id'});
         if (error) failSync('fixture_player_stats.upsert', error);

@@ -1,6 +1,7 @@
 import 'server-only';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {createServiceClient} from '@/lib/db/server';
+import {lastRateLimit} from '@/lib/api-football/client';
 import {slugify} from '@/lib/api-football/mappers';
 
 /**
@@ -73,7 +74,7 @@ export async function finishRun(db: FootballClient, run: SyncRun, status: 'ok' |
             finished_at: new Date().toISOString(),
             status,
             requests_used: run.requests,
-            details: {counters: run.counters, warnings: run.warnings, error: errorMessage ?? null},
+            details: {counters: run.counters, warnings: run.warnings, error: errorMessage ?? null, quota: lastRateLimit},
         })
         .eq('id', run.id);
 }
