@@ -55,9 +55,15 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
             imageUrl: p.image_url,
         });
 
-        const squad = ((squadRes.data ?? []) as unknown as Array<{jersey_number: number | null; player: Parameters<typeof toSquadPlayer>[0] | null}>)
-            .filter((m) => m.player)
-            .map((m) => toSquadPlayer(m.player!, m.jersey_number))
+        // The squad is stored once per current competition the team plays
+        // (league, cup, Europe): one line per player, whatever the source.
+        const byPlayer = new Map<number, ReturnType<typeof toSquadPlayer>>();
+        for (const m of (squadRes.data ?? []) as unknown as Array<{jersey_number: number | null; player: Parameters<typeof toSquadPlayer>[0] | null}>) {
+            if (!m.player) continue;
+            const existing = byPlayer.get(m.player.id);
+            if (!existing || (existing.number === null && m.jersey_number !== null)) byPlayer.set(m.player.id, toSquadPlayer(m.player, m.jersey_number));
+        }
+        const squad = [...byPlayer.values()]
             .sort((a, b) => (POSITION_ORDER[a.position ?? ''] ?? 9) - (POSITION_ORDER[b.position ?? ''] ?? 9) || (a.number ?? 99) - (b.number ?? 99));
 
         const seen = new Set<number>();

@@ -124,6 +124,8 @@ export async function syncCompetitions(): Promise<SyncRun> {
             .eq('leagues.tier', 'featured');
         if (fsError) failSync('seasons.select', fsError);
 
+        // A club in league, cup and Europe is asked its squad once per run.
+        const squadCache = new Map<number, AfSquadResponse['players']>();
         for (const s of featuredSeasons ?? []) {
             const league = s.league as unknown as {id: number; provider_id: number; name: string};
             let teamEntries: AfTeamResponse[] = [];
@@ -156,7 +158,7 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 const dbTeamId = teamIds.get(t.team.id);
                 if (!dbTeamId) continue;
                 try {
-                    await syncSquad(db, run, s.id as number, t.team.id, dbTeamId);
+                    await syncSquad(db, run, s.id as number, t.team.id, dbTeamId, squadCache);
                 } catch (error) {
                     run.warn(`squad ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
                     if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
@@ -176,10 +178,14 @@ export async function syncCompetitions(): Promise<SyncRun> {
     }
 }
 
-async function syncSquad(db: FootballClient, run: SyncRun, dbSeasonId: number, teamProviderId: number, dbTeamId: number) {
-    const {response} = await apiFootballGet<AfSquadResponse[]>('players/squads', {team: teamProviderId});
-    run.requests += 1;
-    const members = response[0]?.players ?? [];
+async function syncSquad(db: FootballClient, run: SyncRun, dbSeasonId: number, teamProviderId: number, dbTeamId: number, cache: Map<number, AfSquadResponse['players']>) {
+    let members = cache.get(teamProviderId);
+    if (!members) {
+        const {response} = await apiFootballGet<AfSquadResponse[]>('players/squads', {team: teamProviderId});
+        run.requests += 1;
+        members = response[0]?.players ?? [];
+        cache.set(teamProviderId, members);
+    }
     if (members.length === 0) return;
 
     const playerRows = members.map((p) => {
