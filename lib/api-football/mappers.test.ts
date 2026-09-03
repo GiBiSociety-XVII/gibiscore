@@ -7,14 +7,17 @@ import {
     mapEvents,
     mapFixtureState,
     mapLineups,
+    mapPlayerProfile,
+    mapPlayerSeason,
     mapPlayerStats,
     mapStandings,
+    parseMeasure,
     mapTeamStats,
     positionName,
     seasonName,
     slugify,
 } from './mappers';
-import type {AfEvent, AfLineup, AfPlayerMatchStats, AfStanding, AfTeamStatistics} from './types';
+import type {AfEvent, AfLineup, AfPlayerMatchStats, AfPlayerProfile, AfPlayerSeasonStats, AfStanding, AfTeamStatistics} from './types';
 
 describe('states', () => {
     it('maps status codes', () => {
@@ -172,5 +175,56 @@ describe('helpers', () => {
         expect(positionName('Goalkeeper')).toBe('goalkeeper');
         expect(positionName('F')).toBe('attacker');
         expect(positionName(null)).toBeNull();
+    });
+});
+
+describe('player seasons', () => {
+    it('parses heights and weights', () => {
+        expect(parseMeasure('180 cm')).toBe(180);
+        expect(parseMeasure('75 kg')).toBe(75);
+        expect(parseMeasure(null)).toBeNull();
+        expect(parseMeasure('')).toBeNull();
+    });
+
+    it('maps a player profile', () => {
+        const profile: AfPlayerProfile = {
+            id: 1, name: 'N. González', firstname: 'Nicolás', lastname: 'González', age: 28,
+            birth: {date: '1998-04-06', place: 'Escobar', country: 'Argentina'}, nationality: 'Argentina',
+            height: '180 cm', weight: '78 kg', injured: false, photo: 'https://x/1.png',
+        };
+        const row = mapPlayerProfile(profile, 'Attacker');
+        expect(row.provider_id).toBe(1);
+        expect(row.date_of_birth).toBe('1998-04-06');
+        expect(row.height_cm).toBe(180);
+        expect(row.weight_kg).toBe(78);
+        expect(row.position).toBe('attacker');
+        expect(row.slug).toBe('n-gonzalez-1');
+    });
+
+    it('flattens season statistics', () => {
+        const stats: AfPlayerSeasonStats = {
+            team: {id: 496, name: 'Juventus', logo: null},
+            league: {id: 135, name: 'Serie A', country: 'Italy', logo: null, flag: null, season: 2026},
+            games: {appearences: 3, lineups: 2, minutes: 190, number: 11, position: 'Attacker', rating: '7.233333', captain: false},
+            substitutes: {in: 1, out: 0, bench: 1},
+            shots: {total: 8, on: 4},
+            goals: {total: 2, conceded: 0, assists: 1, saves: null},
+            passes: {total: 60, key: 5, accuracy: 82},
+            tackles: {total: 3, blocks: null, interceptions: 1},
+            duels: {total: 30, won: 14},
+            dribbles: {attempts: 10, success: 6, past: null},
+            fouls: {drawn: 4, committed: 2},
+            cards: {yellow: 1, yellowred: 0, red: 0},
+            penalty: {won: null, commited: null, scored: 1, missed: 0, saved: null},
+        };
+        const row = mapPlayerSeason(stats);
+        expect(row.season_year).toBe(2026);
+        expect(row.rating).toBe(7.23);
+        expect(row.goals).toBe(2);
+        expect(row.assists).toBe(1);
+        expect(row.passes_accuracy).toBe(82);
+        expect(row.penalties_scored).toBe(1);
+        expect(row.position).toBe('attacker');
+        expect(row.saves).toBeNull();
     });
 });

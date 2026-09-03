@@ -29,6 +29,10 @@
       "schedule": "20 * * * *"
     },
     {
+      "path": "/api/cron/sync-player-seasons",
+      "schedule": "40 * * * *"
+    },
+    {
       "path": "/api/cron/sync-live",
       "schedule": "* * * * *"
     }

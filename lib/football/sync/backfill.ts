@@ -1,29 +1,55 @@
 import 'server-only';
+import {historySeasonCount} from '@/lib/football/competitions';
 import {apiFootballGet} from '@/lib/api-football/client';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
-import {chunk, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
+import {chunk, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
 import {upsertFixtures} from './fixtures';
 
+const DAY = 86_400_000;
+
 /**
- * sync-backfill (hourly, and once by hand after the first install)
+ * sync-backfill (hourly, and by hand with a bigger limit after the install)
  *
- * Finished fixtures of featured leagues whose detail (events, lineups,
- * statistics, player ratings) was never stored: matches played before the
- * site went live, or missed while the live job was not running. Oldest
- * first, 20 fixtures per request, `limit` fixtures per run.
+ * Fills the archive of the featured leagues, current season plus
+ * API_FOOTBALL_HISTORY_SEASONS past ones, without ever touching the API at
+ * page render time:
+ *
+ * 1. Fixture lists. GET /fixtures?league&season (one request, the whole
+ *    season) for every season never listed; the current season is listed
+ *    again every 7 days to pick up rescheduled matches. This is what
+ *    brings in the matchdays played before the site went live.
+ * 2. Fixture detail. Finished fixtures whose events, lineups, statistics
+ *    and player ratings were never stored, newest first, 20 per request,
+ *    `limit` fixtures per run.
  */
-export async function syncBackfill(limit = 200): Promise<SyncRun> {
+export async function syncBackfill(limit = 400): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-backfill');
     try {
+        const seasons = await featuredSeasons(db, historySeasonCount(), run);
+
+        // 1. Season fixture lists.
+        for (const s of seasons) {
+            const listedAt = s.fixturesListedAt ? Date.parse(s.fixturesListedAt) : null;
+            const stale = listedAt === null || (s.isCurrent && Date.now() - listedAt > 7 * DAY);
+            if (!stale) continue;
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {league: s.leagueProviderId, season: s.year});
+            run.requests += 1;
+            await upsertFixtures(db, run, response);
+            const {error} = await db.from('seasons').update({fixtures_listed_at: new Date().toISOString()}).eq('id', s.id);
+            if (error) failSync('seasons.update', error);
+            run.bump('seasons_listed');
+            run.bump('fixtures_listed', response.length);
+        }
+
+        // 2. Detail of finished fixtures, most recent first.
         const {data, error} = await db
             .from('fixtures')
-            .select('provider_id,league:leagues!inner(tier),season:seasons!inner(is_current)')
+            .select('provider_id')
             .eq('state', 'finished')
             .is('details_synced_at', null)
-            .eq('leagues.tier', 'featured')
-            .eq('seasons.is_current', true)
-            .order('starting_at', {ascending: true})
+            .in('season_id', seasons.map((s) => s.id))
+            .order('starting_at', {ascending: false})
             .limit(limit);
         if (error) failSync('fixtures.select', error);
         const ids = (data ?? []).map((r) => r.provider_id as number);

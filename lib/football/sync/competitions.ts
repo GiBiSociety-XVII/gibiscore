@@ -1,5 +1,5 @@
 import 'server-only';
-import {basicScope, getFeaturedCompetitions} from '@/lib/football/competitions';
+import {basicScope, getFeaturedCompetitions, historySeasonCount} from '@/lib/football/competitions';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {currentSeason, positionName, seasonName, slugify} from '@/lib/api-football/mappers';
 import type {AfLeagueResponse, AfSquadResponse, AfTeamResponse} from '@/lib/api-football/types';
@@ -69,8 +69,11 @@ export async function syncCompetitions(): Promise<SyncRun> {
         if (leagueIdError) failSync('leagues.select', leagueIdError);
         const leagueDbId = new Map<number, number>((leagueIdRows ?? []).map((r) => [r.provider_id as number, r.id as number]));
 
-        // Seasons: upsert the current one per league, then flag it.
+        // Seasons: upsert the current one per league, then flag it. Featured
+        // leagues also get their past seasons (history archive), not current.
+        const history = historySeasonCount();
         const seasonRows = [];
+        const historyRows = [];
         for (const e of entries) {
             const leagueId = leagueDbId.get(e.league.id);
             const season = currentSeason(e.seasons);
@@ -83,12 +86,29 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 starting_at: season.start ?? null,
                 ending_at: season.end ?? null,
             });
+            if (!featuredIds.has(e.league.id)) continue;
+            for (const past of e.seasons ?? []) {
+                if (past.year >= season.year || past.year < season.year - history) continue;
+                historyRows.push({
+                    league_id: leagueId,
+                    year: past.year,
+                    name: seasonName(past),
+                    is_current: false,
+                    starting_at: past.start ?? null,
+                    ending_at: past.end ?? null,
+                });
+            }
         }
         for (const rows of chunk(seasonRows, 200)) {
             const {error} = await db.from('seasons').upsert(rows, {onConflict: 'league_id,year'});
             if (error) failSync('seasons.upsert', error);
         }
         run.bump('seasons', seasonRows.length);
+        for (const rows of chunk(historyRows, 200)) {
+            const {error} = await db.from('seasons').upsert(rows, {onConflict: 'league_id,year'});
+            if (error) failSync('seasons.upsert', error);
+        }
+        run.bump('history_seasons', historyRows.length);
         // Older seasons of the same leagues are no longer current.
         for (const rows of chunk(seasonRows, 200)) {
             for (const r of rows) {

@@ -8,6 +8,8 @@ import type {
     AfFixtureResponse,
     AfLineup,
     AfPlayerMatchStats,
+    AfPlayerProfile,
+    AfPlayerSeasonStats,
     AfSeason,
     AfStanding,
     AfTeamStatistics,
@@ -411,4 +413,146 @@ export function positionName(position: string | null | undefined): string | null
         default:
             return null;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Player season aggregates (/players?league=&season=)
+// ---------------------------------------------------------------------------
+
+/** "180 cm" -> 180, "75 kg" -> 75, null otherwise. */
+export function parseMeasure(value: string | null | undefined): number | null {
+    if (!value) return null;
+    const n = Number.parseInt(value, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export interface PlayerProfileRow {
+    provider_id: number;
+    name: string;
+    first_name: string | null;
+    last_name: string | null;
+    age: number | null;
+    date_of_birth: string | null;
+    birth_place: string | null;
+    birth_country: string | null;
+    nationality: string | null;
+    height_cm: number | null;
+    weight_kg: number | null;
+    injured: boolean;
+    image_url: string | null;
+    position: string | null;
+    slug: string;
+    profile_synced_at: string;
+}
+
+export function mapPlayerProfile(p: AfPlayerProfile, position: string | null): PlayerProfileRow {
+    const name = p.name && p.name.trim() !== '' ? p.name : `Giocatore ${p.id}`;
+    return {
+        provider_id: p.id,
+        name,
+        first_name: p.firstname ?? null,
+        last_name: p.lastname ?? null,
+        age: p.age ?? null,
+        date_of_birth: p.birth?.date ?? null,
+        birth_place: p.birth?.place ?? null,
+        birth_country: p.birth?.country ?? null,
+        nationality: p.nationality ?? null,
+        height_cm: parseMeasure(p.height),
+        weight_kg: parseMeasure(p.weight),
+        injured: p.injured === true,
+        image_url: p.photo ?? null,
+        position: positionName(position),
+        slug: slugify(name, p.id),
+        profile_synced_at: new Date().toISOString(),
+    };
+}
+
+export interface PlayerSeasonRow {
+    season_year: number;
+    position: string | null;
+    jersey_number: number | null;
+    captain: boolean;
+    appearances: number | null;
+    lineups: number | null;
+    minutes: number | null;
+    rating: number | null;
+    sub_in: number | null;
+    sub_out: number | null;
+    bench: number | null;
+    shots_total: number | null;
+    shots_on: number | null;
+    goals: number | null;
+    goals_conceded: number | null;
+    assists: number | null;
+    saves: number | null;
+    passes_total: number | null;
+    passes_key: number | null;
+    passes_accuracy: number | null;
+    tackles_total: number | null;
+    blocks: number | null;
+    interceptions: number | null;
+    duels_total: number | null;
+    duels_won: number | null;
+    dribbles_attempts: number | null;
+    dribbles_success: number | null;
+    dribbles_past: number | null;
+    fouls_drawn: number | null;
+    fouls_committed: number | null;
+    yellow_cards: number | null;
+    yellow_red_cards: number | null;
+    red_cards: number | null;
+    penalties_won: number | null;
+    penalties_committed: number | null;
+    penalties_scored: number | null;
+    penalties_missed: number | null;
+    penalties_saved: number | null;
+    raw: AfPlayerSeasonStats;
+    synced_at: string;
+}
+
+/** Flatten one `statistics[]` entry of /players into a player_season_stats row (ids added by the caller). */
+export function mapPlayerSeason(s: AfPlayerSeasonStats): PlayerSeasonRow {
+    const rating = asNumber(s.games?.rating);
+    return {
+        season_year: s.league.season,
+        position: positionName(s.games?.position),
+        jersey_number: s.games?.number ?? null,
+        captain: s.games?.captain === true,
+        appearances: s.games?.appearences ?? null,
+        lineups: s.games?.lineups ?? null,
+        minutes: s.games?.minutes ?? null,
+        rating: rating === null ? null : Math.round(rating * 100) / 100,
+        sub_in: s.substitutes?.in ?? null,
+        sub_out: s.substitutes?.out ?? null,
+        bench: s.substitutes?.bench ?? null,
+        shots_total: s.shots?.total ?? null,
+        shots_on: s.shots?.on ?? null,
+        goals: s.goals?.total ?? null,
+        goals_conceded: s.goals?.conceded ?? null,
+        assists: s.goals?.assists ?? null,
+        saves: s.goals?.saves ?? null,
+        passes_total: s.passes?.total ?? null,
+        passes_key: s.passes?.key ?? null,
+        passes_accuracy: asNumber(s.passes?.accuracy),
+        tackles_total: s.tackles?.total ?? null,
+        blocks: s.tackles?.blocks ?? null,
+        interceptions: s.tackles?.interceptions ?? null,
+        duels_total: s.duels?.total ?? null,
+        duels_won: s.duels?.won ?? null,
+        dribbles_attempts: s.dribbles?.attempts ?? null,
+        dribbles_success: s.dribbles?.success ?? null,
+        dribbles_past: s.dribbles?.past ?? null,
+        fouls_drawn: s.fouls?.drawn ?? null,
+        fouls_committed: s.fouls?.committed ?? null,
+        yellow_cards: s.cards?.yellow ?? null,
+        yellow_red_cards: s.cards?.yellowred ?? null,
+        red_cards: s.cards?.red ?? null,
+        penalties_won: s.penalty?.won ?? null,
+        penalties_committed: s.penalty?.commited ?? null,
+        penalties_scored: s.penalty?.scored ?? null,
+        penalties_missed: s.penalty?.missed ?? null,
+        penalties_saved: s.penalty?.saved ?? null,
+        raw: s,
+        synced_at: new Date().toISOString(),
+    };
 }

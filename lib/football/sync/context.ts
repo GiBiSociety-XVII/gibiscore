@@ -84,7 +84,7 @@ export async function finishRun(db: FootballClient, run: SyncRun, status: 'ok' |
 
 export type IdMap = Map<number, number>; // provider_id -> our id
 
-async function selectIdMap(db: FootballClient, table: string, providerIds: number[]): Promise<IdMap> {
+export async function idMap(db: FootballClient, table: string, providerIds: number[]): Promise<IdMap> {
     const map: IdMap = new Map();
     for (let i = 0; i < providerIds.length; i += 500) {
         const chunk = providerIds.slice(i, i + 500);
@@ -182,14 +182,23 @@ export async function currentSeasons(db: FootballClient, tier?: LeagueTier): Pro
     });
 }
 
-/** Seasons keyed by "leagueDbId:year", creating placeholders for unknown ones. */
+/**
+ * Seasons keyed by "leagueDbId:year", creating placeholders for unknown
+ * ones. A placeholder is flagged current unless the league already has a
+ * current season of a later (or the same) year: past seasons imported for
+ * history must never steal the flag.
+ */
 export async function ensureSeasons(db: FootballClient, wanted: Array<{leagueId: number; year: number}>, run?: SyncRun): Promise<Map<string, number>> {
     const map = new Map<string, number>();
+    const currentYear = new Map<number, number>(); // league -> year flagged current
     const leagueIds = [...new Set(wanted.map((w) => w.leagueId))];
     for (let i = 0; i < leagueIds.length; i += 300) {
-        const {data, error} = await db.from('seasons').select('id,league_id,year').in('league_id', leagueIds.slice(i, i + 300));
+        const {data, error} = await db.from('seasons').select('id,league_id,year,is_current').in('league_id', leagueIds.slice(i, i + 300));
         if (error) fail('seasons.select', error);
-        for (const r of data ?? []) map.set(`${r.league_id}:${r.year}`, r.id as number);
+        for (const r of data ?? []) {
+            map.set(`${r.league_id}:${r.year}`, r.id as number);
+            if (r.is_current) currentYear.set(r.league_id as number, Math.max(currentYear.get(r.league_id as number) ?? 0, r.year as number));
+        }
     }
     const missing = new Map<string, {league_id: number; year: number}>();
     for (const w of wanted) {
@@ -197,13 +206,66 @@ export async function ensureSeasons(db: FootballClient, wanted: Array<{leagueId:
         if (!map.has(key)) missing.set(key, {league_id: w.leagueId, year: w.year});
     }
     if (missing.size > 0) {
-        const rows = [...missing.values()].map((m) => ({...m, name: String(m.year), is_current: true}));
+        const rows = [...missing.values()].map((m) => ({
+            ...m,
+            name: String(m.year),
+            is_current: (currentYear.get(m.league_id) ?? -1) < m.year,
+        }));
         const {data, error} = await db.from('seasons').upsert(rows, {onConflict: 'league_id,year'}).select('id,league_id,year');
         if (error) fail('seasons.upsert', error);
         for (const r of data ?? []) map.set(`${r.league_id}:${r.year}`, r.id as number);
         run?.bump('seasons_created', rows.length);
     }
     return map;
+}
+
+export interface SeasonRow extends SeasonRef {
+    isCurrent: boolean;
+    fixturesListedAt: string | null;
+    playersSyncedAt: string | null;
+}
+
+/**
+ * Seasons of the featured leagues to keep in the database: the current one
+ * plus `historyCount` past years, oldest last. Missing past seasons are
+ * created (not current) so fixtures and player stats can hang off them.
+ */
+export async function featuredSeasons(db: FootballClient, historyCount: number, run?: SyncRun): Promise<SeasonRow[]> {
+    const current = await currentSeasons(db, 'featured');
+    const wanted: Array<{leagueId: number; year: number}> = [];
+    for (const s of current) {
+        for (let back = 1; back <= historyCount; back += 1) wanted.push({leagueId: s.leagueId, year: s.year - back});
+    }
+    if (wanted.length > 0) await ensureSeasons(db, wanted, run);
+
+    const leagueIds = [...new Set(current.map((s) => s.leagueId))];
+    if (leagueIds.length === 0) return [];
+    const minYear = new Map<number, number>(current.map((s) => [s.leagueId, s.year - historyCount]));
+    const {data, error} = await db
+        .from('seasons')
+        .select('id,year,name,is_current,fixtures_listed_at,players_synced_at,league:leagues!inner(id,provider_id,slug,tier)')
+        .in('league_id', leagueIds)
+        .limit(2000);
+    if (error) fail('seasons.select', error);
+    const byLeague = new Map<number, SeasonRef>(current.map((s) => [s.leagueId, s]));
+    return (data ?? [])
+        .map((row): SeasonRow => {
+            const league = row.league as unknown as {id: number; provider_id: number; slug: string; tier: LeagueTier};
+            return {
+                id: row.id as number,
+                leagueId: league.id,
+                leagueProviderId: league.provider_id,
+                leagueSlug: league.slug,
+                tier: league.tier,
+                year: row.year as number,
+                name: row.name as string,
+                isCurrent: row.is_current === true,
+                fixturesListedAt: (row.fixtures_listed_at as string | null) ?? null,
+                playersSyncedAt: (row.players_synced_at as string | null) ?? null,
+            };
+        })
+        .filter((s) => s.year >= (minYear.get(s.leagueId) ?? 0) && s.year <= (byLeague.get(s.leagueId)?.year ?? 0))
+        .sort((a, b) => b.year - a.year || a.leagueSlug.localeCompare(b.leagueSlug));
 }
 
 export interface MinimalTeam {
@@ -223,7 +285,7 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
     if (unique.size === 0) return new Map();
 
     const ids = [...unique.keys()];
-    const existing = await selectIdMap(db, 'teams', ids);
+    const existing = await idMap(db, 'teams', ids);
 
     // Rich rows (from /teams) update everything; minimal rows (from fixtures)
     // only create missing teams so they never blank out stored details.
@@ -253,7 +315,7 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
         );
         if (error) fail('teams.upsert', error);
     }
-    return selectIdMap(db, 'teams', ids);
+    return idMap(db, 'teams', ids);
 }
 
 export interface MinimalPlayer {
@@ -274,7 +336,7 @@ export async function ensurePlayers(db: FootballClient, players: MinimalPlayer[]
     if (unique.size === 0) return new Map();
 
     const ids = [...unique.keys()];
-    const existing = await selectIdMap(db, 'players', ids);
+    const existing = await idMap(db, 'players', ids);
     const missing = ids.filter((id) => !existing.has(id));
     if (missing.length > 0) {
         const rows = missing.map((id) => {
@@ -292,7 +354,7 @@ export async function ensurePlayers(db: FootballClient, players: MinimalPlayer[]
         const {error} = await db.from('players').upsert(rows, {onConflict: 'provider_id', ignoreDuplicates: true});
         if (error) fail('players.upsert', error);
     }
-    return selectIdMap(db, 'players', ids);
+    return idMap(db, 'players', ids);
 }
 
 export function chunk<T>(items: T[], size: number): T[][] {

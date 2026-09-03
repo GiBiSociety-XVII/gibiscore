@@ -75,11 +75,27 @@ da `CRON_SECRET` (`vercel.json` definisce gli orari):
 | `sync-standings` | ogni 30 min | ~13 | classifiche delle leghe in evidenza |
 | `sync-standings?scope=all` | ogni giorno | ~300 | classifiche di ogni competizione attiva |
 | `sync-injuries` | ogni 6 ore | ~13 | infortuni e squalifiche, leghe in evidenza |
-| `sync-backfill` | ogni ora | fino a 10 | dettaglio (eventi, formazioni, voti) delle partite finite delle leghe in evidenza mai scaricato: recupera il pregresso |
+| `sync-backfill` | ogni ora | fino a ~20 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti |
+| `sync-player-seasons` | ogni ora | ~35 per lega-stagione, solo dopo una giornata giocata | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
 | `sync-live` | ogni minuto | 1 + 1 ogni 20 partite in evidenza | punteggi ed eventi di tutte le partite in corso; formazioni, statistiche e voti per quelle in evidenza |
 
-Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro (7.500).
+Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro (7.500);
+le statistiche stagionali aggiungono ~35 richieste per lega dopo ogni giornata.
 Con Ultra (75.000) c'è margine per promuovere altre leghe al livello in evidenza.
+
+### Archivio storico
+
+Per formule, medie e confronti servono anche le stagioni passate. I due job
+`sync-backfill` e `sync-player-seasons` importano, per ogni lega in evidenza,
+la stagione corrente più `API_FOOTBALL_HISTORY_SEASONS` (default 3) stagioni
+precedenti: calendario e risultati, eventi, formazioni, statistiche squadra,
+voti e statistiche per giocatore di ogni partita, e gli aggregati stagionali
+di API-Football (`football.player_season_stats`). Tutto finisce nel database
+una volta sola, poi le pagine e i calcoli leggono solo da lì. Costo una tantum:
+~20 richieste per lega-stagione di dettaglio partite + ~35 di statistiche
+giocatori, cioè circa 2.000-2.500 richieste per 13 leghe × 3 stagioni,
+spalmate dai cron orari in un paio di giorni (o subito, lanciando i job a
+mano con `limit`/`budget` più alti).
 
 Primo avvio su un database vuoto, nell'ordine:
 
@@ -88,7 +104,8 @@ CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-competitions
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-fixtures?window=month"
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-standings?scope=all"
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-injuries
-CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-backfill?limit=1000"   # dettaglio delle partite gia' giocate (~50 richieste)
+CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-backfill?limit=2000"          # calendario completo + dettaglio delle partite gia' giocate (~150 richieste)
+CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-player-seasons?scope=current"  # statistiche stagionali dei giocatori (~450 richieste)
 ```
 
 Diagnostica del piano e della copertura per lega in evidenza:

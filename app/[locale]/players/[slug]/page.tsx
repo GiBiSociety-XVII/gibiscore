@@ -2,6 +2,7 @@ import type {Metadata} from "next";
 import Image from "next/image";
 import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
+import {Badge} from "@/components/shared/ui/badge";
 import {Card} from "@/components/shared/ui/card";
 import {cn} from "@/components/shared/ui/cn";
 import {TeamCrest} from "@/components/home/team-crest";
@@ -27,13 +28,20 @@ function Stat({value, label, accent = false}: {value: string | number; label: st
     );
 }
 
-export default async function PlayerPage({params}: PageProps<"/[locale]/players/[slug]">) {
+function parseSeason(raw: string | string[] | undefined): number | undefined {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (!value || !/^\d{4}$/.test(value)) return undefined;
+    return Number(value);
+}
+
+export default async function PlayerPage({params, searchParams}: PageProps<"/[locale]/players/[slug]">) {
     const {locale, slug} = await params;
+    const {season} = await searchParams;
     setRequestLocale(locale);
     const t = await getTranslations('Pages.player');
     const tFootball = await getTranslations('Football');
     const format = await getFormatter();
-    const page = await getPlayerPage(slug);
+    const page = await getPlayerPage(slug, parseSeason(season));
 
     if (!page) {
         return (
@@ -45,6 +53,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
 
     const {player, team, totals} = page;
     const pos = player.position && ['goalkeeper', 'defender', 'midfielder', 'attacker'].includes(player.position) ? player.position : 'unknown';
+    const isKeeper = pos === 'goalkeeper' || page.seasons.some((s) => s.position === 'goalkeeper');
 
     return (
         <PageShell>
@@ -58,7 +67,10 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                             {player.imageUrl && <Image src={player.imageUrl} alt="" width={48} height={48} className="object-cover" />}
                         </span>
                         <span className="flex flex-col gap-1">
-                            <span>{player.name}</span>
+                            <span className="inline-flex items-center gap-2 flex-wrap">
+                                {player.name}
+                                {player.injured && <Badge variant="outline" className="text-xs">{t('injured')}</Badge>}
+                            </span>
                             {team && (
                                 <Link href={`/teams/${team.slug}`} className="inline-flex items-center gap-2 text-base font-bold text-muted-foreground hover:underline decoration-accent decoration-[3px] underline-offset-4">
                                     <TeamCrest team={team} size={22} />
@@ -70,8 +82,27 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                 }
             />
 
+            {page.availableSeasons.length > 1 && (
+                <nav aria-label={t('seasonPicker')} className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('seasonPicker')}</span>
+                    {page.availableSeasons.map((s) => (
+                        <Link
+                            key={s.year}
+                            href={{pathname: `/players/${player.slug}`, query: s.year === page.availableSeasons[0].year ? {} : {season: s.year}}}
+                            className={cn(
+                                "px-2 py-0.5 rounded-lg border-2 border-foreground text-xs font-extrabold font-mono tabular-nums",
+                                s.year === page.selectedSeason ? "bg-foreground text-background" : "bg-card hover:bg-accent",
+                            )}
+                            aria-current={s.year === page.selectedSeason ? 'page' : undefined}
+                        >
+                            {s.name}
+                        </Link>
+                    ))}
+                </nav>
+            )}
+
             <Card press className="p-3 md:p-4 flex flex-col gap-3">
-                <h2 className="text-lg font-extrabold tracking-tight">{t('totals')}</h2>
+                <h2 className="text-lg font-extrabold tracking-tight">{t('totals', {season: page.selectedSeasonName})}</h2>
                 <div className="grid gap-2 grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
                     <Stat value={totals.matches} label={t('matchesPlayed')} />
                     <Stat value={totals.minutes} label={t('minutes')} />
@@ -82,6 +113,84 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                     <Stat value={totals.averageFantasy !== null ? totals.averageFantasy.toFixed(2) : '–'} label={t('averageFantasy')} accent />
                 </div>
                 <p className="text-xs font-semibold text-muted-foreground">{tFootball('playerTable.fantasyHint')}</p>
+            </Card>
+
+            <Card className="p-3 md:p-4 flex flex-col gap-3 min-w-0">
+                <h2 className="text-lg font-extrabold tracking-tight">{t('seasonStats')}</h2>
+                {page.seasons.length === 0 ? (
+                    <p className="text-sm font-semibold text-muted-foreground">{t('noSeasonStats')}</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-[13px]">
+                            <thead>
+                                <tr className="text-muted-foreground text-[11px] font-extrabold tracking-wider uppercase">
+                                    <th className="px-1.5 py-1 text-left">{t('seasonTable.season')}</th>
+                                    <th className="px-1.5 py-1 text-left">{t('seasonTable.team')}</th>
+                                    <th className="px-1.5 py-1 text-left">{t('seasonTable.competition')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.apps')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.lineups')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.minutes')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.rating')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.goals')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.assists')}</th>
+                                    {isKeeper ? (
+                                        <>
+                                            <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.conceded')}</th>
+                                            <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.saves')}</th>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.shots')}</th>
+                                            <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.keyPasses')}</th>
+                                        </>
+                                    )}
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.passAccuracy')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.cards')}</th>
+                                    <th className="px-1.5 py-1 text-right font-mono">{t('seasonTable.penalties')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {page.seasons.map((s) => (
+                                    <tr key={`${s.seasonYear}-${s.team.id}-${s.competition.id}`} className={cn("border-t-2 border-muted font-semibold", s.seasonYear === page.selectedSeason && "bg-accent/30")}>
+                                        <td className="px-1.5 py-1 font-mono tabular-nums whitespace-nowrap">
+                                            <Link href={{pathname: `/players/${player.slug}`, query: {season: s.seasonYear}}} className="hover:underline decoration-accent decoration-[3px] underline-offset-4">{s.seasonName}</Link>
+                                        </td>
+                                        <td className="px-1.5 py-1 whitespace-nowrap">
+                                            <Link href={`/teams/${s.team.slug}`} className="inline-flex items-center gap-1.5 hover:underline decoration-accent decoration-[3px] underline-offset-4">
+                                                <TeamCrest team={s.team} size={18} />
+                                                {s.team.name}
+                                            </Link>
+                                        </td>
+                                        <td className="px-1.5 py-1 whitespace-nowrap">
+                                            <Link href={`/competitions/${s.competition.slug}`} className="hover:underline decoration-accent decoration-[3px] underline-offset-4">{s.competition.name}</Link>
+                                        </td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.appearances}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.lineups}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.minutes}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.rating !== null ? s.rating.toFixed(2) : '–'}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums font-extrabold">{s.goals}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.assists}</td>
+                                        {isKeeper ? (
+                                            <>
+                                                <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.goalsConceded ?? '–'}</td>
+                                                <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.saves ?? '–'}</td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.shots !== null ? `${s.shots} (${s.shotsOn ?? 0})` : '–'}</td>
+                                                <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.keyPasses ?? '–'}</td>
+                                            </>
+                                        )}
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.passAccuracy !== null ? `${s.passAccuracy}%` : '–'}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{s.yellowCards} / {s.redCards}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{isKeeper ? s.penaltiesSaved : `${s.penaltiesScored}/${s.penaltiesScored + s.penaltiesMissed}`}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                <p className="text-xs font-semibold text-muted-foreground">{t('seasonHint')}</p>
             </Card>
 
             <Card className="p-3 md:p-4 flex flex-col gap-3 min-w-0">
