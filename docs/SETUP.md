@@ -60,7 +60,7 @@ chiamata cron quando questa variabile esiste; le route rifiutano tutto il resto.
 Dopo aver salvato le variabili: **Deployments → ultimo deploy → Redeploy**.
 Le variabili d'ambiente entrano in vigore solo con un nuovo deploy.
 
-## 4. Verifica del deploy (1 minuto)
+## 4. Verifica del deploy e dell'abbonamento Sportmonks (2 minuti)
 
 Sostituisci `<deploy>` con il dominio del deploy di produzione
 (es. `gibiscore.vercel.app` o `gibiscore.com`).
@@ -68,6 +68,16 @@ Sostituisci `<deploy>` con il dominio del deploy di produzione
 - `https://<deploy>/api/health` deve rispondere `{"ok":true,...}`.
 - `https://<deploy>/api/cron/sync-live` aperta dal browser deve rispondere
   `401 unauthorized`: e' corretto, significa che il segreto protegge le route.
+- Controlla cosa vede il token Sportmonks **prima** di lanciare i job:
+
+  ```bash
+  curl -H "Authorization: Bearer $CRON_SECRET" "https://<deploy>/api/cron/sportmonks-status"
+  ```
+
+  La risposta elenca piano, add-on, fine del trial e, per ogni competizione
+  configurata, `accessible: true/false`. Se la Serie A risulta `false` il
+  token e' sul piano free (solo Superliga danese e Premiership scozzese):
+  attiva il trial dell'European Plan su My Sportmonks e ricontrolla.
 
 ## 5. Primo caricamento dati (10-15 minuti)
 
@@ -150,5 +160,6 @@ CRON_SECRET=... pnpm cron sync-fixtures   # BASE_URL predefinito: localhost:3000
 | Homepage sempre con "Dati di esempio" | schema `football` non esposto, oppure tabelle vuote | passo 1.2, poi passo 5 |
 | Job risponde `401` | `CRON_SECRET` mancante o diverso | passo 3, poi Redeploy |
 | Job risponde `502` con messaggio Sportmonks | token errato, lega non inclusa nel piano, limite richieste | leggi il messaggio: contiene il codice HTTP e l'endpoint |
+| `No result(s) found ... via your current subscription` | la lega non e' nel piano del token (tipico: piano free senza trial European) | `/api/cron/sportmonks-status`, poi attiva il trial European Plan |
 | Classifica tutta a zero | nomi dei dettagli di classifica diversi da quelli attesi | l'avviso compare in `sync_runs`; passami il payload di `pnpm probe:sportmonks standings/seasons/<id> "participant;details.type"` |
 | Partita live senza statistiche | il piano non include quell'include, o la lega non ha statistiche live | controlla `warnings` in `sync_runs` |

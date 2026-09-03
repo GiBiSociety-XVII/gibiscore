@@ -19,20 +19,37 @@ export interface SportmonksPagination {
     has_more: boolean;
 }
 
+export interface SportmonksSubscription {
+    meta?: {trial_ends_at?: string | null; ends_at?: string | null; current_timestamp?: number};
+    plans?: Array<{plan: string; sport: string; category: string}>;
+    add_ons?: Array<{add_on: string; sport: string; category: string}>;
+    widgets?: unknown[];
+}
+
 export interface SportmonksResponse<T> {
     data: T;
     pagination?: SportmonksPagination;
+    subscription?: SportmonksSubscription[] | SportmonksSubscription;
     rate_limit?: {resets_in_seconds: number; remaining: number; requested_entity: string};
+    timezone?: string;
 }
+
+export type SportmonksErrorKind = 'http' | 'no_access' | 'invalid_json';
 
 export class SportmonksError extends Error {
     constructor(
         message: string,
         public readonly status: number,
         public readonly path: string,
+        public readonly kind: SportmonksErrorKind = 'http',
     ) {
         super(message);
         this.name = 'SportmonksError';
+    }
+
+    /** True when the token exists but the subscription does not cover the request. */
+    get isNoAccess(): boolean {
+        return this.kind === 'no_access';
     }
 }
 
@@ -82,18 +99,50 @@ export async function sportmonksGet<T>(
     try {
         json = JSON.parse(body);
     } catch {
-        throw new SportmonksError(`Sportmonks returned non-JSON for ${path}: ${body.slice(0, 200)}`, response.status, path);
+        throw new SportmonksError(`Sportmonks returned non-JSON for ${path}: ${body.slice(0, 200)}`, response.status, path, 'invalid_json');
     }
 
     // Sportmonks answers 200 with only a `message` when the token has no
-    // access to the requested league/include. Surface that instead of
-    // letting callers trip over a missing `data`.
+    // access to the requested league/include ("No result(s) found matching
+    // your request ... via your current subscription"). Surface that as a
+    // distinct error kind so jobs can skip the item instead of aborting.
     if (!json || typeof json !== 'object' || !('data' in json)) {
         const message = (json as {message?: string} | null)?.message ?? JSON.stringify(json).slice(0, 300);
-        throw new SportmonksError(`Sportmonks returned no data for ${path}: ${message}`, response.status, path);
+        throw new SportmonksError(`Sportmonks returned no data for ${path}: ${message}`, response.status, path, 'no_access');
     }
 
     return json as SportmonksResponse<T>;
+}
+
+export interface SportmonksAccess {
+    subscription: SportmonksSubscription | null;
+    /** Leagues the token can read, as returned by GET /leagues. */
+    leagues: Array<{id: number; name: string; country_id: number | null; short_code: string | null}>;
+}
+
+/**
+ * What the current token is allowed to read. GET /leagues only lists the
+ * leagues inside the subscription, and every envelope carries the
+ * subscription metadata (plan, add-ons, trial end).
+ */
+export async function sportmonksAccess(): Promise<SportmonksAccess> {
+    const leagues: SportmonksAccess['leagues'] = [];
+    let subscription: SportmonksSubscription | null = null;
+    let page = 1;
+    for (;;) {
+        const envelope = await sportmonksGet<Array<{id: number; name: string; country_id?: number | null; short_code?: string | null}>>('leagues', {
+            params: {page, per_page: 50},
+        });
+        if (!subscription && envelope.subscription) {
+            subscription = Array.isArray(envelope.subscription) ? envelope.subscription[0] ?? null : envelope.subscription;
+        }
+        for (const l of envelope.data) {
+            leagues.push({id: l.id, name: l.name, country_id: l.country_id ?? null, short_code: l.short_code ?? null});
+        }
+        if (!envelope.pagination?.has_more || page >= 20) break;
+        page += 1;
+    }
+    return {subscription, leagues};
 }
 
 /** Iterate every page of a paginated endpoint. */
