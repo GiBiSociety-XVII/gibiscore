@@ -14,7 +14,7 @@ function FormDots({form}: {form: string | null | undefined}) {
                 <span
                     key={i}
                     className={cn(
-                        "inline-flex w-5 h-5 items-center justify-center rounded-md border-2 border-foreground text-[10px] font-extrabold",
+                        "inline-flex w-4 h-4 items-center justify-center rounded-md border-2 border-foreground text-[9px] font-extrabold",
                         r === 'W' && "bg-accent",
                         r === 'D' && "bg-muted",
                         r === 'L' && "bg-foreground text-background",
@@ -35,28 +35,28 @@ export function StandingsTable({groups, highlightTeamId, title}: {groups: Standi
     if (groups.length === 0 || groups.every((g) => g.rows.length === 0)) {
         return (
             <Card className="p-6">
-                {title && <h2 className="text-[22px] font-extrabold tracking-tight mb-2">{title}</h2>}
+                {title && <h2 className="text-lg font-extrabold tracking-tight mb-2">{title}</h2>}
                 <p className="text-sm font-semibold text-muted-foreground">{tEmpty('noStandings')}</p>
             </Card>
         );
     }
 
     return (
-        <Card className="p-4 md:p-6 flex flex-col gap-6 min-w-0">
-            {title && <h2 className="text-[22px] font-extrabold tracking-tight">{title}</h2>}
+        <Card className="p-3 md:p-4 flex flex-col gap-4 min-w-0">
+            {title && <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>}
             {groups.map((group) => (
                 <div key={group.name} className="flex flex-col gap-2 min-w-0">
                     {group.name && <h3 className="text-sm font-extrabold uppercase tracking-wide text-muted-foreground">{group.name}</h3>}
                     <div className="overflow-x-auto">
-                        <table className="w-full text-[15px]">
+                        <table className="w-full text-[13px]">
                             <thead>
-                                <tr className="text-muted-foreground text-xs font-extrabold tracking-wider">
-                                    <th className="px-2 py-1.5 w-8 text-left">{t('position')}</th>
-                                    <th className="px-2 py-1.5 text-left uppercase">{t('team')}</th>
+                                <tr className="text-muted-foreground text-[10px] font-extrabold tracking-wider">
+                                    <th className="px-1.5 py-1 w-8 text-left">{t('position')}</th>
+                                    <th className="px-1.5 py-1 text-left uppercase">{t('team')}</th>
                                     {(['played', 'won', 'drawn', 'lost', 'goalsFor', 'goalsAgainst', 'goalDiff', 'points'] as const).map((col) => (
-                                        <th key={col} className={cn("px-2 py-1.5 text-right font-mono", (col === 'goalsFor' || col === 'goalsAgainst') && "hidden md:table-cell")}>{t(col)}</th>
+                                        <th key={col} className={cn("px-1.5 py-1 text-right font-mono", (col === 'goalsFor' || col === 'goalsAgainst') && "hidden md:table-cell")}>{t(col)}</th>
                                     ))}
-                                    <th className="px-2 py-1.5 text-right hidden lg:table-cell">{t('form')}</th>
+                                    <th className="px-1.5 py-1 text-right hidden lg:table-cell">{t('form')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -65,26 +65,26 @@ export function StandingsTable({groups, highlightTeamId, title}: {groups: Standi
                                         key={row.team.id}
                                         className={cn("font-bold border-t-2", index === 0 ? "border-foreground" : "border-muted", highlightTeamId === row.team.id && "bg-accent/20")}
                                     >
-                                        <td className="px-2 py-2.5">
-                                            <span className={cn("inline-flex items-center justify-center w-[22px] h-[22px] rounded-md border-2 border-foreground text-xs font-mono", row.position <= 4 ? "bg-accent" : "bg-card")}>
+                                        <td className="px-1.5 py-1.5">
+                                            <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-md border-2 border-foreground text-[11px] font-mono", row.position <= 4 ? "bg-accent" : "bg-card")}>
                                                 {row.position}
                                             </span>
                                         </td>
-                                        <td className="px-2 py-2.5">
+                                        <td className="px-1.5 py-1.5">
                                             <Link href={`/teams/${row.team.slug ?? row.team.id}`} className="inline-flex items-center gap-2 hover:underline decoration-accent decoration-[3px] underline-offset-4">
-                                                <TeamCrest team={row.team} size={24} />
+                                                <TeamCrest team={row.team} size={20} />
                                                 <span className="truncate">{row.team.name}</span>
                                             </Link>
                                         </td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums">{row.played}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums">{row.won}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums">{row.drawn}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums">{row.lost}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums hidden md:table-cell">{row.goalsFor ?? '–'}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums hidden md:table-cell">{row.goalsAgainst ?? '–'}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums">{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</td>
-                                        <td className="px-2 py-2.5 text-right font-mono tabular-nums font-extrabold">{row.points}</td>
-                                        <td className="px-2 py-2.5 text-right hidden lg:table-cell"><FormDots form={row.form} /></td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums">{row.played}</td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums">{row.won}</td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums">{row.drawn}</td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums">{row.lost}</td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums hidden md:table-cell">{row.goalsFor ?? '–'}</td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums hidden md:table-cell">{row.goalsAgainst ?? '–'}</td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums">{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</td>
+                                        <td className="px-1.5 py-1.5 text-right font-mono tabular-nums font-extrabold">{row.points}</td>
+                                        <td className="px-1.5 py-1.5 text-right hidden lg:table-cell"><FormDots form={row.form} /></td>
                                     </tr>
                                 ))}
                             </tbody>

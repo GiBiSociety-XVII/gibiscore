@@ -112,6 +112,13 @@ Tutte le competizioni pubblicate da API-Football, su due livelli: in
 evidenza (dettaglio completo) e base (risultati, eventi, classifiche
 giornaliere). Lista in evidenza e budget richieste in README.
 
+**Archivio nel database, non richieste al volo.** Per le formule e le
+statistiche della fase 2 servono serie storiche: per le leghe in evidenza
+il database conserva la stagione corrente e le ultime 3 (calendario,
+eventi, formazioni, statistiche e voti di ogni partita, più gli aggregati
+stagionali per giocatore in `player_season_stats`). Importazione una
+tantum spalmata dai cron; le pagine e i calcoli non toccano mai l'API.
+
 ### Campionati al lancio (proposta originale)
 
 Serie A, Serie B, Coppa Italia, Champions League, Europa League,

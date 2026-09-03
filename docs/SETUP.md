@@ -102,7 +102,19 @@ pnpm cron sync-competitions                 # tutte le leghe e stagioni; squadre
 pnpm cron "sync-fixtures?window=month"      # tutte le partite da ieri a +30 giorni (32 richieste)
 pnpm cron "sync-standings?scope=all"        # classifiche di ogni competizione attiva (~300)
 pnpm cron sync-injuries                     # infortuni e squalifiche delle leghe in evidenza (~13)
+pnpm cron "sync-backfill?limit=2000"        # calendario completo della stagione + eventi, formazioni e voti delle partite gia' giocate (~150 richieste)
+pnpm cron "sync-player-seasons?scope=current"   # statistiche stagionali di ogni giocatore delle leghe in evidenza (~450 richieste)
 pnpm cron sync-live                         # partite in corso, se ce ne sono adesso
+```
+
+Le stagioni passate (default 3, `API_FOOTBALL_HISTORY_SEASONS`) arrivano da
+sole con i cron orari di `sync-backfill` e `sync-player-seasons` nel giro di
+un paio di giorni. Per averle subito, ripeti finche' `pending` e `seasons_due`
+nella risposta non sono 0 (ogni chiamata dura al massimo 5 minuti):
+
+```bash
+pnpm cron "sync-backfill?limit=2000"                 # ~100 richieste a chiamata
+pnpm cron "sync-player-seasons?scope=history&budget=1500"   # ~35 richieste per lega-stagione
 ```
 
 Con il piano **Free** (100 richieste al giorno) imposta prima
@@ -140,7 +152,7 @@ rigenera ogni 60 secondi, quindi il live ha al massimo un minuto di ritardo.
 
 ## 7. Cron automatici
 
-Su Vercel, **Settings → Cron Jobs** deve elencare i sette job di `vercel.json`:
+Su Vercel, **Settings → Cron Jobs** deve elencare i nove job di `vercel.json`:
 
 | Job | Orario (UTC) |
 |---|---|
@@ -150,6 +162,8 @@ Su Vercel, **Settings → Cron Jobs** deve elencare i sette job di `vercel.json`
 | `sync-fixtures` | ogni ora al minuto 15 |
 | `sync-standings` | ogni 30 minuti |
 | `sync-injuries` | ogni 6 ore al minuto 45 |
+| `sync-backfill` | ogni ora al minuto 20 |
+| `sync-player-seasons` | ogni ora al minuto 40 |
 | `sync-live` | ogni minuto |
 
 I cron girano **solo sul deploy di produzione** (branch `master`), non sulle
@@ -184,3 +198,5 @@ CRON_SECRET=... pnpm cron sync-fixtures   # BASE_URL predefinito: localhost:3000
 | Avviso "partial coverage" per una lega | API-Football non copre eventi/formazioni/statistiche per quella stagione | nessuna azione: il sito mostra i dati disponibili |
 | Classifica assente per una coppa | la competizione non ha una tabella in quella fase | normale, `seasons_without_table` nei contatori |
 | Partita live senza statistiche | statistiche pubblicate a fine partita da API-Football per quella lega | arrivano con il job live dopo il fischio finale |
+| Giocatore con 0 gol o pagina partita vuota per una gara gia' giocata | partita o dettaglio mai scaricati (giornata precedente all'attivazione) | `sync-backfill?limit=2000`, poi il cron orario tiene il passo |
+| Tabella "Statistiche per stagione" vuota | `sync-player-seasons` non ancora eseguito per quella lega | `sync-player-seasons?scope=current` (o `scope=history` per le stagioni passate) |

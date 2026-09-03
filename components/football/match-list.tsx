@@ -14,12 +14,12 @@ export function MatchList({title, fixtures, highlightTeamId, showCompetition, em
     return (
         <Card className="overflow-hidden">
             {title && (
-                <div className="px-4 md:px-5 py-3 border-b-[2.5px] border-foreground bg-muted/40">
-                    <h3 className="text-sm font-extrabold uppercase tracking-wide">{title}</h3>
+                <div className="px-3 py-1.5 border-b-[2.5px] border-foreground bg-muted/40">
+                    <h3 className="text-[12px] font-extrabold uppercase tracking-wide">{title}</h3>
                 </div>
             )}
             {fixtures.length === 0 ? (
-                <p className="px-4 py-6 text-sm font-semibold text-muted-foreground">{t(emptyKey)}</p>
+                <p className="px-3 py-4 text-[13px] font-semibold text-muted-foreground">{t(emptyKey)}</p>
             ) : (
                 <div className="flex flex-col">
                     {fixtures.map((f) => (

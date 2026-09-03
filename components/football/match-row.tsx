@@ -15,13 +15,13 @@ export function MatchRow({fixture, highlightTeamId, showCompetition = false}: {f
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const start = new Date(fixture.startingAt);
 
-    const teamClass = (id: number) => cn("font-bold text-[15px] truncate", highlightTeamId === id && "underline decoration-accent decoration-[3px] underline-offset-4");
+    const teamClass = (id: number) => cn("font-bold text-[13px] truncate", highlightTeamId === id && "underline decoration-accent decoration-[3px] underline-offset-4");
 
     return (
         <Link
             href={`/matches/${fixture.id}`}
             className={cn(
-                "grid grid-cols-[92px_minmax(0,1fr)_72px_minmax(0,1fr)] md:grid-cols-[120px_minmax(0,1fr)_88px_minmax(0,1fr)] items-center gap-2 md:gap-3 px-3 md:px-4 py-3 border-t-2 border-muted first:border-t-0 hover:bg-muted/60 transition-colors",
+                "grid grid-cols-[72px_minmax(0,1fr)_64px_minmax(0,1fr)] md:grid-cols-[96px_minmax(0,1fr)_76px_minmax(0,1fr)] items-center gap-2 px-2.5 md:px-3 py-1.5 border-t-2 border-muted first:border-t-0 hover:bg-muted/60 transition-colors",
                 isLive && "bg-accent/15",
             )}
         >
@@ -29,24 +29,24 @@ export function MatchRow({fixture, highlightTeamId, showCompetition = false}: {f
                 {isLive || fixture.state !== 'scheduled' ? (
                     <StatusBadge fixture={fixture} className="self-start" />
                 ) : (
-                    <span className="font-mono text-sm font-bold tabular-nums">{format.dateTime(start, {hour: '2-digit', minute: '2-digit'})}</span>
+                    <span className="font-mono text-[13px] font-bold tabular-nums">{format.dateTime(start, {hour: '2-digit', minute: '2-digit'})}</span>
                 )}
-                <span className="text-[11px] font-semibold text-muted-foreground truncate">
+                <span className="text-[10px] font-semibold text-muted-foreground truncate">
                     {showCompetition ? fixture.leagueName : format.dateTime(start, {day: 'numeric', month: 'short'})}
                 </span>
             </div>
 
             <div className="flex items-center justify-end gap-2 min-w-0">
                 <span className={cn(teamClass(fixture.home.id), "text-right")}>{fixture.home.name}</span>
-                <TeamCrest team={fixture.home} size={28} />
+                <TeamCrest team={fixture.home} size={22} />
             </div>
 
-            <div className="text-center font-mono font-bold tabular-nums text-lg md:text-xl">
+            <div className="text-center font-mono font-bold tabular-nums text-[15px] md:text-base">
                 {hasScore ? `${fixture.homeScore} – ${fixture.awayScore}` : <span className="text-muted-foreground text-sm">vs</span>}
             </div>
 
             <div className="flex items-center gap-2 min-w-0">
-                <TeamCrest team={fixture.away} size={28} />
+                <TeamCrest team={fixture.away} size={22} />
                 <span className={teamClass(fixture.away.id)}>{fixture.away.name}</span>
             </div>
         </Link>

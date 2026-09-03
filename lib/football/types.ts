@@ -267,11 +267,45 @@ export interface PlayerMatchRow {
     fantasy: number | null;
 }
 
+/** One row of football.player_season_stats: a player in a team, competition and season. */
+export interface PlayerSeasonStat {
+    seasonYear: number;
+    seasonName: string;
+    team: TeamSummary;
+    competition: {id: number; name: string; slug: string};
+    position: string | null;
+    appearances: number;
+    lineups: number;
+    minutes: number;
+    rating: number | null;
+    goals: number;
+    assists: number;
+    goalsConceded: number | null;
+    saves: number | null;
+    shots: number | null;
+    shotsOn: number | null;
+    keyPasses: number | null;
+    passAccuracy: number | null;
+    yellowCards: number;
+    redCards: number;
+    penaltiesScored: number;
+    penaltiesMissed: number;
+    penaltiesSaved: number;
+}
+
 export interface PlayerPage {
-    player: SquadPlayer & {nationality: string | null; height: number | null; weight: number | null};
+    player: SquadPlayer & {nationality: string | null; height: number | null; weight: number | null; injured: boolean};
     team: TeamSummary | null;
+    /** Season shown in the totals and match list (year the season starts). */
+    selectedSeason: number;
+    selectedSeasonName: string;
+    /** Seasons with data, newest first. */
+    availableSeasons: Array<{year: number; name: string}>;
+    /** Totals computed from the stored match lines of the selected season. */
     totals: PlayerSeasonTotals;
     matches: PlayerMatchRow[];
+    /** Provider aggregates, every season and competition we store. */
+    seasons: PlayerSeasonStat[];
 }
 
 // ---------------------------------------------------------------------------

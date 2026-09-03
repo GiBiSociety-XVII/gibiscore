@@ -196,3 +196,50 @@ export interface AfStatusResponse {
     subscription: {plan: string; end: string; active: boolean};
     requests: {current: number; limit_day: number};
 }
+
+// ---------------------------------------------------------------------------
+// /players?league=&season=&page= — season aggregates per player
+// ---------------------------------------------------------------------------
+
+export interface AfPlayerSeasonStats {
+    team: {id: number; name: string; logo: string | null};
+    league: {id: number; name: string; country: string | null; logo: string | null; flag: string | null; season: number};
+    games: {
+        appearences: number | null;
+        lineups: number | null;
+        minutes: number | null;
+        number: number | null;
+        position: string | null;
+        rating: string | null;
+        captain: boolean;
+    };
+    substitutes: {in: number | null; out: number | null; bench: number | null};
+    shots: {total: number | null; on: number | null};
+    goals: {total: number | null; conceded: number | null; assists: number | null; saves: number | null};
+    passes: {total: number | null; key: number | null; accuracy: number | string | null};
+    tackles: {total: number | null; blocks: number | null; interceptions: number | null};
+    duels: {total: number | null; won: number | null};
+    dribbles: {attempts: number | null; success: number | null; past: number | null};
+    fouls: {drawn: number | null; committed: number | null};
+    cards: {yellow: number | null; yellowred: number | null; red: number | null};
+    penalty: {won: number | null; commited: number | null; scored: number | null; missed: number | null; saved: number | null};
+}
+
+export interface AfPlayerProfile {
+    id: number;
+    name: string | null;
+    firstname: string | null;
+    lastname: string | null;
+    age: number | null;
+    birth: {date: string | null; place: string | null; country: string | null} | null;
+    nationality: string | null;
+    height: string | null; // "180 cm"
+    weight: string | null; // "75 kg"
+    injured: boolean;
+    photo: string | null;
+}
+
+export interface AfPlayerResponse {
+    player: AfPlayerProfile;
+    statistics: AfPlayerSeasonStats[];
+}

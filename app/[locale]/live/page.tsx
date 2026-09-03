@@ -24,7 +24,7 @@ function shiftDay(day: string, delta: number): string {
 
 function CompetitionSection({group}: {group: CompetitionFixtures}) {
     return (
-        <section className="flex flex-col gap-2">
+        <section className="flex flex-col gap-1.5">
             <Link href={`/competitions/${group.competition.slug}`} className="text-sm font-extrabold uppercase tracking-wide hover:underline decoration-accent decoration-[3px] underline-offset-4 self-start">
                 {group.competition.country ? `${group.competition.country} · ` : ''}{group.competition.name}
             </Link>
@@ -37,11 +37,11 @@ function CountryBlock({block, open}: {block: CountryFixtures; open: boolean}) {
     const count = block.competitions.reduce((s, c) => s + c.fixtures.length, 0);
     return (
         <details className="bb-surface overflow-hidden group" open={open}>
-            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 md:px-5 py-3 font-extrabold hover:bg-muted/60">
+            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-3 md:px-4 py-2 font-extrabold text-[14px] hover:bg-muted/60">
                 <span>{block.country}</span>
                 <span className="text-xs font-bold text-muted-foreground">{count} · {block.competitions.length}</span>
             </summary>
-            <div className="flex flex-col gap-4 p-4 md:p-5 border-t-[2.5px] border-foreground bg-background/60">
+            <div className="flex flex-col gap-3 p-3 border-t-[2.5px] border-foreground bg-background/60">
                 {block.competitions.map((c) => (
                     <div key={c.competition.slug} className="flex flex-col gap-2">
                         <Link href={`/competitions/${c.competition.slug}`} className="text-xs font-extrabold uppercase tracking-wide hover:underline decoration-accent decoration-[3px] underline-offset-4 self-start">
@@ -66,7 +66,7 @@ export default async function LivePage({params, searchParams}: PageProps<"/[loca
 
     const isLive = page.mode === 'live';
     const dayLabel = format.dateTime(new Date(`${page.date}T12:00:00Z`), {weekday: 'long', day: 'numeric', month: 'long'});
-    const navBtn = (active: boolean) => cn("bb-btn px-3 md:px-4 py-2 text-sm whitespace-nowrap", active ? "bg-accent" : "bg-card");
+    const navBtn = (active: boolean) => cn("bb-btn px-3 py-1.5 text-[13px] whitespace-nowrap", active ? "bg-accent" : "bg-card");
 
     return (
         <PageShell>
@@ -93,8 +93,8 @@ export default async function LivePage({params, searchParams}: PageProps<"/[loca
                 </Link>
                 <form method="get" action="/live" className="flex items-center gap-2 ml-auto">
                     <label className="sr-only" htmlFor="live-date">{t('pickDate')}</label>
-                    <input id="live-date" type="date" name="date" defaultValue={page.date} className="bb-input px-3 py-2 text-sm font-bold" />
-                    <button type="submit" className="bb-btn bg-card px-4 py-2 text-sm">{t('go')}</button>
+                    <input id="live-date" type="date" name="date" defaultValue={page.date} className="bb-input px-3 py-1.5 text-[13px] font-bold" />
+                    <button type="submit" className="bb-btn bg-card px-3 py-1.5 text-[13px]">{t('go')}</button>
                 </form>
             </div>
 
@@ -103,14 +103,14 @@ export default async function LivePage({params, searchParams}: PageProps<"/[loca
             ) : (
                 <>
                     {page.featured.length > 0 && (
-                        <div className="flex flex-col gap-6">
-                            <h2 className="text-[22px] font-extrabold tracking-tight">{t('featured')}</h2>
+                        <div className="flex flex-col gap-4">
+                            <h2 className="text-lg font-extrabold tracking-tight">{t('featured')}</h2>
                             {page.featured.map((g) => <CompetitionSection key={g.competition.slug} group={g} />)}
                         </div>
                     )}
                     {page.countries.length > 0 && (
                         <div className="flex flex-col gap-3">
-                            <h2 className="text-[22px] font-extrabold tracking-tight">{t('otherCompetitions')}</h2>
+                            <h2 className="text-lg font-extrabold tracking-tight">{t('otherCompetitions')}</h2>
                             {page.countries.map((block) => (
                                 <CountryBlock key={block.country} block={block} open={isLive} />
                             ))}

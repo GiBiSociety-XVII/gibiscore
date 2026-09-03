@@ -61,7 +61,7 @@
   },
   "player": {
     "notFound": "Giocatore non trovato",
-    "totals": "Stagione in corso",
+    "totals": "Totali {season}",
     "matches": "Partita per partita",
     "matchesPlayed": "Presenze",
     "minutes": "Minuti",
@@ -73,6 +73,29 @@
     "years": "{age} anni",
     "height": "{cm} cm",
     "noMatches": "Nessuna partita con statistiche in questa stagione.",
-    "metaDescription": "{name}: statistiche partita per partita, voti e fantavoto stimato."
+    "metaDescription": "{name}: statistiche partita per partita, voti e fantavoto stimato.",
+    "seasonPicker": "Stagione",
+    "seasonStats": "Statistiche per stagione",
+    "noSeasonStats": "Statistiche per stagione non ancora scaricate.",
+    "seasonHint": "Dati aggregati dal fornitore per campionato e stagione: presenze, titolare, minuti, voto medio, gol, assist, tiri (in porta), passaggi chiave, precisione passaggi, cartellini e rigori. Le stagioni passate arrivano con il job sync-player-seasons.",
+    "injured": "Infortunato",
+    "seasonTable": {
+      "season": "Stagione",
+      "team": "Squadra",
+      "competition": "Competizione",
+      "apps": "PG",
+      "lineups": "Tit.",
+      "minutes": "Min",
+      "rating": "Voto",
+      "goals": "Gol",
+      "assists": "Ast",
+      "shots": "Tiri",
+      "keyPasses": "PC",
+      "passAccuracy": "Pass. %",
+      "cards": "Cart.",
+      "penalties": "Rig.",
+      "conceded": "Subiti",
+      "saves": "Parate"
+    }
   }
 }

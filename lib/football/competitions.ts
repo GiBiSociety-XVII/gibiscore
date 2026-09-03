@@ -80,5 +80,17 @@ export function basicScope(): 'all' | 'featured' {
     return process.env.API_FOOTBALL_SCOPE === 'featured' ? 'featured' : 'all';
 }
 
+/**
+ * How many past seasons of the featured leagues are imported (fixtures
+ * with full detail and player season statistics). 0 disables history.
+ * API_FOOTBALL_HISTORY_SEASONS, default 3.
+ */
+export function historySeasonCount(): number {
+    const raw = process.env.API_FOOTBALL_HISTORY_SEASONS;
+    if (raw === undefined || raw.trim() === '') return 3;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? Math.min(n, 10) : 3;
+}
+
 /** Kept for the home page ordering. */
 export const COMPETITIONS = FEATURED_COMPETITIONS;

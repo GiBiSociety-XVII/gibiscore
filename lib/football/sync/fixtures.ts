@@ -148,13 +148,13 @@ export async function syncFixtureById(providerId: number): Promise<SyncRun> {
 // Core upsert
 // ---------------------------------------------------------------------------
 
-interface UpsertOptions {
+export interface UpsertOptions {
     withDetails?: boolean;
     /** Only events are stored from the payload (live feed for basic leagues). */
     eventsOnly?: boolean;
 }
 
-async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixtureResponse[], options: UpsertOptions = {}) {
+export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixtureResponse[], options: UpsertOptions = {}) {
     if (fixtures.length === 0) return;
 
     const leagues = await ensureLeagues(
@@ -209,6 +209,8 @@ async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixt
             venue_name: f.fixture.venue?.name ?? null,
             referee: f.fixture.referee ?? null,
             last_synced_at: new Date().toISOString(),
+            // Full detail stored in this pass: events, lineups, stats, ratings.
+            ...(options.withDetails && !options.eventsOnly ? {details_synced_at: new Date().toISOString()} : {}),
         });
     }
     if (skipped.length > 0) {
