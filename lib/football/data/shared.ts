@@ -29,6 +29,7 @@ export interface LeagueRow {
     country: string | null;
     logo_url: string | null;
     type: string | null;
+    tier?: 'featured' | 'basic' | null;
 }
 
 export interface FixtureRow {
@@ -46,7 +47,7 @@ export interface FixtureRow {
 }
 
 export const TEAM_SELECT = 'id,name,short_code,logo_url,slug';
-export const LEAGUE_SELECT = 'id,name,slug,country,logo_url,type';
+export const LEAGUE_SELECT = 'id,name,slug,country,logo_url,type,tier';
 
 export const FIXTURE_SELECT =
     'id,round,starting_at,state,minute,home_score,away_score,' +
@@ -55,12 +56,19 @@ export const FIXTURE_SELECT =
     `away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT}),` +
     'stats:fixture_team_stats(team_id,possession,shots_total,xg)';
 
+/** Lighter select for long lists (live page, day lists): no statistics join. */
+export const FIXTURE_LIST_SELECT =
+    'id,round,starting_at,state,minute,home_score,away_score,' +
+    `league:leagues(${LEAGUE_SELECT}),` +
+    `home:teams!fixtures_home_team_id_fkey(${TEAM_SELECT}),` +
+    `away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT})`;
+
 export function toTeam(row: TeamRow): TeamSummary {
     return {id: row.id, name: row.name, shortCode: row.short_code, logoUrl: row.logo_url, slug: row.slug};
 }
 
 export function toCompetition(row: LeagueRow): CompetitionSummary {
-    return {id: row.id, name: row.name, slug: row.slug, country: row.country, logoUrl: row.logo_url, type: row.type};
+    return {id: row.id, name: row.name, slug: row.slug, country: row.country, logoUrl: row.logo_url, type: row.type, featured: row.tier === 'featured'};
 }
 
 export function toFixture(row: FixtureRow): FixtureSummary | null {
@@ -72,6 +80,8 @@ export function toFixture(row: FixtureRow): FixtureSummary | null {
         id: row.id,
         leagueName: row.league.name,
         leagueSlug: row.league.slug,
+        leagueCountry: row.league.country,
+        leagueFeatured: row.league.tier === 'featured',
         round: row.round,
         startingAt: row.starting_at,
         state: row.state,

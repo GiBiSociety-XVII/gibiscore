@@ -1,12 +1,12 @@
 import 'server-only';
-import {apiFootballGet} from '@/lib/api-football/client';
+import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import type {AfInjuryResponse} from '@/lib/api-football/types';
 import {currentSeasons, ensurePlayers, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /**
- * sync-injuries (every 6 hours)
+ * sync-injuries (every 6 hours, featured leagues only)
  *
- * One request per current season. API-Football reports injuries and
+ * One request per featured season. API-Football reports injuries and
  * suspensions per upcoming fixture ("Missing Fixture", "Questionable");
  * rows have no id, so the season's list is replaced on every run.
  */
@@ -14,9 +14,17 @@ export async function syncInjuries(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-injuries');
     try {
-        for (const season of await currentSeasons(db)) {
-            const {response} = await apiFootballGet<AfInjuryResponse[]>('injuries', {league: season.leagueProviderId, season: season.year});
-            run.requests += 1;
+        for (const season of await currentSeasons(db, 'featured')) {
+            let response: AfInjuryResponse[] = [];
+            try {
+                ({response} = await apiFootballGet<AfInjuryResponse[]>('injuries', {league: season.leagueProviderId, season: season.year}));
+            } catch (error) {
+                run.warn(`injuries ${season.leagueSlug}: ${(error as Error).message}`);
+                if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
+                continue;
+            } finally {
+                run.requests += 1;
+            }
 
             const teams = await ensureTeams(db, response.map((r) => ({id: r.team.id, name: r.team.name, logo: r.team.logo})));
             const players = await ensurePlayers(db, response.map((r) => ({id: r.player.id, name: r.player.name, photo: r.player.photo})));

@@ -1,23 +1,44 @@
 import 'server-only';
-import {apiFootballGet} from '@/lib/api-football/client';
+import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {mapStandings} from '@/lib/api-football/mappers';
 import type {AfStandingsResponse} from '@/lib/api-football/types';
 import {currentSeasons, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /**
- * sync-standings (every 30 minutes)
+ * sync-standings
  *
- * One request per current season. Cups without a table return nothing and
- * are skipped. Group stages (Champions League league phase, cup groups)
- * keep their group name; a plain league table is stored with group ''.
+ * scope 'featured' (every 30 minutes): one request per featured season.
+ * scope 'all' (daily): every current season whose league had a fixture in
+ * the last 10 days or has one in the next 10, so dormant competitions cost
+ * nothing. Cups without a table return nothing and are skipped.
  */
-export async function syncStandings(): Promise<SyncRun> {
+export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Promise<SyncRun> {
     const db = footballClient();
-    const run = await startRun(db, 'sync-standings');
+    const run = await startRun(db, scope === 'all' ? 'sync-standings-all' : 'sync-standings');
     try {
-        for (const season of await currentSeasons(db)) {
-            const {response} = await apiFootballGet<AfStandingsResponse[]>('standings', {league: season.leagueProviderId, season: season.year});
-            run.requests += 1;
+        let seasons = await currentSeasons(db, scope === 'featured' ? 'featured' : undefined);
+
+        if (scope === 'all') {
+            const from = new Date(Date.now() - 10 * 86_400_000).toISOString();
+            const to = new Date(Date.now() + 10 * 86_400_000).toISOString();
+            const {data, error} = await db.from('fixtures').select('season_id').gte('starting_at', from).lte('starting_at', to).limit(20000);
+            if (error) failSync('fixtures.select', error);
+            const active = new Set((data ?? []).map((r) => r.season_id as number));
+            seasons = seasons.filter((s) => active.has(s.id));
+        }
+        run.bump('seasons', seasons.length);
+
+        for (const season of seasons) {
+            let response: AfStandingsResponse[] = [];
+            try {
+                ({response} = await apiFootballGet<AfStandingsResponse[]>('standings', {league: season.leagueProviderId, season: season.year}));
+            } catch (error) {
+                run.warn(`standings ${season.leagueSlug} ${season.year}: ${(error as Error).message}`);
+                if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
+                continue;
+            } finally {
+                run.requests += 1;
+            }
             const league = response[0]?.league;
             if (!league || !league.standings || league.standings.length === 0) {
                 run.bump('seasons_without_table');

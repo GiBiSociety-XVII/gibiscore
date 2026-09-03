@@ -32,6 +32,7 @@ export interface CompetitionSummary {
     country: string | null;
     logoUrl: string | null;
     type: string | null;
+    featured?: boolean;
 }
 
 export interface SeasonSummary {
@@ -44,6 +45,8 @@ export interface FixtureSummary {
     id: number;
     leagueName: string;
     leagueSlug?: string;
+    leagueCountry?: string | null;
+    leagueFeatured?: boolean;
     round: string | null;
     startingAt: string; // ISO timestamp
     state: FixtureState;

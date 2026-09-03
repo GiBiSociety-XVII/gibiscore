@@ -106,7 +106,13 @@ contratto faremo il trial di 14 giorni controllando sul campo la copertura
 reale di Serie B e Coppa Italia (le pagine di copertura dichiarano gli id
 delle leghe, ma la completezza puo' variare per stagione).
 
-### Campionati al lancio (proposta)
+### Copertura (aggiornata al 3 settembre 2026, piano API-Football a pagamento)
+
+Tutte le competizioni pubblicate da API-Football, su due livelli: in
+evidenza (dettaglio completo) e base (risultati, eventi, classifiche
+giornaliere). Lista in evidenza e budget richieste in README.
+
+### Campionati al lancio (proposta originale)
 
 Serie A, Serie B, Coppa Italia, Champions League, Europa League,
 Conference League. Le altre top 5 (Premier, Liga, Bundesliga, Ligue 1)
@@ -196,8 +202,8 @@ URL in inglese come su GiBiArena, testi in italiano. Tutto gratis al lancio.
 | Route | Contenuto | Stato |
 |---|---|---|
 | `/` | Partite del momento, classifica Serie A, giocatore in evidenza | fatta |
-| `/live` | Partite di ieri, oggi e domani per competizione, live in cima | fatta |
-| `/competitions` | Elenco competizioni seguite | fatta |
+| `/live` | Solo partite in corso di tutte le competizioni; con `?date=` il programma completo del giorno, navigabile | fatta |
+| `/competitions` | Tutte le ~1.100 competizioni: in evidenza, poi per paese | fatta |
 | `/competitions/[slug]` | Classifica completa (con gironi), prossime partite e risultati per giornata, live | fatta |
 | `/matches/[id]` | Scoreboard, cronaca, formazioni, statistiche squadra, voti e fantavoto giocatori | fatta |
 | `/teams/[slug]` | Posizione in classifica, ultime e prossime partite, rosa, indisponibili | fatta |

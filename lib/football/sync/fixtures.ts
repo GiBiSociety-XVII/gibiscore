@@ -1,5 +1,5 @@
 import 'server-only';
-import {liveFilter} from '@/lib/football/competitions';
+import {basicScope, isFeaturedProviderId} from '@/lib/football/competitions';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {
     extractMinute,
@@ -13,16 +13,17 @@ import {
 import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {
     chunk,
-    currentSeasons,
+    ensureLeagues,
     ensurePlayers,
+    ensureSeasons,
     ensureTeams,
     failSync,
     finishRun,
     footballClient,
-    leagueIdMap,
     startRun,
     type FootballClient,
     type IdMap,
+    type LeagueRef,
     type MinimalPlayer,
     type SyncRun,
 } from './context';
@@ -31,37 +32,32 @@ function ymd(date: Date): string {
     return date.toISOString().slice(0, 10);
 }
 
+/** Fixtures outside the basic scope are ignored entirely. */
+function inScope(f: AfFixtureResponse): boolean {
+    return basicScope() === 'all' || isFeaturedProviderId(f.league.id);
+}
+
 /**
  * sync-fixtures (hourly)
  *
- * One request per current season: the schedule from yesterday to +14 days.
- * Upserts fixtures and creates teams on the fly. Detail data (events,
- * statistics, lineups, player stats) is the live job's work.
+ * One request per day: GET /fixtures?date=YYYY-MM-DD returns every match of
+ * every competition that day. Default window: yesterday to +7 days (9
+ * requests). The daily run extends it to +30 days.
  */
 export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?: number} = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-fixtures');
     try {
-        const now = new Date();
-        const from = ymd(new Date(now.getTime() - (options.fromDaysAgo ?? 1) * 86_400_000));
-        const to = ymd(new Date(now.getTime() + (options.toDaysAhead ?? 14) * 86_400_000));
-
-        const seasons = await currentSeasons(db);
-        if (seasons.length === 0) {
-            run.warn('no current season in the database: run sync-competitions first');
-        }
-
+        const fromDaysAgo = options.fromDaysAgo ?? 1;
+        const toDaysAhead = options.toDaysAhead ?? 7;
         const fixtures: AfFixtureResponse[] = [];
-        for (const season of seasons) {
-            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {
-                league: season.leagueProviderId,
-                season: season.year,
-                from,
-                to,
-            });
+        for (let offset = -fromDaysAgo; offset <= toDaysAhead; offset += 1) {
+            const day = ymd(new Date(Date.now() + offset * 86_400_000));
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {date: day});
             run.requests += 1;
-            fixtures.push(...response);
+            fixtures.push(...response.filter(inScope));
         }
+        run.bump('fetched', fixtures.length);
 
         await upsertFixtures(db, run, fixtures);
         await finishRun(db, run, 'ok');
@@ -75,28 +71,31 @@ export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?:
 /**
  * sync-live (every minute)
  *
- * 1. One request lists everything in play for our leagues.
- * 2. Those fixtures, plus the ones our DB still marks as live or that should
+ * 1. GET /fixtures?live=all: every match in play worldwide, with events.
+ *    Scores, minute and events are stored for all of them.
+ * 2. Featured fixtures in play, plus fixtures our DB still marks as live
+ *    but the feed no longer lists (they just ended) and fixtures that should
  *    have kicked off in the last 3 hours, are re-fetched by id (20 per
- *    request): the by-id response carries events, lineups, statistics and
- *    player stats.
+ *    request) for lineups, statistics and player stats.
  */
 export async function syncLive(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-live');
     try {
-        const {response: inplay} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {live: liveFilter()});
+        const {response: inplayAll} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {live: 'all'});
         run.requests += 1;
+        const inplay = inplayAll.filter(inScope);
         run.bump('inplay', inplay.length);
 
-        const ids = new Set<number>(inplay.map((f) => f.fixture.id));
+        const inplayIds = new Set(inplay.map((f) => f.fixture.id));
+        const detailIds = new Set<number>(inplay.filter((f) => isFeaturedProviderId(f.league.id)).map((f) => f.fixture.id));
 
         const {data: staleRows, error} = await db
             .from('fixtures')
             .select('provider_id')
             .in('state', ['live', 'half_time', 'extra_time', 'penalties']);
         if (error) failSync('fixtures.select', error);
-        for (const r of staleRows ?? []) ids.add(r.provider_id as number);
+        for (const r of staleRows ?? []) if (!inplayIds.has(r.provider_id as number)) detailIds.add(r.provider_id as number);
 
         const threeHoursAgo = new Date(Date.now() - 3 * 3_600_000).toISOString();
         const {data: dueRows, error: dueError} = await db
@@ -106,17 +105,21 @@ export async function syncLive(): Promise<SyncRun> {
             .lte('starting_at', new Date().toISOString())
             .gte('starting_at', threeHoursAgo);
         if (dueError) failSync('fixtures.select', dueError);
-        for (const r of dueRows ?? []) ids.add(r.provider_id as number);
+        for (const r of dueRows ?? []) if (!inplayIds.has(r.provider_id as number)) detailIds.add(r.provider_id as number);
+
+        // Basic-tier live fixtures: scores and events straight from the feed.
+        const basicLive = inplay.filter((f) => !detailIds.has(f.fixture.id));
+        await upsertFixtures(db, run, basicLive, {withDetails: true, eventsOnly: true});
 
         const detailed: AfFixtureResponse[] = [];
-        for (const group of chunk([...ids], 20)) {
+        for (const group of chunk([...detailIds], 20)) {
             const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')});
             run.requests += 1;
-            detailed.push(...response);
+            detailed.push(...response.filter(inScope));
         }
         run.bump('detailed', detailed.length);
-
         await upsertFixtures(db, run, detailed, {withDetails: true});
+
         await finishRun(db, run, 'ok');
         return run;
     } catch (error) {
@@ -145,29 +148,27 @@ export async function syncFixtureById(providerId: number): Promise<SyncRun> {
 // Core upsert
 // ---------------------------------------------------------------------------
 
-async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixtureResponse[], options: {withDetails?: boolean} = {}) {
+interface UpsertOptions {
+    withDetails?: boolean;
+    /** Only events are stored from the payload (live feed for basic leagues). */
+    eventsOnly?: boolean;
+}
+
+async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixtureResponse[], options: UpsertOptions = {}) {
     if (fixtures.length === 0) return;
 
-    const leagues = await leagueIdMap(db, [...new Set(fixtures.map((f) => f.league.id))]);
+    const leagues = await ensureLeagues(
+        db,
+        fixtures.map((f) => ({id: f.league.id, name: f.league.name, country: f.league.country, logo: f.league.logo})),
+        (id) => (isFeaturedProviderId(id) ? 'featured' : 'basic'),
+    );
 
-    // Seasons by (league db id, year); create placeholders for unknown ones.
-    const {data: seasonRows, error: seasonError} = await db.from('seasons').select('id,league_id,year');
-    if (seasonError) failSync('seasons.select', seasonError);
-    const seasonId = new Map<string, number>((seasonRows ?? []).map((r) => [`${r.league_id}:${r.year}`, r.id as number]));
-    const missing = new Map<string, {league_id: number; year: number}>();
+    const seasonKey = new Map<string, {leagueId: number; year: number}>();
     for (const f of fixtures) {
-        const leagueId = leagues.get(f.league.id);
-        if (leagueId && !seasonId.has(`${leagueId}:${f.league.season}`)) {
-            missing.set(`${leagueId}:${f.league.season}`, {league_id: leagueId, year: f.league.season});
-        }
+        const league = leagues.get(f.league.id);
+        if (league) seasonKey.set(`${league.id}:${f.league.season}`, {leagueId: league.id, year: f.league.season});
     }
-    if (missing.size > 0) {
-        const rows = [...missing.values()].map((m) => ({...m, name: String(m.year), is_current: false}));
-        const {data: created, error} = await db.from('seasons').upsert(rows, {onConflict: 'league_id,year'}).select('id,league_id,year');
-        if (error) failSync('seasons.upsert', error);
-        for (const r of created ?? []) seasonId.set(`${r.league_id}:${r.year}`, r.id as number);
-        run.warn(`created ${rows.length} placeholder season(s); run sync-competitions to name them`);
-    }
+    const seasons = await ensureSeasons(db, [...seasonKey.values()], run);
 
     const teams = await ensureTeams(
         db,
@@ -180,11 +181,11 @@ async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixt
     const fixtureRows = [];
     const skipped: number[] = [];
     for (const f of fixtures) {
-        const leagueId = leagues.get(f.league.id);
-        const season = leagueId ? seasonId.get(`${leagueId}:${f.league.season}`) : undefined;
+        const league = leagues.get(f.league.id);
+        const season = league ? seasons.get(`${league.id}:${f.league.season}`) : undefined;
         const homeId = teams.get(f.teams.home.id);
         const awayId = teams.get(f.teams.away.id);
-        if (!leagueId || !season || !homeId || !awayId) {
+        if (!league || !season || !homeId || !awayId) {
             skipped.push(f.fixture.id);
             continue;
         }
@@ -192,7 +193,7 @@ async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixt
         if (state === 'unknown') run.warn(`fixture ${f.fixture.id}: unknown status ${f.fixture.status?.short}`);
         fixtureRows.push({
             provider_id: f.fixture.id,
-            league_id: leagueId,
+            league_id: league.id,
             season_id: season,
             round: f.league.round ?? null,
             stage: null,
@@ -207,15 +208,14 @@ async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixt
             away_score_ht: f.score?.halftime?.away ?? null,
             venue_name: f.fixture.venue?.name ?? null,
             referee: f.fixture.referee ?? null,
-            raw: options.withDetails ? stripRaw(f) : undefined,
             last_synced_at: new Date().toISOString(),
         });
     }
     if (skipped.length > 0) {
-        run.warn(`skipped ${skipped.length} fixture(s) of leagues not in the database: ${skipped.slice(0, 10).join(',')}`);
+        run.warn(`skipped ${skipped.length} fixture(s) with unresolved league/season/teams: ${skipped.slice(0, 10).join(',')}`);
     }
 
-    for (const rows of chunk(fixtureRows, 200)) {
+    for (const rows of chunk(fixtureRows, 300)) {
         const {error} = await db.from('fixtures').upsert(rows, {onConflict: 'provider_id'});
         if (error) failSync('fixtures.upsert', error);
     }
@@ -223,33 +223,28 @@ async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixt
 
     if (!options.withDetails) return;
 
-    const {data: idRows, error: idError} = await db
-        .from('fixtures')
-        .select('id,provider_id')
-        .in('provider_id', fixtureRows.map((r) => r.provider_id));
-    if (idError) failSync('fixtures.select', idError);
-    const fixtureIds: IdMap = new Map((idRows ?? []).map((r) => [r.provider_id as number, r.id as number]));
+    const fixtureIds: IdMap = new Map();
+    for (const ids of chunk(fixtureRows.map((r) => r.provider_id), 500)) {
+        const {data: idRows, error: idError} = await db.from('fixtures').select('id,provider_id').in('provider_id', ids);
+        if (idError) failSync('fixtures.select', idError);
+        for (const r of idRows ?? []) fixtureIds.set(r.provider_id as number, r.id as number);
+    }
 
     for (const f of fixtures) {
         const fixtureId = fixtureIds.get(f.fixture.id);
         if (!fixtureId) continue;
         try {
-            await upsertDetails(db, run, f, fixtureId, teams);
+            await upsertDetails(db, run, f, fixtureId, teams, options.eventsOnly === true, leagues.get(f.league.id));
         } catch (error) {
             run.warn(`fixture ${f.fixture.id} details: ${(error as Error).message}`);
         }
     }
 }
 
-/** Keep the raw payload small: drop the bulky parts we already normalised. */
-function stripRaw(f: AfFixtureResponse): Record<string, unknown> {
-    return {fixture: f.fixture, league: f.league, teams: f.teams, goals: f.goals, score: f.score};
-}
-
-async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureResponse, fixtureId: number, teams: IdMap) {
+async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureResponse, fixtureId: number, teams: IdMap, eventsOnly: boolean, league?: LeagueRef) {
     const events = mapEvents(f.events);
-    const lineups = mapLineups(f.lineups);
-    const playerStats = mapPlayerStats(f.players);
+    const lineups = eventsOnly ? [] : mapLineups(f.lineups);
+    const playerStats = eventsOnly ? [] : mapPlayerStats(f.players);
 
     // Players referenced anywhere must exist first (FK).
     const refs: MinimalPlayer[] = [];
@@ -262,7 +257,7 @@ async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureRespo
     const players = await ensurePlayers(db, refs);
 
     // Events: no provider id, so replace the whole timeline of the fixture.
-    if (f.events !== undefined) {
+    if (Array.isArray(f.events)) {
         const {error: deleteError} = await db.from('fixture_events').delete().eq('fixture_id', fixtureId);
         if (deleteError) failSync('fixture_events.delete', deleteError);
         const rows = events.map((e) => ({
@@ -284,6 +279,8 @@ async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureRespo
         }
         run.bump('events', rows.length);
     }
+
+    if (eventsOnly) return;
 
     // Team statistics
     const statRows = [...mapTeamStats(f.statistics).entries()]
@@ -327,5 +324,5 @@ async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureRespo
         run.bump('player_stats', playerStatRows.length);
     }
 
-    if (isLiveState(mapFixtureState(f.fixture.status?.short))) run.bump('live');
+    if (isLiveState(mapFixtureState(f.fixture.status?.short))) run.bump(league?.tier === 'featured' ? 'live_featured' : 'live_basic');
 }

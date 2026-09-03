@@ -1,60 +1,117 @@
 import 'server-only';
-import {COMPETITIONS} from '../competitions';
+import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionFixtures, type FixtureSummary} from '../types';
-import {FIXTURE_SELECT, footballDb, logReadError, toFixtures} from './shared';
+import {FIXTURE_LIST_SELECT, footballDb, logReadError, toFixtures} from './shared';
 
-/** Start and end of "today" in Rome, as ISO strings. */
-function romeDayBounds(offsetDays = 0): {from: string; to: string} {
-    const now = new Date(Date.now() + offsetDays * 86_400_000);
-    const rome = new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit'}).format(now);
-    // Rome is UTC+1 or UTC+2; widen the window by two hours on each side and
-    // let the page group by local date, so no fixture falls between the cracks.
-    const start = new Date(`${rome}T00:00:00+02:00`);
+const ROME = 'Europe/Rome';
+
+function romeDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {timeZone: ROME}).format(date);
+}
+
+/** ISO bounds that surely contain the whole Rome day, widened by two hours. */
+function romeDayBounds(day: string): {from: string; to: string} {
+    const start = new Date(`${day}T00:00:00+02:00`);
     return {
         from: new Date(start.getTime() - 2 * 3_600_000).toISOString(),
         to: new Date(start.getTime() + 26 * 3_600_000).toISOString(),
     };
 }
 
-export interface LivePage {
-    date: string; // YYYY-MM-DD in Rome
-    liveCount: number;
-    groups: CompetitionFixtures[];
+export interface CountryFixtures {
+    country: string;
+    competitions: CompetitionFixtures[];
 }
 
-export async function getLivePage(offsetDays = 0): Promise<LivePage> {
-    const {from, to} = romeDayBounds(offsetDays);
-    const date = new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Rome'}).format(new Date(Date.now() + offsetDays * 86_400_000));
+export interface LivePage {
+    mode: 'live' | 'day';
+    /** YYYY-MM-DD in Rome: the day shown (today in live mode). */
+    date: string;
+    today: string;
+    liveCount: number;
+    total: number;
+    featured: CompetitionFixtures[];
+    countries: CountryFixtures[];
+}
+
+function group(fixtures: FixtureSummary[]): {featured: CompetitionFixtures[]; countries: CountryFixtures[]} {
+    const bySlug = new Map<string, CompetitionFixtures>();
+    for (const f of fixtures) {
+        const slug = f.leagueSlug ?? f.leagueName;
+        if (!bySlug.has(slug)) {
+            bySlug.set(slug, {
+                competition: {id: 0, name: f.leagueName, slug, country: f.leagueCountry ?? null, logoUrl: null, type: null, featured: f.leagueFeatured === true},
+                fixtures: [],
+            });
+        }
+        bySlug.get(slug)!.fixtures.push(f);
+    }
+    const rank = (f: FixtureSummary) => (LIVE_STATES.includes(f.state) ? 0 : 1);
+    for (const g of bySlug.values()) g.fixtures.sort((a, b) => rank(a) - rank(b) || a.startingAt.localeCompare(b.startingAt));
+
+    const featured = [...bySlug.values()]
+        .filter((g) => g.competition.featured)
+        .sort((a, b) => featuredPriority(a.competition.slug) - featuredPriority(b.competition.slug));
+
+    const byCountry = new Map<string, CompetitionFixtures[]>();
+    for (const g of bySlug.values()) {
+        if (g.competition.featured) continue;
+        const country = g.competition.country ?? 'World';
+        if (!byCountry.has(country)) byCountry.set(country, []);
+        byCountry.get(country)!.push(g);
+    }
+    const countries = [...byCountry.entries()]
+        .map(([country, competitions]) => ({country, competitions: competitions.sort((a, b) => a.competition.name.localeCompare(b.competition.name))}))
+        .sort((a, b) => (a.country === 'World' ? -1 : b.country === 'World' ? 1 : a.country.localeCompare(b.country)));
+
+    return {featured, countries};
+}
+
+/**
+ * Live mode (no date): only matches in play, every competition.
+ * Day mode (date given): every match of that Rome day.
+ */
+export async function getLivePage(date?: string | null): Promise<LivePage> {
+    const today = romeDate(new Date());
+    const mode: LivePage['mode'] = date ? 'day' : 'live';
+    const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
     try {
         const db = footballDb();
-        const {data, error} = await db
-            .from('fixtures')
-            .select(FIXTURE_SELECT)
-            .gte('starting_at', from)
-            .lte('starting_at', to)
-            .order('starting_at', {ascending: true})
-            .limit(200);
-        if (error) throw error;
-
-        const romeDate = (iso: string) => new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Rome'}).format(new Date(iso));
-        const fixtures = toFixtures(data).filter((f) => romeDate(f.startingAt) === date);
-
-        const priority = new Map(COMPETITIONS.map((c) => [c.slug, c.priority]));
-        const bySlug = new Map<string, CompetitionFixtures>();
-        for (const f of fixtures) {
-            const slug = f.leagueSlug ?? f.leagueName;
-            if (!bySlug.has(slug)) {
-                bySlug.set(slug, {competition: {id: 0, name: f.leagueName, slug, country: null, logoUrl: null, type: null}, fixtures: []});
-            }
-            bySlug.get(slug)!.fixtures.push(f);
+        let rows: unknown;
+        if (mode === 'live') {
+            const {data, error} = await db
+                .from('fixtures')
+                .select(FIXTURE_LIST_SELECT)
+                .in('state', [...LIVE_STATES])
+                .order('starting_at', {ascending: true})
+                .limit(500);
+            if (error) throw error;
+            rows = data;
+        } else {
+            const {from, to} = romeDayBounds(day);
+            const {data, error} = await db
+                .from('fixtures')
+                .select(FIXTURE_LIST_SELECT)
+                .gte('starting_at', from)
+                .lte('starting_at', to)
+                .order('starting_at', {ascending: true})
+                .limit(3000);
+            if (error) throw error;
+            rows = data;
         }
-        const groups = [...bySlug.values()].sort((a, b) => (priority.get(a.competition.slug) ?? 99) - (priority.get(b.competition.slug) ?? 99));
-        const rank = (f: FixtureSummary) => (LIVE_STATES.includes(f.state) ? 0 : 1);
-        for (const g of groups) g.fixtures.sort((a, b) => rank(a) - rank(b) || a.startingAt.localeCompare(b.startingAt));
-
-        return {date, liveCount: fixtures.filter((f) => LIVE_STATES.includes(f.state)).length, groups};
+        const fixtures = toFixtures(rows).filter((f) => mode === 'live' || romeDate(new Date(f.startingAt)) === day);
+        const {featured, countries} = group(fixtures);
+        return {
+            mode,
+            date: day,
+            today,
+            liveCount: fixtures.filter((f) => LIVE_STATES.includes(f.state)).length,
+            total: fixtures.length,
+            featured,
+            countries,
+        };
     } catch (error) {
         logReadError('getLivePage', error);
-        return {date, liveCount: 0, groups: []};
+        return {mode, date: day, today, liveCount: 0, total: 0, featured: [], countries: []};
     }
 }

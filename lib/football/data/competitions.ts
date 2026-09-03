@@ -1,5 +1,5 @@
 import 'server-only';
-import {COMPETITIONS} from '../competitions';
+import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionPage, type CompetitionSummary, type FixtureSummary, type RoundFixtures, type StandingGroup} from '../types';
 import {
     FIXTURE_SELECT,
@@ -15,25 +15,47 @@ import {
     type StandingQueryRow,
 } from './shared';
 
-/** Active competitions, ordered like the configuration. */
-export async function listCompetitions(): Promise<Array<CompetitionSummary & {season: {id: number; name: string; year: number} | null}>> {
+export interface CompetitionListItem extends CompetitionSummary {
+    season: {id: number; name: string; year: number} | null;
+}
+
+export interface CompetitionList {
+    featured: CompetitionListItem[];
+    countries: Array<{country: string; competitions: CompetitionListItem[]}>;
+    total: number;
+}
+
+/** Every active competition: featured first, the rest grouped by country. */
+export async function listCompetitions(): Promise<CompetitionList> {
     try {
         const db = footballDb();
         const {data, error} = await db
             .from('leagues')
             .select(`${LEAGUE_SELECT},seasons(id,name,year,is_current)`)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .limit(3000);
         if (error) throw error;
-        const priority = new Map(COMPETITIONS.map((c) => [c.slug, c.priority]));
-        return ((data ?? []) as unknown as Array<LeagueRow & {seasons: Array<{id: number; name: string; year: number; is_current: boolean}>}>)
-            .map((row) => {
-                const season = row.seasons?.find((s) => s.is_current) ?? null;
-                return {...toCompetition(row), season: season ? {id: season.id, name: season.name, year: season.year} : null};
-            })
-            .sort((a, b) => (priority.get(a.slug) ?? 99) - (priority.get(b.slug) ?? 99) || a.name.localeCompare(b.name));
+        const items = ((data ?? []) as unknown as Array<LeagueRow & {seasons: Array<{id: number; name: string; year: number; is_current: boolean}>}>).map((row) => {
+            const season = row.seasons?.find((s) => s.is_current) ?? null;
+            return {...toCompetition(row), season: season ? {id: season.id, name: season.name, year: season.year} : null};
+        });
+
+        const featured = items.filter((c) => c.featured).sort((a, b) => featuredPriority(a.slug) - featuredPriority(b.slug));
+        const byCountry = new Map<string, CompetitionListItem[]>();
+        for (const c of items) {
+            if (c.featured) continue;
+            const country = c.country ?? 'World';
+            if (!byCountry.has(country)) byCountry.set(country, []);
+            byCountry.get(country)!.push(c);
+        }
+        const countries = [...byCountry.entries()]
+            .map(([country, competitions]) => ({country, competitions: competitions.sort((a, b) => a.name.localeCompare(b.name))}))
+            .sort((a, b) => (a.country === 'World' ? -1 : b.country === 'World' ? 1 : a.country.localeCompare(b.country)));
+
+        return {featured, countries, total: items.length};
     } catch (error) {
         logReadError('listCompetitions', error);
-        return [];
+        return {featured: [], countries: [], total: 0};
     }
 }
 
@@ -85,7 +107,6 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
         const finished = fixtures.filter((f) => f.state === 'finished' || (f.state !== 'scheduled' && !LIVE_STATES.includes(f.state) && new Date(f.startingAt).getTime() < now));
         const scheduled = fixtures.filter((f) => f.state === 'scheduled' || (f.state === 'postponed' && new Date(f.startingAt).getTime() >= now));
 
-        // Latest rounds first for results; next rounds first for upcoming.
         const results = groupByRound(finished).sort((a, b) => (roundNumber(b.round) ?? 0) - (roundNumber(a.round) ?? 0)).slice(0, 3);
         for (const r of results) r.fixtures.sort((a, b) => b.startingAt.localeCompare(a.startingAt));
         const upcoming = groupByRound(scheduled).slice(0, 3);
