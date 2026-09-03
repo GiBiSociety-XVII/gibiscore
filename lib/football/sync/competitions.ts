@@ -24,6 +24,10 @@ export async function syncCompetitions(): Promise<SyncRun> {
         for (const comp of COMPETITIONS) {
             const {data: league} = await sportmonksGet<SmLeague>(`leagues/${comp.sportmonksId}`, {include: 'currentSeason'});
             run.requests += 1;
+            if (!league || typeof league.id !== 'number') {
+                run.warn(`league ${comp.slug} (#${comp.sportmonksId}): empty payload, is it included in the plan?`);
+                continue;
+            }
 
             const {data: leagueRow, error} = await db
                 .from('leagues')

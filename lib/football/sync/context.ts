@@ -45,6 +45,9 @@ export interface SyncRun {
 export async function startRun(db: FootballClient, job: string): Promise<SyncRun> {
     const {data, error} = await db.from('sync_runs').insert({job}).select('id').single();
     if (error) fail('sync_runs.insert', error);
+    if (!data || typeof data.id !== 'number') {
+        throw new SyncError('sync_runs.insert returned no row: is the `football` schema exposed in Supabase Data API settings?');
+    }
     const run: SyncRun = {
         id: data.id as number,
         job,

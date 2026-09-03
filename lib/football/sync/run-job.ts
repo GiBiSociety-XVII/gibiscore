@@ -26,10 +26,21 @@ export function cronRoute(job: () => Promise<SyncRun>) {
                 warnings: run.warnings,
             });
         } catch (error) {
-            const message = (error as Error).message;
-            console.error('[cron] job failed', error);
+            const err = error as Error & {status?: number; path?: string; details?: unknown};
+            console.error('[cron] job failed', err);
             const status = error instanceof SportmonksError ? 502 : 500;
-            return NextResponse.json({ok: false, error: message, ms: Date.now() - startedAt}, {status});
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: err.message,
+                    kind: err.name,
+                    sportmonks: error instanceof SportmonksError ? {status: err.status, path: err.path} : undefined,
+                    details: err.details ?? undefined,
+                    at: err.stack?.split('\n').slice(1, 4).map((l) => l.trim()),
+                    ms: Date.now() - startedAt,
+                },
+                {status},
+            );
         }
     };
 }
