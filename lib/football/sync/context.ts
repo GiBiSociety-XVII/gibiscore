@@ -1,12 +1,11 @@
 import 'server-only';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {createServiceClient} from '@/lib/db/server';
-import {slugify} from '@/lib/sportmonks/mappers';
-import type {SmPlayer, SmTeam} from '@/lib/sportmonks/types';
+import {slugify} from '@/lib/api-football/mappers';
 
 /**
  * Shared plumbing for sync jobs: a service-role client bound to the
- * `football` schema, id maps between Sportmonks ids and our ids, and a
+ * `football` schema, id maps between provider ids and our ids, and a
  * sync_runs logger.
  */
 
@@ -81,67 +80,117 @@ export async function finishRun(db: FootballClient, run: SyncRun, status: 'ok' |
 // Id maps
 // ---------------------------------------------------------------------------
 
-export type IdMap = Map<number, number>; // sportmonks_id -> our id
+export type IdMap = Map<number, number>; // provider_id -> our id
 
-async function selectIdMap(db: FootballClient, table: string, sportmonksIds: number[]): Promise<IdMap> {
+async function selectIdMap(db: FootballClient, table: string, providerIds: number[]): Promise<IdMap> {
     const map: IdMap = new Map();
-    for (let i = 0; i < sportmonksIds.length; i += 500) {
-        const chunk = sportmonksIds.slice(i, i + 500);
-        const {data, error} = await db.from(table).select('id,sportmonks_id').in('sportmonks_id', chunk);
+    for (let i = 0; i < providerIds.length; i += 500) {
+        const chunk = providerIds.slice(i, i + 500);
+        const {data, error} = await db.from(table).select('id,provider_id').in('provider_id', chunk);
         if (error) fail(`${table}.select`, error);
-        for (const row of data ?? []) map.set(row.sportmonks_id as number, row.id as number);
+        for (const row of data ?? []) map.set(row.provider_id as number, row.id as number);
     }
     return map;
 }
 
-export async function leagueIdMap(db: FootballClient, sportmonksIds: number[]): Promise<IdMap> {
-    return selectIdMap(db, 'leagues', sportmonksIds);
+export async function leagueIdMap(db: FootballClient, providerIds: number[]): Promise<IdMap> {
+    return selectIdMap(db, 'leagues', providerIds);
 }
 
-export async function seasonIdMap(db: FootballClient, sportmonksIds: number[]): Promise<IdMap> {
-    return selectIdMap(db, 'seasons', sportmonksIds);
+export interface SeasonRef {
+    id: number;
+    leagueId: number;
+    leagueProviderId: number;
+    leagueSlug: string;
+    year: number;
+    name: string;
+}
+
+/** Every season flagged current, with its league. */
+export async function currentSeasons(db: FootballClient): Promise<SeasonRef[]> {
+    const {data, error} = await db
+        .from('seasons')
+        .select('id,year,name,league:leagues!inner(id,provider_id,slug)')
+        .eq('is_current', true);
+    if (error) fail('seasons.select', error);
+    return (data ?? []).map((row) => {
+        const league = row.league as unknown as {id: number; provider_id: number; slug: string};
+        return {
+            id: row.id as number,
+            leagueId: league.id,
+            leagueProviderId: league.provider_id,
+            leagueSlug: league.slug,
+            year: row.year as number,
+            name: row.name as string,
+        };
+    });
+}
+
+export interface MinimalTeam {
+    id: number;
+    name: string;
+    logo?: string | null;
+    code?: string | null;
+    country?: string | null;
+    founded?: number | null;
+    venueName?: string | null;
 }
 
 /** Upsert teams from any payload that carries them and return the id map. */
-export async function ensureTeams(db: FootballClient, teams: SmTeam[]): Promise<IdMap> {
-    const unique = new Map<number, SmTeam>();
-    for (const team of teams) unique.set(team.id, team);
+export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Promise<IdMap> {
+    const unique = new Map<number, MinimalTeam>();
+    for (const team of teams) if (team.id) unique.set(team.id, {...unique.get(team.id), ...team});
     if (unique.size === 0) return new Map();
 
-    const rows = [...unique.values()].map((team) => ({
-        sportmonks_id: team.id,
-        name: team.name,
-        short_code: team.short_code ?? null,
-        logo_url: team.image_path ?? null,
-        venue_name: team.venue?.name ?? null,
-        founded: team.founded ?? null,
-        slug: slugify(team.name, team.id),
-    }));
+    const ids = [...unique.keys()];
+    const existing = await selectIdMap(db, 'teams', ids);
 
-    const {error} = await db.from('teams').upsert(rows, {onConflict: 'sportmonks_id'});
-    if (error) fail('teams.upsert', error);
-    return selectIdMap(db, 'teams', [...unique.keys()]);
+    // Rich rows (from /teams) update everything; minimal rows (from fixtures)
+    // only create missing teams so they never blank out stored details.
+    const richRows = [...unique.values()].filter((t) => t.code !== undefined || t.country !== undefined || t.founded !== undefined);
+    const minimalRows = [...unique.values()].filter((t) => !richRows.includes(t) && !existing.has(t.id));
+
+    if (richRows.length > 0) {
+        const {error} = await db.from('teams').upsert(
+            richRows.map((t) => ({
+                provider_id: t.id,
+                name: t.name,
+                short_code: t.code ?? null,
+                country: t.country ?? null,
+                logo_url: t.logo ?? null,
+                venue_name: t.venueName ?? null,
+                founded: t.founded ?? null,
+                slug: slugify(t.name, t.id),
+            })),
+            {onConflict: 'provider_id'},
+        );
+        if (error) fail('teams.upsert', error);
+    }
+    if (minimalRows.length > 0) {
+        const {error} = await db.from('teams').upsert(
+            minimalRows.map((t) => ({provider_id: t.id, name: t.name, logo_url: t.logo ?? null, slug: slugify(t.name, t.id)})),
+            {onConflict: 'provider_id', ignoreDuplicates: true},
+        );
+        if (error) fail('teams.upsert', error);
+    }
+    return selectIdMap(db, 'teams', ids);
 }
 
 export interface MinimalPlayer {
     id: number;
     name: string | null;
-    player?: SmPlayer | null;
-}
-
-function playerName(p: MinimalPlayer): string {
-    const full = p.player?.display_name ?? p.player?.common_name ?? p.player?.name ?? p.name;
-    return full && full.trim() !== '' ? full : `Giocatore ${p.id}`;
+    photo?: string | null;
+    age?: number | null;
+    position?: string | null;
 }
 
 /**
- * Upsert players by id. Rows that only carry an id and a name (from events
- * or lineups) never overwrite richer data already stored: we only send
- * columns we actually know.
+ * Upsert players by id. Minimal rows (from events, lineups, match stats)
+ * only create missing players so richer squad data is never overwritten.
  */
 export async function ensurePlayers(db: FootballClient, players: MinimalPlayer[]): Promise<IdMap> {
     const unique = new Map<number, MinimalPlayer>();
-    for (const p of players) if (p.id) unique.set(p.id, p);
+    for (const p of players) if (p.id) unique.set(p.id, {...unique.get(p.id), ...p});
     if (unique.size === 0) return new Map();
 
     const ids = [...unique.keys()];
@@ -150,17 +199,17 @@ export async function ensurePlayers(db: FootballClient, players: MinimalPlayer[]
     if (missing.length > 0) {
         const rows = missing.map((id) => {
             const p = unique.get(id)!;
-            const name = playerName(p);
+            const name = p.name && p.name.trim() !== '' ? p.name : `Giocatore ${id}`;
             return {
-                sportmonks_id: id,
+                provider_id: id,
                 name,
-                display_name: p.player?.display_name ?? null,
-                image_url: p.player?.image_path ?? null,
-                date_of_birth: p.player?.date_of_birth ?? null,
+                image_url: p.photo ?? null,
+                age: p.age ?? null,
+                position: p.position ?? null,
                 slug: slugify(name, id),
             };
         });
-        const {error} = await db.from('players').upsert(rows, {onConflict: 'sportmonks_id', ignoreDuplicates: true});
+        const {error} = await db.from('players').upsert(rows, {onConflict: 'provider_id', ignoreDuplicates: true});
         if (error) fail('players.upsert', error);
     }
     return selectIdMap(db, 'players', ids);

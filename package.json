@@ -9,8 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "probe:sportmonks": "node scripts/sportmonks-probe.mjs",
-    "cron": "node scripts/run-cron.mjs"
+    "cron": "node scripts/run-cron.mjs",
+    "probe:api-football": "node scripts/api-football-probe.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

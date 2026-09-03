@@ -17,7 +17,9 @@ Nulla di quanto scritto qui e' ancora implementato.
 - Monetizzazione: **per ora tutto gratis**, nessun abbonamento. Premium e
   abbonamenti si valutano in futuro. La pubblicita' resta possibile fin da
   subito (componenti Adsterra di GiBiArena) ma non e' un requisito del lancio.
-- Fornitore dati: **Sportmonks** (European Plan + add-on xG), confermato.
+- Fornitore dati: **API-Football** (api-sports.io), piano Pro o Ultra. Deciso il 3 settembre
+  2026 dopo aver visto il listino Sportmonks: il pacchetto completo superava i 400 euro al
+  mese, il piano Starter da 29 euro limita a 5 leghe senza coppe europee.
 - Infrastruttura: **progetto Supabase dedicato a GiBiScore**, separato da
   GiBiArena. Al massimo si condivide l'autenticazione (sezione 5).
 - Repo: `GiBiSociety-XVII/gibiscore` (pubblico), partito vuoto, costruito da zero
@@ -30,7 +32,23 @@ Restano da verificare in fase di sviluppo:
 2. Come condividere l'autenticazione tra due progetti Supabase (sezione 5),
    solo quando il login diventera' davvero utile.
 
-## 3. Fonti dati: DECISO, Sportmonks European Plan + add-on xG
+## 3. Fonti dati: DECISO, API-Football (cambio del 3 settembre 2026)
+
+**Decisione finale: API-Football**, piano Pro (~19 $/mese, 7.500 richieste al
+giorno) o Ultra (~29 $/mese, 75.000). Tutte le leghe incluse, comprese le coppe
+europee; eventi, formazioni, statistiche squadra e giocatore con rating,
+infortuni, classifiche, xG di squadra dove disponibile, storico stagioni.
+Mancano rispetto a Sportmonks: xG per singolo tiro, formazioni attese,
+pressure index, tutti extra a pagamento anche li'.
+
+Perche' non Sportmonks: il pacchetto completo visto al checkout superava i 400
+euro al mese; il piano Starter da 29 euro limita a 5 leghe e le coppe europee
+richiedono un piano speciale da altri 29 euro; xG e previsioni sono add-on.
+Per un sito gratuito il rapporto dati/costo di API-Football e' migliore.
+
+Il confronto originale resta sotto come storico.
+
+### Confronto originale (settembre 2026, prima del cambio)
 
 Obiettivo dichiarato: **pacchetto completo**, non il minimo per partire.
 Servono, per ogni partita: pre-match (formazioni probabili, infortuni,
@@ -197,12 +215,13 @@ potrebbe diventare Premium se un giorno si decidera' di introdurlo.
 ## 8. Prossimi passi
 
 1. ~~Scegliere la direzione grafica~~ fatto: opzione A.
-2. Attivare il trial Sportmonks e verificare la copertura di Serie B e Coppa Italia.
+2. ~~Attivare il trial Sportmonks~~ sostituito da API-Football: verificare la copertura
+   con `/api/cron/api-football-status` e il primo giro dei job.
 3. ~~Confermare la strada per il login condiviso~~ fatto: progetto Supabase separato.
 4. ~~Definire cosa e' Premium~~ fatto: tutto gratis per ora.
 5. ~~Scaffolding del progetto Next.js~~ fatto (3 settembre 2026).
-6. ~~Job di sincronizzazione Sportmonks~~ scritti e testati sui mapper; da
-   validare con il token reale (`pnpm probe:sportmonks`, poi i cron).
+6. ~~Job di sincronizzazione~~ riscritti per API-Football, testati sui mapper; da
+   validare con la chiave reale (`pnpm probe:api-football`, poi i cron).
 7. Pagine: partita, squadra, giocatore, classifiche, calendario per competizione.
 8. Login facoltativo con Supabase Auth.
 
