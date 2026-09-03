@@ -79,6 +79,22 @@ Sostituisci `<deploy>` con il dominio del deploy di produzione
   token e' sul piano free (solo Superliga danese e Premiership scozzese):
   attiva il trial dell'European Plan su My Sportmonks e ricontrolla.
 
+### 4b. Modalita' di validazione (trial non ancora attivo)
+
+Se il token e' ancora sul piano free puoi comunque provare tutta la pipeline
+con le leghe incluse (Superliga danese #271, Premiership scozzese #501):
+
+1. Su Vercel aggiungi la variabile `SPORTMONKS_LEAGUE_IDS` con valore `271,501`
+   e fai un Redeploy.
+2. Lancia i job del passo 5: i dati danesi e scozzesi entrano nel database e la
+   homepage li mostra al posto dell'esempio.
+3. Quando il trial European Plan e' attivo: rimuovi la variabile, Redeploy,
+   rilancia `sync-competitions`. Le leghe di prova restano nel database ma non
+   vengono piu' aggiornate; si possono cancellare in un secondo momento.
+
+`/api/cron/sportmonks-status` mostra `validation_mode: true` quando la
+variabile e' impostata.
+
 ## 5. Primo caricamento dati (10-15 minuti)
 
 I cron partono da soli, ma su un database vuoto conviene lanciare i job a mano

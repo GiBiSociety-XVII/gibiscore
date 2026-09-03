@@ -1,5 +1,5 @@
 import 'server-only';
-import {COMPETITIONS} from '@/lib/football/competitions';
+import {getCompetitions, isValidationMode} from '@/lib/football/competitions';
 import {sportmonksAccess, sportmonksGet, sportmonksPages, SportmonksError} from '@/lib/sportmonks/client';
 import {positionName, slugify} from '@/lib/sportmonks/mappers';
 import type {SmLeague, SmSeason, SmSquadMember, SmTeam} from '@/lib/sportmonks/types';
@@ -21,16 +21,21 @@ export async function syncCompetitions(): Promise<SyncRun> {
     try {
         const seasons: Array<{leagueDbId: number; season: SmSeason}> = [];
         const inaccessible: string[] = [];
+        const competitions = getCompetitions();
+        if (isValidationMode()) {
+            run.warn(`validation mode: SPORTMONKS_LEAGUE_IDS=${process.env.SPORTMONKS_LEAGUE_IDS} overrides the configured competitions`);
+        }
 
-        for (const comp of COMPETITIONS) {
+        for (const comp of competitions) {
             let league: SmLeague | null = null;
+            const label = comp.slug ?? `league-${comp.sportmonksId}`;
             try {
                 const envelope = await sportmonksGet<SmLeague>(`leagues/${comp.sportmonksId}`, {include: 'currentSeason'});
                 league = envelope.data;
             } catch (error) {
                 if (error instanceof SportmonksError && error.isNoAccess) {
-                    inaccessible.push(`${comp.slug} (#${comp.sportmonksId})`);
-                    run.warn(`league ${comp.slug} (#${comp.sportmonksId}) is not included in the Sportmonks subscription, skipped`);
+                    inaccessible.push(`${label} (#${comp.sportmonksId})`);
+                    run.warn(`league ${label} (#${comp.sportmonksId}) is not included in the Sportmonks subscription, skipped`);
                     continue;
                 }
                 throw error;
@@ -38,10 +43,11 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 run.requests += 1;
             }
             if (!league || typeof league.id !== 'number') {
-                run.warn(`league ${comp.slug} (#${comp.sportmonksId}): empty payload, is it included in the plan?`);
+                run.warn(`league ${label} (#${comp.sportmonksId}): empty payload, is it included in the plan?`);
                 continue;
             }
 
+            const slug = comp.slug ?? slugify(league.name, league.id);
             const {data: leagueRow, error} = await db
                 .from('leagues')
                 .upsert(
@@ -51,7 +57,7 @@ export async function syncCompetitions(): Promise<SyncRun> {
                         short_code: league.short_code ?? null,
                         type: league.type ?? null,
                         logo_url: league.image_path ?? null,
-                        slug: comp.slug,
+                        slug,
                         is_active: league.active ?? true,
                     },
                     {onConflict: 'sportmonks_id'},
@@ -60,11 +66,11 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 .single();
             if (error) failSync('leagues.upsert', error);
             run.bump('leagues');
-            console.info(`[sync-competitions] ${comp.slug}: Sportmonks #${league.id} = "${league.name}"`);
+            console.info(`[sync-competitions] ${slug}: Sportmonks #${league.id} = "${league.name}"`);
 
             const season = league.currentseason ?? league.currentSeason ?? null;
             if (!season) {
-                run.warn(`league ${comp.slug} (#${league.id}) has no current season in the payload`);
+                run.warn(`league ${slug} (#${league.id}) has no current season in the payload`);
                 continue;
             }
             seasons.push({leagueDbId: leagueRow.id as number, season});
@@ -83,7 +89,8 @@ export async function syncCompetitions(): Promise<SyncRun> {
             }
             throw new SyncError(
                 `none of the configured leagues is accessible with this Sportmonks token (${inaccessible.join(', ')}). ${available}. ` +
-                    'Activate the European Plan trial (or add the leagues to the plan) and run again.',
+                    'Activate the European Plan trial (or add the leagues to the plan) and run again. ' +
+                    'To validate the pipeline meanwhile, set SPORTMONKS_LEAGUE_IDS to the accessible league ids and redeploy.',
             );
         }
 

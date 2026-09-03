@@ -105,7 +105,9 @@ export async function getHomeData(): Promise<HomeData> {
         const rank = (f: FixtureSummary) => (LIVE.includes(f.state) ? 0 : f.state === 'scheduled' ? 1 : 2);
         summaries.sort((a, b) => rank(a) - rank(b) || (priority.get(a.leagueName) ?? 99) - (priority.get(b.leagueName) ?? 99) || a.startingAt.localeCompare(b.startingAt));
 
-        const standings = await getStandings(db, 'serie-a', 6);
+        // Serie A first; while it is not in the subscription (validation mode)
+        // fall back to whatever current season has a table.
+        const standings = (await getStandings(db, 'serie-a', 6)) ?? (await getStandings(db, null, 6));
 
         return {
             isSample: false,
@@ -136,30 +138,35 @@ type SchemaClient = ReturnType<ReturnType<typeof createPublicClient>['schema']>;
 
 async function getStandings(
     db: SchemaClient,
-    leagueSlug: string,
+    leagueSlug: string | null,
     limit: number,
 ): Promise<{leagueName: string; rows: StandingRow[]} | null> {
-    const {data: seasonData, error: seasonError} = await db
+    let seasonQuery = db
         .from('seasons')
         .select('id,league:leagues!inner(name,slug)')
-        .eq('is_current', true)
-        .eq('leagues.slug', leagueSlug)
-        .maybeSingle();
-    if (seasonError || !seasonData) return null;
-    const season = seasonData as unknown as {id: number; league: {name: string; slug: string}};
+        .eq('is_current', true);
+    if (leagueSlug) seasonQuery = seasonQuery.eq('leagues.slug', leagueSlug);
+    const {data: seasonRows, error: seasonError} = await seasonQuery.limit(10);
+    if (seasonError || !seasonRows || seasonRows.length === 0) return null;
+    const seasons = seasonRows as unknown as Array<{id: number; league: {name: string; slug: string}}>;
 
-    const {data, error} = await db
-        .from('standings')
-        .select('position,played,won,drawn,lost,goals_for,goals_against,points,team:teams(id,name,short_code,logo_url)')
-        .eq('season_id', season.id)
-        .eq('group', '')
-        .order('position', {ascending: true})
-        .limit(limit);
-    if (error || !data || data.length === 0) return null;
-    const rows = data as unknown as StandingQueryRow[];
+    for (const season of seasons) {
+        const {data, error} = await db
+            .from('standings')
+            .select('position,played,won,drawn,lost,goals_for,goals_against,points,team:teams(id,name,short_code,logo_url)')
+            .eq('season_id', season.id)
+            .eq('group', '')
+            .order('position', {ascending: true})
+            .limit(limit);
+        if (error || !data || data.length === 0) continue;
+        return buildStandings(season.league.name, data as unknown as StandingQueryRow[]);
+    }
+    return null;
+}
 
+function buildStandings(leagueName: string, rows: StandingQueryRow[]): {leagueName: string; rows: StandingRow[]} {
     return {
-        leagueName: season.league.name,
+        leagueName,
         rows: rows
             .filter((r) => r.team)
             .map((r) => ({

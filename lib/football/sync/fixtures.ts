@@ -1,5 +1,5 @@
 import 'server-only';
-import {COMPETITION_FILTER} from '@/lib/football/competitions';
+import {competitionFilter} from '@/lib/football/competitions';
 import {sportmonksGet, sportmonksPages} from '@/lib/sportmonks/client';
 import {
     extractMinute,
@@ -58,7 +58,7 @@ export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?:
         const fixtures: SmFixture[] = [];
         for await (const page of sportmonksPages<SmFixture>(`fixtures/between/${ymd(from)}/${ymd(to)}`, {
             include: SCHEDULE_INCLUDES,
-            params: {filters: `fixtureLeagues:${COMPETITION_FILTER}`, per_page: 50},
+            params: {filters: `fixtureLeagues:${competitionFilter()}`, per_page: 50},
         })) {
             run.requests += 1;
             fixtures.push(...page);
@@ -89,7 +89,7 @@ export async function syncLive(): Promise<SyncRun> {
     try {
         const {data: inplay} = await sportmonksGet<SmFixture[]>('livescores/inplay', {
             include: DETAIL_INCLUDES,
-            params: {filters: `fixtureLeagues:${COMPETITION_FILTER}`},
+            params: {filters: `fixtureLeagues:${competitionFilter()}`},
         });
         run.requests += 1;
         run.bump('inplay', inplay.length);
