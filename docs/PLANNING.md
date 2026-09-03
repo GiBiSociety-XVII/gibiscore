@@ -3,75 +3,132 @@
 Documento di lavoro. Si aggiorna man mano che le decisioni vengono prese.
 Nulla di quanto scritto qui e' ancora implementato.
 
-## 1. Cosa sappiamo
+## 1. Cosa e' GiBiScore (deciso)
 
-- Dominio: **gibiscore.com**
-- Owner: GiBiSociety (stesso team di GiBiArena)
-- Repo: `GiBiSociety-XVII/gibiscore` (pubblico), partito vuoto
-- Deve nascere **da zero**, non come fork o sotto-sezione di GiBiArena
+- Dominio: **gibiscore.com**, owner GiBiSociety (stesso team di GiBiArena)
+- Sito di **risultati e statistiche calcio**: partite live, classifiche,
+  statistiche di giocatori, squadre e campionato. Obiettivo: "studiare" il
+  calcio, non solo leggere il punteggio.
+- Dati da **API esterne** (vedi sezione 3)
+- **Login facoltativo**. Chi ha gia' un account GiBiArena lo usa anche qui
+  (stesso Supabase Auth, vedi sezione 5)
+- Lingua: **solo italiano** all'inizio, inglese in seguito. Si parte comunque
+  con la struttura `app/[locale]` per non dover rifare le route dopo.
+- Monetizzazione: **pubblicita' per gli utenti free**; **abbonamento** che
+  toglie la pubblicita' e sblocca tutte le funzioni (Stripe, come GiBiArena)
+- Repo: `GiBiSociety-XVII/gibiscore` (pubblico), partito vuoto, costruito da zero
 
-## 2. Cosa NON sappiamo ancora (domande aperte)
+## 2. Ancora da decidere
 
-1. **Cosa mostra GiBiScore?** Il nome suggerisce "punteggi". Ipotesi possibili:
-   - risultati live / classifiche sportive (calcio, ecc.)
-   - risultati e classifiche esport (LoL, Clash of Clans, tornei)
-   - classifiche/punteggi dei giochi e degli utenti GiBiSociety (leaderboard cross-sito)
-   - altro
-2. **Pubblico e lingue**: stesse 5 lingue di GiBiArena (it, en, es, fr, de) con default `it`, o solo italiano/inglese?
-3. **Sorgente dati**: API esterne (quali?), inserimento manuale da pannello admin, o dati gia' presenti nel DB di GiBiArena?
-4. **Utenti e login**: serve un account? Se si', condiviso con GiBiArena (stesso Supabase Auth) o indipendente?
-5. **Monetizzazione**: ads (come GiBiArena), premium via Stripe, nessuna?
-6. **"Pagina web"**: una singola landing/one-page o un sito multi-pagina?
-7. **Identita' visiva**: riprendere lo stile GiBiArena o look completamente nuovo?
+1. Direzione grafica (sezione 4). Bozze visive in lavorazione.
+2. Quale API calcio (sezione 3) e quali campionati coprire al lancio.
+   Proposta: Serie A + Serie B + Champions League, poi le altre top 5.
+3. Quali funzioni sono Premium e quali free (sezione 6).
+4. Prezzo dell'abbonamento e se e' lo stesso abbonamento di GiBiArena o uno separato.
 
-## 3. Cosa abbiamo studiato: lo stack di GiBiArena
+## 3. Fonti dati: API calcio a confronto
 
-Riferimento utile perche' team, hosting e strumenti sono gli stessi.
+Verificato a settembre 2026 (prezzi indicativi, da ricontrollare al momento della firma).
 
-| Area | GiBiArena |
-|---|---|
-| Framework | Next.js 16 (App Router) + React 19 + TypeScript |
-| Stile | Tailwind CSS 4, icone `lucide-react`, font Geist |
-| i18n | `next-intl`, route `app/[locale]/...`, locali it/en/es/fr/de |
-| Database / Auth | Supabase (progetto "GiBiArena", `@supabase/ssr`) |
-| Hosting | Vercel (team "GiBiSociety's", piano Pro), cron in `vercel.json` |
-| Pagamenti | Stripe |
-| Extra | PWA + push notifications, Vercel Analytics, `@vercel/blob` |
-| Package manager | pnpm |
-| Struttura | `app/` route, `components/`, `core/` (logica per dominio), `lib/` (db, integrazioni), `supabase/migrations/` |
+| API | Free | A pagamento | Note |
+|---|---|---|---|
+| **API-Football** (api-sports.io) | 100 richieste/giorno, tutti gli endpoint | da ~19 $/mese, tutte le competizioni | Copertura piu' ampia: live, formazioni, statistiche giocatori, eventi. Piani prepagati, quota bloccata (nessun extra a sorpresa). Buon compromesso per partire. |
+| **football-data.org** | 12 competizioni (incluse Serie A, Champions, top 5 europee), 10 chiamate/min, punteggi in ritardo | add-on per live e dati approfonditi | Free "per sempre" dichiarato. Nessuna statistica giocatore nel free. Ottimo per prototipo e classifiche, insufficiente per "studiare i giocatori". |
+| **Sportmonks** | solo Superliga danese e Premiership scozzese | da ~29-39 EUR/mese (piano European) | Dati di qualita' professionale, piani per numero di leghe. Il piu' caro dei tre ma il piu' solido se si cresce. |
 
-Nota: al momento nel team Vercel non risulta nessun progetto collegato via MCP (lista vuota),
-quindi il progetto Vercel di GiBiScore andra' creato da zero al momento del deploy.
-Anche il progetto Supabase esistente e' uno solo (GiBiArena).
+Consiglio: **API-Football** per partire (free per sviluppare, ~19 $/mese in
+produzione), con un layer di cache nostro (sezione 5) cosi' le richieste
+verso l'API non crescono con i visitatori. Se in futuro serviranno dati
+piu' fini (xG, heatmap) valutare Sportmonks o l'add-on di API-Football.
 
-## 4. Opzioni di stack per GiBiScore
+Regola importante: **mai chiamare l'API dal browser**. Le chiamate passano
+sempre dal server (cron + cache in DB) per proteggere la chiave e la quota.
 
-### Opzione A — Stesso stack di GiBiArena (consigliata di default)
-Next.js + Tailwind + next-intl su Vercel, Supabase solo se servono dati/utenti.
-- Pro: know-how gia' acquisito, componenti e pattern riutilizzabili, stesso deploy.
-- Contro: overkill se il sito e' una semplice pagina statica.
+## 4. Direzione grafica: tre opzioni
 
-### Opzione B — Sito statico leggero (Astro o HTML/Tailwind puro)
-- Pro: velocissimo, costo zero, ideale per una one-page informativa.
-- Contro: se poi servono dati live, login o pannelli admin si deve migrare.
+Bozze su canvas (link nella chat). Tutte mostrano la stessa homepage
+(partite live, classifica, giocatore in evidenza, spazio ads, banner Premium)
+per un confronto onesto.
 
-### Opzione C — Next.js minimale senza DB
-Un solo locale all'inizio, dati da API esterne o file statici, DB aggiunto dopo.
-Compromesso tra A e B.
+| | A · Bold Blocks (stile GiBiArena) | B · Broadcast scuro | C · Quotidiano sportivo |
+|---|---|---|---|
+| Look | Sfondo caldo #f5f3ee, bordi inchiostro 2.5px, ombre piene, accento lime #b6ff3c, font Geist | Tema scuro, numeri grandi condensati (Barlow Condensed), verde campo, ticker | Carta calda, testata serif (Newsreader), colonne con filetti, verde profondo + rosso live |
+| Pro | Un solo ecosistema riconoscibile, componenti `bb-*` riutilizzabili subito | Linguaggio delle app di live score e delle grafiche TV, ottimo di sera e su mobile | Valorizza analisi e lettura, differenzia GiBiScore come sito "di studio" |
+| Contro | Bordi spessi mangiano spazio nelle tabelle dense | Si allontana da GiBiArena, contrasti e ads da curare | Meno adatto a scorrere partite live in fretta |
 
-La scelta dipende dalle risposte alla sezione 2, soprattutto alla domanda 1 e 3.
+Consiglio: **A** se vuoi che GiBiArena e GiBiScore si riconoscano come
+fratelli e riusare componenti. Se invece vuoi che GiBiScore abbia una sua
+identita', **B** e' la scelta piu' naturale per un sito di risultati.
+Una via di mezzo possibile: struttura e componenti di A con un tema scuro
+opzionale preso da B.
 
-## 5. Decisioni infrastrutturali da prendere (indipendenti dal contenuto)
+## 5. Stack e architettura proposti
 
-- **Supabase**: nuovo progetto dedicato oppure stesso progetto di GiBiArena con schema separato.
-  Consiglio: progetto dedicato, per non accoppiare i due siti.
+Stesso stack di GiBiArena (Opzione A dello studio precedente), scelto perche'
+il sito ha dati live, login, abbonamenti e cron: un sito statico non basta.
+
+| Area | Scelta | Motivo |
+|---|---|---|
+| Framework | Next.js 16 App Router + React 19 + TypeScript | uguale a GiBiArena |
+| Stile | Tailwind CSS 4 + lucide-react | uguale a GiBiArena |
+| i18n | next-intl, `app/[locale]`, solo `it` attivo all'inizio | inglese si aggiunge senza rifare le route |
+| DB + Auth | Supabase, **progetto dedicato** `gibiscore` | dati calcio separati da GiBiArena |
+| Account condiviso | stesso Supabase Auth di GiBiArena? Due strade (sotto) | l'utente ha chiesto login condiviso |
+| Pagamenti | Stripe | uguale a GiBiArena |
+| Hosting | Vercel, nuovo progetto `gibiscore`, cron in `vercel.json` | uguale a GiBiArena |
+| Ads | Adsterra (gia' usato in GiBiArena) | componenti riutilizzabili |
+| Package manager | pnpm | uguale a GiBiArena |
+
+### Login condiviso con GiBiArena: due strade
+
+1. **Stesso progetto Supabase di GiBiArena** (schema `gibiscore` separato per
+   le tabelle calcio). Login condiviso "gratis": stessa tabella `auth.users`,
+   stesso abbonamento visibile da entrambi i siti.
+   Contro: i due siti condividono il DB, un problema su uno tocca l'altro.
+2. **Progetto Supabase separato** + Auth federata (l'utente si logga su
+   GiBiScore con un provider OAuth e si collega l'email). Piu' pulito ma
+   l'abbonamento condiviso va sincronizzato a mano via Stripe webhook.
+
+Consiglio: **strada 1**, perche' il login condiviso e l'eventuale abbonamento
+unico sono il valore che l'utente ha chiesto. I dati calcio stanno in uno
+schema Postgres separato (`football.*`) con le loro RLS.
+
+### Flusso dati
+
+```
+API-Football  --cron Vercel (ogni 1-2 min durante le partite, ogni ora altrimenti)-->
+Supabase (tabelle football.*: fixtures, standings, players, teams, stats)  -->
+Next.js (Server Components + SWR per il live)  -->  utente
+```
+
+- Le pagine leggono **solo dal nostro DB**, mai dall'API esterna.
+- Cache HTTP breve (`revalidate`) per le pagine live, lunga per storico.
+
+## 6. Mappa del sito (prima versione)
+
+| Route | Contenuto | Free / Premium |
+|---|---|---|
+| `/` | Partite live, classifica breve, giocatore in evidenza | free |
+| `/live` | Tutte le partite di oggi con aggiornamento automatico | free |
+| `/serie-a` (per competizione) | Calendario, risultati, classifica completa | free |
+| `/squadre/[slug]` | Rosa, forma, statistiche stagionali | base free, avanzate premium |
+| `/giocatori/[slug]` | Scheda giocatore, statistiche per partita | base free, confronti e storico premium |
+| `/partita/[id]` | Dettaglio partita: eventi, formazioni, statistiche | free, xG e heatmap premium |
+| `/classifiche` | Marcatori, assist, cartellini | free |
+| `/premium` | Pagina abbonamento | - |
+| `/account` | Profilo, abbonamento | login |
+
+## 7. Decisioni infrastrutturali
+
+- **Supabase**: vedi sezione 5 (strada 1 consigliata).
 - **Vercel**: nuovo progetto `gibiscore` collegato a questo repo, dominio `gibiscore.com`.
 - **Branching**: `main` = produzione; branch `claude/*` per il lavoro assistito, PR verso `main`.
-- **Env**: `.env*` mai committati (stessa regola di GiBiArena).
+- **Env**: `.env*` mai committati. Chiave API-Football solo lato server.
 
-## 6. Prossimi passi
+## 8. Prossimi passi
 
-1. Rispondere alle domande della sezione 2.
-2. Scegliere lo stack (sezione 4) e fissare le decisioni della sezione 5.
-3. Definire la mappa delle pagine (sitemap) e le fonti dati.
-4. Solo dopo: scaffolding del progetto.
+1. Scegliere la direzione grafica (A, B, C o mix).
+2. Confermare API-Football e i campionati del lancio.
+3. Confermare la strada per il login condiviso (sezione 5).
+4. Definire cosa e' Premium (sezione 6).
+5. Solo dopo: scaffolding del progetto Next.js.
