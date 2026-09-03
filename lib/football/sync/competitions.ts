@@ -1,9 +1,9 @@
 import 'server-only';
 import {COMPETITIONS} from '@/lib/football/competitions';
-import {sportmonksGet, sportmonksPages} from '@/lib/sportmonks/client';
+import {sportmonksAccess, sportmonksGet, sportmonksPages, SportmonksError} from '@/lib/sportmonks/client';
 import {positionName, slugify} from '@/lib/sportmonks/mappers';
 import type {SmLeague, SmSeason, SmSquadMember, SmTeam} from '@/lib/sportmonks/types';
-import {ensureTeams, failSync, footballClient, finishRun, startRun, type SyncRun} from './context';
+import {ensureTeams, failSync, footballClient, finishRun, startRun, SyncError, type SyncRun} from './context';
 
 /**
  * sync-competitions (daily)
@@ -20,10 +20,23 @@ export async function syncCompetitions(): Promise<SyncRun> {
 
     try {
         const seasons: Array<{leagueDbId: number; season: SmSeason}> = [];
+        const inaccessible: string[] = [];
 
         for (const comp of COMPETITIONS) {
-            const {data: league} = await sportmonksGet<SmLeague>(`leagues/${comp.sportmonksId}`, {include: 'currentSeason'});
-            run.requests += 1;
+            let league: SmLeague | null = null;
+            try {
+                const envelope = await sportmonksGet<SmLeague>(`leagues/${comp.sportmonksId}`, {include: 'currentSeason'});
+                league = envelope.data;
+            } catch (error) {
+                if (error instanceof SportmonksError && error.isNoAccess) {
+                    inaccessible.push(`${comp.slug} (#${comp.sportmonksId})`);
+                    run.warn(`league ${comp.slug} (#${comp.sportmonksId}) is not included in the Sportmonks subscription, skipped`);
+                    continue;
+                }
+                throw error;
+            } finally {
+                run.requests += 1;
+            }
             if (!league || typeof league.id !== 'number') {
                 run.warn(`league ${comp.slug} (#${comp.sportmonksId}): empty payload, is it included in the plan?`);
                 continue;
@@ -55,6 +68,23 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 continue;
             }
             seasons.push({leagueDbId: leagueRow.id as number, season});
+        }
+
+        if (seasons.length === 0) {
+            // Nothing usable: explain which leagues the token can actually see.
+            let available = '';
+            try {
+                const access = await sportmonksAccess();
+                run.requests += 1;
+                const plans = access.subscription?.plans?.map((p) => p.plan).join(', ') || 'unknown plan';
+                available = `plan: ${plans}; leagues in subscription: ${access.leagues.map((l) => `${l.name} (#${l.id})`).join(', ') || 'none'}`;
+            } catch (error) {
+                available = `could not list accessible leagues: ${(error as Error).message}`;
+            }
+            throw new SyncError(
+                `none of the configured leagues is accessible with this Sportmonks token (${inaccessible.join(', ')}). ${available}. ` +
+                    'Activate the European Plan trial (or add the leagues to the plan) and run again.',
+            );
         }
 
         // Mark every season of these leagues as not current, then upsert the current ones.
