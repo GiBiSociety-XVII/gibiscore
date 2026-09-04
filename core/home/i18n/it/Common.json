@@ -28,11 +28,7 @@
     "headToHead": "Precedenti",
     "adSlot": "Spazio pubblicitario",
     "favorites": "Classifiche preferite",
-    "customize": "Personalizza",
-    "done": "Fatto",
-    "pickTitle": "I tuoi campionati",
-    "pickHint": "Scegli le competizioni da vedere qui a fianco. La scelta resta salvata su questo dispositivo; puoi usare anche la stella accanto a ogni competizione.",
-    "noFavorites": "Nessuna competizione selezionata.",
+    "noFavorites": "Nessuna competizione: usa la stella accanto a un campionato per vederne qui la classifica.",
     "addFavorite": "Aggiungi ai preferiti",
     "removeFavorite": "Togli dai preferiti"
   }

@@ -1,10 +1,8 @@
 'use client';
 
-import {Settings2} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
-import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {useFavorites} from "@/lib/favorites";
 import type {StandingGroup} from "@/lib/football/types";
@@ -37,14 +35,13 @@ function loadTable(slug: string): Promise<Table | null> {
 
 /**
  * Home rail: full, scrollable tables of the user's favourite competitions
- * (kept in the browser). Without favourites, the pinned competitions
- * playing that day. Tables are fetched from a cached API route so the
- * page itself stays static.
+ * (starred in the scores list or the sidebar, kept in the browser).
+ * Without favourites, the pinned competitions playing that day. Tables
+ * are fetched from a cached API route so the page itself stays static.
  */
 export function FavoritesRail({defaults, catalog}: {defaults: string[]; catalog: RailCompetition[]}) {
     const t = useTranslations('Common.rail');
-    const {favorites, toggle} = useFavorites();
-    const [editing, setEditing] = useState(false);
+    const {favorites} = useFavorites();
     const [tables, setTables] = useState<Record<string, Table | null | undefined>>({});
     const slugs = favorites.length > 0 ? favorites.slice(0, 6) : defaults;
 
@@ -66,42 +63,7 @@ export function FavoritesRail({defaults, catalog}: {defaults: string[]; catalog:
 
     return (
         <>
-            <div className="flex items-center justify-between gap-2 px-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">{favorites.length > 0 ? t('favorites') : t('standings')}</span>
-                <button
-                    type="button"
-                    onClick={() => setEditing((v) => !v)}
-                    aria-expanded={editing}
-                    className={cn("inline-flex items-center gap-1 h-6 px-2 rounded-md border-2 text-[11px] font-extrabold", editing ? "bg-foreground text-background border-foreground" : "border-foreground/20 bg-card hover:border-foreground")}
-                >
-                    <Settings2 className="w-3.5 h-3.5" />
-                    {editing ? t('done') : t('customize')}
-                </button>
-            </div>
-
-            {editing && (
-                <Panel title={t('pickTitle')}>
-                    <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted">{t('pickHint')}</p>
-                    <ul className="flex flex-col max-h-[300px] overflow-y-auto [scrollbar-width:thin]">
-                        {catalog.map((c) => {
-                            const on = favorites.includes(c.slug);
-                            return (
-                                <li key={c.slug}>
-                                    <label className="flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0 text-[13px] font-bold cursor-pointer hover:bg-muted/60">
-                                        <input type="checkbox" checked={on} onChange={() => toggle(c.slug)} className="accent-[rgb(var(--foreground))] w-3.5 h-3.5" />
-                                        {c.logoUrl && (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={c.logoUrl} alt="" width={16} height={16} loading="lazy" className="object-contain" />
-                                        )}
-                                        <span className="truncate">{c.name}</span>
-                                    </label>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </Panel>
-            )}
-
+            <span className="px-1 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">{favorites.length > 0 ? t('favorites') : t('standings')}</span>
             {slugs.length === 0 && <p className="px-1 text-[12px] font-semibold text-muted-foreground">{t('noFavorites')}</p>}
 
             {slugs.map((slug) => {
