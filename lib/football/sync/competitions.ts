@@ -27,8 +27,12 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
         const featuredIds = new Set(featured.map((c) => c.providerId));
         const scope = basicScope();
         // Squads change rarely: fetched on Monday and Thursday (or on request), ~500 requests each time.
-        const day = new Date().getUTCDay();
-        const squadsDue = options.squads ?? (day === 1 || day === 4);
+        // During the transfer windows (January, February, August, September) every day: the provider's
+        // squads lag behind moves and the fantasy auction reads them.
+        const now = new Date();
+        const day = now.getUTCDay();
+        const transferWindow = [0, 1, 7, 8].includes(now.getUTCMonth());
+        const squadsDue = options.squads ?? (transferWindow || day === 1 || day === 4);
         const skipSquads = process.env.API_FOOTBALL_SKIP_SQUADS === '1' || !squadsDue;
         if (skipSquads) run.bump('squads_skipped');
 

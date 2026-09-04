@@ -93,19 +93,32 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
         if (seasons.length === 0) return null;
         const year = Math.max(...seasons.map((s) => s.season.year));
 
-        // Current squads.
-        const squad = (await fetchAll(
-            (a, b) => db.from('squad_members').select(`season_id,team_id,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('season_id', seasons.map((s) => s.season.id)).order('player_id').range(a, b),
-            {max: 6000},
-        )) as unknown as Array<{season_id: number; team_id: number; player: {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null} | null; team: TeamRow | null}>;
+        // Current squads, plus anyone with statistics for a club of these
+        // leagues this season: the provider's squads lag behind transfers,
+        // the season statistics list a player under his new club as soon as
+        // he plays. Whichever source was written last decides the club.
+        type Member = {player: {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null}; team: TeamRow; league: string; at: string};
+        const [squad, played] = await Promise.all([
+            fetchAll(
+                (a, b) => db.from('squad_members').select(`season_id,team_id,updated_at,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('season_id', seasons.map((s) => s.season.id)).order('player_id').range(a, b),
+                {max: 6000},
+            ) as unknown as Promise<Array<{season_id: number; updated_at: string; player: Member['player'] | null; team: TeamRow | null}>>,
+            fetchAll(
+                (a, b) => db.from('player_season_stats').select(`league_id,synced_at,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('league_id', seasons.map((s) => s.league.id)).eq('season_year', year).order('id').range(a, b),
+                {max: 6000},
+            ) as unknown as Promise<Array<{league_id: number; synced_at: string; player: Member['player'] | null; team: TeamRow | null}>>,
+        ]);
         const leagueOfSeason = new Map(seasons.map((s) => [s.season.id, s.league]));
-        const members = new Map<number, {player: NonNullable<(typeof squad)[number]['player']>; team: TeamRow; league: string}>();
+        const leagueById = new Map(seasons.map((s) => [s.league.id, s.league]));
+        const members = new Map<number, Member>();
         const teams = new Map<number, TeamRow>();
-        for (const m of squad) {
-            if (!m.player || !m.team) continue;
+        const consider = (m: Member) => {
             teams.set(m.team.id, m.team);
-            if (!members.has(m.player.id)) members.set(m.player.id, {player: m.player, team: m.team, league: leagueOfSeason.get(m.season_id)?.name ?? ''});
-        }
+            const known = members.get(m.player.id);
+            if (!known || m.at > known.at) members.set(m.player.id, m);
+        };
+        for (const m of squad) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueOfSeason.get(m.season_id)?.name ?? '', at: m.updated_at});
+        for (const m of played) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueById.get(m.league_id)?.name ?? '', at: m.synced_at});
         const playerIds = [...members.keys()];
         if (playerIds.length === 0) return null;
 

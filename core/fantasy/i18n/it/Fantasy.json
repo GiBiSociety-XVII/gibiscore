@@ -41,14 +41,27 @@
       "primeira-liga": "Primeira Liga"
     },
     "mode": "Modalità",
-    "modes": {"classic": "Classic", "mantra": "Mantra"},
+    "modes": {
+      "classic": "Classic",
+      "mantra": "Mantra"
+    },
     "mantraHint": "I ruoli Mantra dettagliati (Dc, E, M, W, T...) arrivano più avanti: per ora la rosa usa i quattro ruoli classici.",
     "participants": "Partecipanti",
     "credits": "Crediti a testa",
     "slots": "Giocatori in rosa",
     "slotsTotal": "{count} giocatori per squadra",
-    "roles": {"P": "Portieri", "D": "Difensori", "C": "Centrocampisti", "A": "Attaccanti"},
-    "rolesShort": {"P": "P", "D": "D", "C": "C", "A": "A"},
+    "roles": {
+      "P": "Portieri",
+      "D": "Difensori",
+      "C": "Centrocampisti",
+      "A": "Attaccanti"
+    },
+    "rolesShort": {
+      "P": "P",
+      "D": "D",
+      "C": "C",
+      "A": "A"
+    },
     "rules": "Punteggi",
     "rulesHint": "Bonus e malus della tua lega. Servono per la fantamedia stimata.",
     "rule": {
@@ -106,7 +119,11 @@
       "fantaAvg": "Fantamedia stimata a partita",
       "price": "Crediti consigliati per la tua lega"
     },
-    "confidence": {"low": "pochi dati", "medium": "dati parziali", "high": "dati solidi"},
+    "confidence": {
+      "low": "pochi dati",
+      "medium": "dati parziali",
+      "high": "dati solidi"
+    },
     "injured": "Infortunato",
     "suspended": "Squalificato",
     "doubtful": "In dubbio",
@@ -124,7 +141,17 @@
     "me": "Io",
     "confirm": "Conferma",
     "seasonsTitle": "Ultime stagioni",
-    "seasonCols": {"season": "Stag.", "team": "Squadra", "league": "Competizione", "apps": "PG", "lineups": "Tit.", "minutes": "Min", "goals": "Gol", "assists": "Ast", "rating": "Voto"},
+    "seasonCols": {
+      "season": "Stag.",
+      "team": "Squadra",
+      "league": "Competizione",
+      "apps": "PG",
+      "lineups": "Tit.",
+      "minutes": "Min",
+      "goals": "Gol",
+      "assists": "Ast",
+      "rating": "Voto"
+    },
     "noSeasons": "Nessuna statistica nelle ultime tre stagioni.",
     "showing": "{shown} di {total} giocatori",
     "more": "Mostra altri"
@@ -138,6 +165,52 @@
     "empty": "Nessun acquisto ancora. Usa \"Compra\" sul listone.",
     "others": "Altre squadre",
     "perSlot": "Media per slot libero: {credits} cr.",
-    "roleBudget": "Budget consigliato per ruolo"
+    "roleBudget": "Budget consigliato per ruolo",
+    "strategy": "Strategia: {name}"
+  },
+  "strategies": {
+    "title": "Strategie consigliate",
+    "ranked": "In ordine per questo listone",
+    "intro": "Ogni strategia è simulata sul listone con i crediti consigliati: vedi come divide il budget, chi comprerebbe e quanto vale la formazione che ne esce. \"Usa\" imposta i budget per ruolo nella tua rosa e segna gli obiettivi nel listone.",
+    "hint": "Il valore formazione è la somma delle fantamedie stimate dei migliori undici (3-4-3) pesate per la titolarità. Gli obiettivi cambiano man mano che i giocatori vengono comprati.",
+    "lineupValue": "Valore XI",
+    "overallShort": "tot.",
+    "best": "Migliore",
+    "inUse": "In uso",
+    "use": "Usa questa strategia",
+    "stopUsing": "Non usare più",
+    "needsDefence": "Serve il modificatore difesa nelle impostazioni",
+    "spent": "Spesa simulata {spent} su {credits} crediti",
+    "target": "Obiettivo",
+    "balanced": {
+      "name": "Equilibrata",
+      "tagline": "Nessun buco, un buon titolare in ogni ruolo",
+      "description": "Divisione classica dei crediti (8-17-27-48). In ogni reparto un top e titolari affidabili dietro, senza svenarsi per nessuno. È la scelta più sicura quando conosci poco gli avversari o quando il listone non ha fuoriclasse isolati."
+    },
+    "topPerRole": {
+      "name": "Un top per reparto",
+      "tagline": "Il migliore di ogni ruolo, poi riempitivi titolari",
+      "description": "Circa metà del budget di ogni ruolo va su un solo giocatore (due in attacco), il resto su titolari a poco. Vince quando i top del listone sono davvero staccati dagli altri: paghi il bonus sicuro e risparmi sulle scommesse."
+    },
+    "strongMidfield": {
+      "name": "Centrocampo forte",
+      "tagline": "Il grosso del budget sui centrocampisti con bonus",
+      "description": "Quasi metà dei crediti sui centrocampisti che fanno gol e assist e sui rigoristi, attacco di secondo livello, difesa e portiere low cost. Funziona nelle leghe dove i centrocampisti da bonus sono pochi e tutti li sottovalutano in asta."
+    },
+    "topAttack": {
+      "name": "Attacco da top",
+      "tagline": "Due o tre attaccanti d'élite, il resto a risparmio",
+      "description": "Due terzi dei crediti in attacco: i primi due o tre attaccanti del listone, poi difesa e centrocampo di titolari economici. Alto rischio, alto rendimento: se un top si infortuna paghi caro, se restano sani decidi molte giornate da solo."
+    },
+    "defenceBlock": {
+      "name": "Blocco difesa + portiere",
+      "tagline": "Difensori della stessa squadra e portiere da top",
+      "description": "Con il modificatore difesa attivo, investe su portiere e difensori con voto alto (idealmente il blocco di una squadra che subisce poco), tenendo un attacco solido ma non da top. Il modificatore aggiunge punti ogni giornata anche senza bonus."
+    },
+    "valueHunting": {
+      "name": "Caccia al valore",
+      "tagline": "Tanti titolari sottovalutati, nessuna spesa folle",
+      "description": "Spesa piatta: nessun giocatore sopra il 15-20% del budget, tanti titolari con buon rapporto voto/prezzo e scommesse su chi ha guadagnato posto quest'anno. Ideale per chi segue le probabili formazioni e vuole profondità di rosa."
+    }
   }
 }

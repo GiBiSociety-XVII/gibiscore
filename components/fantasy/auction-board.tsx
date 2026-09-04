@@ -9,10 +9,12 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
+import {StrategyPanel} from "./strategy-panel";
 import {ROLE_SHARE, totalSlots, type AuctionConfig, type Purchase} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
+import {rankStrategies, type StrategyKey} from "@/lib/fantasy/strategies";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team'] as const;
@@ -51,6 +53,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const ta = useTranslations('Fantasy.auction');
     const tr = useTranslations('Fantasy.roster');
     const ts = useTranslations('Fantasy.setup');
+    const tst = useTranslations('Fantasy.strategies');
     const router = useRouter();
     const hydrated = useHydrated();
     const config = configStore.useValue();
@@ -71,6 +74,12 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
         return suggestPrices(pool.players, {credits: config.credits, participants: config.participants, slots: config.slots, roleShare: ROLE_SHARE});
     }, [pool, config]);
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
+    // Strategies simulated on what is still on the market (players bought by others are gone).
+    const plans = useMemo(() => {
+        if (!pool || !config) return [];
+        const taken = new Set(purchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
+        return rankStrategies(pool.players, prices, config, taken);
+    }, [pool, config, prices, purchases]);
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
@@ -118,6 +127,10 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
         setBuying(null);
     };
     const release = (playerId: number) => purchasesStore.write(purchases.filter((p) => p.playerId !== playerId));
+    const strategy = plans.find((p) => p.key === config.strategy) ?? null;
+    const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
+    const roleShare = strategy?.share ?? ROLE_SHARE;
+    const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].map((p) => p.id)) : []);
 
     const shown = players.slice(0, limit);
     const selectClass = "bb-input h-8 px-2 text-[12px] font-bold";
@@ -188,7 +201,10 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                                     </button>
                                                     <TeamCrest team={p.team} size={16} />
                                                     <span className="flex flex-col leading-tight min-w-0">
-                                                        <Link href={`/players/${p.slug}`} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
+                                                        <span className="inline-flex items-center gap-1 min-w-0">
+                                                            <Link href={`/players/${p.slug}`} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
+                                                            {targets.has(p.id) && !purchase && <span className="bb-badge bg-accent text-[9px] h-4 px-1 shrink-0" title={tst('target')}>★</span>}
+                                                        </span>
                                                         <span className="text-[10px] font-semibold text-muted-foreground truncate">{p.team.name}{p.age !== null ? ` · ${p.age}` : ''} · <span title={t(`confidence.${p.scores.confidence}`)}>{p.scores.sample} PG</span></span>
                                                     </span>
                                                 </div>
@@ -251,8 +267,8 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                 <p className="text-[11px] font-semibold text-muted-foreground">{ta('intro')}</p>
             </div>
 
-            {/* My roster */}
-            <div className="flex flex-col gap-3 xl:sticky xl:top-24">
+            {/* My roster and the strategies */}
+            <div className="flex flex-col gap-3">
                 <Panel title={tr('title')}>
                     <div className="grid grid-cols-2 divide-x divide-muted border-b border-muted">
                         <div className="px-3 py-2 flex flex-col"><span className={cn("font-mono text-xl font-extrabold tabular-nums", left < 0 && "text-red-700")}>{left}</span><span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tr('credits')} {tr('left')}</span></div>
@@ -263,11 +279,14 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             <div key={r} className="px-2 py-1.5 flex flex-col items-center gap-0.5">
                                 <RoleBadge role={r} />
                                 <span className="font-mono text-[12px] font-extrabold tabular-nums">{tr('slots', {filled: mineByRole(r).length, total: config.slots[r]})}</span>
-                                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">~{Math.round(config.credits * ROLE_SHARE[r])} cr.</span>
+                                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">~{Math.round(config.credits * roleShare[r])} cr.</span>
                             </div>
                         ))}
                     </div>
-                    <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">{tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}</p>
+                    <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
+                        {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
+                        {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
+                    </p>
                     {mine.length === 0 ? (
                         <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{tr('empty')}</p>
                     ) : (
@@ -302,6 +321,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         </ul>
                     </Panel>
                 )}
+                <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={selectStrategy} credits={config.credits} />
             </div>
 
             {/* Buy sheet */}

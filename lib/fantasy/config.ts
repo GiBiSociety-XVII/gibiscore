@@ -56,6 +56,8 @@ export interface AuctionConfig {
     modifiers: Modifiers;
     /** Who is at the auction (names), first one is the user. */
     managers: string[];
+    /** Chosen auction strategy (lib/fantasy/strategies.ts), drives my role budgets. */
+    strategy: string | null;
 }
 
 export const DEFAULT_SLOTS: Record<AuctionMode, Record<FantaRole, number>> = {
@@ -75,6 +77,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     rules: DEFAULT_RULES,
     modifiers: {defence: true, captain: false, fairPlay: false, midfield: false},
     managers: [],
+    strategy: null,
 };
 
 /** Share of the market that usually goes to each role (Serie A leagues, classic). */
@@ -113,5 +116,6 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         rules: {...DEFAULT_RULES, ...(r.rules ?? {})},
         modifiers: {...DEFAULT_CONFIG.modifiers, ...(r.modifiers ?? {})},
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
+        strategy: typeof r.strategy === 'string' ? r.strategy : null,
     };
 }
