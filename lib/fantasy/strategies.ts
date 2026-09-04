@@ -262,8 +262,11 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             // The strategy's preferences shift the order (a penalty taker, a starter, a youngster...).
             const rank = (p: PoolPlayer) => p.scores.overall + (strategy.prefer?.(p, {chosen}) ?? 0);
             const pool = candidates.filter((p) => !used.has(p.id)).sort((a, b) => rank(b) - rank(a) || (b.scores.fantaAvg ?? 0) - (a.scores.fantaAvg ?? 0));
-            // What this slot may cost: its share of the role budget, never more than what leaves 1 credit per remaining slot.
-            const room = left - (slotsLeft - 1);
+            // What this slot may cost: its share of the role budget, never more than what leaves enough
+            // for the remaining slots at the cheapest prices still on the market.
+            const cheapestLeft = pool.map((p) => prices.get(p.id) ?? 1).sort((a, b) => a - b);
+            const reserve = cheapestLeft.slice(1, slotsLeft).reduce((s, v) => s + v, 0) + Math.max(0, slotsLeft - cheapestLeft.length);
+            const room = left - reserve;
             let cap = Math.max(1, Math.min(Math.round(budget[role] * fraction * 1.15), room));
             // A slot too small for anyone still on the market takes the cheapest player left, when the budget allows it.
             const cheapest = pool.reduce((m, p) => Math.min(m, prices.get(p.id) ?? 1), Infinity);

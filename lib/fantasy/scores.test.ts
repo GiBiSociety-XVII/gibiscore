@@ -126,8 +126,8 @@ describe('suggestPrices', () => {
         expect(prices.get(1)!).toBeLessThanOrEqual(220);
         expect(prices.get(5)!).toBeGreaterThan(prices.get(1)! * 0.55);
         expect(prices.get(12)!).toBeLessThan(prices.get(1)! * 0.45);
-        expect(prices.get(24)!).toBeLessThan(prices.get(1)! * 0.15);
-        expect(prices.get(40)!).toBeLessThanOrEqual(8);
+        expect(prices.get(24)!).toBeLessThan(prices.get(1)! * 0.25);
+        expect(prices.get(40)!).toBeLessThanOrEqual(12);
         expect(Math.abs(spent - 500 * 8 * 0.48)).toBeLessThan(60);
     });
 
@@ -137,7 +137,7 @@ describe('suggestPrices', () => {
         expect(prices.get(301)!).toBeGreaterThan(prices.get(201)!);
         expect(prices.get(201)!).toBeGreaterThan(prices.get(101)!);
         expect(prices.get(101)!).toBeGreaterThan(prices.get(1)! * 0.7);
-        // Keepers: a couple matter, the tenth is almost free.
-        expect(prices.get(10)!).toBeLessThan(prices.get(1)! * 0.2);
+        // Keepers: a couple matter, the tenth costs a fraction.
+        expect(prices.get(10)!).toBeLessThan(prices.get(1)! * 0.3);
     });
 });

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {FantaRole} from './scores';
-import {assignTiers, groupByTier, TIERS, type TierPlayer} from './tiers';
+import {assignTiers, explainTiers, groupByTier, TIERS, type TierPlayer} from './tiers';
 
 const pool = (role: FantaRole, n: number, offset: number) => Array.from({length: n}, (_, i) => ({id: offset + i + 1, role, scores: {overall: 95 - i}}));
 const config = {participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}};
@@ -67,6 +67,23 @@ describe('assignTiers', () => {
         const tiers = assignTiers(players, config);
         expect(tiers.get(31)).toBe('avoid');
         expect(tiers.get(66)).toBe('jolly');
+    });
+
+    it('explains every tier with its rank and the rule that put him there', () => {
+        const players: TierPlayer[] = pool('A', 70, 0).map((p) => ({...p, age: 28, scores: {...p.scores, starter: 60, fitness: 70, bonus: 40, form: 50, confidence: 'high' as const}}));
+        players[0] = {...players[0], scores: {...players[0].scores, confidence: 'low', sample: 3}};
+        players[54] = {...players[54], age: 21, scores: {...players[54].scores, bonus: 55}};
+        players[57] = {...players[57], injury: {longTerm: true, daysOut: 120}};
+        const infos = explainTiers(players, config);
+        expect(infos.get(2)).toMatchObject({tier: 'top', rank: 1, ofRole: 70, bought: 48, why: [{kind: 'ranked', tier: 'top', from: 1, to: 4}]});
+        // Thin evidence: top by mark alone, ranked after the first ten solid players instead.
+        const thin = infos.get(1)!;
+        expect(thin.tier).toBe('first');
+        expect(thin.rank).toBe(11);
+        expect(thin.why).toContainEqual({kind: 'thinDropped', from: 'top', sample: 3});
+        expect(infos.get(55)!.why).toEqual([{kind: 'belowBought'}, {kind: 'young', age: 21, bonus: 55}]);
+        expect(infos.get(58)!.why).toEqual([{kind: 'belowBought'}, {kind: 'longInjury', daysOut: 120}]);
+        expect(infos.get(60)!.why).toEqual([{kind: 'belowBought'}, {kind: 'filler'}]);
     });
 
     it('groups by role and tier, best first', () => {

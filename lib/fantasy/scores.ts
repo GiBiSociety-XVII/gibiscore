@@ -331,7 +331,19 @@ export interface PriceConfig {
  * twenty-fourth a tenth; keepers fall much faster (two or three
  * matter), defenders and midfielders are a little flatter.
  */
-const RANK_HALF: Record<FantaRole, number> = {P: 3.5, D: 9, C: 8, A: 8};
+/**
+ * Price curve down the ranking of a role: a Hill curve with a long
+ * middle (exponent 1.5, half-way rank per role) so the money does not
+ * collapse on the first handful, times a nudge for the mark itself.
+ * The list prices the first `PRICE_TAIL` x bought players: the ones
+ * just outside what the league buys are worth a few credits, not one.
+ */
+const RANK_HALF: Record<FantaRole, number> = {P: 4, D: 12, C: 11, A: 10};
+const RANK_POWER = 1.5;
+export const PRICE_TAIL = 1.5;
+export function priceWeight(role: FantaRole, rank: number, overall: number, top: number): number {
+    return (1 / (1 + (rank / RANK_HALF[role]) ** RANK_POWER)) * (0.6 + 0.4 * (overall / Math.max(1, top)) ** 2);
+}
 
 /**
  * Suggested credits per player. Each role gets its share of the market
@@ -346,10 +358,11 @@ export function suggestPrices<T extends {id: number; role: FantaRole; scores: Pi
     const market = config.credits * config.participants;
     for (const role of ['P', 'D', 'C', 'A'] as const) {
         const pool = players.filter((p) => p.role === role).sort((a, b) => b.scores.overall - a.scores.overall);
-        const bought = pool.slice(0, Math.max(1, config.participants * config.slots[role]));
+        // Priced: what the league buys plus the players just outside, who go for a few credits.
+        const bought = pool.slice(0, Math.max(1, Math.round(config.participants * config.slots[role] * PRICE_TAIL)));
         const budget = market * config.roleShare[role];
         const top = bought[0]?.scores.overall ?? 1;
-        const weight = (p: T, rank: number) => (1 / (1 + (rank / RANK_HALF[role]) ** 2)) * (0.6 + 0.4 * (p.scores.overall / top) ** 2);
+        const weight = (p: T, rank: number) => priceWeight(role, rank, p.scores.overall, top);
         for (const p of pool) prices.set(p.id, 1);
         // No fixed ceiling: a price is what the market money and the ranking say,
         // bounded only by what one manager can physically pay while keeping a

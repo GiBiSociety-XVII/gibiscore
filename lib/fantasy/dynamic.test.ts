@@ -44,8 +44,8 @@ describe('dynamicPrices', () => {
     it('lowers the remaining tops when the table has already burnt its money', () => {
         const players = pool();
         const list = suggestPrices(players, {...config, roleShare});
-        // Every manager blew 400 of 500 on a cheap attacker: nobody can pay for a top any more.
-        const purchases = Array.from({length: 8}, (_, i) => ({playerId: 250 + i, price: 400, manager: i}));
+        // Every manager blew 460 of 500 on a cheap attacker: nobody can pay for a top any more.
+        const purchases = Array.from({length: 8}, (_, i) => ({playerId: 250 + i, price: 460, manager: i}));
         const m = marketState(players, list, config, purchases);
         expect(m.byRole.A.hungry).toBe(0);
         const dyn = dynamicPrices(players, list, config, purchases);

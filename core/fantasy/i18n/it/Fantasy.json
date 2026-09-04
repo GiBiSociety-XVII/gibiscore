@@ -325,6 +325,52 @@
     "avoid": {
       "name": "Da evitare",
       "short": "EVITA"
+    },
+    "why": {
+      "button": "Perché è in questa fascia",
+      "close": "Chiudi",
+      "rank": "{rank}º {role} su {total} per voto totale ({overall})",
+      "ranked": "Posizioni {from}-{to} del ruolo: la tua lega compra {bought} {roles}, e la fascia {tier} è la quota di chi sta lì",
+      "lastBought": "Quinta fascia: gli ultimi che la lega compra davvero (posizioni {from}-{to})",
+      "belowBought": "Oltre i {bought} {roles} che la tua lega compra: qui contano il profilo e i segnali",
+      "thinDropped": "Pochi dati alle spalle ({sample} partite pesate): per voto starebbe in {from}, ma senza numeri solidi non può salire",
+      "longInjury": "Infortunio lungo: rientro stimato tra {days} giorni",
+      "longInjuryUnknown": "Infortunio lungo, rientro senza data",
+      "neverPlays": "Gioca quasi mai: titolarità {starter} su 100 con dati sufficienti per fidarsi",
+      "lowFitness": "Disponibilità al minimo ({fitness} su 100): infortuni, età o poche presenze in rosa",
+      "young": "{age} anni e bonus in canna ({bonus} su 100): può crescere in fretta",
+      "hotStart": "Partenza a razzo: voto partenza {form} su 100 e posto da titolare",
+      "thinPromising": "Numeri buoni ma poche partite alle spalle ({sample} pesate): può esplodere, o sparire",
+      "filler": "Nessun segnale per una scommessa: da prendere a 1 credito solo per completare la rosa",
+      "strengths": "Punti forti: {list}",
+      "weaknesses": "Punti deboli: {list}",
+      "confidence": "Affidabilità dei voti: {level} ({sample} partite pesate)",
+      "levels": {
+        "low": "bassa",
+        "medium": "media",
+        "high": "alta"
+      },
+      "scores": {
+        "starter": "titolarità",
+        "bonus": "bonus",
+        "rating": "voto",
+        "discipline": "disciplina",
+        "fitness": "fisico",
+        "team": "club",
+        "form": "partenza"
+      }
+    },
+    "roleOne": {
+      "P": "portiere",
+      "D": "difensore",
+      "C": "centrocampista",
+      "A": "attaccante"
+    },
+    "roleMany": {
+      "P": "portieri",
+      "D": "difensori",
+      "C": "centrocampisti",
+      "A": "attaccanti"
     }
   }
 }

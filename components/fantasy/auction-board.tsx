@@ -10,14 +10,14 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
-import {TierBadge, TierList} from "./tier-list";
+import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
 import {bestLineup, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
-import {TIERS, assignTiers, type Tier} from "@/lib/fantasy/tiers";
+import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
@@ -88,7 +88,8 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const prices = pool && config ? dynamicPrices(pool.players, listPrices, config, purchases) : listPrices;
     const market = pool && config ? marketState(pool.players, listPrices, config, purchases) : null;
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
-    const tiers = useMemo(() => (pool && config ? assignTiers(pool.players, config) : new Map<number, Tier>()), [pool, config]);
+    const tierInfos = useMemo(() => (pool && config ? explainTiers(pool.players, config) : new Map<number, TierInfo>()), [pool, config]);
+    const tiers = useMemo(() => new Map<number, Tier>([...tierInfos].map(([id, info]) => [id, info.tier])), [tierInfos]);
     // Strategies simulated on what is still on the market at live prices, starting from what I already own.
     const plans = useMemo(() => {
         if (!pool || !config) return [];
@@ -283,7 +284,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
 
                 {view === 'tiers' && (
                     <>
-                        <TierList players={players} tiers={tiers} prices={prices} bought={bought} targets={targets} onBuy={openBuy} />
+                        <TierList players={players} infos={tierInfos} prices={prices} bought={bought} targets={targets} onBuy={openBuy} />
                         <p className="text-[11px] font-semibold text-muted-foreground">{tt('hint')}</p>
                     </>
                 )}
@@ -329,7 +330,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                                 </div>
                                             </td>
                                             <td className="px-1 py-1 text-center"><RoleBadge role={p.role} /></td>
-                                            <td className="px-1 py-1 text-center"><TierBadge tier={tiers.get(p.id) ?? 'filler'} /></td>
+                                            <td className="px-1 py-1 text-center"><span className="inline-flex items-center gap-1"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{tierInfos.get(p.id) && <TierWhy player={p} info={tierInfos.get(p.id)!} />}</span></td>
                                             {SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
                                             <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>

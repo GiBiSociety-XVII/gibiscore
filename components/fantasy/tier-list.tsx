@@ -1,12 +1,14 @@
 'use client';
 
+import {HelpCircle, X} from "lucide-react";
+import {useEffect, useRef, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {AuctionPlayer} from "@/lib/fantasy/data";
 import type {FantaRole} from "@/lib/fantasy/scores";
-import {TIERS, groupByTier, type Tier} from "@/lib/fantasy/tiers";
+import {TIERS, groupByTier, type Tier, type TierInfo, type TierWhy as Why} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 
@@ -31,10 +33,74 @@ export function TierBadge({tier, short = true, className}: {tier: Tier; short?: 
     return <span className={cn("inline-flex items-center justify-center h-5 px-1.5 rounded border text-[10px] font-extrabold uppercase tracking-wide whitespace-nowrap", TIER_CLASS[tier], className)} title={t(`${tier}.name`)}>{short ? t(`${tier}.short`) : t(`${tier}.name`)}</span>;
 }
 
+const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
+
+/** One reason of a tier, in words. */
+function useWhyText(role: FantaRole) {
+    const t = useTranslations('Fantasy.tiers');
+    return (w: Why, info: TierInfo): string => {
+        const roles = t(`roleMany.${role}`);
+        switch (w.kind) {
+            case 'ranked': return w.tier === 'fifth' ? t('why.lastBought', {from: w.from, to: w.to}) : t('why.ranked', {from: w.from, to: w.to, bought: info.bought, roles, tier: t(`${w.tier}.name`)});
+            case 'belowBought': return t('why.belowBought', {bought: info.bought, roles});
+            case 'thinDropped': return t('why.thinDropped', {sample: w.sample, from: t(`${w.from}.name`)});
+            case 'longInjury': return w.daysOut === null ? t('why.longInjuryUnknown') : t('why.longInjury', {days: w.daysOut});
+            case 'neverPlays': return t('why.neverPlays', {starter: w.starter});
+            case 'lowFitness': return t('why.lowFitness', {fitness: w.fitness});
+            case 'young': return t('why.young', {age: w.age, bonus: w.bonus});
+            case 'hotStart': return t('why.hotStart', {form: w.form});
+            case 'thinPromising': return t('why.thinPromising', {sample: w.sample});
+            case 'filler': return t('why.filler');
+        }
+    };
+}
+
+/** A "?" that opens the reasons behind a player's tier: rank, the rule that put him there, strengths and weaknesses. */
+export function TierWhy({player, info}: {player: AuctionPlayer; info: TierInfo}) {
+    const t = useTranslations('Fantasy.tiers');
+    const text = useWhyText(player.role);
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLSpanElement>(null);
+    useEffect(() => {
+        if (!open) return;
+        const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+        document.addEventListener('mousedown', onDown);
+        document.addEventListener('keydown', onKey);
+        return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+    }, [open]);
+    const strengths = SCORE_KEYS.filter((k) => player.scores[k] >= 70).map((k) => `${t(`why.scores.${k}`)} ${player.scores[k]}`);
+    const weaknesses = SCORE_KEYS.filter((k) => player.scores[k] <= 40).map((k) => `${t(`why.scores.${k}`)} ${player.scores[k]}`);
+    return (
+        <span ref={ref} className="relative inline-flex">
+            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={t('why.button')} title={t('why.button')} className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-foreground/40 bg-card text-muted-foreground hover:bg-accent hover:text-foreground">
+                <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+            {open && (
+                <div role="dialog" className="absolute z-30 top-6 left-0 w-72 max-w-[80vw] rounded-lg border-2 border-foreground bg-background shadow-[4px_4px_0_0_var(--color-foreground)] p-3 flex flex-col gap-1.5 text-left normal-case tracking-normal">
+                    <div className="flex items-center gap-2">
+                        <TierBadge tier={info.tier} short={false} />
+                        <span className="text-[12px] font-extrabold truncate">{player.name}</span>
+                        <button type="button" onClick={() => setOpen(false)} aria-label={t('why.close')} className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded border border-foreground bg-card"><X className="w-3 h-3" /></button>
+                    </div>
+                    <p className="text-[12px] font-bold">{t('why.rank', {rank: info.rank, role: t(`roleOne.${player.role}`), total: info.ofRole, overall: player.scores.overall})}</p>
+                    <ul className="flex flex-col gap-1 text-[11px] font-semibold leading-snug list-disc pl-4">
+                        {info.why.map((w, i) => <li key={i}>{text(w, info)}</li>)}
+                        {strengths.length > 0 && <li className="text-emerald-800">{t('why.strengths', {list: strengths.join(', ')})}</li>}
+                        {weaknesses.length > 0 && <li className="text-red-800">{t('why.weaknesses', {list: weaknesses.join(', ')})}</li>}
+                        <li className="text-muted-foreground">{t('why.confidence', {level: t(`why.levels.${player.scores.confidence}`), sample: Math.round(player.scores.sample)})}</li>
+                    </ul>
+                </div>
+            )}
+        </span>
+    );
+}
+
 /** Four role columns, players grouped by tier with price and overall; bought players struck through. */
-export function TierList({players, tiers, prices, bought, targets, onBuy}: {players: AuctionPlayer[]; tiers: Map<number, Tier>; prices: Map<number, number>; bought: Map<number, {manager: number; price: number}>; targets: Set<number>; onBuy: (player: AuctionPlayer) => void}) {
+export function TierList({players, infos, prices, bought, targets, onBuy}: {players: AuctionPlayer[]; infos: Map<number, TierInfo>; prices: Map<number, number>; bought: Map<number, {manager: number; price: number}>; targets: Set<number>; onBuy: (player: AuctionPlayer) => void}) {
     const t = useTranslations('Fantasy.tiers');
     const tb = useTranslations('Fantasy.board');
+    const tiers = new Map<number, Tier>([...infos].map(([id, info]) => [id, info.tier]));
     const grouped = groupByTier(players, tiers);
     return (
         <div className="grid gap-3 grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 items-start">
@@ -58,6 +124,7 @@ export function TierList({players, tiers, prices, bought, targets, onBuy}: {play
                                                 <Link href={`/players/${p.slug}`} className={cn("font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2", purchase && "line-through")}>{p.name}</Link>
                                                 {targets.has(p.id) && !purchase && <span className="bb-badge bg-accent text-[9px] h-4 px-1 shrink-0">★</span>}
                                                 <span className="text-[10px] font-semibold text-muted-foreground truncate">{p.team.shortCode ?? p.team.name}</span>
+                                                {infos.get(p.id) && <TierWhy player={p} info={infos.get(p.id)!} />}
                                                 <span className="ml-auto font-mono text-[11px] font-bold tabular-nums text-muted-foreground">{p.scores.overall}</span>
                                                 <span className="font-mono text-[12px] font-extrabold tabular-nums w-8 text-right">{prices.get(p.id) ?? 1}</span>
                                                 {!purchase && <button type="button" onClick={() => onBuy(p)} className="bb-btn bg-accent w-7 h-6 inline-flex items-center justify-center text-[14px] leading-none font-extrabold" aria-label={`${tb('buy')} ${p.name}`}>+</button>}

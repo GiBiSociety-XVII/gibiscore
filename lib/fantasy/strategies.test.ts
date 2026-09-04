@@ -15,7 +15,7 @@ function pool(): PoolPlayer[] {
     make('P', 30);
     make('D', 90);
     make('C', 90);
-    make('A', 70);
+    make('A', 100);
     return out;
 }
 

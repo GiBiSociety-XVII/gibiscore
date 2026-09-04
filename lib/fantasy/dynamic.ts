@@ -1,5 +1,5 @@
 import {ROLE_SHARE, type AuctionConfig, type Purchase} from './config';
-import type {FantaRole, FantaScores} from './scores';
+import {PRICE_TAIL, priceWeight, type FantaRole, type FantaScores} from './scores';
 
 /**
  * Live prices during the auction. The list prices assume a full market;
@@ -46,7 +46,6 @@ export interface Market {
 }
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
-const RANK_HALF: Record<FantaRole, number> = {P: 3.5, D: 9, C: 8, A: 8};
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -166,9 +165,9 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         const cap = capFor(role);
         const state = market.byRole[role];
         const available = players.filter((p) => p.role === role && !paidFor.has(p.id)).sort((a, b) => b.scores.overall - a.scores.overall);
-        const toBuy = available.slice(0, Math.max(1, state.slotsLeft));
+        const toBuy = available.slice(0, Math.max(1, Math.round(state.slotsLeft * PRICE_TAIL)));
         const top = toBuy[0]?.scores.overall ?? 1;
-        const weight = (p: PricedPlayer, rank: number) => (1 / (1 + (rank / RANK_HALF[role]) ** 2)) * (0.6 + 0.4 * (p.scores.overall / top) ** 2);
+        const weight = (p: PricedPlayer, rank: number) => priceWeight(role, rank, p.scores.overall, top);
         const total = toBuy.reduce((s, p, i) => s + weight(p, i), 0);
         // A table that pays over list keeps doing it, softly: at most a tenth either way.
         const mood = Math.sqrt(clamp(state.inflation, 0.8, 1.2));
