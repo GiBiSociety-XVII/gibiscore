@@ -169,7 +169,10 @@
     "paid": "Prezzo pagato",
     "maxBidHint": "Secondo la tua strategia non superare {max} crediti.",
     "quickList": "Listino",
-    "quickMax": "Max"
+    "quickMax": "Max",
+    "blockRole": "{manager} ha già {count} {role}: rosa piena in questo ruolo.",
+    "blockCredits": "{manager} non può pagare più di {max} crediti: deve tenerne uno per ogni slot ancora libero.",
+    "full": "pieno"
   },
   "roster": {
     "title": "La mia rosa",

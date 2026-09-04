@@ -137,9 +137,26 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
             configStore.write(null);
         }
     };
+    // Roster limits per manager: slots of the role, and credits that must leave 1 per open slot.
+    const rosterOf = (manager: number) => purchases.filter((p) => p.manager === manager && byId.has(p.playerId));
+    const roleCount = (manager: number, r: FantaRole) => rosterOf(manager).filter((p) => byId.get(p.playerId)!.role === r).length;
+    const roleFull = (manager: number, r: FantaRole) => roleCount(manager, r) >= config.slots[r];
+    const creditsLeftOf = (manager: number) => config.credits - rosterOf(manager).reduce((s, p) => s + p.price, 0);
+    const openSlotsOf = (manager: number) => Math.max(0, slotsTotal - rosterOf(manager).length);
+    /** Why a purchase cannot go through, or null. */
+    const blocker = (player: AuctionPlayer, manager: number, price: number): string | null => {
+        const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
+        if (roleFull(manager, player.role) && !already) return t('blockRole', {manager: managers[manager] ?? t('me'), count: config.slots[player.role], role: ts(`roles.${player.role}`)});
+        const left = creditsLeftOf(manager) + (already?.price ?? 0);
+        const open = openSlotsOf(manager) + (already ? 1 : 0);
+        const maxPay = left - (open - 1);
+        if (price > maxPay) return t('blockCredits', {manager: managers[manager] ?? t('me'), max: Math.max(0, maxPay)});
+        return null;
+    };
     const confirmBuy = () => {
         if (!buying) return;
         const price = Math.max(0, Math.round(Number(buying.price) || 0));
+        if (blocker(buying.player, buying.manager, price)) return;
         purchasesStore.write([...purchases.filter((p) => p.playerId !== buying.player.id), {playerId: buying.player.id, price, manager: buying.manager}]);
         setLastManager(buying.manager);
         setBuying(null);
@@ -454,7 +471,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             <label className="flex flex-col gap-1">
                                 <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('manager')}</span>
                                 <select className="bb-input h-10 px-2.5 text-[14px] font-bold" value={buying.manager} onChange={(e) => setBuying({...buying, manager: Number(e.target.value)})}>
-                                    {managers.map((m, i) => <option key={i} value={i}>{i === 0 ? `${m} (${t('mine')})` : m}</option>)}
+                                    {managers.map((m, i) => <option key={i} value={i} disabled={roleFull(i, buying.player.role) && !purchases.some((p) => p.playerId === buying.player.id && p.manager === i)}>{i === 0 ? `${m} (${t('mine')})` : m}{roleFull(i, buying.player.role) ? ` · ${t('full')}` : ''}</option>)}
                                 </select>
                             </label>
                         </div>
@@ -462,7 +479,15 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             {t('columns.price')}: {prices.get(buying.player.id) ?? 1} · {t('listPrice', {price: listPrices.get(buying.player.id) ?? 1})} · {t('columns.fantaAvg')}: {buying.player.scores.fantaAvg?.toFixed(2) ?? '–'}
                             {strategy && maxBidOf(buying.player.id) !== null && <span className="block text-foreground">{t('maxBidHint', {max: maxBidOf(buying.player.id)!})}</span>}
                         </p>
-                        <button type="submit" className="bb-btn bg-accent h-10 px-4 text-[13px] font-extrabold">{t('confirm')}</button>
+                        {(() => {
+                            const why = blocker(buying.player, buying.manager, Math.max(0, Math.round(Number(buying.price) || 0)));
+                            return (
+                                <>
+                                    {why && <p role="alert" className="text-[12px] font-bold text-red-700">{why}</p>}
+                                    <button type="submit" disabled={why !== null} className="bb-btn bg-accent h-10 px-4 text-[13px] font-extrabold disabled:opacity-50 disabled:cursor-not-allowed">{t('confirm')}</button>
+                                </>
+                            );
+                        })()}
                     </form>
                 </div>
             )}
