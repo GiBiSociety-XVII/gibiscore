@@ -2,7 +2,8 @@ import 'server-only';
 import {basicScope, isFeaturedProviderId} from '@/lib/football/competitions';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {
-    extractExtraMinute, extractMinute,
+    extractExtraMinute,
+    extractMinute,
     isLiveState,
     mapEvents,
     mapFixtureState,
