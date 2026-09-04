@@ -15,7 +15,7 @@
     "title": "Asta",
     "metaTitle": "Asta fantacalcio",
     "metaDescription": "Asta del fantacalcio con voti da 1 a 100 per ogni giocatore: titolarità, bonus, rendimento, malus, affidabilità e squadra, con crediti consigliati.",
-    "intro": "Voti da 1 a 100 calcolati sulle ultime tre stagioni e sull'andamento di questa. I crediti consigliati seguono le impostazioni della tua lega.",
+    "intro": "Voti da 1 a 100: la stagione scorsa è la base (55%), quella prima conta il 15%, quella in corso cresce con le giornate giocate (5% dopo due, 20% dopo otto, quasi metà a gennaio). La partenza di giocatore e club è un voto a parte. I crediti consigliati seguono le impostazioni della tua lega.",
     "empty": "Nessun giocatore disponibile per questo campionato: le rose non sono ancora state importate.",
     "settings": "Impostazioni",
     "changeSettings": "Modifica impostazioni",
@@ -107,7 +107,8 @@
       "fantaAvg": "FM st.",
       "price": "Crediti",
       "status": "Stato",
-      "tier": "Fascia"
+      "tier": "Fascia",
+      "form": "Partenza"
     },
     "columnHints": {
       "starter": "Titolarità: quanto spesso parte titolare e quanti minuti gioca",
@@ -119,7 +120,8 @@
       "overall": "Voto complessivo pesato per ruolo",
       "fantaAvg": "Fantamedia stimata a partita",
       "price": "Crediti consigliati per la tua lega",
-      "tier": "Fascia nel ruolo: top, semi-top, prima, seconda, terza, riempitivi"
+      "tier": "Fascia nel ruolo: top, semi-top, prima, seconda, terza, riempitivi",
+      "form": "Partenza: com'è iniziata la stagione per lui e per il suo club rispetto all'anno scorso (50 = come atteso)"
     },
     "confidence": {
       "low": "pochi dati",

@@ -45,6 +45,8 @@ export interface AuctionInput {
     /** 0..1, 0.5 = league average; null before the season has a shape. */
     teamAttack: number | null;
     teamDefence: number | null;
+    /** Rounds the club has played this season: the shape counts as "team" from five, as "form" from the first. */
+    teamRounds?: number;
 }
 
 export interface FantaScores {
@@ -60,6 +62,8 @@ export interface FantaScores {
     fitness: number;
     /** Strength of the club this season. */
     team: number;
+    /** How the season has started for him and his club, against his own past: 50 = as expected. */
+    form: number;
     overall: number;
     /** Estimated fantasy average per match played (rating + bonus - malus). */
     fantaAvg: number | null;
@@ -71,17 +75,19 @@ export interface FantaScores {
 const clamp = (v: number, min = 1, max = 100) => Math.max(min, Math.min(max, Math.round(v)));
 
 /**
- * Season weights: the current season grows towards 50% as it goes (two
- * matches count ~1%, eight ~20%, fifteen or more 50%: a hot start does
- * not make a price), previous 40%, older 10%; missing seasons hand their
- * share to the others.
+ * Season weights. Auctions happen in early September and early January,
+ * so the previous season is the backbone (55%) and the one before it
+ * counts 15%; the current season starts small and grows with the
+ * matches played: 5% after two rounds, 20% after eight, 45% by January
+ * (nineteen rounds). How the player and his club have started is a
+ * separate mark ("form"), not a bigger weight.
  */
 export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<number, number> {
     const years = [...new Set(seasons.map((s) => s.year))].filter((y) => y <= currentYear && y >= currentYear - 2);
     const gamesOf = (y: number) => Math.max(0, ...seasons.filter((s) => s.year === y).map((s) => s.games));
     const raw = new Map<number, number>();
     for (const y of years) {
-        const base = y === currentYear ? 0.5 * Math.min(1, gamesOf(y) / 15) ** 1.5 : y === currentYear - 1 ? 0.4 : 0.1;
+        const base = y === currentYear ? 0.6 * Math.min(1, gamesOf(y) / 19) ** 1.2 : y === currentYear - 1 ? 0.55 : 0.15;
         if (base > 0) raw.set(y, base);
     }
     const total = [...raw.values()].reduce((s, v) => s + v, 0);
@@ -151,17 +157,17 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
 const BONUS_SCALE: Record<FantaRole, number> = {P: 0.1, D: 0.25, C: 0.55, A: 1.0};
 
 const WEIGHTS: Record<FantaRole, Record<Exclude<keyof FantaScores, 'overall' | 'fantaAvg' | 'sample' | 'confidence'>, number>> = {
-    P: {starter: 35, bonus: 0, rating: 25, discipline: 20, fitness: 10, team: 10},
-    D: {starter: 30, bonus: 20, rating: 20, discipline: 10, fitness: 10, team: 10},
-    C: {starter: 25, bonus: 35, rating: 15, discipline: 5, fitness: 10, team: 10},
-    A: {starter: 25, bonus: 40, rating: 15, discipline: 5, fitness: 10, team: 5},
+    P: {starter: 32, bonus: 0, rating: 23, discipline: 18, fitness: 8, team: 9, form: 10},
+    D: {starter: 27, bonus: 18, rating: 18, discipline: 9, fitness: 8, team: 9, form: 11},
+    C: {starter: 22, bonus: 32, rating: 14, discipline: 4, fitness: 8, team: 9, form: 11},
+    A: {starter: 22, bonus: 36, rating: 14, discipline: 4, fitness: 8, team: 5, form: 11},
 };
 
 export function scorePlayer(input: AuctionInput): FantaScores {
     const weights = seasonWeights(input.seasons, input.currentYear);
     const years = [...weights.keys()];
     if (years.length === 0) {
-        return {starter: 1, bonus: 1, rating: 1, discipline: 50, fitness: input.injury?.active ? 20 : 50, team: teamScore(input), overall: 1, fantaAvg: null, sample: 0, confidence: 'low'};
+        return {starter: 1, bonus: 1, rating: 1, discipline: 50, fitness: input.injury?.active ? 20 : 50, team: teamScore(input), form: 50, overall: 1, fantaAvg: null, sample: 0, confidence: 'low'};
     }
 
     let starter = 0;
@@ -232,6 +238,7 @@ export function scorePlayer(input: AuctionInput): FantaScores {
         discipline: clamp(discipline),
         fitness: clamp(fitness),
         team: teamScore(input),
+        form: formScore(input),
     };
     const w = WEIGHTS[input.role];
     const overall = (Object.keys(w) as Array<keyof typeof w>).reduce((s, k) => s + (scores[k] * w[k]) / 100, 0);
@@ -247,15 +254,59 @@ export function scorePlayer(input: AuctionInput): FantaScores {
     };
 }
 
-/** Club strength for the role, compressed to 20..80: it is one factor, not the whole story. */
-function teamScore(input: AuctionInput): number {
+/** Attack/defence mix of the club for the role, 0..1 (0.5 average). */
+function clubMix(input: AuctionInput): number | null {
     const attack = input.teamAttack;
     const defence = input.teamDefence;
-    if (attack === null && defence === null) return 50;
+    if (attack === null && defence === null) return null;
     const mix = input.role === 'A' ? [0.8, 0.2] : input.role === 'C' ? [0.6, 0.4] : input.role === 'D' ? [0.35, 0.65] : [0.15, 0.85];
-    const a = attack ?? 0.5;
-    const d = defence ?? 0.5;
-    return clamp(50 + (mix[0] * a + mix[1] * d - 0.5) * 60);
+    return mix[0] * (attack ?? 0.5) + mix[1] * (defence ?? 0.5);
+}
+
+/** Club strength for the role, compressed to 20..80, only once the club has played five rounds. */
+function teamScore(input: AuctionInput): number {
+    const mix = clubMix(input);
+    if (mix === null || (input.teamRounds ?? 5) < 5) return 50;
+    return clamp(50 + (mix - 0.5) * 60);
+}
+
+/**
+ * Start of the season against the player's own past: is he starting,
+ * is he rating and scoring above or below his previous season, how has
+ * his club started. Half weight after two rounds, full after four; 50
+ * when nothing has been played yet.
+ */
+function formScore(input: AuctionInput): number {
+    const cur = input.seasons.filter((s) => s.year === input.currentYear);
+    const past = input.seasons.filter((s) => s.year === input.currentYear - 1);
+    const rounds = Math.max(input.teamRounds ?? 0, ...cur.map((s) => s.games));
+    if (rounds < 1) return 50;
+    const now = aggregateYear(cur, input.currentTeamId);
+    const before = aggregateYear(past, input.currentTeamId);
+    let delta = 0;
+
+    // Playing? Starts over the club's rounds, against last season's starting rate.
+    const startNow = Math.min(1, now.lineups / rounds);
+    const startBefore = before.apps + before.bench > 0 ? before.lineups / (before.apps + before.bench) : 0.5;
+    delta += Math.max(-15, Math.min(15, (startNow - startBefore) * 40));
+    // Not seen at all while the club has played: bad sign unless injured.
+    if (now.apps === 0 && rounds >= 2 && !input.injury?.active) delta -= 12;
+
+    if (now.ratingApps > 0 && before.ratingApps > 0) {
+        delta += Math.max(-12, Math.min(12, (now.ratingSum / now.ratingApps - before.ratingSum / before.ratingApps) * 20));
+    }
+    if (now.minutes > 0 && before.minutes > 0) {
+        const bonusNow = ((3 * now.goals + now.assists) * 90) / now.minutes;
+        const bonusBefore = ((3 * before.goals + before.assists) * 90) / before.minutes;
+        delta += Math.max(-12, Math.min(12, ((bonusNow - bonusBefore) / BONUS_SCALE[input.role]) * 10));
+    }
+
+    // The club's start, softly until it has played a few rounds.
+    const mix = clubMix(input);
+    if (mix !== null) delta += (mix - 0.5) * 40 * Math.min(1, rounds / 5);
+
+    // Two rounds are half a signal, four a full one.
+    return clamp(50 + delta * Math.min(1, rounds / 4));
 }
 
 // ---------------------------------------------------------------------------

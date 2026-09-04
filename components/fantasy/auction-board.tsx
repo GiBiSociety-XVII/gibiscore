@@ -19,7 +19,7 @@ import {rankStrategies, type StrategyKey} from "@/lib/fantasy/strategies";
 import {TIERS, assignTiers, type Tier} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
-const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team'] as const;
+const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
 type SortKey = 'overall' | 'price' | 'fantaAvg' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
 
@@ -255,7 +255,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={12} className="px-3 py-2">
+                                                <td colSpan={13} className="px-3 py-2">
                                                     {p.seasons.length === 0 ? (
                                                         <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
                                                     ) : (

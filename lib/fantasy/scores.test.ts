@@ -10,10 +10,13 @@ const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
 describe('seasonWeights', () => {
     it('weights the current season by how far it has gone', () => {
         const w = seasonWeights([line(2026, {games: 2}), line(2025), line(2024)], 2026);
-        const cur = 0.5 * (2 / 15) ** 1.5;
-        expect(w.get(2026)!).toBeCloseTo(cur / (cur + 0.5), 5);
-        expect(w.get(2025)!).toBeCloseTo(0.4 / (cur + 0.5), 5);
-        expect(seasonWeights([line(2026, {games: 20}), line(2025)], 2026).get(2026)!).toBeCloseTo(0.5 / 0.9, 5);
+        const cur = 0.6 * (2 / 19) ** 1.2;
+        expect(w.get(2026)!).toBeCloseTo(cur / (cur + 0.7), 5);
+        expect(w.get(2026)!).toBeLessThan(0.08);
+        expect(w.get(2025)!).toBeCloseTo(0.55 / (cur + 0.7), 5);
+        // January: the current season is the biggest weight.
+        const jan = seasonWeights([line(2026, {games: 19}), line(2025), line(2024)], 2026);
+        expect(jan.get(2026)!).toBeGreaterThan(jan.get(2025)!);
         expect([...w.values()].reduce((s, v) => s + v, 0)).toBeCloseTo(1, 5);
     });
 
@@ -95,6 +98,21 @@ describe('scorePlayer with a transfer', () => {
         expect(lower.rating).toBeLessThan(top.rating);
         expect(lower.bonus).toBeLessThan(top.bonus);
         expect(lower.overall).toBeLessThan(top.overall - 5);
+    });
+});
+
+describe('form', () => {
+    it('is neutral before the season and rewards a strong start', () => {
+        const base = [line(2025)];
+        const none = scorePlayer({role: 'A', age: 26, currentYear: 2026, seasons: base, injury: null, teamAttack: null, teamDefence: null, teamRounds: 0});
+        const hot = scorePlayer({role: 'A', age: 26, currentYear: 2026, seasons: [...base, line(2026, {games: 3, appearances: 3, lineups: 3, bench: 0, minutes: 270, goals: 4, assists: 1, rating: 7.6})], injury: null, teamAttack: 0.8, teamDefence: 0.6, teamRounds: 3});
+        const cold = scorePlayer({role: 'A', age: 26, currentYear: 2026, seasons: [...base, line(2026, {games: 3, appearances: 1, lineups: 0, bench: 2, minutes: 15, goals: 0, assists: 0, rating: 6.0})], injury: null, teamAttack: 0.3, teamDefence: 0.4, teamRounds: 3});
+        expect(none.form).toBe(50);
+        expect(hot.form).toBeGreaterThan(60);
+        expect(cold.form).toBeLessThan(40);
+        expect(hot.overall).toBeGreaterThan(cold.overall);
+        // Three rounds do not make the team score: that waits for five.
+        expect(hot.team).toBe(50);
     });
 });
 

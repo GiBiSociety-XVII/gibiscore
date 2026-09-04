@@ -154,15 +154,16 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
             Promise.all(seasons.map(async (s) => [s.season.id, await getSeasonStudy(s.season.id)] as const)),
             loadTeamSidelined(db, [...teams.keys()]),
         ]);
-        const teamShape = new Map<number, {attack: number; defence: number}>();
+        // Club shape from the first round: the scoring uses it softly as
+        // "form" at once and as "team" strength only from the fifth round.
+        const teamShape = new Map<number, {attack: number; defence: number; rounds: number}>();
         for (const [, study] of studies) {
-            // A club's shape needs at least five rounds: earlier it is noise and every club is average.
-            if (!study || study.played < study.teams.length * 2.5) continue;
+            if (!study || study.played === 0) continue;
             const perTeam = study.goalsPerMatch / 2;
             const logistic = (ratio: number) => 1 / (1 + Math.exp(-(ratio - 1) * 3));
             for (const t of study.teams) {
                 if (t.played === 0) continue;
-                teamShape.set(t.team.id, {attack: logistic(t.goalsFor / t.played / perTeam), defence: logistic(perTeam / Math.max(0.2, t.goalsAgainst / t.played))});
+                teamShape.set(t.team.id, {attack: logistic(t.goalsFor / t.played / perTeam), defence: logistic(perTeam / Math.max(0.2, t.goalsAgainst / t.played)), rounds: t.played});
             }
         }
         const injuryOf = new Map<number, SidelinedEntry>();
@@ -212,6 +213,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
                 injury: injury ? {active: true, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm} : null,
                 teamAttack: shape?.attack ?? null,
                 teamDefence: shape?.defence ?? null,
+                teamRounds: shape?.rounds ?? 0,
             });
             players.push({
                 id: player.id,
