@@ -1,3 +1,4 @@
+import type {ReturnEstimate} from './spells';
 /**
  * Read models used by the UI. They mirror the football.* tables in
  * supabase/migrations but stay independent of the provider payloads.
@@ -30,6 +31,8 @@ export interface CompetitionSummary {
     name: string;
     slug: string;
     country: string | null;
+    /** ISO 3166 alpha-2 when known (null for World / international). */
+    countryCode: string | null;
     logoUrl: string | null;
     type: string | null;
     featured?: boolean;
@@ -46,11 +49,17 @@ export interface FixtureSummary {
     leagueName: string;
     leagueSlug?: string;
     leagueCountry?: string | null;
+    leagueCountryCode?: string | null;
+    leagueLogoUrl?: string | null;
     leagueFeatured?: boolean;
     round: string | null;
     startingAt: string; // ISO timestamp
     state: FixtureState;
     minute: number | null;
+    /** Stoppage time while a period runs past its length ("90+3"). */
+    extraMinute?: number | null;
+    /** When the row was last written by the live sync, ISO; lets the minute tick client-side. */
+    syncedAt?: string | null;
     home: TeamSummary;
     away: TeamSummary;
     homeScore: number | null;
@@ -77,7 +86,13 @@ export interface StandingRow {
     goalsFor?: number;
     goalsAgainst?: number;
     form?: string | null;
+    /** Provider note such as "Promotion - Champions League" or "Relegation". */
+    description?: string | null;
+    zone?: StandingZone | null;
 }
+
+/** Colour band of a table row, derived from the provider's description. */
+export type StandingZone = 'champions' | 'europa' | 'conference' | 'promotion' | 'playoff' | 'relegation' | 'relegation_playoff';
 
 export interface StandingGroup {
     name: string; // '' for the main table
@@ -113,13 +128,37 @@ export interface RoundFixtures {
     fixtures: FixtureSummary[];
 }
 
+/** One line of a season ranking (top scorers, assists, ratings). */
+export interface RankedPlayer {
+    player: {id: number; name: string; slug: string; imageUrl: string | null};
+    team: TeamSummary;
+    position: string | null;
+    appearances: number;
+    minutes: number;
+    goals: number;
+    assists: number;
+    penaltiesScored: number;
+    rating: number | null;
+    yellowCards: number;
+    redCards: number;
+}
+
 export interface CompetitionPage {
     competition: CompetitionSummary;
     season: SeasonSummary | null;
     standings: StandingGroup[];
+    /** Every round of the season, newest first (results and calendar alike). */
+    rounds: RoundFixtures[];
+    /** Teams of the season (from the table, else from the fixtures), alphabetical. */
+    teams: TeamSummary[];
+    /** Round to open by default: the one with the most recent activity. */
+    currentRound: string | null;
     results: RoundFixtures[];
     upcoming: RoundFixtures[];
     live: FixtureSummary[];
+    rankings: {scorers: RankedPlayer[]; assists: RankedPlayer[]};
+    /** Rankings of past seasons with imported statistics, newest first. */
+    pastRankings: Array<{year: number; name: string; rankings: {scorers: RankedPlayer[]; assists: RankedPlayer[]}}>;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,12 +231,12 @@ export interface PlayerMatchLine {
     keyPasses: number | null;
     yellowCards: number;
     redCards: number;
-    fantasy: number | null;
 }
 
 export interface MatchPage {
     fixture: FixtureSummary & {
         competition: CompetitionSummary;
+        seasonId: number | null;
         venue: string | null;
         referee: string | null;
         homeScoreHt: number | null;
@@ -207,6 +246,25 @@ export interface MatchPage {
     lineups: {home: TeamLineup | null; away: TeamLineup | null};
     stats: {home: TeamMatchStats | null; away: TeamMatchStats | null};
     players: {home: PlayerMatchLine[]; away: PlayerMatchLine[]};
+    /** Table of the competition (main group of the two teams), for the side rail. */
+    standings: StandingGroup[];
+    /** Last meetings between the two teams, newest first. */
+    headToHead: FixtureSummary[];
+    /** Last five results of each team before this match, newest first. */
+    form: {home: FormEntry[]; away: FormEntry[]};
+    /** Highest rated player of the match, when ratings exist. */
+    bestPlayer: PlayerMatchLine | null;
+    /** Players currently out on each side. */
+    absences: {home: SidelinedEntry[]; away: SidelinedEntry[]};
+}
+
+export interface FormEntry {
+    fixtureId: number;
+    result: 'W' | 'D' | 'L';
+    score: string;
+    opponent: TeamSummary;
+    home: boolean;
+    startingAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,14 +288,67 @@ export interface TeamStandingLine {
     totalTeams: number;
 }
 
+/** Aggregates of the current season, computed from our stored fixtures and team statistics. */
+export interface TeamSeasonStats {
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    cleanSheets: number;
+    /** Averages over the matches with statistics stored (null when none). */
+    withStats: number;
+    avgPossession: number | null;
+    avgShots: number | null;
+    avgShotsOnTarget: number | null;
+    avgCorners: number | null;
+    avgXg: number | null;
+}
+
+/** A squad member's season totals for this team, summed over its competitions. */
+export interface TeamPlayerSeason {
+    player: {id: number; name: string; slug: string; imageUrl: string | null};
+    position: string | null;
+    number: number | null;
+    appearances: number;
+    lineups: number;
+    minutes: number;
+    goals: number;
+    assists: number;
+    rating: number | null;
+    yellowCards: number;
+    redCards: number;
+}
+
 export interface TeamPage {
     team: TeamSummary & {country: string | null; venue: string | null; founded: number | null};
+    seasonStats: TeamSeasonStats | null;
+    players: TeamPlayerSeason[];
+    /** Every fixture of the current seasons, oldest first. */
+    calendar: FixtureSummary[];
     standings: TeamStandingLine[];
     recent: FixtureSummary[];
     upcoming: FixtureSummary[];
     live: FixtureSummary[];
     squad: SquadPlayer[];
-    sidelined: Array<{player: SquadPlayer; category: string; description: string | null}>;
+    sidelined: SidelinedEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Absences (injuries, suspensions), rebuilt from the fixtures missed
+// ---------------------------------------------------------------------------
+
+export interface SidelinedEntry {
+    player: {id: number; name: string; slug: string; imageUrl: string | null; position: string | null};
+    /** injury | suspension | doubtful | other */
+    category: string;
+    description: string | null;
+    /** First fixture missed, YYYY-MM-DD. */
+    since: string;
+    daysOut: number;
+    missed: number;
+    estimate: ReturnEstimate;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +363,6 @@ export interface PlayerSeasonTotals {
     yellowCards: number;
     redCards: number;
     averageRating: number | null;
-    averageFantasy: number | null;
 }
 
 export interface PlayerMatchRow {
@@ -264,7 +374,6 @@ export interface PlayerMatchRow {
     assists: number;
     yellowCards: number;
     redCards: number;
-    fantasy: number | null;
 }
 
 /** One row of football.player_season_stats: a player in a team, competition and season. */

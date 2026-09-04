@@ -2,6 +2,7 @@ import 'server-only';
 import {basicScope, isFeaturedProviderId} from '@/lib/football/competitions';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {
+    extractExtraMinute,
     extractMinute,
     isLiveState,
     mapEvents,
@@ -82,6 +83,19 @@ export async function syncLive(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-live');
     try {
+        // Nothing in play and no kick-off in the last 3 hours or the next
+        // 2 minutes: no request at all (saves ~700 requests a day at night).
+        const {count: possible, error: possibleError} = await db
+            .from('fixtures')
+            .select('id', {count: 'exact', head: true})
+            .or(`state.in.(live,half_time,extra_time,penalties),and(state.eq.scheduled,starting_at.gte.${new Date(Date.now() - 3 * 3_600_000).toISOString()},starting_at.lte.${new Date(Date.now() + 2 * 60_000).toISOString()})`);
+        if (possibleError) failSync('fixtures.count', possibleError);
+        if ((possible ?? 0) === 0) {
+            run.bump('idle');
+            await finishRun(db, run, 'ok');
+            return run;
+        }
+
         const {response: inplayAll} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {live: 'all'});
         run.requests += 1;
         const inplay = inplayAll.filter(inScope);
@@ -200,6 +214,7 @@ export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures:
             starting_at: new Date(f.fixture.date).toISOString(),
             state,
             minute: extractMinute(f.fixture.status, state),
+            extra_minute: extractExtraMinute(f.fixture.status, state),
             home_team_id: homeId,
             away_team_id: awayId,
             home_score: f.goals?.home ?? null,

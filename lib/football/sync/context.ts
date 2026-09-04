@@ -2,6 +2,7 @@ import 'server-only';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {createServiceClient} from '@/lib/db/server';
 import {lastRateLimit} from '@/lib/api-football/client';
+import {fetchAll} from '@/lib/db/paginate';
 import {slugify} from '@/lib/api-football/mappers';
 
 /**
@@ -162,14 +163,16 @@ export interface SeasonRef {
 
 /** Every season flagged current, with its league; optionally one tier only. */
 export async function currentSeasons(db: FootballClient, tier?: LeagueTier): Promise<SeasonRef[]> {
-    let query = db
-        .from('seasons')
-        .select('id,year,name,league:leagues!inner(id,provider_id,slug,tier)')
-        .eq('is_current', true);
-    if (tier) query = query.eq('leagues.tier', tier);
-    const {data, error} = await query.limit(5000);
-    if (error) fail('seasons.select', error);
-    return (data ?? []).map((row) => {
+    // ~1,100 current seasons: more than one Data API page.
+    const data = await fetchAll((a, b) => {
+        let query = db
+            .from('seasons')
+            .select('id,year,name,league:leagues!inner(id,provider_id,slug,tier)')
+            .eq('is_current', true);
+        if (tier) query = query.eq('leagues.tier', tier);
+        return query.order('id').range(a, b);
+    }, {max: 10000});
+    return data.map((row) => {
         const league = row.league as unknown as {id: number; provider_id: number; slug: string; tier: LeagueTier};
         return {
             id: row.id as number,

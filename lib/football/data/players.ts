@@ -1,5 +1,4 @@
 import 'server-only';
-import {fantasyScore} from '../fantasy';
 import type {PlayerMatchRow, PlayerPage, PlayerSeasonStat, PlayerSeasonTotals} from '../types';
 import {normalizePosition} from './matches';
 import {FIXTURE_SELECT, TEAM_SELECT, footballDb, logReadError, toFixture, toTeam, type FixtureRow, type TeamRow} from './shared';
@@ -40,11 +39,6 @@ interface SeasonStatRow {
     team: TeamRow | null;
     league: {id: number; name: string; slug: string} | null;
     season: {name: string} | null;
-}
-
-function statNumber(stats: Record<string, number | string | null> | null, key: string): number {
-    const v = stats?.[key];
-    return typeof v === 'number' ? v : Number(v ?? 0) || 0;
 }
 
 const MATCH_LINE_SELECT = `team_id,minutes_played,rating,goals,assists,yellow_cards,red_cards,stats,fixture:fixtures!inner(${FIXTURE_SELECT},season:seasons!inner(year,name))`;
@@ -154,18 +148,6 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
                     assists: r.assists,
                     yellowCards: r.yellow_cards,
                     redCards: r.red_cards,
-                    fantasy: fantasyScore({
-                        rating: r.rating,
-                        position,
-                        minutes: r.minutes_played,
-                        goals: r.goals,
-                        assists: r.assists,
-                        yellowCards: r.yellow_cards,
-                        redCards: r.red_cards,
-                        penaltiesMissed: statNumber(r.stats, 'penalty_missed'),
-                        penaltiesSaved: statNumber(r.stats, 'penalty_saved'),
-                        goalsConceded: statNumber(r.stats, 'goals_conceded'),
-                    }),
                 };
             })
             .filter((r): r is PlayerMatchRow => r !== null)
@@ -173,7 +155,6 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
 
         const played = rows.filter((r) => (r.minutes ?? 0) > 0);
         const rated = played.filter((r) => r.rating !== null);
-        const withFantasy = played.filter((r) => r.fantasy !== null);
         const totals: PlayerSeasonTotals = {
             matches: played.length,
             minutes: played.reduce((s, r) => s + (r.minutes ?? 0), 0),
@@ -182,7 +163,6 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
             yellowCards: rows.reduce((s, r) => s + r.yellowCards, 0),
             redCards: rows.reduce((s, r) => s + r.redCards, 0),
             averageRating: rated.length ? Math.round((rated.reduce((s, r) => s + (r.rating ?? 0), 0) / rated.length) * 100) / 100 : null,
-            averageFantasy: withFantasy.length ? Math.round((withFantasy.reduce((s, r) => s + (r.fantasy ?? 0), 0) / withFantasy.length) * 100) / 100 : null,
         };
 
         const squad = (squadRes.data?.[0] ?? null) as unknown as {jersey_number: number | null; team: TeamRow | null} | null;

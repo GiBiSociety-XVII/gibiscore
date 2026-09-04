@@ -2,6 +2,7 @@ import 'server-only';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {mapStandings} from '@/lib/api-football/mappers';
 import type {AfStandingsResponse} from '@/lib/api-football/types';
+import {fetchAll} from '@/lib/db/paginate';
 import {currentSeasons, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /**
@@ -21,8 +22,7 @@ export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Pro
         if (scope === 'all') {
             const from = new Date(Date.now() - 10 * 86_400_000).toISOString();
             const to = new Date(Date.now() + 10 * 86_400_000).toISOString();
-            const {data, error} = await db.from('fixtures').select('season_id').gte('starting_at', from).lte('starting_at', to).limit(20000);
-            if (error) failSync('fixtures.select', error);
+            const data = await fetchAll((a, b) => db.from('fixtures').select('season_id').gte('starting_at', from).lte('starting_at', to).order('id').range(a, b), {max: 40000});
             const active = new Set((data ?? []).map((r) => r.season_id as number));
             seasons = seasons.filter((s) => active.has(s.id));
         }
@@ -67,6 +67,7 @@ export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Pro
                     goals_against: s.goalsAgainst,
                     points: s.points,
                     form: s.form,
+                    description: s.description,
                 }));
 
             const {error} = await db.from('standings').upsert(dbRows, {onConflict: 'season_id,stage,group,team_id'});

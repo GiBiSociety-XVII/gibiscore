@@ -1,11 +1,21 @@
 import type {Metadata} from "next";
 import Image from "next/image";
 import {getTranslations, setRequestLocale} from "next-intl/server";
-import {Badge} from "@/components/shared/ui/badge";
+import {SiteShell, Panel} from "@/components/shell/site-shell";
+import {FavoriteStar} from "@/components/football/favorite-star";
+import {Flag} from "@/components/football/flag";
 import {MatchList} from "@/components/football/match-list";
-import {NotFoundBox, PageShell, PageTitle} from "@/components/football/page-shell";
+import {NotFoundBox, PageHeader} from "@/components/football/page-header";
+import {ScorersPanel, StandingsPanel} from "@/components/football/rail";
+import {Rankings} from "@/components/football/rankings";
+import {SelectPanels} from "@/components/football/select-panels";
 import {StandingsTable} from "@/components/football/standings-table";
+import {Tabs} from "@/components/football/tabs";
+import {TeamCrest} from "@/components/football/team-crest";
+import {Link} from "@/i18n/navigation";
+import {SeasonStudyView} from "@/components/football/season-study";
 import {getCompetitionPage} from "@/lib/football/data/competitions";
+import {getSeasonStudy} from "@/lib/football/data/study";
 import {roundLabel} from "@/lib/football/data/shared";
 
 export const revalidate = 120;
@@ -15,10 +25,7 @@ export async function generateMetadata({params}: PageProps<"/[locale]/competitio
     const t = await getTranslations('Pages.competition');
     const page = await getCompetitionPage(slug);
     if (!page) return {title: t('notFound')};
-    return {
-        title: page.competition.name,
-        description: t('metaDescription', {name: page.competition.name, season: page.season?.name ?? ''}),
-    };
+    return {title: page.competition.name, description: t('metaDescription', {name: page.competition.name, season: page.season?.name ?? ''})};
 }
 
 export default async function CompetitionPage({params}: PageProps<"/[locale]/competitions/[slug]">) {
@@ -30,54 +37,111 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
 
     if (!page) {
         return (
-            <PageShell>
+            <SiteShell>
                 <NotFoundBox message={t('notFound')} backHref="/competitions" backLabel={t('backToList')} />
-            </PageShell>
+            </SiteShell>
         );
     }
 
     const {competition, season} = page;
+    const study = season ? await getSeasonStudy(season.id) : null;
+    const rail = (
+        <>
+            {page.standings.length > 0 && <StandingsPanel title={t('standings')} slug={competition.slug} groups={page.standings.slice(0, 1)} />}
+            {page.rankings.scorers.length > 0 && <ScorersPanel title={t('scorers')} players={page.rankings.scorers} />}
+        </>
+    );
+
+    const matchesTab = (
+        <>
+            {page.live.length > 0 && <MatchList title={t('live')} fixtures={page.live} showDate />}
+            {page.rounds.length === 0 ? (
+                <MatchList fixtures={[]} />
+            ) : (
+                <SelectPanels
+                    label={t('round')}
+                    defaultId={page.currentRound ?? undefined}
+                    panels={page.rounds.map((r) => ({id: r.round, label: roundLabel(r.round) || '—', content: <MatchList fixtures={r.fixtures} showDate />}))}
+                />
+            )}
+        </>
+    );
+
+    const standingsTab = (
+        <Panel title={`${t('standings')}${season ? ` · ${season.name}` : ''}`}>
+            <StandingsTable groups={page.standings} />
+        </Panel>
+    );
+
+    const rankingsGrid = (r: {scorers: typeof page.rankings.scorers; assists: typeof page.rankings.assists}) => (
+        <div className="grid gap-3 grid-cols-1 2xl:grid-cols-2">
+            <Panel title={t('scorers')}><div className="px-1"><Rankings kind="scorers" players={r.scorers} /></div></Panel>
+            <Panel title={t('assists')}><div className="px-1"><Rankings kind="assists" players={r.assists} /></div></Panel>
+        </div>
+    );
+    const playersTab = page.pastRankings.length === 0 ? (
+        rankingsGrid(page.rankings)
+    ) : (
+        <SelectPanels
+            label={t('season')}
+            panels={[
+                {id: String(season?.year ?? 'current'), label: season?.name ?? '', content: rankingsGrid(page.rankings)},
+                ...page.pastRankings.map((p) => ({id: String(p.year), label: p.name, content: rankingsGrid(p.rankings)})),
+            ]}
+        />
+    );
+
+    const teamsTab = (
+        <Panel title={`${t('tabs.teams')} · ${page.teams.length}`}>
+            {page.teams.length === 0 ? (
+                <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{tFootball('empty.noFixtures')}</p>
+            ) : (
+                <ul className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-px bg-muted">
+                    {page.teams.map((team) => (
+                        <li key={team.id} className="bg-card">
+                            <Link href={`/teams/${team.slug}`} className="flex items-center gap-2.5 px-3 h-11 hover:bg-muted/60">
+                                <TeamCrest team={team} size={22} />
+                                <span className="text-[13px] font-bold truncate">{team.name}</span>
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </Panel>
+    );
 
     return (
-        <PageShell>
-            <PageTitle
-                eyebrow={[competition.country, season ? tFootball('labels.season', {season: season.name}) : null].filter(Boolean).join(' · ')}
-                title={
-                    <span className="inline-flex items-center gap-3">
-                        {competition.logoUrl && (
-                            <span className="inline-flex w-10 h-10 items-center justify-center rounded-xl border-[2.5px] border-foreground bg-card overflow-hidden">
-                                <Image src={competition.logoUrl} alt="" width={30} height={30} className="object-contain" />
-                            </span>
-                        )}
-                        {competition.name}
+        <SiteShell rail={rail}>
+            <PageHeader
+                visual={
+                    <span className="inline-flex w-12 h-12 items-center justify-center rounded-xl border-[2.5px] border-foreground bg-card overflow-hidden">
+                        {competition.logoUrl ? <Image src={competition.logoUrl} alt="" width={36} height={36} className="object-contain" /> : <Flag code={competition.countryCode} size={28} />}
                     </span>
                 }
-                aside={page.live.length > 0 ? <Badge variant="accent">{t('live')} · {page.live.length}</Badge> : null}
+                title={competition.name}
+                meta={
+                    <>
+                        <Flag code={competition.countryCode} size={14} />
+                        {competition.country}
+                        {season && <span>· {tFootball('labels.season', {season: season.name})}</span>}
+                    </>
+                }
+                aside={
+                    <span className="inline-flex items-center gap-2">
+                        {page.live.length > 0 && <span className="bb-badge bg-accent">{t('live')} · {page.live.length}</span>}
+                        <FavoriteStar slug={competition.slug} size={18} className="w-8 h-8 border-2 border-foreground bg-card" />
+                    </span>
+                }
             />
-
-            {page.live.length > 0 && <MatchList title={t('live')} fixtures={page.live} />}
-
-            <div className="grid gap-4 grid-cols-1 xl:grid-cols-[7fr_5fr] items-start">
-                <StandingsTable groups={page.standings} title={t('standings')} />
-                <div className="flex flex-col gap-4 min-w-0">
-                    <section className="flex flex-col gap-2">
-                        <h2 className="text-lg font-extrabold tracking-tight">{t('upcoming')}</h2>
-                        {page.upcoming.length === 0 ? (
-                            <MatchList fixtures={[]} />
-                        ) : (
-                            page.upcoming.map((r) => <MatchList key={r.round} title={roundLabel(r.round) || undefined} fixtures={r.fixtures} />)
-                        )}
-                    </section>
-                    <section className="flex flex-col gap-2">
-                        <h2 className="text-lg font-extrabold tracking-tight">{t('results')}</h2>
-                        {page.results.length === 0 ? (
-                            <MatchList fixtures={[]} />
-                        ) : (
-                            page.results.map((r) => <MatchList key={r.round} title={roundLabel(r.round) || undefined} fixtures={r.fixtures} />)
-                        )}
-                    </section>
-                </div>
-            </div>
-        </PageShell>
+            <Tabs
+                items={[
+                    {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.live.length},
+                    {id: 'standings', label: t('tabs.standings'), content: standingsTab},
+                    {id: 'teams', label: t('tabs.teams'), content: teamsTab},
+                    {id: 'study', label: t('tabs.study'), content: <SeasonStudyView study={study} />},
+                    {id: 'players', label: t('tabs.players'), content: playersTab},
+                ]}
+            />
+        </SiteShell>
     );
 }

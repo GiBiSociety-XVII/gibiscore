@@ -1,22 +1,4 @@
 {
-  "live": {
-    "title": "Live",
-    "dayTitle": "Partite del {date}",
-    "metaTitle": "Live",
-    "metaDescription": "Risultati in tempo reale di tutte le competizioni e programma completo di ogni giornata.",
-    "liveBadge": "{count, plural, =0 {Nessuna partita in corso} one {# partita in corso} other {# partite in corso}}",
-    "totalBadge": "{count, plural, =0 {Nessuna partita} one {# partita} other {# partite}}",
-    "liveOnly": "Solo live",
-    "previousDay": "Giorno prima",
-    "nextDay": "Giorno dopo",
-    "today": "Oggi",
-    "pickDate": "Vai alla data",
-    "go": "Vai",
-    "featured": "In evidenza",
-    "otherCompetitions": "Altre competizioni",
-    "emptyLive": "In questo momento non c'è nessuna partita in corso. Scegli un giorno per vedere il programma.",
-    "emptyDay": "Nessuna partita in programma in questo giorno."
-  },
   "competitions": {
     "title": "Competizioni",
     "metaTitle": "Competizioni",
@@ -24,18 +6,34 @@
     "open": "Apri",
     "season": "Stagione {season}",
     "featured": "In evidenza",
-    "byCountry": "Tutte le competizioni per paese",
+    "byCountry": "Per paese",
     "count": "{count, plural, one {# competizione} other {# competizioni}}",
-    "empty": "Le competizioni compaiono dopo la prima sincronizzazione dei dati."
+    "empty": "Le competizioni compaiono dopo la prima sincronizzazione dei dati.",
+    "searchTitle": "Risultati per “{query}”",
+    "noResults": "Nessuna competizione o paese corrisponde alla ricerca."
   },
   "competition": {
+    "tabs": {
+      "matches": "Partite",
+      "standings": "Classifica",
+      "players": "Giocatori",
+      "teams": "Squadre",
+      "study": "Statistiche"
+    },
     "standings": "Classifica",
     "results": "Risultati",
     "upcoming": "Prossime partite",
     "live": "In corso",
+    "scorers": "Marcatori",
+    "assists": "Assist",
+    "previousRound": "Precedente",
+    "nextRound": "Successiva",
+    "allRounds": "Tutte le giornate",
     "notFound": "Competizione non trovata",
     "backToList": "Tutte le competizioni",
-    "metaDescription": "{name}: classifica aggiornata, risultati e calendario della stagione {season}."
+    "metaDescription": "{name}: classifica aggiornata, risultati e calendario della stagione {season}.",
+    "round": "Giornata",
+    "season": "Stagione"
   },
   "match": {
     "notFound": "Partita non trovata",
@@ -45,7 +43,25 @@
     "stats": "Statistiche",
     "players": "Voti e statistiche giocatori",
     "metaTitle": "{home} – {away}",
-    "metaDescription": "{home} contro {away}, {competition}: risultato, cronaca, formazioni, statistiche e voti dei giocatori."
+    "metaDescription": "{home} contro {away}, {competition}: risultato, cronaca, formazioni, statistiche e voti dei giocatori.",
+    "tabs": {
+      "summary": "Cronaca",
+      "lineups": "Formazioni",
+      "stats": "Statistiche",
+      "players": "Giocatori"
+    },
+    "info": "Informazioni",
+    "headToHead": "Precedenti",
+    "comparison": "Confronto",
+    "form": "Forma",
+    "position": "Posizione",
+    "points": "Punti",
+    "goals": "Gol fatti / subiti",
+    "bestPlayer": "Migliore in campo",
+    "noForm": "Nessun precedente in archivio.",
+    "scorers": "Marcatori",
+    "absences": "Indisponibili",
+    "prediction": "Pronostico"
   },
   "team": {
     "notFound": "Squadra non trovata",
@@ -57,7 +73,38 @@
     "sidelined": "Indisponibili",
     "position": "{position}ª su {total}",
     "founded": "Fondata nel {year}",
-    "metaDescription": "{name}: risultati, prossime partite, classifica, rosa e indisponibili."
+    "metaDescription": "{name}: risultati, prossime partite, classifica, rosa e indisponibili.",
+    "tabs": {
+      "matches": "Partite",
+      "squad": "Rosa",
+      "standings": "Classifica",
+      "stats": "Statistiche",
+      "players": "Giocatori",
+      "calendar": "Calendario"
+    },
+    "statsTitle": "Statistiche stagione",
+    "played": "Partite",
+    "record": "V · N · P",
+    "goals": "Gol fatti / subiti",
+    "cleanSheets": "Porte inviolate",
+    "avgPossession": "Possesso medio",
+    "avgShots": "Tiri a partita",
+    "avgShotsOn": "Tiri in porta a partita",
+    "avgCorners": "Angoli a partita",
+    "avgXg": "xG a partita",
+    "noStats": "Statistiche non ancora disponibili per questa stagione.",
+    "playersTitle": "Statistiche giocatori · stagione in corso",
+    "noPlayers": "Statistiche dei giocatori non ancora disponibili per questa stagione.",
+    "playerCols": {
+      "apps": "PG",
+      "lineups": "Tit.",
+      "minutes": "Min",
+      "goals": "Gol",
+      "assists": "Ast",
+      "rating": "Voto",
+      "cards": "Cart."
+    },
+    "month": "Mese"
   },
   "player": {
     "notFound": "Giocatore non trovato",
@@ -69,7 +116,6 @@
     "assists": "Assist",
     "cards": "Cartellini",
     "averageRating": "Voto medio",
-    "averageFantasy": "Fantamedia",
     "years": "{age} anni",
     "height": "{cm} cm",
     "noMatches": "Nessuna partita con statistiche in questa stagione.",
@@ -96,6 +142,110 @@
       "penalties": "Rig.",
       "conceded": "Subiti",
       "saves": "Parate"
+    },
+    "tabs": {
+      "seasons": "Stagioni",
+      "matches": "Partite"
+    },
+    "ratingTrend": "Andamento voti",
+    "compare": "Confronta"
+  },
+  "scores": {
+    "metaTitle": "Risultati calcio in tempo reale",
+    "metaDescription": "Risultati live e programma di tutte le partite di oggi: campionati, coppe nazionali e competizioni internazionali di tutto il mondo.",
+    "dayMetaTitle": "Partite del {date}",
+    "liveMetaTitle": "Partite live",
+    "today": "Oggi",
+    "yesterday": "Ieri",
+    "tomorrow": "Domani",
+    "previousDay": "Giorno precedente",
+    "nextDay": "Giorno successivo",
+    "pickDate": "Scegli una data",
+    "go": "Vai",
+    "filters": {
+      "all": "Tutte",
+      "live": "Live",
+      "finished": "Finite",
+      "scheduled": "Programma"
+    },
+    "liveHint": "{count, plural, =0 {Nessuna partita in corso in questo momento.} one {# partita in corso.} other {# partite in corso.}}",
+    "emptyLive": "In questo momento non c’è nessuna partita in corso. Scegli un giorno per vedere il programma.",
+    "emptyDay": "Nessuna partita per questo filtro.",
+    "favoritesGroup": "Preferiti",
+    "refresh": "Aggiornamento automatico"
+  },
+  "search": {
+    "title": "Risultati per “{query}”",
+    "metaTitle": "Cerca",
+    "placeholder": "Squadra, giocatore o competizione",
+    "button": "Cerca",
+    "teams": "Squadre",
+    "players": "Giocatori",
+    "competitions": "Competizioni",
+    "empty": "Nessun risultato per “{query}”. Prova con un nome più corto.",
+    "tooShort": "Scrivi almeno 2 lettere."
+  },
+  "stats": {
+    "title": "Statistiche",
+    "metaTitle": "Statistiche giocatori",
+    "metaDescription": "Marcatori, assist e voti migliori delle principali competizioni: Serie A, Premier League, La Liga, Bundesliga, Ligue 1, Champions League e altre.",
+    "intro": "Classifiche di stagione per ogni competizione principale, aggiornate dopo ogni giornata.",
+    "scorers": "Marcatori",
+    "assists": "Assist",
+    "empty": "Dati non ancora disponibili per questa competizione.",
+    "seasonPicker": "Stagione"
+  },
+  "injuries": {
+    "title": "Infortunati e squalificati",
+    "metaTitle": "Infortunati e squalificati",
+    "metaDescription": "Giocatori infortunati e squalificati delle principali competizioni: da quanto sono fuori e data di rientro indicativa, squadra per squadra.",
+    "intro": "Chi manca, da quanto e quando dovrebbe rientrare, squadra per squadra. Aggiornamento ogni sei ore.",
+    "empty": "Nessun indisponibile in archivio al momento.",
+    "category": {
+      "injury": "Infortunio",
+      "suspension": "Squalifica",
+      "doubtful": "In dubbio",
+      "other": "Non disponibile"
     }
+  },
+  "compare": {
+    "title": "Confronto giocatori",
+    "metaTitle": "Confronto giocatori",
+    "metaDescription": "Confronta due giocatori sulla stessa stagione: presenze, gol, assist, tiri, passaggi chiave e valori ogni 90 minuti.",
+    "intro": "Scegli due giocatori: i numeri sono quelli della stessa stagione, sommati su tutte le competizioni.",
+    "pickA": "Primo giocatore",
+    "pickB": "Secondo giocatore",
+    "noResults": "Nessun giocatore trovato.",
+    "notFound": "Uno dei due giocatori non è stato trovato.",
+    "seasonTitle": "Stagione {season}",
+    "hint": "Valori \"ogni 90\" calcolati sui minuti giocati. In azzurro il valore migliore della riga.",
+    "rows": {
+      "apps": "Presenze",
+      "minutes": "Minuti",
+      "goals": "Gol",
+      "assists": "Assist",
+      "goals90": "Gol ogni 90",
+      "assists90": "Assist ogni 90",
+      "shots90": "Tiri ogni 90",
+      "shotsOn": "Tiri in porta",
+      "keyPasses90": "Passaggi chiave ogni 90",
+      "passAccuracy": "Precisione passaggi",
+      "rating": "Voto medio",
+      "cards": "Cartellini"
+    },
+    "selected": "Selezionato",
+    "change": "Cambia",
+    "remove": "Rimuovi",
+    "cancel": "Annulla",
+    "pickOther": "{name} è selezionato: ora scegli il giocatore con cui confrontarlo.",
+    "seasonPicker": "Stagione",
+    "seasonOneOnly": "Solo uno dei due giocatori ha dati in questa stagione"
+  },
+  "predictions": {
+    "title": "Pronostici",
+    "metaTitle": "Pronostici partite",
+    "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione.",
+    "intro": "Le prossime partite delle competizioni principali con le probabilità del nostro modello statistico. Apri la partita per lo studio completo.",
+    "days": "Prossimi {count} giorni"
   }
 }

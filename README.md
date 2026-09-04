@@ -69,15 +69,15 @@ da `CRON_SECRET` (`vercel.json` definisce gli orari):
 
 | Job | Frequenza | Richieste | Cosa fa |
 |---|---|---|---|
-| `sync-competitions` | ogni giorno | ~275 | tutte le leghe e stagioni correnti; squadre e rose delle leghe in evidenza |
+| `sync-competitions` | ogni giorno | ~15 (~530 lunedì e giovedì con le rose, o con `?squads=1`) | tutte le leghe e stagioni correnti; squadre e rose delle leghe in evidenza |
 | `sync-fixtures` | ogni ora | 9 | tutte le partite da ieri a +7 giorni (una richiesta per giorno) |
 | `sync-fixtures?window=month` | ogni giorno | 32 | finestra estesa a +30 giorni |
 | `sync-standings` | ogni 30 min | ~13 | classifiche delle leghe in evidenza |
 | `sync-standings?scope=all` | ogni giorno | ~300 | classifiche di ogni competizione attiva |
-| `sync-injuries` | ogni 6 ore | ~13 | infortuni e squalifiche, leghe in evidenza |
+| `sync-injuries` | ogni 6 ore | ~13 | infortuni e squalifiche, leghe in evidenza (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
 | `sync-backfill` | ogni ora | fino a ~20 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti |
 | `sync-player-seasons` | ogni ora | ~35 per lega-stagione, solo dopo una giornata giocata | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
-| `sync-live` | ogni minuto | 1 + 1 ogni 20 partite in evidenza | punteggi ed eventi di tutte le partite in corso; formazioni, statistiche e voti per quelle in evidenza |
+| `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso, altrimenti 1 + 1 ogni 20 partite in evidenza | punteggi ed eventi di tutte le partite in corso; formazioni, statistiche e voti per quelle in evidenza |
 
 Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro (7.500);
 le statistiche stagionali aggiungono ~35 richieste per lega dopo ogni giornata.
@@ -113,6 +113,38 @@ Diagnostica del piano e della copertura per lega in evidenza:
 
 Ogni esecuzione scrive una riga in `football.sync_runs` con contatori,
 richieste usate e avvisi: è il primo posto dove guardare se qualcosa manca.
+
+## Identità
+
+I file del marchio (icone, favicon, lockup di GiBiScore, GiBiArena e
+GiBiSociety) e le regole d'uso stanno in `public/brand/` (`README.txt`).
+Accento di GiBiScore `#3BC9FF` (`--accent`), testo colorato su chiaro
+`#0A72A8` (`--accent-text`), tile e testo `#14131A`. Il favicon usa la
+variante ad accento pieno, iOS la tile nera, `theme-color` `#14131A`.
+
+## Pagine
+
+Struttura alla Diretta/Sofascore: barra laterale con le competizioni
+principali e tutti i paesi, lista risultati al centro, classifiche nella
+colonna di destra. URL in inglese, testi in italiano.
+
+| URL | Contenuto |
+|---|---|
+| `/` | partite di oggi, tutte le competizioni (filtri Tutte / Live / Finite / Programma) |
+| `/live` | solo partite in corso |
+| `/scores/2026-09-05` | partite di un giorno qualsiasi |
+| `/competitions` | competizioni principali e tutti i paesi (`?q=` filtra) |
+| `/stats` | marcatori, assist e voti migliori di ogni competizione principale |
+| `/injuries` | infortunati e squalificati delle competizioni principali: da quanto sono fuori, partite saltate e rientro indicativo |
+| `/predictions` | pronostici statistici delle prossime partite (probabilità 1-X-2, gol attesi, over, entrambe a segno) |
+| `/fantacalcio` | sezione fantacalcio (pagine dedicate: il fantacalcio non compare nelle pagine generali) |
+| `/fantacalcio/asta` | asta: configurazione della lega (campionato, Classic/Mantra, crediti, rosa, punteggi, modificatori) e listone con voti 1-100 (titolarità, bonus, voto, malus, fisico, club), fantamedia stimata, crediti consigliati e tabellone acquisti; impostazioni e acquisti restano nel browser (`lib/fantasy/`); fasce per ruolo e nove strategie d'asta simulate sul listone |
+| `/compare?a=&b=` | due giocatori a confronto sulla stessa stagione, con valori ogni 90 minuti |
+| `/search?q=` | ricerca squadre, giocatori e competizioni (suggerimenti live nella barra) |
+| `/competitions/serie-a` | partite per giornata, classifica, squadre, statistiche (gol, xG, over 2,5, casa/trasferta), marcatori e assist per stagione |
+| `/matches/123` | tabellino: cronaca, formazioni, statistiche, voti; classifica e precedenti a lato |
+| `/teams/inter-505` | partite, rosa, posizioni in classifica |
+| `/players/n-gonzalez-1234` (`/2024` per una stagione) | totali, statistiche per stagione, partita per partita |
 
 ## Database
 

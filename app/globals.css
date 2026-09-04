@@ -19,8 +19,15 @@ body {
   --card-foreground: 20 19 26;
   --muted: 237 234 225;
   --muted-foreground: 107 105 118;
-  --accent: 182 255 60;
+  /* GiBiScore accent (identity GiBi): #3BC9FF, text on light #0A72A8 */
+  --accent: 59 201 255;
   --accent-foreground: 20 19 26;
+  --accent-text: 10 114 168;
+  /* Sister brands, for the GiBiSociety footer */
+  --brand-arena: 182 255 60;
+  --brand-arena-text: 78 122 0;
+  --brand-society: 255 122 69;
+  --brand-society-text: 194 65 12;
   --border: 20 19 26;
   --ring: 20 19 26;
   --radius: 0.75rem;
@@ -36,6 +43,11 @@ body {
   --color-muted-foreground: rgb(var(--muted-foreground));
   --color-accent: rgb(var(--accent));
   --color-accent-foreground: rgb(var(--accent-foreground));
+  --color-accent-text: rgb(var(--accent-text));
+  --color-brand-arena: rgb(var(--brand-arena));
+  --color-brand-society: rgb(var(--brand-society));
+  --color-brand-arena-text: rgb(var(--brand-arena-text));
+  --color-brand-society-text: rgb(var(--brand-society-text));
   --color-border: rgb(var(--border));
   --color-ring: rgb(var(--ring));
   --radius-lg: var(--radius-lg);
@@ -150,4 +162,31 @@ body {
     outline: none;
     box-shadow: 3px 3px 0 rgb(var(--foreground));
   }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Scores list filters: the day's list is rendered once, rows carry       */
+/* data-row (live / finished / scheduled / other) and the wrapper's       */
+/* data-filter hides what does not match. Blocks left empty disappear.    */
+/* ---------------------------------------------------------------------- */
+/* Rows of a favourite team (marked by the client from localStorage). */
+[data-row][data-fav] {
+  background-color: rgb(var(--accent) / 0.16);
+  box-shadow: inset 3px 0 0 rgb(var(--accent));
+}
+
+[data-filter="live"] [data-row]:not([data-row="live"]),
+[data-filter="finished"] [data-row]:not([data-row="finished"]),
+[data-filter="scheduled"] [data-row]:not([data-row="scheduled"]) {
+  display: none;
+}
+[data-filter="live"] :is([data-block], [data-group]):not(:has([data-row="live"])),
+[data-filter="finished"] :is([data-block], [data-group]):not(:has([data-row="finished"])),
+[data-filter="scheduled"] :is([data-block], [data-group]):not(:has([data-row="scheduled"])) {
+  display: none;
+}
+[data-filter="live"]:not(:has([data-row="live"])) [data-empty],
+[data-filter="finished"]:not(:has([data-row="finished"])) [data-empty],
+[data-filter="scheduled"]:not(:has([data-row="scheduled"])) [data-empty] {
+  display: block;
 }

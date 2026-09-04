@@ -3,6 +3,7 @@ import {basicScope, getFeaturedCompetitions, historySeasonCount} from '@/lib/foo
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {currentSeason, positionName, seasonName, slugify} from '@/lib/api-football/mappers';
 import type {AfLeagueResponse, AfSquadResponse, AfTeamResponse} from '@/lib/api-football/types';
+import {fetchAll} from '@/lib/db/paginate';
 import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type FootballClient, type SyncRun} from './context';
 
 /**
@@ -17,7 +18,7 @@ import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncE
  *
  * Request budget: 1 + featured teams (~13) + squads (~260) = ~275 requests.
  */
-export async function syncCompetitions(): Promise<SyncRun> {
+export async function syncCompetitions(options: {squads?: boolean} = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-competitions');
 
@@ -25,7 +26,15 @@ export async function syncCompetitions(): Promise<SyncRun> {
         const featured = getFeaturedCompetitions();
         const featuredIds = new Set(featured.map((c) => c.providerId));
         const scope = basicScope();
-        const skipSquads = process.env.API_FOOTBALL_SKIP_SQUADS === '1';
+        // Squads change rarely: fetched on Monday and Thursday (or on request), ~500 requests each time.
+        // During the transfer windows (January, February, August, September) every day: the provider's
+        // squads lag behind moves and the fantasy auction reads them.
+        const now = new Date();
+        const day = now.getUTCDay();
+        const transferWindow = [0, 1, 7, 8].includes(now.getUTCMonth());
+        const squadsDue = options.squads ?? (transferWindow || day === 1 || day === 4);
+        const skipSquads = process.env.API_FOOTBALL_SKIP_SQUADS === '1' || !squadsDue;
+        if (skipSquads) run.bump('squads_skipped');
 
         const {response: all} = await apiFootballGet<AfLeagueResponse[]>('leagues');
         run.requests += 1;
@@ -65,9 +74,9 @@ export async function syncCompetitions(): Promise<SyncRun> {
         // Demote leagues no longer featured, promote the featured ones.
         await db.from('leagues').update({tier: 'basic'}).eq('tier', 'featured').not('provider_id', 'in', `(${[...featuredIds].join(',')})`);
 
-        const {data: leagueIdRows, error: leagueIdError} = await db.from('leagues').select('id,provider_id').in('provider_id', entries.map((e) => e.league.id));
-        if (leagueIdError) failSync('leagues.select', leagueIdError);
-        const leagueDbId = new Map<number, number>((leagueIdRows ?? []).map((r) => [r.provider_id as number, r.id as number]));
+        // ~1,250 leagues: more than one Data API page.
+        const leagueIdRows = await fetchAll((a, b) => db.from('leagues').select('id,provider_id').in('provider_id', entries.map((e) => e.league.id)).order('id').range(a, b), {max: 5000});
+        const leagueDbId = new Map<number, number>(leagueIdRows.map((r) => [r.provider_id as number, r.id as number]));
 
         // Seasons: upsert the current one per league, then flag it. Featured
         // leagues also get their past seasons (history archive), not current.
@@ -124,6 +133,8 @@ export async function syncCompetitions(): Promise<SyncRun> {
             .eq('leagues.tier', 'featured');
         if (fsError) failSync('seasons.select', fsError);
 
+        // A club in league, cup and Europe is asked its squad once per run.
+        const squadCache = new Map<number, AfSquadResponse['players']>();
         for (const s of featuredSeasons ?? []) {
             const league = s.league as unknown as {id: number; provider_id: number; name: string};
             let teamEntries: AfTeamResponse[] = [];
@@ -156,7 +167,7 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 const dbTeamId = teamIds.get(t.team.id);
                 if (!dbTeamId) continue;
                 try {
-                    await syncSquad(db, run, s.id as number, t.team.id, dbTeamId);
+                    await syncSquad(db, run, s.id as number, t.team.id, dbTeamId, squadCache);
                 } catch (error) {
                     run.warn(`squad ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
                     if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
@@ -176,10 +187,14 @@ export async function syncCompetitions(): Promise<SyncRun> {
     }
 }
 
-async function syncSquad(db: FootballClient, run: SyncRun, dbSeasonId: number, teamProviderId: number, dbTeamId: number) {
-    const {response} = await apiFootballGet<AfSquadResponse[]>('players/squads', {team: teamProviderId});
-    run.requests += 1;
-    const members = response[0]?.players ?? [];
+async function syncSquad(db: FootballClient, run: SyncRun, dbSeasonId: number, teamProviderId: number, dbTeamId: number, cache: Map<number, AfSquadResponse['players']>) {
+    let members = cache.get(teamProviderId);
+    if (!members) {
+        const {response} = await apiFootballGet<AfSquadResponse[]>('players/squads', {team: teamProviderId});
+        run.requests += 1;
+        members = response[0]?.players ?? [];
+        cache.set(teamProviderId, members);
+    }
     if (members.length === 0) return;
 
     const playerRows = members.map((p) => {

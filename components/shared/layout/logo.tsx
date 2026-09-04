@@ -1,20 +1,35 @@
+/* eslint-disable @next/next/no-img-element */
 import {cn} from "@/components/shared/ui/cn";
 
-/** Placeholder mark until the real GiBiScore logo is ready. */
-export function LogoMark({className}: {className?: string}) {
+/**
+ * Identity GiBi assets (public/brand): black tile, GB in Poppins Bold as
+ * curves, one glyph and one accent per site. Never rotated, stretched or
+ * shadowed; below 32 px the full-accent variant is used.
+ */
+export type GibiSite = 'gibiscore' | 'gibiarena' | 'gibisociety';
+
+/** Primary icon (black tile). `accent` switches to the full-accent tile for tiny sizes. */
+export function BrandIcon({site = 'gibiscore', size = 32, accent = false, className, alt = ''}: {site?: GibiSite; size?: number; accent?: boolean; className?: string; alt?: string}) {
+    const variant = accent || size < 32 ? 'icon-accent' : 'icon';
+    return <img src={`/brand/svg/${site}-${variant}.svg`} alt={alt} width={size} height={size} className={cn("shrink-0 select-none", className)} draggable={false} />;
+}
+
+/** Icon + wordmark, for light (`dark={false}`) or dark backgrounds. Height in px, width follows the 925:232 ratio. */
+export function BrandLockup({site = 'gibiscore', height = 30, dark = false, className, alt}: {site?: GibiSite; height?: number; dark?: boolean; className?: string; alt?: string}) {
+    const width = Math.round((height * 925) / 232);
     return (
-        <span
-            aria-hidden="true"
-            className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-xl border-[2.5px] border-foreground bg-accent shadow-[4px_4px_0_rgb(var(--foreground))]",
-                className,
-            )}
-        >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
-                <path d="M8 8l3 2v4l-3 2M16 8l-3 2v4l3 2" />
-            </svg>
-        </span>
+        <img
+            src={`/brand/svg/${site}-lockup${dark ? '-dark' : ''}.svg`}
+            alt={alt ?? (site === 'gibiscore' ? 'GiBiScore' : site === 'gibiarena' ? 'GiBiArena' : 'GiBiSociety')}
+            width={width}
+            height={height}
+            className={cn("shrink-0 select-none", className)}
+            draggable={false}
+        />
     );
+}
+
+/** Kept for existing imports: the GiBiScore icon. */
+export function LogoMark({size = 36, className}: {size?: number; className?: string}) {
+    return <BrandIcon size={size} className={className} />;
 }

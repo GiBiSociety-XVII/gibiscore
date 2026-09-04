@@ -1,12 +1,54 @@
 {
   "sectionsLabel": "Sezioni del sito",
-  "search": "Cerca squadra o giocatore",
+  "search": "Cerca",
   "login": "Accedi",
   "nav": {
-    "home": "Home",
+    "scores": "Risultati",
     "live": "Live",
     "competitions": "Competizioni",
-    "serieA": "Serie A",
-    "championsLeague": "Champions League"
+    "stats": "Statistiche",
+    "search": "Cerca",
+    "fantasy": "Fanta"
+  },
+  "searchHint": "Invio per tutti i risultati",
+  "searchTeams": "Squadre",
+  "searchPlayers": "Giocatori",
+  "searchCompetitions": "Competizioni",
+  "searchNone": "Nessun risultato",
+  "menus": {
+    "scores": {
+      "matchesTitle": "Partite",
+      "today": "Partite di oggi",
+      "live": "Partite live",
+      "yesterday": "Risultati di ieri",
+      "tomorrow": "Programma di domani",
+      "toolsTitle": "Strumenti",
+      "search": "Cerca squadra o giocatore",
+      "searchHint": "Squadre, giocatori, competizioni",
+      "favorites": "Preferiti e le mie squadre",
+      "favoritesHint": "Usa la stella per seguirli nella home",
+      "overview": "Tutte le partite di oggi"
+    },
+    "competitions": {
+      "italyTitle": "Italia",
+      "europeTitle": "Coppe europee",
+      "topTitle": "Top campionati",
+      "overview": "Tutte le competizioni"
+    },
+    "stats": {
+      "playersTitle": "Giocatori",
+      "scorers": "Marcatori",
+      "assists": "Assist",
+      "squadsTitle": "Squadre e rose",
+      "injuries": "Infortunati e squalificati",
+      "injuriesHint": "Per competizione, squadra per squadra",
+      "teamStats": "Statistiche squadra",
+      "teamStatsHint": "Cerca una squadra e apri la tab Statistiche",
+      "overview": "Tutte le statistiche",
+      "compare": "Confronto giocatori",
+      "compareHint": "Due giocatori a confronto, stessa stagione",
+      "predictions": "Pronostici",
+      "predictionsHint": "Probabilità 1-X-2 delle prossime partite"
+    }
   }
 }

@@ -31,17 +31,27 @@ export const metadata: Metadata = {
         template: "%s | GiBiScore",
     },
     description:
-        "GiBiScore: risultati live, classifiche, xG e statistiche di squadre e giocatori di Serie A e delle principali competizioni europee.",
+        "GiBiScore: risultati live, classifiche e statistiche di squadre e giocatori di tutte le competizioni di calcio del mondo.",
     applicationName: "GiBiScore",
     openGraph: {
         type: "website",
         siteName: "GiBiScore",
         locale: "it_IT",
     },
+    // Identity GiBi: favicon in the full-accent variant, black tile for iOS.
+    icons: {
+        icon: [
+            {url: "/brand/svg/gibiscore-icon-accent.svg", type: "image/svg+xml"},
+            {url: "/brand/png/gibiscore-favicon-accent-32.png", sizes: "32x32", type: "image/png"},
+            {url: "/brand/png/gibiscore-favicon-accent-192.png", sizes: "192x192", type: "image/png"},
+        ],
+        apple: [{url: "/brand/png/gibiscore-icon-180.png", sizes: "180x180"}],
+    },
+    manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
-    themeColor: "#f5f3ee",
+    themeColor: "#14131A",
     width: "device-width",
     initialScale: 1,
 };

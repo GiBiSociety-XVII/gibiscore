@@ -59,6 +59,12 @@ export function extractMinute(status: {short: string; elapsed: number | null}, s
     return null;
 }
 
+/** Stoppage time ("90+3" -> 3) while a period runs past its length, null otherwise. */
+export function extractExtraMinute(status: {short: string; elapsed: number | null; extra?: number | null}, state: FixtureState): number | null {
+    if (isLiveState(state) && typeof status.extra === 'number' && status.extra > 0) return status.extra;
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // Seasons
 // ---------------------------------------------------------------------------
@@ -353,6 +359,7 @@ export interface StandingRowData {
     goalsFor: number;
     goalsAgainst: number;
     form: string | null;
+    description: string | null;
     group: string;
 }
 
@@ -375,6 +382,7 @@ export function mapStandings(groups: AfStanding[][] | undefined, mainGroupName?:
                 goalsFor: s.all?.goals?.for ?? 0,
                 goalsAgainst: s.all?.goals?.against ?? 0,
                 form: s.form ?? null,
+                description: s.description ?? null,
                 group: isMain ? '' : (s.group ?? ''),
             });
         }

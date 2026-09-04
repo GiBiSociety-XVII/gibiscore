@@ -15,6 +15,7 @@ export default getRequestConfig(async ({requestLocale}) => {
     const HomePage = (await import(`../core/home/i18n/${locale}/HomePage.json`)).default;
     const Football = (await import(`../core/football/i18n/${locale}/Football.json`)).default;
     const Pages = (await import(`../core/football/i18n/${locale}/Pages.json`)).default;
+    const Fantasy = (await import(`../core/fantasy/i18n/${locale}/Fantasy.json`)).default;
 
     return {
         locale,
@@ -26,6 +27,7 @@ export default getRequestConfig(async ({requestLocale}) => {
             HomePage,
             Football,
             Pages,
+            Fantasy,
         },
     };
 });

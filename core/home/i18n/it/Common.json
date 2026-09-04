@@ -9,10 +9,61 @@
     "backHome": "Torna alla home"
   },
   "footer": {
-    "about": "GiBiScore è il sito di risultati e statistiche calcio di GiBiSociety: partite live, classifiche, xG e schede di squadre e giocatori.",
-    "explore": "Esplora",
-    "network": "GiBiSociety",
-    "gibiarena": "GiBiArena",
-    "rights": "Tutti i diritti riservati."
+    "email": "service@gibiscore.com",
+    "instagram": "@gibiarena",
+    "columns": {
+      "scores": {
+        "title": "Risultati",
+        "today": "Partite di oggi",
+        "live": "Partite live",
+        "yesterday": "Risultati di ieri",
+        "tomorrow": "Programma di domani"
+      },
+      "competitions": {
+        "title": "Competizioni",
+        "all": "Tutte le competizioni"
+      },
+      "stats": {
+        "title": "Statistiche",
+        "players": "Statistiche giocatori",
+        "scorers": "Marcatori",
+        "search": "Cerca squadra o giocatore",
+        "injuries": "Infortunati e squalificati",
+        "compare": "Confronto giocatori",
+        "predictions": "Pronostici",
+        "fantasy": "Fantacalcio"
+      },
+      "info": {
+        "title": "Info",
+        "privacy": "Informativa Privacy",
+        "terms": "Termini di Servizio",
+        "data": "Dati forniti da API-Football",
+        "gibiarena": "GiBiArena"
+      }
+    },
+    "productOf": "Un prodotto di",
+    "society": "GiBiSociety",
+    "discover": "Scopri anche",
+    "arena": "GiBiArena",
+    "copyright": "GiBiSociety · Tutti i diritti riservati."
+  },
+  "sidebar": {
+    "label": "Competizioni",
+    "pinned": "Competizioni principali",
+    "countries": "Paesi",
+    "all": "Tutte"
+  },
+  "rail": {
+    "standings": "Classifica",
+    "fullStandings": "Completa",
+    "scorers": "Marcatori",
+    "headToHead": "Precedenti",
+    "favorites": "Classifiche preferite",
+    "noFavorites": "Nessuna competizione: usa la stella accanto a un campionato per vederne qui la classifica.",
+    "addFavorite": "Aggiungi ai preferiti",
+    "removeFavorite": "Togli dai preferiti",
+    "myTeams": "Le mie squadre",
+    "noMatches": "Nessuna partita in archivio.",
+    "headToHeadHint": "Bilancio della squadra di casa negli ultimi precedenti"
   }
 }
