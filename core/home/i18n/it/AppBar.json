@@ -42,7 +42,9 @@
       "injuriesHint": "Per competizione, squadra per squadra",
       "teamStats": "Statistiche squadra",
       "teamStatsHint": "Cerca una squadra e apri la tab Statistiche",
-      "overview": "Tutte le statistiche"
+      "overview": "Tutte le statistiche",
+      "compare": "Confronto giocatori",
+      "compareHint": "Due giocatori a confronto, stessa stagione"
     }
   }
 }

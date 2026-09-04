@@ -144,6 +144,8 @@ export interface CompetitionPage {
     standings: StandingGroup[];
     /** Every round of the season, newest first (results and calendar alike). */
     rounds: RoundFixtures[];
+    /** Teams of the season (from the table, else from the fixtures), alphabetical. */
+    teams: TeamSummary[];
     /** Round to open by default: the one with the most recent activity. */
     currentRound: string | null;
     results: RoundFixtures[];
@@ -315,6 +317,8 @@ export interface TeamPage {
     team: TeamSummary & {country: string | null; venue: string | null; founded: number | null};
     seasonStats: TeamSeasonStats | null;
     players: TeamPlayerSeason[];
+    /** Every fixture of the current seasons, oldest first. */
+    calendar: FixtureSummary[];
     standings: TeamStandingLine[];
     recent: FixtureSummary[];
     upcoming: FixtureSummary[];

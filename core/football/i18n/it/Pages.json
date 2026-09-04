@@ -16,7 +16,8 @@
     "tabs": {
       "matches": "Partite",
       "standings": "Classifica",
-      "players": "Giocatori"
+      "players": "Giocatori",
+      "teams": "Squadre"
     },
     "standings": "Classifica",
     "results": "Risultati",
@@ -75,7 +76,8 @@
       "squad": "Rosa",
       "standings": "Classifica",
       "stats": "Statistiche",
-      "players": "Giocatori"
+      "players": "Giocatori",
+      "calendar": "Calendario"
     },
     "statsTitle": "Statistiche stagione",
     "played": "Partite",
@@ -98,7 +100,8 @@
       "assists": "Ast",
       "rating": "Voto",
       "cards": "Cart."
-    }
+    },
+    "month": "Mese"
   },
   "player": {
     "notFound": "Giocatore non trovato",
@@ -197,6 +200,32 @@
     "category": {
       "injury": "Infortunio",
       "suspension": "Squalifica"
+    }
+  },
+  "compare": {
+    "title": "Confronto giocatori",
+    "metaTitle": "Confronto giocatori",
+    "metaDescription": "Confronta due giocatori sulla stessa stagione: presenze, gol, assist, tiri, passaggi chiave e valori ogni 90 minuti.",
+    "intro": "Scegli due giocatori: i numeri sono quelli della stessa stagione, sommati su tutte le competizioni.",
+    "pickA": "Primo giocatore",
+    "pickB": "Secondo giocatore",
+    "noResults": "Nessun giocatore trovato.",
+    "notFound": "Uno dei due giocatori non è stato trovato.",
+    "seasonTitle": "Stagione {season}",
+    "hint": "Valori \"ogni 90\" calcolati sui minuti giocati. In azzurro il valore migliore della riga.",
+    "rows": {
+      "apps": "Presenze",
+      "minutes": "Minuti",
+      "goals": "Gol",
+      "assists": "Assist",
+      "goals90": "Gol ogni 90",
+      "assists90": "Assist ogni 90",
+      "shots90": "Tiri ogni 90",
+      "shotsOn": "Tiri in porta",
+      "keyPasses90": "Passaggi chiave ogni 90",
+      "passAccuracy": "Precisione passaggi",
+      "rating": "Voto medio",
+      "cards": "Cartellini"
     }
   }
 }

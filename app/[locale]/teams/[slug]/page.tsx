@@ -1,5 +1,5 @@
 import type {Metadata} from "next";
-import {getTranslations, setRequestLocale} from "next-intl/server";
+import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {Badge} from "@/components/shared/ui/badge";
 import {cn} from "@/components/shared/ui/cn";
@@ -7,6 +7,7 @@ import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {FavoriteStar} from "@/components/football/favorite-star";
 import {MatchList} from "@/components/football/match-list";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
+import {SelectPanels} from "@/components/football/select-panels";
 import {Tabs} from "@/components/football/tabs";
 import {TeamCrest} from "@/components/football/team-crest";
 import Image from "next/image";
@@ -113,6 +114,28 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
         </div>
     );
 
+    const format = await getFormatter();
+    const months = new Map<string, typeof page.calendar>();
+    for (const f of page.calendar) {
+        const key = f.startingAt.slice(0, 7);
+        if (!months.has(key)) months.set(key, []);
+        months.get(key)!.push(f);
+    }
+    const nowMonth = new Date().toISOString().slice(0, 7);
+    const calendarTab = months.size === 0 ? (
+        <MatchList fixtures={[]} />
+    ) : (
+        <SelectPanels
+            label={t('month')}
+            defaultId={months.has(nowMonth) ? nowMonth : [...months.keys()].pop()}
+            panels={[...months.entries()].map(([key, list]) => ({
+                id: key,
+                label: format.dateTime(new Date(`${key}-15T12:00:00Z`), {month: 'long', year: 'numeric'}),
+                content: <MatchList fixtures={list} highlightTeamId={team.id} showDate showCompetition />,
+            }))}
+        />
+    );
+
     const st = page.seasonStats;
     const statsTab = !st ? (
         <Panel title={t('statsTitle')}><p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('noStats')}</p></Panel>
@@ -208,6 +231,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
             <Tabs
                 items={[
                     {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.live.length},
+                    {id: 'calendar', label: t('tabs.calendar'), content: calendarTab, count: page.calendar.length},
                     {id: 'squad', label: t('tabs.squad'), content: squadTab},
                     {id: 'players', label: t('tabs.players'), content: playersTab, count: page.players.length},
                     {id: 'standings', label: t('tabs.standings'), content: standingsTab},

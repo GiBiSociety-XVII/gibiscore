@@ -69,6 +69,7 @@ export default function AppBar() {
             items: [
                 {label: m('stats.scorers'), href: '/stats'},
                 {label: m('stats.assists'), href: '/stats'},
+                {label: m('stats.compare'), href: '/compare', hint: m('stats.compareHint')},
             ],
         },
         {

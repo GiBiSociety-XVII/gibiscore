@@ -28,7 +28,8 @@
         "players": "Statistiche giocatori",
         "scorers": "Marcatori",
         "search": "Cerca squadra o giocatore",
-        "injuries": "Infortunati e squalificati"
+        "injuries": "Infortunati e squalificati",
+        "compare": "Confronto giocatori"
       },
       "info": {
         "title": "Info",

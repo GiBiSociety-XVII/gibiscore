@@ -18,7 +18,7 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
         const team = teamRow as unknown as TeamRow & {country: string | null; venue_name: string | null; founded: number | null};
 
         const now = new Date().toISOString();
-        const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, seasonStats, players] = await Promise.all([
+        const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, seasonStats, players, calendarRes] = await Promise.all([
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).lte('starting_at', now).order('starting_at', {ascending: false}).limit(8),
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).gt('starting_at', now).order('starting_at', {ascending: true}).limit(6),
             db.from('standings').select(`${STANDING_SELECT},season:seasons!inner(id,name,year,is_current,league:leagues(${LEAGUE_SELECT}))`).eq('team_id', team.id).eq('seasons.is_current', true),
@@ -26,8 +26,9 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
             db.from('sidelined').select('category,description,player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).order('start_date', {ascending: false}).limit(30),
             loadSeasonStats(db, team.id),
             loadPlayers(db, team.id),
+            db.from('fixtures').select(`${FIXTURE_SELECT},season:seasons!inner(is_current)`).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).eq('seasons.is_current', true).order('starting_at', {ascending: true}).limit(120),
         ]);
-        for (const res of [pastRes, futureRes, standingsRes, squadRes, sidelinedRes]) if (res.error) throw res.error;
+        for (const res of [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, calendarRes]) if (res.error) throw res.error;
 
         const past = toFixtures(pastRes.data);
         const live = past.filter((f) => LIVE_STATES.includes(f.state));
@@ -83,6 +84,7 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
             sidelined,
             seasonStats,
             players,
+            calendar: toFixtures(calendarRes.data),
         };
     } catch (error) {
         logReadError(`getTeamPage(${slug})`, error);

@@ -11,6 +11,8 @@ import {Rankings} from "@/components/football/rankings";
 import {SelectPanels} from "@/components/football/select-panels";
 import {StandingsTable} from "@/components/football/standings-table";
 import {Tabs} from "@/components/football/tabs";
+import {TeamCrest} from "@/components/football/team-crest";
+import {Link} from "@/i18n/navigation";
 import {getCompetitionPage} from "@/lib/football/data/competitions";
 import {roundLabel} from "@/lib/football/data/shared";
 
@@ -86,6 +88,25 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
         />
     );
 
+    const teamsTab = (
+        <Panel title={`${t('tabs.teams')} · ${page.teams.length}`}>
+            {page.teams.length === 0 ? (
+                <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{tFootball('empty.noFixtures')}</p>
+            ) : (
+                <ul className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-px bg-muted">
+                    {page.teams.map((team) => (
+                        <li key={team.id} className="bg-card">
+                            <Link href={`/teams/${team.slug}`} className="flex items-center gap-2.5 px-3 h-11 hover:bg-muted/60">
+                                <TeamCrest team={team} size={22} />
+                                <span className="text-[13px] font-bold truncate">{team.name}</span>
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </Panel>
+    );
+
     return (
         <SiteShell rail={rail}>
             <PageHeader
@@ -113,6 +134,7 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
                 items={[
                     {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.live.length},
                     {id: 'standings', label: t('tabs.standings'), content: standingsTab},
+                    {id: 'teams', label: t('tabs.teams'), content: teamsTab},
                     {id: 'players', label: t('tabs.players'), content: playersTab},
                 ]}
             />

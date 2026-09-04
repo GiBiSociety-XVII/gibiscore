@@ -1,6 +1,6 @@
 import 'server-only';
 import {featuredPriority} from '../competitions';
-import {LIVE_STATES, type CompetitionPage, type CompetitionSummary, type FixtureSummary, type RankedPlayer, type RoundFixtures, type StandingGroup} from '../types';
+import {LIVE_STATES, type CompetitionPage, type CompetitionSummary, type FixtureSummary, type RankedPlayer, type RoundFixtures, type StandingGroup, type TeamSummary} from '../types';
 import {
     FIXTURE_LIST_SELECT,
     LEAGUE_SELECT,
@@ -129,7 +129,7 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
         const competition = toCompetition(league);
         const emptyRankings = {scorers: [], assists: []};
         if (!current) {
-            return {competition, season: null, standings: [], rounds: [], currentRound: null, results: [], upcoming: [], live: [], rankings: emptyRankings, pastRankings: []};
+            return {competition, season: null, standings: [], rounds: [], teams: [], currentRound: null, results: [], upcoming: [], live: [], rankings: emptyRankings, pastRankings: []};
         }
 
         const [standingsRes, fixturesRes, rankings, statSeasons] = await Promise.all([
@@ -170,6 +170,13 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
             .map((r) => ({...r, first: r.fixtures[0]?.startingAt ?? ''}))
             .sort((a, b) => b.first.localeCompare(a.first) || (roundNumber(b.round) ?? 0) - (roundNumber(a.round) ?? 0))
             .map(({round, fixtures: list}) => ({round, fixtures: list}));
+        const teamMap = new Map<number, TeamSummary>();
+        for (const g of groups.values()) for (const r of g.rows) teamMap.set(r.team.id, r.team);
+        if (teamMap.size === 0) for (const f of fixtures) {
+            teamMap.set(f.home.id, f.home);
+            teamMap.set(f.away.id, f.away);
+        }
+        const teams = [...teamMap.values()].sort((a, b) => a.name.localeCompare(b.name));
         const played = rounds.find((r) => r.fixtures.some((f) => LIVE_STATES.includes(f.state) || f.state === 'finished'));
         const currentRound = played?.round ?? rounds[rounds.length - 1]?.round ?? null;
 
@@ -182,6 +189,7 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
             season: {id: current.id, name: current.name, year: current.year},
             standings: [...groups.values()].sort((a, b) => a.name.localeCompare(b.name)),
             rounds,
+            teams,
             currentRound,
             results,
             upcoming,
