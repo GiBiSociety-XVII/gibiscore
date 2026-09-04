@@ -58,19 +58,32 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
             highlightTeamId === id && "underline decoration-accent decoration-[3px] underline-offset-2",
         );
 
+    const teamName = (side: 'home' | 'away') => {
+        const team = fixture[side];
+        const label = compact ? (team.shortCode ?? team.name) : team.name;
+        const className = cn(teamClass(side, team.id), side === 'home' && "text-right");
+        // Sits above the stretched match link, so the name opens the team page.
+        return team.slug ? (
+            <Link href={`/teams/${team.slug}`} className={cn(className, "relative z-10 hover:underline decoration-accent decoration-[3px] underline-offset-2")} title={team.name}>{label}</Link>
+        ) : (
+            <span className={className} title={team.name}>{label}</span>
+        );
+    };
+
     return (
-        <Link
-            href={`/matches/${fixture.id}`}
+        <div
             data-row={state}
             data-teams={`${fixture.home.slug ?? ''}|${fixture.away.slug ?? ''}`}
             className={cn(
-                "grid items-center gap-1.5 px-2 min-h-8 border-t border-muted first:border-t-0 hover:bg-muted/70 transition-colors",
+                "relative grid items-center gap-1.5 px-2 min-h-8 border-t border-muted first:border-t-0 hover:bg-muted/70 transition-colors",
                 showDate || showCompetition
                     ? "grid-cols-[78px_minmax(0,1fr)_52px_minmax(0,1fr)]"
                     : "grid-cols-[46px_minmax(0,1fr)_52px_minmax(0,1fr)] md:grid-cols-[52px_minmax(0,1fr)_56px_minmax(0,1fr)]",
                 isLive && "bg-accent/10",
             )}
         >
+            {/* Whole row opens the match; team names above it open the teams. */}
+            <Link href={`/matches/${fixture.id}`} className="absolute inset-0 z-0 rounded-sm focus-visible:outline-2 focus-visible:outline-accent" aria-label={`${fixture.home.name} - ${fixture.away.name}`} />
             <span className="flex flex-col leading-tight text-[11px] min-w-0">
                 {showDate && <span className="text-[10px] font-semibold text-muted-foreground">{format.dateTime(new Date(fixture.startingAt), compact ? {day: '2-digit', month: '2-digit', year: '2-digit'} : {day: '2-digit', month: '2-digit'})}</span>}
                 <span className="inline-flex"><StatusCell fixture={fixture} /></span>
@@ -78,7 +91,7 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
             </span>
 
             <span className="flex items-center justify-end gap-1.5 min-w-0">
-                <span className={cn(teamClass('home', fixture.home.id), "text-right")} title={fixture.home.name}>{compact ? (fixture.home.shortCode ?? fixture.home.name) : fixture.home.name}</span>
+                {teamName('home')}
                 <TeamCrest team={fixture.home} size={18} />
             </span>
 
@@ -88,8 +101,8 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
 
             <span className="flex items-center gap-1.5 min-w-0">
                 <TeamCrest team={fixture.away} size={18} />
-                <span className={teamClass('away', fixture.away.id)} title={fixture.away.name}>{compact ? (fixture.away.shortCode ?? fixture.away.name) : fixture.away.name}</span>
+                {teamName('away')}
             </span>
-        </Link>
+        </div>
     );
 }

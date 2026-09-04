@@ -213,16 +213,18 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                     </div>
                 )}
                 {(page.form.home.length > 0 || page.form.away.length > 0 || page.bestPlayer) && (
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 pb-2.5 -mt-1">
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 px-3 pb-2.5 -mt-1">
                         <span className="flex justify-center"><FormStrip entries={page.form.home} /></span>
-                        <span className="text-[11px] font-bold text-muted-foreground text-center truncate max-w-[200px]">
-                            {page.bestPlayer && (
-                                <Link href={`/players/${page.bestPlayer.player.slug}`} className="hover:underline decoration-accent decoration-[2px] underline-offset-2">
-                                    {t('bestPlayer')}: <span className="text-foreground">{page.bestPlayer.player.name}</span> <span className="font-mono bg-accent px-1 rounded text-foreground">{page.bestPlayer.rating?.toFixed(1)}</span>
+                        <span className="flex justify-center md:order-3"><FormStrip entries={page.form.away} /></span>
+                        {page.bestPlayer && (
+                            <span className="col-span-2 md:col-span-1 md:order-2 text-[11px] font-bold text-muted-foreground text-center leading-snug min-w-0">
+                                <Link href={`/players/${page.bestPlayer.player.slug}`} className="inline-flex flex-wrap items-center justify-center gap-x-1 hover:underline decoration-accent decoration-[2px] underline-offset-2">
+                                    <span className="whitespace-nowrap">{t('bestPlayer')}:</span>
+                                    <span className="text-foreground">{page.bestPlayer.player.name}</span>
+                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{page.bestPlayer.rating?.toFixed(1)}</span>
                                 </Link>
-                            )}
-                        </span>
-                        <span className="flex justify-center"><FormStrip entries={page.form.away} /></span>
+                            </span>
+                        )}
                     </div>
                 )}
             </section>
