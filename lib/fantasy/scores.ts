@@ -336,6 +336,8 @@ export interface PriceConfig {
     slots: Record<FantaRole, number>;
     /** Share of the total budget that usually goes to each role. */
     roleShare: Record<FantaRole, number>;
+    /** Price level, 1 = the prices add up to the credits at the table (see AuctionConfig.priceLevel). */
+    level?: number;
 }
 
 /** What the pricing reads of a player: the marks, or just the overall when the rest is unknown. */
@@ -414,7 +416,7 @@ export function suggestPrices<T extends PriceablePlayer>(players: T[], config: P
         const weights = valueWeights(pool, role, bought);
         // Priced: what the league buys plus the players just outside, who go for a few credits.
         const priced = [...pool].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0)).slice(0, Math.max(1, Math.round(bought * PRICE_TUNING.tail)));
-        const budget = market * config.roleShare[role];
+        const budget = market * config.roleShare[role] * (config.level ?? 1);
         for (const p of pool) prices.set(p.id, 1);
         // No fixed ceiling: a price is what the market money and the value say, bounded only by
         // what one manager can physically pay while keeping a credit for every other slot of the

@@ -141,7 +141,7 @@ export function completionReserve(players: PricedPlayer[], prices: Map<number, n
  * players keep the price they went for. With no purchases this is the
  * list price.
  */
-export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'participants' | 'slots'>, purchases: Purchase[]): Map<number, number> {
+export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'participants' | 'slots'> & Partial<Pick<AuctionConfig, 'priceLevel'>>, purchases: Purchase[]): Map<number, number> {
     if (purchases.length === 0) return new Map(listPrices);
     const prices = new Map<number, number>();
     const market = marketState(players, listPrices, config, purchases);
@@ -169,7 +169,8 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         const total = toBuy.reduce((s, p) => s + weight(p), 0);
         // A table that pays over list keeps doing it, softly: at most a tenth either way.
         const mood = Math.sqrt(clamp(state.inflation, 0.8, 1.2));
-        const rest = Math.max(0, state.money - toBuy.length);
+        // The same level as the list: the money left on the table, seen through a contested auction.
+        const rest = Math.max(0, (state.money * (config.priceLevel ?? 100)) / 100 - toBuy.length);
         // Scarcity against the start: tops gone while managers still want one make the tops left
         // dearer (up to +30%); tops still around with few buyers left make them cheaper (down to -20%).
         // Semi-tops feel half of it.

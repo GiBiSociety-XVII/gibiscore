@@ -82,7 +82,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {
         if (!pool || !config) return new Map<number, number>();
-        return suggestPrices(pool.players, {credits: config.credits, participants: config.participants, slots: config.slots, roleShare: ROLE_SHARE});
+        return suggestPrices(pool.players, {credits: config.credits, participants: config.participants, slots: config.slots, roleShare: ROLE_SHARE, level: config.priceLevel / 100});
     }, [pool, config]);
     // Cheap enough to redo on every render: a few hundred players, a handful of purchases.
     const prices = pool && config ? dynamicPrices(pool.players, listPrices, config, purchases) : listPrices;

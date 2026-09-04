@@ -58,6 +58,12 @@ export interface AuctionConfig {
     managers: string[];
     /** Chosen auction strategy (lib/fantasy/strategies.ts), drives my role budgets. */
     strategy: string | null;
+    /**
+     * Level of the prices, percent. 100 = the list prices add up exactly to the credits at the
+     * table; higher = the list of a contested auction, where the money piles up on the players
+     * worth having and the fillers go for one credit anyway.
+     */
+    priceLevel: number;
 }
 
 export const DEFAULT_SLOTS: Record<AuctionMode, Record<FantaRole, number>> = {
@@ -78,6 +84,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     modifiers: {defence: true, captain: false, fairPlay: false, midfield: false},
     managers: [],
     strategy: null,
+    priceLevel: 135,
 };
 
 /** Share of the market that usually goes to each role (Serie A leagues, classic). */
@@ -117,5 +124,6 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         modifiers: {...DEFAULT_CONFIG.modifiers, ...(r.modifiers ?? {})},
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
+        priceLevel: num(r.priceLevel, DEFAULT_CONFIG.priceLevel, 50, 300),
     };
 }

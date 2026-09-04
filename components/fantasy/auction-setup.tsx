@@ -103,6 +103,9 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                                 <NumberField value={config.credits} min={50} max={5000} onCommit={(n) => set('credits', n)} />
                             </Field>
                         </div>
+                        <Field label={t('priceLevel')} hint={t('priceLevelHint')}>
+                            <NumberField value={config.priceLevel} min={50} max={300} onCommit={(n) => set('priceLevel', n)} className="max-w-[140px]" />
+                        </Field>
                     </div>
                 </div>
             </Panel>

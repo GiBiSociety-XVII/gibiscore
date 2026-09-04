@@ -49,6 +49,8 @@
     "mantraHint": "I ruoli Mantra dettagliati (Dc, E, M, W, T...) arrivano più avanti: per ora la rosa usa i quattro ruoli classici.",
     "participants": "Partecipanti",
     "credits": "Crediti a testa",
+    "priceLevel": "Livello prezzi (%)",
+    "priceLevelHint": "100 = i prezzi del listino sommano esattamente ai crediti del tavolo. Più alto = listino da asta combattuta: i soldi si concentrano sui giocatori che valgono e i riempitivi restano a 1 credito. Vale anche per i prezzi live.",
     "slots": "Giocatori in rosa",
     "slotsTotal": "{count} giocatori per squadra",
     "roles": {
