@@ -81,7 +81,13 @@ export interface StandingRow {
     goalsFor?: number;
     goalsAgainst?: number;
     form?: string | null;
+    /** Provider note such as "Promotion - Champions League" or "Relegation". */
+    description?: string | null;
+    zone?: StandingZone | null;
 }
+
+/** Colour band of a table row, derived from the provider's description. */
+export type StandingZone = 'champions' | 'europa' | 'conference' | 'promotion' | 'playoff' | 'relegation' | 'relegation_playoff';
 
 export interface StandingGroup {
     name: string; // '' for the main table

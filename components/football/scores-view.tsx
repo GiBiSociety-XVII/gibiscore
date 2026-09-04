@@ -4,7 +4,9 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {shiftDay, type ScoresPage} from "@/lib/football/data/scores";
 import {CompetitionBlock} from "./competition-block";
+import {AutoRefresh} from "./auto-refresh";
 import {DatePicker} from "./date-picker";
+import {FavoritesFirst} from "./favorites-first";
 import {ScoreFilters} from "./score-filters";
 
 function dayHref(day: string, today: string): string {
@@ -71,8 +73,10 @@ export async function ScoresView({page}: {page: ScoresPage}) {
     const counts = {all: page.total, live: page.liveCount, finished: page.finishedCount, scheduled: page.scheduledCount};
     const labels = {all: t('filters.all'), live: t('filters.live'), finished: t('filters.finished'), scheduled: t('filters.scheduled')};
 
+    const refresh = isLive || (page.date === page.today && page.liveCount + page.scheduledCount > 0);
     return (
         <div className="bb-surface overflow-hidden">
+            <AutoRefresh seconds={isLive ? 30 : 60} enabled={refresh} />
             <DateStrip page={page} />
             <div className="p-1.5 md:p-2 flex flex-col gap-2">
                 {isLive ? (
@@ -88,10 +92,12 @@ export async function ScoresView({page}: {page: ScoresPage}) {
     );
 }
 
-function ScoresList({page, emptyText}: {page: ScoresPage; emptyText: string}) {
+async function ScoresList({page, emptyText}: {page: ScoresPage; emptyText: string}) {
+    const t = await getTranslations('Pages.scores');
     if (page.total === 0) return <p className="px-2 py-6 text-center text-[13px] font-semibold text-muted-foreground">{emptyText}</p>;
     return (
         <div className="flex flex-col gap-2">
+            <FavoritesFirst label={t('favoritesGroup')} />
             {page.pinned.length > 0 && (
                 <div data-group className="border-2 border-foreground rounded-lg overflow-hidden">
                     {page.pinned.map((g) => <CompetitionBlock key={g.competition.slug} group={g} />)}

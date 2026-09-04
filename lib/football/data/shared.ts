@@ -1,6 +1,6 @@
 import 'server-only';
 import {createPublicClient} from '@/lib/db/server';
-import type {CompetitionSummary, FixtureState, FixtureSummary, StandingRow, TeamSummary} from '../types';
+import type {CompetitionSummary, FixtureState, FixtureSummary, StandingRow, StandingZone, TeamSummary} from '../types';
 
 /**
  * Shared pieces of the read layer: the public client bound to the football
@@ -142,11 +142,27 @@ export interface StandingQueryRow {
     goals_against: number;
     points: number;
     form: string | null;
+    description?: string | null;
     group: string;
     team: TeamRow | null;
 }
 
-export const STANDING_SELECT = `position,played,won,drawn,lost,goals_for,goals_against,points,form,group,team:teams(${TEAM_SELECT})`;
+export const STANDING_SELECT = `position,played,won,drawn,lost,goals_for,goals_against,points,form,description,group,team:teams(${TEAM_SELECT})`;
+
+/** "Promotion - Champions League (Group Stage: )" -> 'champions', "Relegation - Serie B" -> 'relegation' ... */
+export function standingZone(description: string | null | undefined): StandingZone | null {
+    if (!description) return null;
+    const d = description.toLowerCase();
+    if (d.includes('champions league')) return 'champions';
+    if (d.includes('europa league')) return 'europa';
+    if (d.includes('conference')) return 'conference';
+    if (d.includes('relegation') && d.includes('play')) return 'relegation_playoff';
+    if (d.includes('relegation') || d.includes('descent')) return 'relegation';
+    if (d.includes('promotion') && d.includes('play')) return 'playoff';
+    if (d.includes('promotion')) return 'promotion';
+    if (d.includes('play-off') || d.includes('playoff') || d.includes('play off')) return 'playoff';
+    return null;
+}
 
 export function toStandingRow(r: StandingQueryRow): StandingRow | null {
     if (!r.team) return null;
@@ -162,6 +178,8 @@ export function toStandingRow(r: StandingQueryRow): StandingRow | null {
         goalsAgainst: r.goals_against,
         points: r.points,
         form: r.form,
+        description: r.description ?? null,
+        zone: standingZone(r.description),
     };
 }
 

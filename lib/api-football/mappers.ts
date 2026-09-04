@@ -353,6 +353,7 @@ export interface StandingRowData {
     goalsFor: number;
     goalsAgainst: number;
     form: string | null;
+    description: string | null;
     group: string;
 }
 
@@ -375,6 +376,7 @@ export function mapStandings(groups: AfStanding[][] | undefined, mainGroupName?:
                 goalsFor: s.all?.goals?.for ?? 0,
                 goalsAgainst: s.all?.goals?.against ?? 0,
                 form: s.form ?? null,
+                description: s.description ?? null,
                 group: isMain ? '' : (s.group ?? ''),
             });
         }

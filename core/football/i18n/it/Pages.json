@@ -130,6 +130,19 @@
     },
     "liveHint": "{count, plural, =0 {Nessuna partita in corso in questo momento.} one {# partita in corso.} other {# partite in corso.}}",
     "emptyLive": "In questo momento non c’è nessuna partita in corso. Scegli un giorno per vedere il programma.",
-    "emptyDay": "Nessuna partita per questo filtro."
+    "emptyDay": "Nessuna partita per questo filtro.",
+    "favoritesGroup": "Preferiti",
+    "refresh": "Aggiornamento automatico"
+  },
+  "search": {
+    "title": "Risultati per “{query}”",
+    "metaTitle": "Cerca",
+    "placeholder": "Squadra, giocatore o competizione",
+    "button": "Cerca",
+    "teams": "Squadre",
+    "players": "Giocatori",
+    "competitions": "Competizioni",
+    "empty": "Nessun risultato per “{query}”. Prova con un nome più corto.",
+    "tooShort": "Scrivi almeno 2 lettere."
   }
 }

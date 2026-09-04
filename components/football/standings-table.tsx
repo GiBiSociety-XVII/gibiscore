@@ -1,7 +1,34 @@
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
-import type {StandingGroup} from "@/lib/football/types";
+import type {StandingGroup, StandingZone} from "@/lib/football/types";
+
+const ZONE_CLASS: Record<StandingZone, string> = {
+    champions: "bg-accent",
+    europa: "bg-[#2f6bff]",
+    conference: "bg-[#22b8a8]",
+    promotion: "bg-accent",
+    playoff: "bg-[#f2b600]",
+    relegation: "bg-[#e5323e]",
+    relegation_playoff: "bg-[#f08a4b]",
+};
+
+/** Legend of the zones that actually appear in the table, in table order. */
+function ZoneLegend({rows, labels}: {rows: StandingGroup['rows']; labels: (zone: StandingZone) => string}) {
+    const seen: StandingZone[] = [];
+    for (const r of rows) if (r.zone && !seen.includes(r.zone)) seen.push(r.zone);
+    if (seen.length === 0) return null;
+    return (
+        <ul className="flex flex-wrap gap-x-3 gap-y-1 px-2 py-1.5 text-[10px] font-bold text-muted-foreground border-t border-muted">
+            {seen.map((zone) => (
+                <li key={zone} className="inline-flex items-center gap-1">
+                    <span className={cn("inline-block w-2 h-2 rounded-sm", ZONE_CLASS[zone])} />
+                    {labels(zone)}
+                </li>
+            ))}
+        </ul>
+    );
+}
 import {TeamCrest} from "./team-crest";
 
 function FormDots({form}: {form: string | null | undefined}) {
@@ -33,6 +60,7 @@ function FormDots({form}: {form: string | null | undefined}) {
 export function StandingsTable({groups, highlightTeamIds = [], compact = false, limit}: {groups: StandingGroup[]; highlightTeamIds?: number[]; compact?: boolean; limit?: number}) {
     const t = useTranslations('Football.table');
     const tEmpty = useTranslations('Football.empty');
+    const tZone = useTranslations('Football.zones');
 
     if (groups.length === 0 || groups.every((g) => g.rows.length === 0)) {
         return <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{tEmpty('noStandings')}</p>;
@@ -64,8 +92,9 @@ export function StandingsTable({groups, highlightTeamIds = [], compact = false, 
                                     const highlighted = highlightTeamIds.includes(row.team.id);
                                     return (
                                         <tr key={row.team.id} className={cn("border-t border-muted", highlighted && "bg-accent/25")}>
-                                            <td className={cn("px-1", compact ? "py-1" : "py-1.5")}>
-                                                <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded text-[11px] font-mono font-bold", row.position <= 4 ? "bg-accent" : "bg-muted")}>{row.position}</span>
+                                            <td className={cn("px-1 relative", compact ? "py-1" : "py-1.5")}>
+                                                {row.zone && <span className={cn("absolute left-0 top-0 bottom-0 w-[3px]", ZONE_CLASS[row.zone])} aria-hidden="true" />}
+                                                <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded text-[11px] font-mono font-bold", row.zone === 'champions' || row.zone === 'promotion' ? "bg-accent" : "bg-muted")}>{row.position}</span>
                                             </td>
                                             <td className={cn("px-1 font-bold", compact ? "py-1" : "py-1.5")}>
                                                 <Link href={`/teams/${row.team.slug ?? row.team.id}`} className="inline-flex items-center gap-1.5 hover:underline decoration-accent decoration-[3px] underline-offset-2 max-w-full">
@@ -92,6 +121,7 @@ export function StandingsTable({groups, highlightTeamIds = [], compact = false, 
                             </tbody>
                         </table>
                     </div>
+                    {!compact && <ZoneLegend rows={group.rows} labels={(zone) => tZone(zone)} />}
                 </div>
             ))}
         </div>

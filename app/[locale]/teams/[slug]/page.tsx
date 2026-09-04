@@ -7,6 +7,8 @@ import {MatchList} from "@/components/football/match-list";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
 import {Tabs} from "@/components/football/tabs";
 import {TeamCrest} from "@/components/football/team-crest";
+import {StandingsTable} from "@/components/football/standings-table";
+import {getStandingsBySlug} from "@/lib/football/data/competitions";
 import {getTeamPage} from "@/lib/football/data/teams";
 
 export const revalidate = 120;
@@ -37,6 +39,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
     }
 
     const {team} = page;
+    const tables = (await Promise.all(page.standings.slice(0, 4).map((s) => getStandingsBySlug(s.competition.slug)))).filter((x): x is NonNullable<typeof x> => x !== null && x.groups.length > 0);
     const squadByPosition = POSITIONS.map((pos) => ({pos, players: page.squad.filter((p) => p.position === pos)}));
     const others = page.squad.filter((p) => !POSITIONS.includes(p.position as (typeof POSITIONS)[number]));
 
@@ -107,7 +110,17 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
         </div>
     );
 
-    const standingsTab = <Panel title={t('standings')}>{page.standings.length === 0 ? <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{tFootball('empty.noStandings')}</p> : <div className="flex flex-col">{standingCards}</div>}</Panel>;
+    const standingsTab = tables.length === 0 ? (
+        <Panel title={t('standings')}><p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{tFootball('empty.noStandings')}</p></Panel>
+    ) : (
+        <>
+            {tables.map((table) => (
+                <Panel key={table.competition.slug} title={table.competition.name} action={<Link href={`/competitions/${table.competition.slug}`} className="text-[11px] font-extrabold underline decoration-accent decoration-[2px] underline-offset-2">{table.competition.country ?? ''}</Link>}>
+                    <StandingsTable groups={table.groups} highlightTeamIds={[team.id]} />
+                </Panel>
+            ))}
+        </>
+    );
 
     return (
         <SiteShell rail={rail}>

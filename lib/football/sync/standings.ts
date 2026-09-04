@@ -67,6 +67,7 @@ export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Pro
                     goals_against: s.goalsAgainst,
                     points: s.points,
                     form: s.form,
+                    description: s.description,
                 }));
 
             const {error} = await db.from('standings').upsert(dbRows, {onConflict: 'season_id,stage,group,team_id'});

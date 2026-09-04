@@ -114,5 +114,14 @@
     "assists": "Ast",
     "rating": "Voto",
     "empty": "Classifica giocatori non ancora disponibile per questa stagione."
+  },
+  "zones": {
+    "champions": "Champions League",
+    "europa": "Europa League",
+    "conference": "Conference League",
+    "promotion": "Promozione",
+    "playoff": "Playoff",
+    "relegation": "Retrocessione",
+    "relegation_playoff": "Playout"
   }
 }

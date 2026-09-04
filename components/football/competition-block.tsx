@@ -10,7 +10,7 @@ import {MatchRow} from "./match-row";
 export function CompetitionBlock({group, showCountry = true}: {group: CompetitionFixtures; showCountry?: boolean}) {
     const c = group.competition;
     return (
-        <section data-block className="flex flex-col border-t-2 border-foreground first:border-t-0">
+        <section data-block data-slug={c.slug} className="flex flex-col border-t-2 border-foreground first:border-t-0">
             <div className="flex items-center gap-1 pl-2 pr-1 h-8 bg-muted/60 text-[12px] font-extrabold">
                 <Link href={`/competitions/${c.slug}`} className="group flex-1 min-w-0 flex items-center gap-2 h-full hover:underline decoration-accent decoration-[3px] underline-offset-2">
                     {c.logoUrl && !c.countryCode ? (

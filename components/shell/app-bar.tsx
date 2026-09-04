@@ -47,7 +47,7 @@ export default function AppBar() {
                         })}
                     </nav>
 
-                    <form action="/competitions" method="get" className="ml-auto hidden md:flex items-center gap-2 h-8 px-2.5 w-[220px] rounded-md border-2 border-foreground/20 bg-card text-muted-foreground focus-within:border-foreground focus-within:text-foreground transition-colors">
+                    <form action="/search" method="get" className="ml-auto hidden md:flex items-center gap-2 h-8 px-2.5 w-[220px] rounded-md border-2 border-foreground/20 bg-card text-muted-foreground focus-within:border-foreground focus-within:text-foreground transition-colors">
                         <Search className="w-4 h-4 shrink-0" />
                         <input
                             type="search"

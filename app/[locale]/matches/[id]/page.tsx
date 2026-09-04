@@ -3,6 +3,7 @@ import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server"
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
+import {AutoRefresh} from "@/components/football/auto-refresh";
 import {EventsTimeline} from "@/components/football/events-timeline";
 import {Flag} from "@/components/football/flag";
 import {Lineups} from "@/components/football/lineups";
@@ -83,6 +84,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
 
     return (
         <SiteShell rail={rail}>
+            <AutoRefresh seconds={30} enabled={isLive} aroundIso={fixture.state === 'scheduled' ? fixture.startingAt : undefined} />
             {/* Scoreboard */}
             <section className="bb-surface overflow-hidden">
                 <div className="flex items-center gap-2 px-3 h-8 border-b-2 border-foreground bg-muted/60 text-[12px] font-extrabold">
