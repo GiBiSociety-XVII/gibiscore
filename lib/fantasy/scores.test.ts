@@ -10,8 +10,10 @@ const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
 describe('seasonWeights', () => {
     it('weights the current season by how far it has gone', () => {
         const w = seasonWeights([line(2026, {games: 2}), line(2025), line(2024)], 2026);
-        expect(w.get(2026)!).toBeCloseTo(0.1 / 0.6, 5);
-        expect(w.get(2025)!).toBeCloseTo(0.35 / 0.6, 5);
+        const cur = 0.5 * (2 / 15) ** 1.5;
+        expect(w.get(2026)!).toBeCloseTo(cur / (cur + 0.5), 5);
+        expect(w.get(2025)!).toBeCloseTo(0.35 / (cur + 0.5), 5);
+        expect(seasonWeights([line(2026, {games: 20}), line(2025)], 2026).get(2026)!).toBeCloseTo(0.5 / 0.85, 5);
         expect([...w.values()].reduce((s, v) => s + v, 0)).toBeCloseTo(1, 5);
     });
 
@@ -77,7 +79,20 @@ describe('suggestPrices', () => {
         const prices = suggestPrices(players, {credits: 500, participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
         const spent = [...prices.values()].reduce((s, v) => s + v, 0);
         expect(prices.get(1)!).toBeGreaterThan(prices.get(20)!);
-        expect(prices.get(40)).toBe(1);
+        expect(prices.get(1)!).toBeGreaterThanOrEqual(120);
+        expect(prices.get(1)!).toBeLessThanOrEqual(300);
+        expect(prices.get(8)!).toBeLessThan(prices.get(1)! * 0.6);
+        expect(prices.get(40)!).toBeLessThanOrEqual(5);
         expect(Math.abs(spent - 500 * 8 * 0.48)).toBeLessThan(60);
+    });
+
+    it('prices attackers above midfielders, defenders and keepers with the same marks', () => {
+        const players = (['P', 'D', 'C', 'A'] as const).flatMap((role) => Array.from({length: 60}, (_, i) => ({id: i + 1 + (role === 'P' ? 0 : role === 'D' ? 100 : role === 'C' ? 200 : 300), role, scores: {overall: 90 - i}})));
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        expect(prices.get(301)!).toBeGreaterThan(prices.get(201)!);
+        expect(prices.get(201)!).toBeGreaterThan(prices.get(101)!);
+        expect(prices.get(101)!).toBeGreaterThan(prices.get(1)! * 0.7);
+        // Keepers: a couple matter, the tenth is almost free.
+        expect(prices.get(10)!).toBeLessThan(prices.get(1)! * 0.2);
     });
 });

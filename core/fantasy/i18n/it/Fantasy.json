@@ -106,7 +106,8 @@
       "overall": "Totale",
       "fantaAvg": "FM st.",
       "price": "Crediti",
-      "status": "Stato"
+      "status": "Stato",
+      "tier": "Fascia"
     },
     "columnHints": {
       "starter": "Titolarità: quanto spesso parte titolare e quanti minuti gioca",
@@ -117,7 +118,8 @@
       "team_": "Forza della squadra in questa stagione",
       "overall": "Voto complessivo pesato per ruolo",
       "fantaAvg": "Fantamedia stimata a partita",
-      "price": "Crediti consigliati per la tua lega"
+      "price": "Crediti consigliati per la tua lega",
+      "tier": "Fascia nel ruolo: top, semi-top, prima, seconda, terza, riempitivi"
     },
     "confidence": {
       "low": "pochi dati",
@@ -154,7 +156,10 @@
     },
     "noSeasons": "Nessuna statistica nelle ultime tre stagioni.",
     "showing": "{shown} di {total} giocatori",
-    "more": "Mostra altri"
+    "more": "Mostra altri",
+    "view": "Vista",
+    "viewList": "Listone",
+    "viewTiers": "Fasce"
   },
   "roster": {
     "title": "La mia rosa",
@@ -211,6 +216,42 @@
       "name": "Caccia al valore",
       "tagline": "Tanti titolari sottovalutati, nessuna spesa folle",
       "description": "Spesa piatta: nessun giocatore sopra il 15-20% del budget, tanti titolari con buon rapporto voto/prezzo e scommesse su chi ha guadagnato posto quest'anno. Ideale per chi segue le probabili formazioni e vuole profondità di rosa."
+    }
+  },
+  "tiers": {
+    "title": "Fasce",
+    "roles": {
+      "P": "Portieri",
+      "D": "Difensori",
+      "C": "Centrocampisti",
+      "A": "Attaccanti"
+    },
+    "all": "Tutte le fasce",
+    "moreFillers": "e altri {count} riempitivi",
+    "hint": "Fasce per ruolo in base al voto totale: il numero di giocatori di ogni fascia segue quanti ne compra la tua lega (partecipanti × slot). Top e semi-top sono i pochi che tutti vogliono, terza fascia gli ultimi titolari, il resto riempitivi e scommesse.",
+    "top": {
+      "name": "Top",
+      "short": "TOP"
+    },
+    "semiTop": {
+      "name": "Semi-top",
+      "short": "SEMI"
+    },
+    "first": {
+      "name": "Prima fascia",
+      "short": "1ª"
+    },
+    "second": {
+      "name": "Seconda fascia",
+      "short": "2ª"
+    },
+    "third": {
+      "name": "Terza fascia",
+      "short": "3ª"
+    },
+    "filler": {
+      "name": "Riempitivi e scommesse",
+      "short": "RIEMP."
     }
   }
 }

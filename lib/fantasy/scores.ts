@@ -68,13 +68,18 @@ export interface FantaScores {
 
 const clamp = (v: number, min = 1, max = 100) => Math.max(min, Math.min(max, Math.round(v)));
 
-/** Season weights: current 50% once it has ten matches, previous 35%, older 15%; missing seasons hand their share to the others. */
+/**
+ * Season weights: the current season grows towards 50% as it goes (two
+ * matches count ~1%, eight ~20%, fifteen or more 50%: a hot start does
+ * not make a price), previous 35%, older 15%; missing seasons hand their
+ * share to the others.
+ */
 export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<number, number> {
     const years = [...new Set(seasons.map((s) => s.year))].filter((y) => y <= currentYear && y >= currentYear - 2);
     const gamesOf = (y: number) => Math.max(0, ...seasons.filter((s) => s.year === y).map((s) => s.games));
     const raw = new Map<number, number>();
     for (const y of years) {
-        const base = y === currentYear ? 0.5 * Math.min(1, gamesOf(y) / 10) : y === currentYear - 1 ? 0.35 : 0.15;
+        const base = y === currentYear ? 0.5 * Math.min(1, gamesOf(y) / 15) ** 1.5 : y === currentYear - 1 ? 0.35 : 0.15;
         if (base > 0) raw.set(y, base);
     }
     const total = [...raw.values()].reduce((s, v) => s + v, 0);
@@ -249,7 +254,22 @@ export interface PriceConfig {
     roleShare: Record<FantaRole, number>;
 }
 
-/** Suggested credits per player: the role's share of the market, split among the players that will actually be bought by how good they are. */
+/**
+ * How fast prices fall down the ranking of a role, in ranks: the top
+ * attacker takes about a third of one budget, the eighth about a sixth,
+ * the sixteenth a tenth; keepers fall much faster (two or three matter),
+ * defenders are flat. Tuned on 8-team, 500-credit Serie A auctions.
+ */
+const RANK_DECAY: Record<FantaRole, number> = {P: 5, D: 14, C: 12, A: 11};
+
+/**
+ * Suggested credits per player. Each role gets its share of the market
+ * (attackers cost the most, then midfielders, defenders, keepers); inside
+ * the role prices follow the ranking with the role's decay, adjusted by
+ * how far a player's mark sits from the top mark, so a clear number one
+ * costs more than a crowded top. Only the players that will actually be
+ * bought (participants x slots) share the money; everyone else is 1.
+ */
 export function suggestPrices<T extends {id: number; role: FantaRole; scores: Pick<FantaScores, 'overall'>}>(players: T[], config: PriceConfig): Map<number, number> {
     const prices = new Map<number, number>();
     const market = config.credits * config.participants;
@@ -257,20 +277,22 @@ export function suggestPrices<T extends {id: number; role: FantaRole; scores: Pi
         const pool = players.filter((p) => p.role === role).sort((a, b) => b.scores.overall - a.scores.overall);
         const bought = pool.slice(0, Math.max(1, config.participants * config.slots[role]));
         const budget = market * config.roleShare[role];
-        const weight = (p: T) => Math.exp((p.scores.overall - 50) / 9);
+        const top = bought[0]?.scores.overall ?? 1;
+        const weight = (p: T, rank: number) => Math.exp(-rank / RANK_DECAY[role]) * (0.35 + 0.65 * (p.scores.overall / top) ** 3);
         for (const p of pool) prices.set(p.id, 1);
         // Nobody pays more than 60% of a single budget: what a capped player
         // leaves on the table goes to the others, a few passes until stable.
         const cap = Math.max(1, Math.round(config.credits * 0.6));
         const fixed = new Map<number, number>();
+        const rankOf = new Map(bought.map((p, i) => [p.id, i]));
         for (let pass = 0; pass < 6; pass += 1) {
             const open = bought.filter((p) => !fixed.has(p.id));
-            const total = open.reduce((s, p) => s + weight(p), 0);
+            const total = open.reduce((s, p) => s + weight(p, rankOf.get(p.id) ?? 0), 0);
             if (open.length === 0 || total === 0) break;
             const rest = Math.max(0, budget - [...fixed.values()].reduce((s, v) => s + v, 0) - open.length);
             let capped = false;
             for (const p of open) {
-                const price = Math.max(1, Math.round(1 + (rest * weight(p)) / total));
+                const price = Math.max(1, Math.round(1 + (rest * weight(p, rankOf.get(p.id) ?? 0)) / total));
                 if (price > cap) {
                     fixed.set(p.id, cap);
                     capped = true;

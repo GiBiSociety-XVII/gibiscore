@@ -10,11 +10,13 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {StrategyPanel} from "./strategy-panel";
+import {TierBadge, TierList} from "./tier-list";
 import {ROLE_SHARE, totalSlots, type AuctionConfig, type Purchase} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
 import {rankStrategies, type StrategyKey} from "@/lib/fantasy/strategies";
+import {TIERS, assignTiers, type Tier} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team'] as const;
@@ -54,6 +56,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const tr = useTranslations('Fantasy.roster');
     const ts = useTranslations('Fantasy.setup');
     const tst = useTranslations('Fantasy.strategies');
+    const tt = useTranslations('Fantasy.tiers');
     const router = useRouter();
     const hydrated = useHydrated();
     const config = configStore.useValue();
@@ -62,6 +65,8 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
 
     const [q, setQ] = useState('');
     const [role, setRole] = useState<FantaRole | 'all'>('all');
+    const [tier, setTier] = useState<Tier | 'all'>('all');
+    const [view, setView] = useState<'list' | 'tiers'>('list');
     const [teamId, setTeamId] = useState<number | 'all'>('all');
     const [hideBought, setHideBought] = useState(false);
     const [sort, setSort] = useState<SortKey>('overall');
@@ -74,6 +79,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
         return suggestPrices(pool.players, {credits: config.credits, participants: config.participants, slots: config.slots, roleShare: ROLE_SHARE});
     }, [pool, config]);
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
+    const tiers = useMemo(() => (pool && config ? assignTiers(pool.players, config) : new Map<number, Tier>()), [pool, config]);
     // Strategies simulated on what is still on the market (players bought by others are gone).
     const plans = useMemo(() => {
         if (!pool || !config) return [];
@@ -83,7 +89,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
-        const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || p.name.toLowerCase().includes(needle) || p.team.name.toLowerCase().includes(needle)));
+        const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (tier === 'all' || tiers.get(p.id) === tier) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || p.name.toLowerCase().includes(needle) || p.team.name.toLowerCase().includes(needle)));
         const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'name' ? p.name : p.scores[sort]);
         return list.sort((a, b) => {
             const va = value(a);
@@ -91,7 +97,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
             if (typeof va === 'string' && typeof vb === 'string') return va.localeCompare(vb);
             return (vb as number) - (va as number) || b.scores.overall - a.scores.overall;
         });
-    }, [pool, q, role, teamId, hideBought, bought, sort, prices]);
+    }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices]);
 
     if (!hydrated) return <p className="text-sm font-semibold text-muted-foreground">…</p>;
 
@@ -163,6 +169,10 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         <option value="all">{t('allTeams')}</option>
                         {pool.teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
                     </select>
+                    <select className={selectClass} value={tier} onChange={(e) => { setTier(e.target.value as Tier | 'all'); setLimit(PAGE); }} aria-label={t('columns.tier')}>
+                        <option value="all">{tt('all')}</option>
+                        {TIERS.map((k) => <option key={k} value={k}>{tt(`${k}.name`)}</option>)}
+                    </select>
                     <select className={selectClass} value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={t('sort')}>
                         {(['overall', 'price', 'fantaAvg', ...SCORE_KEYS, 'name'] as SortKey[]).map((k) => <option key={k} value={k}>{t('sort')}: {k === 'name' ? t('columns.player') : t(`columns.${k === 'team' ? 'team_' : k}`)}</option>)}
                     </select>
@@ -170,7 +180,20 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         <input type="checkbox" checked={hideBought} onChange={(e) => setHideBought(e.target.checked)} className="w-4 h-4" />
                         {t('hideBought')}
                     </label>
+                    <div role="radiogroup" aria-label={t('view')} className="flex gap-1 ml-auto">
+                        {(['list', 'tiers'] as const).map((v) => (
+                            <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", view === v ? "bg-foreground text-background" : "bg-card")}>{v === 'list' ? t('viewList') : t('viewTiers')}</button>
+                        ))}
+                    </div>
                 </div>
+
+                {view === 'tiers' && (
+                    <>
+                        <TierList players={players} tiers={tiers} prices={prices} bought={bought} targets={targets} onBuy={(p) => setBuying({player: p, price: prices.get(p.id) ?? 1, manager: 0})} />
+                        <p className="text-[11px] font-semibold text-muted-foreground">{tt('hint')}</p>
+                    </>
+                )}
+                {view === 'list' && (<>
 
                 {/* List */}
                 <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="text-[11px] font-semibold text-muted-foreground">{ta('updated')}</span>}>
@@ -180,6 +203,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             <tr className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground border-b-2 border-foreground">
                                 <th className="px-2 py-1.5 text-left w-full">{t('columns.player')}</th>
                                 <th className="px-1 py-1.5 text-center">{t('columns.role')}</th>
+                                <th className="px-1 py-1.5 text-center" title={t('columnHints.tier')}>{t('columns.tier')}</th>
                                 {SCORE_KEYS.map((k) => <th key={k} className="px-1 py-1.5 text-center" title={t(`columnHints.${k === 'team' ? 'team_' : k}`)}>{t(`columns.${k === 'team' ? 'team_' : k}`)}</th>)}
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.overall')}>{t('columns.overall')}</th>
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>
@@ -210,6 +234,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                                 </div>
                                             </td>
                                             <td className="px-1 py-1 text-center"><RoleBadge role={p.role} /></td>
+                                            <td className="px-1 py-1 text-center"><TierBadge tier={tiers.get(p.id) ?? 'filler'} /></td>
                                             {SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
                                             <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>
@@ -230,7 +255,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={11} className="px-3 py-2">
+                                                <td colSpan={12} className="px-3 py-2">
                                                     {p.seasons.length === 0 ? (
                                                         <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
                                                     ) : (
@@ -265,6 +290,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                     )}
                 </Panel>
                 <p className="text-[11px] font-semibold text-muted-foreground">{ta('intro')}</p>
+                </>)}
             </div>
 
             {/* My roster and the strategies */}
