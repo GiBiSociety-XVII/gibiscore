@@ -97,5 +97,22 @@
     "bench": "Panchina",
     "starters": "Titolari",
     "estimated": "stimato"
+  },
+  "statusShort": {
+    "live": "LIVE",
+    "halfTime": "INT",
+    "penalties": "RIG",
+    "finished": "FIN",
+    "postponed": "RINV",
+    "cancelled": "ANN",
+    "abandoned": "SOSP"
+  },
+  "rankings": {
+    "player": "Giocatore",
+    "apps": "PG",
+    "goals": "Gol",
+    "assists": "Ast",
+    "rating": "Voto",
+    "empty": "Classifica giocatori non ancora disponibile per questa stagione."
   }
 }

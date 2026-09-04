@@ -27,6 +27,7 @@ export interface LeagueRow {
     name: string;
     slug: string;
     country: string | null;
+    country_code?: string | null;
     logo_url: string | null;
     type: string | null;
     tier?: 'featured' | 'basic' | null;
@@ -47,7 +48,7 @@ export interface FixtureRow {
 }
 
 export const TEAM_SELECT = 'id,name,short_code,logo_url,slug';
-export const LEAGUE_SELECT = 'id,name,slug,country,logo_url,type,tier';
+export const LEAGUE_SELECT = 'id,name,slug,country,country_code,logo_url,type,tier';
 
 export const FIXTURE_SELECT =
     'id,round,starting_at,state,minute,home_score,away_score,' +
@@ -68,7 +69,29 @@ export function toTeam(row: TeamRow): TeamSummary {
 }
 
 export function toCompetition(row: LeagueRow): CompetitionSummary {
-    return {id: row.id, name: row.name, slug: row.slug, country: row.country, logoUrl: row.logo_url, type: row.type, featured: row.tier === 'featured'};
+    return {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        country: row.country,
+        countryCode: normalizeCountryCode(row.country_code),
+        logoUrl: row.logo_url,
+        type: row.type,
+        featured: row.tier === 'featured',
+    };
+}
+
+/** Two-letter code or null ("World" and confederations have none). */
+export function normalizeCountryCode(code: string | null | undefined): string | null {
+    if (!code) return null;
+    const c = code.trim().toLowerCase();
+    return /^[a-z]{2}$/.test(c) ? c : null;
+}
+
+/** Flag of a country as served by the data provider's CDN. */
+export function flagUrl(code: string | null | undefined): string | null {
+    const c = normalizeCountryCode(code);
+    return c ? `https://media.api-sports.io/flags/${c}.svg` : null;
 }
 
 export function toFixture(row: FixtureRow): FixtureSummary | null {
@@ -81,6 +104,8 @@ export function toFixture(row: FixtureRow): FixtureSummary | null {
         leagueName: row.league.name,
         leagueSlug: row.league.slug,
         leagueCountry: row.league.country,
+        leagueCountryCode: normalizeCountryCode(row.league.country_code),
+        leagueLogoUrl: row.league.logo_url,
         leagueFeatured: row.league.tier === 'featured',
         round: row.round,
         startingAt: row.starting_at,

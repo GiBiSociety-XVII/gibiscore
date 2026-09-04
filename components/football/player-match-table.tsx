@@ -2,7 +2,7 @@ import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {Card} from "@/components/shared/ui/card";
 import {cn} from "@/components/shared/ui/cn";
-import {TeamCrest} from "@/components/home/team-crest";
+import {TeamCrest} from "@/components/football/team-crest";
 import type {PlayerMatchLine, TeamSummary} from "@/lib/football/types";
 
 function Rating({value, accent = 7}: {value: number | null; accent?: number}) {

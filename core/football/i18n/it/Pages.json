@@ -1,22 +1,4 @@
 {
-  "live": {
-    "title": "Live",
-    "dayTitle": "Partite del {date}",
-    "metaTitle": "Live",
-    "metaDescription": "Risultati in tempo reale di tutte le competizioni e programma completo di ogni giornata.",
-    "liveBadge": "{count, plural, =0 {Nessuna partita in corso} one {# partita in corso} other {# partite in corso}}",
-    "totalBadge": "{count, plural, =0 {Nessuna partita} one {# partita} other {# partite}}",
-    "liveOnly": "Solo live",
-    "previousDay": "Giorno prima",
-    "nextDay": "Giorno dopo",
-    "today": "Oggi",
-    "pickDate": "Vai alla data",
-    "go": "Vai",
-    "featured": "In evidenza",
-    "otherCompetitions": "Altre competizioni",
-    "emptyLive": "In questo momento non c'è nessuna partita in corso. Scegli un giorno per vedere il programma.",
-    "emptyDay": "Nessuna partita in programma in questo giorno."
-  },
   "competitions": {
     "title": "Competizioni",
     "metaTitle": "Competizioni",
@@ -24,15 +6,28 @@
     "open": "Apri",
     "season": "Stagione {season}",
     "featured": "In evidenza",
-    "byCountry": "Tutte le competizioni per paese",
+    "byCountry": "Per paese",
     "count": "{count, plural, one {# competizione} other {# competizioni}}",
-    "empty": "Le competizioni compaiono dopo la prima sincronizzazione dei dati."
+    "empty": "Le competizioni compaiono dopo la prima sincronizzazione dei dati.",
+    "searchTitle": "Risultati per “{query}”",
+    "noResults": "Nessuna competizione o paese corrisponde alla ricerca."
   },
   "competition": {
+    "tabs": {
+      "matches": "Partite",
+      "standings": "Classifica",
+      "players": "Giocatori"
+    },
     "standings": "Classifica",
     "results": "Risultati",
     "upcoming": "Prossime partite",
     "live": "In corso",
+    "scorers": "Marcatori",
+    "assists": "Assist",
+    "ratings": "Voti migliori",
+    "previousRound": "Precedente",
+    "nextRound": "Successiva",
+    "allRounds": "Tutte le giornate",
     "notFound": "Competizione non trovata",
     "backToList": "Tutte le competizioni",
     "metaDescription": "{name}: classifica aggiornata, risultati e calendario della stagione {season}."
@@ -45,7 +40,15 @@
     "stats": "Statistiche",
     "players": "Voti e statistiche giocatori",
     "metaTitle": "{home} – {away}",
-    "metaDescription": "{home} contro {away}, {competition}: risultato, cronaca, formazioni, statistiche e voti dei giocatori."
+    "metaDescription": "{home} contro {away}, {competition}: risultato, cronaca, formazioni, statistiche e voti dei giocatori.",
+    "tabs": {
+      "summary": "Cronaca",
+      "lineups": "Formazioni",
+      "stats": "Statistiche",
+      "players": "Giocatori"
+    },
+    "info": "Informazioni",
+    "headToHead": "Precedenti"
   },
   "team": {
     "notFound": "Squadra non trovata",
@@ -57,7 +60,12 @@
     "sidelined": "Indisponibili",
     "position": "{position}ª su {total}",
     "founded": "Fondata nel {year}",
-    "metaDescription": "{name}: risultati, prossime partite, classifica, rosa e indisponibili."
+    "metaDescription": "{name}: risultati, prossime partite, classifica, rosa e indisponibili.",
+    "tabs": {
+      "matches": "Partite",
+      "squad": "Rosa",
+      "standings": "Classifica"
+    }
   },
   "player": {
     "notFound": "Giocatore non trovato",
@@ -96,6 +104,32 @@
       "penalties": "Rig.",
       "conceded": "Subiti",
       "saves": "Parate"
+    },
+    "tabs": {
+      "seasons": "Stagioni",
+      "matches": "Partite"
     }
+  },
+  "scores": {
+    "metaTitle": "Risultati calcio in tempo reale",
+    "metaDescription": "Risultati live e programma di tutte le partite di oggi: campionati, coppe nazionali e competizioni internazionali di tutto il mondo.",
+    "dayMetaTitle": "Partite del {date}",
+    "liveMetaTitle": "Partite live",
+    "today": "Oggi",
+    "yesterday": "Ieri",
+    "tomorrow": "Domani",
+    "previousDay": "Giorno precedente",
+    "nextDay": "Giorno successivo",
+    "pickDate": "Scegli una data",
+    "go": "Vai",
+    "filters": {
+      "all": "Tutte",
+      "live": "Live",
+      "finished": "Finite",
+      "scheduled": "Programma"
+    },
+    "liveHint": "{count, plural, =0 {Nessuna partita in corso in questo momento.} one {# partita in corso.} other {# partite in corso.}}",
+    "emptyLive": "In questo momento non c’è nessuna partita in corso. Scegli un giorno per vedere il programma.",
+    "emptyDay": "Nessuna partita per questo filtro."
   }
 }

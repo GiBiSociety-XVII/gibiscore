@@ -1,54 +1,93 @@
-import {useFormatter} from "next-intl";
+import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
-import {TeamCrest} from "@/components/home/team-crest";
 import {LIVE_STATES, type FixtureSummary} from "@/lib/football/types";
-import {StatusBadge} from "./status-badge";
+import {TeamCrest} from "./team-crest";
+
+export type RowState = 'live' | 'finished' | 'scheduled' | 'other';
+
+export function rowState(fixture: Pick<FixtureSummary, 'state'>): RowState {
+    if (LIVE_STATES.includes(fixture.state)) return 'live';
+    if (fixture.state === 'finished') return 'finished';
+    if (fixture.state === 'scheduled') return 'scheduled';
+    return 'other';
+}
+
+/** Time / minute / short state, first column of a row. */
+function StatusCell({fixture}: {fixture: FixtureSummary}) {
+    const t = useTranslations('Football.statusShort');
+    const format = useFormatter();
+    switch (fixture.state) {
+        case 'live':
+        case 'extra_time':
+            return <span className="text-accent-foreground bg-accent rounded px-1 font-mono font-extrabold tabular-nums">{fixture.minute !== null ? `${fixture.minute}'` : t('live')}</span>;
+        case 'half_time':
+            return <span className="bg-accent rounded px-1 font-extrabold">{t('halfTime')}</span>;
+        case 'penalties':
+            return <span className="bg-accent rounded px-1 font-extrabold">{t('penalties')}</span>;
+        case 'finished':
+            return <span className="text-muted-foreground font-bold">{t('finished')}</span>;
+        case 'postponed':
+            return <span className="text-muted-foreground font-bold">{t('postponed')}</span>;
+        case 'cancelled':
+            return <span className="text-muted-foreground font-bold">{t('cancelled')}</span>;
+        case 'abandoned':
+            return <span className="text-muted-foreground font-bold">{t('abandoned')}</span>;
+        default:
+            return <span className="font-mono font-bold tabular-nums">{format.dateTime(new Date(fixture.startingAt), {hour: '2-digit', minute: '2-digit'})}</span>;
+    }
+}
 
 /**
- * One line per match in lists (competition, team, live pages).
- * Layout: [status/time] [home name + crest] [score] [crest + away name].
+ * One match per line, like a scores app: [time/minute] [home] [score] [away].
+ * `showDate` adds the day before the time (team and player pages);
+ * `showCompetition` adds the competition under the time (team pages).
  */
-export function MatchRow({fixture, highlightTeamId, showCompetition = false}: {fixture: FixtureSummary; highlightTeamId?: number; showCompetition?: boolean}) {
+export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean}) {
     const format = useFormatter();
-    const isLive = LIVE_STATES.includes(fixture.state);
+    const state = rowState(fixture);
+    const isLive = state === 'live';
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
-    const start = new Date(fixture.startingAt);
+    const winner = hasScore && fixture.state === 'finished' ? (fixture.homeScore! > fixture.awayScore! ? 'home' : fixture.awayScore! > fixture.homeScore! ? 'away' : null) : null;
 
-    const teamClass = (id: number) => cn("font-bold text-[13px] truncate", highlightTeamId === id && "underline decoration-accent decoration-[3px] underline-offset-4");
+    const teamClass = (side: 'home' | 'away', id: number) =>
+        cn(
+            "truncate text-[13px]",
+            winner === null || winner === side ? "font-bold" : "font-semibold text-foreground/70",
+            highlightTeamId === id && "underline decoration-accent decoration-[3px] underline-offset-2",
+        );
 
     return (
         <Link
             href={`/matches/${fixture.id}`}
+            data-row={state}
             className={cn(
-                "grid grid-cols-[72px_minmax(0,1fr)_64px_minmax(0,1fr)] md:grid-cols-[96px_minmax(0,1fr)_76px_minmax(0,1fr)] items-center gap-2 px-2.5 md:px-3 py-1.5 border-t-2 border-muted first:border-t-0 hover:bg-muted/60 transition-colors",
-                isLive && "bg-accent/15",
+                "grid items-center gap-1.5 px-2 min-h-8 border-t border-muted first:border-t-0 hover:bg-muted/70 transition-colors",
+                showDate || showCompetition
+                    ? "grid-cols-[78px_minmax(0,1fr)_52px_minmax(0,1fr)]"
+                    : "grid-cols-[46px_minmax(0,1fr)_52px_minmax(0,1fr)] md:grid-cols-[52px_minmax(0,1fr)_56px_minmax(0,1fr)]",
+                isLive && "bg-accent/10",
             )}
         >
-            <div className="flex flex-col gap-1 min-w-0">
-                {isLive || fixture.state !== 'scheduled' ? (
-                    <StatusBadge fixture={fixture} className="self-start" />
-                ) : (
-                    <span className="font-mono text-[13px] font-bold tabular-nums">{format.dateTime(start, {hour: '2-digit', minute: '2-digit'})}</span>
-                )}
-                <span className="text-[10px] font-semibold text-muted-foreground truncate">
-                    {showCompetition ? fixture.leagueName : format.dateTime(start, {day: 'numeric', month: 'short'})}
-                </span>
-            </div>
+            <span className="flex flex-col leading-tight text-[11px] min-w-0">
+                {showDate && <span className="text-[10px] font-semibold text-muted-foreground">{format.dateTime(new Date(fixture.startingAt), {day: '2-digit', month: '2-digit'})}</span>}
+                <span className="inline-flex"><StatusCell fixture={fixture} /></span>
+                {showCompetition && <span className="text-[10px] font-semibold text-muted-foreground truncate">{fixture.leagueName}</span>}
+            </span>
 
-            <div className="flex items-center justify-end gap-2 min-w-0">
-                <span className={cn(teamClass(fixture.home.id), "text-right")}>{fixture.home.name}</span>
-                <TeamCrest team={fixture.home} size={22} />
-            </div>
+            <span className="flex items-center justify-end gap-1.5 min-w-0">
+                <span className={cn(teamClass('home', fixture.home.id), "text-right")}>{fixture.home.name}</span>
+                <TeamCrest team={fixture.home} size={18} />
+            </span>
 
-            <div className="text-center font-mono font-bold tabular-nums text-[15px] md:text-base">
-                {hasScore ? `${fixture.homeScore} – ${fixture.awayScore}` : <span className="text-muted-foreground text-sm">vs</span>}
-            </div>
+            <span className={cn("text-center font-mono font-extrabold tabular-nums text-[13px] rounded", isLive && "bg-accent")}>
+                {hasScore ? `${fixture.homeScore} - ${fixture.awayScore}` : <span className="text-muted-foreground font-bold">-</span>}
+            </span>
 
-            <div className="flex items-center gap-2 min-w-0">
-                <TeamCrest team={fixture.away} size={22} />
-                <span className={teamClass(fixture.away.id)}>{fixture.away.name}</span>
-            </div>
+            <span className="flex items-center gap-1.5 min-w-0">
+                <TeamCrest team={fixture.away} size={18} />
+                <span className={teamClass('away', fixture.away.id)}>{fixture.away.name}</span>
+            </span>
         </Link>
     );
 }

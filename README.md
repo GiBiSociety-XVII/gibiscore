@@ -114,6 +114,23 @@ Diagnostica del piano e della copertura per lega in evidenza:
 Ogni esecuzione scrive una riga in `football.sync_runs` con contatori,
 richieste usate e avvisi: è il primo posto dove guardare se qualcosa manca.
 
+## Pagine
+
+Struttura alla Diretta/Sofascore: barra laterale con le competizioni
+principali e tutti i paesi, lista risultati al centro, classifiche nella
+colonna di destra. URL in inglese, testi in italiano.
+
+| URL | Contenuto |
+|---|---|
+| `/` | partite di oggi, tutte le competizioni (filtri Tutte / Live / Finite / Programma) |
+| `/live` | solo partite in corso |
+| `/scores/2026-09-05` | partite di un giorno qualsiasi |
+| `/competitions` | competizioni principali e tutti i paesi (`?q=` filtra) |
+| `/competitions/serie-a` | partite per giornata, classifica, marcatori / assist / voti |
+| `/matches/123` | tabellino: cronaca, formazioni, statistiche, voti; classifica e precedenti a lato |
+| `/teams/inter-505` | partite, rosa, posizioni in classifica |
+| `/players/n-gonzalez-1234` (`/2024` per una stagione) | totali, statistiche per stagione, partita per partita |
+
 ## Database
 
 Progetto Supabase dedicato "GiBiScore". Lo schema `football` va esposto nel

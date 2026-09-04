@@ -1,7 +1,8 @@
 import 'server-only';
 import {fantasyScore} from '../fantasy';
 import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, TeamLineup, TeamMatchStats} from '../types';
-import {FIXTURE_SELECT, LEAGUE_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toTeam, type FixtureRow, type LeagueRow, type TeamRow} from './shared';
+import type {StandingGroup} from '../types';
+import {FIXTURE_LIST_SELECT, FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toFixtures, toTeam, toStandingRow, type FixtureRow, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
 interface EventRow {
     id: number;
@@ -82,7 +83,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         const {data, error} = await db
             .from('fixtures')
             .select(
-                `${FIXTURE_SELECT},venue_name,referee,home_score_ht,away_score_ht,` +
+                `${FIXTURE_SELECT},season_id,venue_name,referee,home_score_ht,away_score_ht,` +
                     'events:fixture_events(id,team_id,type,minute,extra_minute,info,sort_order,player_name,related_player_name,' +
                     'player:players!fixture_events_player_id_fkey(id,name,slug),related:players!fixture_events_related_player_id_fkey(id,name,slug)),' +
                     'lineups(team_id,is_starter,formation,formation_position,jersey_number,player:players(id,name,slug,position)),' +
@@ -96,6 +97,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         if (!data) return null;
 
         const row = data as unknown as FixtureRow & {
+            season_id: number | null;
             venue_name: string | null;
             referee: string | null;
             home_score_ht: number | null;
@@ -194,7 +196,15 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         const home = playerLines(homeId);
         const away = playerLines(awayId);
 
+        // Side rail: table of the competition (group of the two teams) and last meetings.
+        const [standings, headToHead] = await Promise.all([
+            row.season_id ? loadStandings(db, row.season_id, homeId, awayId) : Promise.resolve([]),
+            loadHeadToHead(db, homeId, awayId, row.id),
+        ]);
+
         return {
+            standings,
+            headToHead,
             fixture: {
                 ...base,
                 competition: toCompetition(row.league),
@@ -237,3 +247,41 @@ export function normalizePosition(position: string | null | undefined): string |
 }
 
 export {LEAGUE_SELECT, TEAM_SELECT};
+
+async function loadStandings(db: ReturnType<typeof footballDb>, seasonId: number, homeId: number, awayId: number): Promise<StandingGroup[]> {
+    try {
+        const {data, error} = await db.from('standings').select(STANDING_SELECT).eq('season_id', seasonId).order('group').order('position').limit(200);
+        if (error) throw error;
+        const groups = new Map<string, StandingGroup>();
+        for (const r of (data ?? []) as unknown as StandingQueryRow[]) {
+            const row = toStandingRow(r);
+            if (!row) continue;
+            if (!groups.has(r.group)) groups.set(r.group, {name: r.group, rows: []});
+            groups.get(r.group)!.rows.push(row);
+        }
+        const all = [...groups.values()];
+        const withTeams = all.filter((g) => g.rows.some((r) => r.team.id === homeId || r.team.id === awayId));
+        return withTeams.length > 0 ? withTeams : all.slice(0, 1);
+    } catch (error) {
+        logReadError('loadStandings', error);
+        return [];
+    }
+}
+
+async function loadHeadToHead(db: ReturnType<typeof footballDb>, homeId: number, awayId: number, excludeId: number) {
+    try {
+        const {data, error} = await db
+            .from('fixtures')
+            .select(FIXTURE_LIST_SELECT)
+            .or(`and(home_team_id.eq.${homeId},away_team_id.eq.${awayId}),and(home_team_id.eq.${awayId},away_team_id.eq.${homeId})`)
+            .eq('state', 'finished')
+            .neq('id', excludeId)
+            .order('starting_at', {ascending: false})
+            .limit(6);
+        if (error) throw error;
+        return toFixtures(data);
+    } catch (error) {
+        logReadError('loadHeadToHead', error);
+        return [];
+    }
+}

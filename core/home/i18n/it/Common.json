@@ -14,5 +14,18 @@
     "network": "GiBiSociety",
     "gibiarena": "GiBiArena",
     "rights": "Tutti i diritti riservati."
+  },
+  "sidebar": {
+    "label": "Competizioni",
+    "pinned": "Competizioni principali",
+    "countries": "Paesi",
+    "all": "Tutte"
+  },
+  "rail": {
+    "standings": "Classifica",
+    "fullStandings": "Completa",
+    "scorers": "Marcatori",
+    "headToHead": "Precedenti",
+    "adSlot": "Spazio pubblicitario"
   }
 }

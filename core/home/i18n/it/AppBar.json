@@ -1,12 +1,10 @@
 {
   "sectionsLabel": "Sezioni del sito",
-  "search": "Cerca squadra o giocatore",
+  "search": "Cerca competizione",
   "login": "Accedi",
   "nav": {
-    "home": "Home",
+    "scores": "Risultati",
     "live": "Live",
-    "competitions": "Competizioni",
-    "serieA": "Serie A",
-    "championsLeague": "Champions League"
+    "competitions": "Competizioni"
   }
 }

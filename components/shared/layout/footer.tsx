@@ -3,11 +3,9 @@ import {Link} from "@/i18n/navigation";
 import {LogoMark} from "./logo";
 
 const EXPLORE_LINKS = [
-    {key: 'home', href: '/'},
+    {key: 'scores', href: '/'},
     {key: 'live', href: '/live'},
     {key: 'competitions', href: '/competitions'},
-    {key: 'serieA', href: '/competitions/serie-a'},
-    {key: 'championsLeague', href: '/competitions/champions-league'},
 ] as const;
 
 export default function Footer() {
@@ -17,8 +15,8 @@ export default function Footer() {
 
     return (
         <footer className="mt-auto w-full bg-background border-t-[2.5px] border-foreground">
-            <div className="max-w-6xl mx-auto px-4 py-8 md:py-10">
-                <div className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr] gap-6 md:gap-5 mb-6">
+            <div className="max-w-[1600px] mx-auto px-4 py-6">
+                <div className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr] gap-5 mb-5">
                     <div className="flex flex-col items-start gap-4 col-span-2 md:col-span-1">
                         <div className="flex items-center gap-3">
                             <LogoMark />

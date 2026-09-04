@@ -30,6 +30,8 @@ export interface CompetitionSummary {
     name: string;
     slug: string;
     country: string | null;
+    /** ISO 3166 alpha-2 when known (null for World / international). */
+    countryCode: string | null;
     logoUrl: string | null;
     type: string | null;
     featured?: boolean;
@@ -46,6 +48,8 @@ export interface FixtureSummary {
     leagueName: string;
     leagueSlug?: string;
     leagueCountry?: string | null;
+    leagueCountryCode?: string | null;
+    leagueLogoUrl?: string | null;
     leagueFeatured?: boolean;
     round: string | null;
     startingAt: string; // ISO timestamp
@@ -113,13 +117,33 @@ export interface RoundFixtures {
     fixtures: FixtureSummary[];
 }
 
+/** One line of a season ranking (top scorers, assists, ratings). */
+export interface RankedPlayer {
+    player: {id: number; name: string; slug: string; imageUrl: string | null};
+    team: TeamSummary;
+    position: string | null;
+    appearances: number;
+    minutes: number;
+    goals: number;
+    assists: number;
+    penaltiesScored: number;
+    rating: number | null;
+    yellowCards: number;
+    redCards: number;
+}
+
 export interface CompetitionPage {
     competition: CompetitionSummary;
     season: SeasonSummary | null;
     standings: StandingGroup[];
+    /** Every round of the season, newest first (results and calendar alike). */
+    rounds: RoundFixtures[];
+    /** Round to open by default: the one with the most recent activity. */
+    currentRound: string | null;
     results: RoundFixtures[];
     upcoming: RoundFixtures[];
     live: FixtureSummary[];
+    rankings: {scorers: RankedPlayer[]; assists: RankedPlayer[]; ratings: RankedPlayer[]};
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +231,10 @@ export interface MatchPage {
     lineups: {home: TeamLineup | null; away: TeamLineup | null};
     stats: {home: TeamMatchStats | null; away: TeamMatchStats | null};
     players: {home: PlayerMatchLine[]; away: PlayerMatchLine[]};
+    /** Table of the competition (main group of the two teams), for the side rail. */
+    standings: StandingGroup[];
+    /** Last meetings between the two teams, newest first. */
+    headToHead: FixtureSummary[];
 }
 
 // ---------------------------------------------------------------------------
