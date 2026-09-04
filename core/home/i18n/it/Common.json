@@ -61,6 +61,7 @@
     "addFavorite": "Aggiungi ai preferiti",
     "removeFavorite": "Togli dai preferiti",
     "myTeams": "Le mie squadre",
-    "noMatches": "Nessuna partita in archivio."
+    "noMatches": "Nessuna partita in archivio.",
+    "headToHeadHint": "Bilancio della squadra di casa negli ultimi precedenti"
   }
 }

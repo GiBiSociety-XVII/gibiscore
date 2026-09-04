@@ -92,7 +92,7 @@ export default function AppBar() {
                         <BrandIcon size={40} className="sm:hidden" alt="GiBiScore" />
                     </Link>
 
-                    <nav aria-label={t('sectionsLabel')} className="flex items-center gap-1 md:gap-2 overflow-x-auto md:overflow-visible [scrollbar-width:none]">
+                    <nav aria-label={t('sectionsLabel')} className="hidden md:flex items-center gap-2">
                         <NavMegaMenu
                             label={t('nav.scores')}
                             icon={<CalendarDays className="w-5 h-5" />}

@@ -69,7 +69,7 @@ da `CRON_SECRET` (`vercel.json` definisce gli orari):
 
 | Job | Frequenza | Richieste | Cosa fa |
 |---|---|---|---|
-| `sync-competitions` | ogni giorno | ~275 | tutte le leghe e stagioni correnti; squadre e rose delle leghe in evidenza |
+| `sync-competitions` | ogni giorno | ~15 (~530 lunedì e giovedì con le rose, o con `?squads=1`) | tutte le leghe e stagioni correnti; squadre e rose delle leghe in evidenza |
 | `sync-fixtures` | ogni ora | 9 | tutte le partite da ieri a +7 giorni (una richiesta per giorno) |
 | `sync-fixtures?window=month` | ogni giorno | 32 | finestra estesa a +30 giorni |
 | `sync-standings` | ogni 30 min | ~13 | classifiche delle leghe in evidenza |
@@ -77,7 +77,7 @@ da `CRON_SECRET` (`vercel.json` definisce gli orari):
 | `sync-injuries` | ogni 6 ore | ~13 | infortuni e squalifiche, leghe in evidenza |
 | `sync-backfill` | ogni ora | fino a ~20 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti |
 | `sync-player-seasons` | ogni ora | ~35 per lega-stagione, solo dopo una giornata giocata | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
-| `sync-live` | ogni minuto | 1 + 1 ogni 20 partite in evidenza | punteggi ed eventi di tutte le partite in corso; formazioni, statistiche e voti per quelle in evidenza |
+| `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso, altrimenti 1 + 1 ogni 20 partite in evidenza | punteggi ed eventi di tutte le partite in corso; formazioni, statistiche e voti per quelle in evidenza |
 
 Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro (7.500);
 le statistiche stagionali aggiungono ~35 richieste per lega dopo ogni giornata.

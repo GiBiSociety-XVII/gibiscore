@@ -18,7 +18,7 @@ import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncE
  *
  * Request budget: 1 + featured teams (~13) + squads (~260) = ~275 requests.
  */
-export async function syncCompetitions(): Promise<SyncRun> {
+export async function syncCompetitions(options: {squads?: boolean} = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-competitions');
 
@@ -26,7 +26,11 @@ export async function syncCompetitions(): Promise<SyncRun> {
         const featured = getFeaturedCompetitions();
         const featuredIds = new Set(featured.map((c) => c.providerId));
         const scope = basicScope();
-        const skipSquads = process.env.API_FOOTBALL_SKIP_SQUADS === '1';
+        // Squads change rarely: fetched on Monday and Thursday (or on request), ~500 requests each time.
+        const day = new Date().getUTCDay();
+        const squadsDue = options.squads ?? (day === 1 || day === 4);
+        const skipSquads = process.env.API_FOOTBALL_SKIP_SQUADS === '1' || !squadsDue;
+        if (skipSquads) run.bump('squads_skipped');
 
         const {response: all} = await apiFootballGet<AfLeagueResponse[]>('leagues');
         run.requests += 1;

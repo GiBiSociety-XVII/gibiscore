@@ -95,7 +95,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     const rail = (
         <>
             {page.standings.length > 0 && <StandingsPanel title={fixture.competition.name} slug={fixture.competition.slug} groups={page.standings} highlightTeamIds={teamIds} />}
-            <HeadToHeadPanel fixtures={page.headToHead} />
+            <HeadToHeadPanel fixtures={page.headToHead} teamId={fixture.home.id} />
         </>
     );
 

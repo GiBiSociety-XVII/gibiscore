@@ -27,11 +27,24 @@ export async function ScorersPanel({title, players}: {title: string; players: Ra
     );
 }
 
-export async function HeadToHeadPanel({fixtures}: {fixtures: FixtureSummary[]}) {
+export async function HeadToHeadPanel({fixtures, teamId}: {fixtures: FixtureSummary[]; /** Team the W/D/L summary is counted for (the home side of the current match). */ teamId?: number}) {
     const t = await getTranslations('Common.rail');
     if (fixtures.length === 0) return null;
+    let won = 0;
+    let drawn = 0;
+    let lost = 0;
+    if (teamId !== undefined) {
+        for (const f of fixtures) {
+            if (f.homeScore === null || f.awayScore === null) continue;
+            const mine = f.home.id === teamId ? f.homeScore : f.awayScore;
+            const theirs = f.home.id === teamId ? f.awayScore : f.homeScore;
+            if (mine > theirs) won += 1;
+            else if (mine < theirs) lost += 1;
+            else drawn += 1;
+        }
+    }
     return (
-        <Panel title={t('headToHead')}>
+        <Panel title={t('headToHead')} action={teamId !== undefined ? <span className="font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground" title={t('headToHeadHint')}>{won}V · {drawn}N · {lost}P</span> : undefined}>
             <div className="flex flex-col">{fixtures.map((f) => <MatchRow key={f.id} fixture={f} showDate compact />)}</div>
         </Panel>
     );

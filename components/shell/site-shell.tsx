@@ -2,6 +2,7 @@ import type {ReactNode} from "react";
 import Footer from "@/components/shared/layout/footer";
 import {getNavigation, type Navigation} from "@/lib/football/data/navigation";
 import AppBar from "./app-bar";
+import {MobileTabs} from "./mobile-tabs";
 import {PinnedChips, Sidebar} from "./sidebar";
 
 /**
@@ -13,7 +14,7 @@ import {PinnedChips, Sidebar} from "./sidebar";
 export async function SiteShell({children, rail, wide = false, navigation}: {children: ReactNode; rail?: ReactNode; wide?: boolean; navigation?: Navigation}) {
     const nav = navigation ?? (await getNavigation());
     return (
-        <div className="min-h-screen flex flex-col bg-background">
+        <div className="min-h-screen flex flex-col bg-background pb-16 lg:pb-0">
             <AppBar />
             <div className="flex-1 w-full max-w-[1600px] mx-auto px-2 md:px-4 py-3 flex gap-3 items-start">
                 <aside className="hidden lg:block w-[228px] shrink-0 sticky top-[92px] max-h-[calc(100vh-104px)] overflow-y-auto [scrollbar-width:thin]">
@@ -30,6 +31,7 @@ export async function SiteShell({children, rail, wide = false, navigation}: {chi
                 )}
             </div>
             <Footer />
+            <MobileTabs />
         </div>
     );
 }
