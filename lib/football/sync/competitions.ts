@@ -3,6 +3,7 @@ import {basicScope, getFeaturedCompetitions, historySeasonCount} from '@/lib/foo
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {currentSeason, positionName, seasonName, slugify} from '@/lib/api-football/mappers';
 import type {AfLeagueResponse, AfSquadResponse, AfTeamResponse} from '@/lib/api-football/types';
+import {fetchAll} from '@/lib/db/paginate';
 import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type FootballClient, type SyncRun} from './context';
 
 /**
@@ -65,9 +66,9 @@ export async function syncCompetitions(): Promise<SyncRun> {
         // Demote leagues no longer featured, promote the featured ones.
         await db.from('leagues').update({tier: 'basic'}).eq('tier', 'featured').not('provider_id', 'in', `(${[...featuredIds].join(',')})`);
 
-        const {data: leagueIdRows, error: leagueIdError} = await db.from('leagues').select('id,provider_id').in('provider_id', entries.map((e) => e.league.id));
-        if (leagueIdError) failSync('leagues.select', leagueIdError);
-        const leagueDbId = new Map<number, number>((leagueIdRows ?? []).map((r) => [r.provider_id as number, r.id as number]));
+        // ~1,250 leagues: more than one Data API page.
+        const leagueIdRows = await fetchAll((a, b) => db.from('leagues').select('id,provider_id').in('provider_id', entries.map((e) => e.league.id)).order('id').range(a, b), {max: 5000});
+        const leagueDbId = new Map<number, number>(leagueIdRows.map((r) => [r.provider_id as number, r.id as number]));
 
         // Seasons: upsert the current one per league, then flag it. Featured
         // leagues also get their past seasons (history archive), not current.

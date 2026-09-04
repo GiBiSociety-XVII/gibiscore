@@ -150,13 +150,17 @@ async function syncSeason(db: FootballClient, run: SyncRun, s: SeasonRow): Promi
     const teams = await ensureTeams(db, stats.map(({st}) => ({id: st.team.id, name: st.team.name, logo: st.team.logo})));
     const players = await idMap(db, 'players', [...unique.keys()]);
 
-    const rows = [];
+    // The feed can list the same player/team twice (pagination overlaps,
+    // duplicated statistics blocks): keep one row per key or Postgres
+    // rejects the whole upsert ("cannot affect row a second time").
+    const byKey = new Map<string, Record<string, unknown>>();
     for (const {playerProviderId, st} of stats) {
         const playerId = players.get(playerProviderId);
         const teamId = teams.get(st.team.id);
         if (!playerId || !teamId) continue;
-        rows.push({player_id: playerId, team_id: teamId, league_id: s.leagueId, season_id: s.id, ...mapPlayerSeason(st)});
+        byKey.set(`${playerId}:${teamId}`, {player_id: playerId, team_id: teamId, league_id: s.leagueId, season_id: s.id, ...mapPlayerSeason(st)});
     }
+    const rows = [...byKey.values()];
     for (const group of chunk(rows, 300)) {
         const {error} = await db.from('player_season_stats').upsert(group, {onConflict: 'player_id,team_id,league_id,season_year'});
         if (error) failSync('player_season_stats.upsert', error);
