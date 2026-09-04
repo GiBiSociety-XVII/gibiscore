@@ -1,7 +1,7 @@
 import 'server-only';
 import {fantasyScore} from '../fantasy';
 import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, TeamLineup, TeamMatchStats} from '../types';
-import type {StandingGroup} from '../types';
+import type {FormEntry, StandingGroup} from '../types';
 import {FIXTURE_LIST_SELECT, FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toFixtures, toTeam, toStandingRow, type FixtureRow, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
 interface EventRow {
@@ -197,14 +197,20 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         const away = playerLines(awayId);
 
         // Side rail: table of the competition (group of the two teams) and last meetings.
-        const [standings, headToHead] = await Promise.all([
+        const [standings, headToHead, homeForm, awayForm] = await Promise.all([
             row.season_id ? loadStandings(db, row.season_id, homeId, awayId) : Promise.resolve([]),
             loadHeadToHead(db, homeId, awayId, row.id),
+            loadForm(db, homeId, row.starting_at, row.id),
+            loadForm(db, awayId, row.starting_at, row.id),
         ]);
+        const rated = [...home, ...away].filter((p) => p.rating !== null && (p.minutes ?? 0) > 0);
+        const bestPlayer = rated.length > 0 ? rated.reduce((best, p) => ((p.rating ?? 0) > (best.rating ?? 0) ? p : best)) : null;
 
         return {
             standings,
             headToHead,
+            form: {home: homeForm, away: awayForm},
+            bestPlayer,
             fixture: {
                 ...base,
                 competition: toCompetition(row.league),
@@ -282,6 +288,40 @@ async function loadHeadToHead(db: ReturnType<typeof footballDb>, homeId: number,
         return toFixtures(data);
     } catch (error) {
         logReadError('loadHeadToHead', error);
+        return [];
+    }
+}
+
+/** Last five finished matches of a team before `beforeIso`, newest first. */
+async function loadForm(db: ReturnType<typeof footballDb>, teamId: number, beforeIso: string, excludeId: number): Promise<FormEntry[]> {
+    try {
+        const {data, error} = await db
+            .from('fixtures')
+            .select(FIXTURE_LIST_SELECT)
+            .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+            .eq('state', 'finished')
+            .lt('starting_at', beforeIso)
+            .neq('id', excludeId)
+            .order('starting_at', {ascending: false})
+            .limit(5);
+        if (error) throw error;
+        return toFixtures(data)
+            .filter((f) => f.homeScore !== null && f.awayScore !== null)
+            .map((f) => {
+                const isHome = f.home.id === teamId;
+                const mine = isHome ? f.homeScore! : f.awayScore!;
+                const theirs = isHome ? f.awayScore! : f.homeScore!;
+                return {
+                    fixtureId: f.id,
+                    result: mine > theirs ? 'W' : mine < theirs ? 'L' : 'D',
+                    score: `${f.homeScore}-${f.awayScore}`,
+                    opponent: isHome ? f.away : f.home,
+                    home: isHome,
+                    startingAt: f.startingAt,
+                };
+            });
+    } catch (error) {
+        logReadError('loadForm', error);
         return [];
     }
 }

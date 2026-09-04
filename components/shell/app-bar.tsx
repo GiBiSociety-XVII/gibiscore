@@ -11,6 +11,7 @@ const NAV_ITEMS = [
     {key: 'scores', href: '/', match: (p: string) => p === '/' || p.startsWith('/scores')},
     {key: 'live', href: '/live', match: (p: string) => p.startsWith('/live')},
     {key: 'competitions', href: '/competitions', match: (p: string) => p.startsWith('/competitions')},
+    {key: 'stats', href: '/stats', match: (p: string) => p.startsWith('/stats')},
 ] as const;
 
 /** Ink bar, always visible: brand, three sections, search. */

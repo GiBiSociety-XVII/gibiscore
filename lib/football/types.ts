@@ -241,6 +241,19 @@ export interface MatchPage {
     standings: StandingGroup[];
     /** Last meetings between the two teams, newest first. */
     headToHead: FixtureSummary[];
+    /** Last five results of each team before this match, newest first. */
+    form: {home: FormEntry[]; away: FormEntry[]};
+    /** Highest rated player of the match, when ratings exist. */
+    bestPlayer: PlayerMatchLine | null;
+}
+
+export interface FormEntry {
+    fixtureId: number;
+    result: 'W' | 'D' | 'L';
+    score: string;
+    opponent: TeamSummary;
+    home: boolean;
+    startingAt: string;
 }
 
 // ---------------------------------------------------------------------------

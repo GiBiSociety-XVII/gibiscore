@@ -6,6 +6,7 @@ const EXPLORE_LINKS = [
     {key: 'scores', href: '/'},
     {key: 'live', href: '/live'},
     {key: 'competitions', href: '/competitions'},
+    {key: 'stats', href: '/stats'},
 ] as const;
 
 export default function Footer() {

@@ -126,6 +126,8 @@ colonna di destra. URL in inglese, testi in italiano.
 | `/live` | solo partite in corso |
 | `/scores/2026-09-05` | partite di un giorno qualsiasi |
 | `/competitions` | competizioni principali e tutti i paesi (`?q=` filtra) |
+| `/stats` | marcatori, assist e voti migliori di ogni competizione principale |
+| `/search?q=` | ricerca squadre, giocatori e competizioni |
 | `/competitions/serie-a` | partite per giornata, classifica, marcatori / assist / voti |
 | `/matches/123` | tabellino: cronaca, formazioni, statistiche, voti; classifica e precedenti a lato |
 | `/teams/inter-505` | partite, rosa, posizioni in classifica |

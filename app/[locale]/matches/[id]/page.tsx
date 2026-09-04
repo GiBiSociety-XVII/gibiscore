@@ -6,6 +6,7 @@ import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {AutoRefresh} from "@/components/football/auto-refresh";
 import {EventsTimeline} from "@/components/football/events-timeline";
 import {Flag} from "@/components/football/flag";
+import {FormStrip} from "@/components/football/form-strip";
 import {Lineups} from "@/components/football/lineups";
 import {NotFoundBox} from "@/components/football/page-header";
 import {PlayerMatchTable} from "@/components/football/player-match-table";
@@ -68,8 +69,33 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
         </>
     );
 
+    const rowOf = (teamId: number) => page.standings.flatMap((g) => g.rows).find((r) => r.team.id === teamId) ?? null;
+    const homeRow = rowOf(fixture.home.id);
+    const awayRow = rowOf(fixture.away.id);
+    const comparison = (homeRow || awayRow || page.form.home.length > 0 || page.form.away.length > 0) && (
+        <Panel title={t('comparison')}>
+            <table className="w-full text-[13px]">
+                <tbody>
+                    {[
+                        {label: t('form'), home: <FormStrip entries={page.form.home} />, away: <FormStrip entries={page.form.away} />},
+                        {label: t('position'), home: homeRow ? `${homeRow.position}ª` : '–', away: awayRow ? `${awayRow.position}ª` : '–'},
+                        {label: t('points'), home: homeRow?.points ?? '–', away: awayRow?.points ?? '–'},
+                        {label: t('goals'), home: homeRow ? `${homeRow.goalsFor ?? 0} / ${homeRow.goalsAgainst ?? 0}` : '–', away: awayRow ? `${awayRow.goalsFor ?? 0} / ${awayRow.goalsAgainst ?? 0}` : '–'},
+                    ].map((line) => (
+                        <tr key={line.label} className="border-t border-muted first:border-t-0">
+                            <td className="px-3 py-1.5 w-1/3 text-right font-mono font-extrabold tabular-nums">{line.home}</td>
+                            <td className="px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{line.label}</td>
+                            <td className="px-3 py-1.5 w-1/3 text-left font-mono font-extrabold tabular-nums">{line.away}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </Panel>
+    );
+
     const summaryTab = (
         <>
+            {comparison}
             <EventsTimeline events={page.events} title={t('tabs.summary')} />
             <Panel title={t('info')}>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 px-3 py-2 text-[13px]">
@@ -114,6 +140,19 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                         <span className="text-[13px] md:text-base font-extrabold text-center leading-tight group-hover:underline decoration-accent decoration-[3px] underline-offset-2">{fixture.away.name}</span>
                     </Link>
                 </div>
+                {(page.form.home.length > 0 || page.form.away.length > 0 || page.bestPlayer) && (
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 pb-2.5 -mt-1">
+                        <span className="flex justify-center"><FormStrip entries={page.form.home} /></span>
+                        <span className="text-[11px] font-bold text-muted-foreground text-center truncate max-w-[200px]">
+                            {page.bestPlayer && (
+                                <Link href={`/players/${page.bestPlayer.player.slug}`} className="hover:underline decoration-accent decoration-[2px] underline-offset-2">
+                                    {t('bestPlayer')}: <span className="text-foreground">{page.bestPlayer.player.name}</span> <span className="font-mono bg-accent px-1 rounded text-foreground">{page.bestPlayer.rating?.toFixed(1)}</span>
+                                </Link>
+                            )}
+                        </span>
+                        <span className="flex justify-center"><FormStrip entries={page.form.away} /></span>
+                    </div>
+                )}
             </section>
 
             <Tabs

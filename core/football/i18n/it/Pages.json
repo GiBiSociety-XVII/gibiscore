@@ -48,7 +48,14 @@
       "players": "Giocatori"
     },
     "info": "Informazioni",
-    "headToHead": "Precedenti"
+    "headToHead": "Precedenti",
+    "comparison": "Confronto",
+    "form": "Forma",
+    "position": "Posizione",
+    "points": "Punti",
+    "goals": "Gol fatti / subiti",
+    "bestPlayer": "Migliore in campo",
+    "noForm": "Nessun precedente in archivio."
   },
   "team": {
     "notFound": "Squadra non trovata",
@@ -144,5 +151,15 @@
     "competitions": "Competizioni",
     "empty": "Nessun risultato per “{query}”. Prova con un nome più corto.",
     "tooShort": "Scrivi almeno 2 lettere."
+  },
+  "stats": {
+    "title": "Statistiche",
+    "metaTitle": "Statistiche giocatori",
+    "metaDescription": "Marcatori, assist e voti migliori delle principali competizioni: Serie A, Premier League, La Liga, Bundesliga, Ligue 1, Champions League e altre.",
+    "intro": "Classifiche di stagione per ogni competizione principale, aggiornate dopo ogni giornata.",
+    "scorers": "Marcatori",
+    "assists": "Assist",
+    "ratings": "Voti migliori",
+    "empty": "Dati non ancora disponibili per questa competizione."
   }
 }
