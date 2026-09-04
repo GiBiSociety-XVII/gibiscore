@@ -8,6 +8,7 @@ import {MatchList} from "@/components/football/match-list";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
 import {ScorersPanel, StandingsPanel} from "@/components/football/rail";
 import {Rankings} from "@/components/football/rankings";
+import {SelectPanels} from "@/components/football/select-panels";
 import {StandingsTable} from "@/components/football/standings-table";
 import {Tabs} from "@/components/football/tabs";
 import {getCompetitionPage} from "@/lib/football/data/competitions";
@@ -39,8 +40,6 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
     }
 
     const {competition, season} = page;
-    const current = page.rounds.find((r) => r.round === page.currentRound) ?? null;
-    const others = page.rounds.filter((r) => r.round !== page.currentRound);
     const rail = (
         <>
             {page.standings.length > 0 && <StandingsPanel title={t('standings')} slug={competition.slug} groups={page.standings.slice(0, 1)} />}
@@ -51,25 +50,15 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
     const matchesTab = (
         <>
             {page.live.length > 0 && <MatchList title={t('live')} fixtures={page.live} showDate />}
-            {current && <MatchList title={roundLabel(current.round) || t('tabs.matches')} fixtures={current.fixtures} showDate />}
-            {others.length > 0 && (
-                <Panel title={t('allRounds')}>
-                    <div className="flex flex-col">
-                        {others.map((r) => (
-                            <details key={r.round} className="group border-t border-muted first:border-t-0">
-                                <summary className="flex items-center justify-between px-3 h-8 text-[13px] font-extrabold cursor-pointer list-none hover:bg-muted/60 [&::-webkit-details-marker]:hidden">
-                                    <span>{roundLabel(r.round) || '—'}</span>
-                                    <span className="font-mono text-[11px] text-muted-foreground">{r.fixtures.length}</span>
-                                </summary>
-                                <div className="flex flex-col border-t border-muted">
-                                    {r.fixtures.map((f) => <MatchListRow key={f.id} f={f} />)}
-                                </div>
-                            </details>
-                        ))}
-                    </div>
-                </Panel>
+            {page.rounds.length === 0 ? (
+                <MatchList fixtures={[]} />
+            ) : (
+                <SelectPanels
+                    label={t('round')}
+                    defaultId={page.currentRound ?? undefined}
+                    panels={page.rounds.map((r) => ({id: r.round, label: roundLabel(r.round) || '—', content: <MatchList fixtures={r.fixtures} showDate />}))}
+                />
             )}
-            {!current && others.length === 0 && <MatchList fixtures={[]} />}
         </>
     );
 
@@ -119,11 +108,4 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
             />
         </SiteShell>
     );
-}
-
-// Tiny wrapper so the server component above can keep importing MatchRow lazily.
-import {MatchRow} from "@/components/football/match-row";
-import type {FixtureSummary} from "@/lib/football/types";
-function MatchListRow({f}: {f: FixtureSummary}) {
-    return <MatchRow fixture={f} showDate />;
 }

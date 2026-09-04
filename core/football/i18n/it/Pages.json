@@ -30,7 +30,8 @@
     "allRounds": "Tutte le giornate",
     "notFound": "Competizione non trovata",
     "backToList": "Tutte le competizioni",
-    "metaDescription": "{name}: classifica aggiornata, risultati e calendario della stagione {season}."
+    "metaDescription": "{name}: classifica aggiornata, risultati e calendario della stagione {season}.",
+    "round": "Giornata"
   },
   "match": {
     "notFound": "Partita non trovata",
@@ -55,7 +56,8 @@
     "points": "Punti",
     "goals": "Gol fatti / subiti",
     "bestPlayer": "Migliore in campo",
-    "noForm": "Nessun precedente in archivio."
+    "noForm": "Nessun precedente in archivio.",
+    "scorers": "Marcatori"
   },
   "team": {
     "notFound": "Squadra non trovata",
@@ -71,8 +73,20 @@
     "tabs": {
       "matches": "Partite",
       "squad": "Rosa",
-      "standings": "Classifica"
-    }
+      "standings": "Classifica",
+      "stats": "Statistiche"
+    },
+    "statsTitle": "Statistiche stagione",
+    "played": "Partite",
+    "record": "V · N · P",
+    "goals": "Gol fatti / subiti",
+    "cleanSheets": "Porte inviolate",
+    "avgPossession": "Possesso medio",
+    "avgShots": "Tiri a partita",
+    "avgShotsOn": "Tiri in porta a partita",
+    "avgCorners": "Angoli a partita",
+    "avgXg": "xG a partita",
+    "noStats": "Statistiche non ancora disponibili per questa stagione."
   },
   "player": {
     "notFound": "Giocatore non trovato",

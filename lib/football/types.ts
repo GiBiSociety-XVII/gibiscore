@@ -277,8 +277,27 @@ export interface TeamStandingLine {
     totalTeams: number;
 }
 
+/** Aggregates of the current season, computed from our stored fixtures and team statistics. */
+export interface TeamSeasonStats {
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    cleanSheets: number;
+    /** Averages over the matches with statistics stored (null when none). */
+    withStats: number;
+    avgPossession: number | null;
+    avgShots: number | null;
+    avgShotsOnTarget: number | null;
+    avgCorners: number | null;
+    avgXg: number | null;
+}
+
 export interface TeamPage {
     team: TeamSummary & {country: string | null; venue: string | null; founded: number | null};
+    seasonStats: TeamSeasonStats | null;
     standings: TeamStandingLine[];
     recent: FixtureSummary[];
     upcoming: FixtureSummary[];

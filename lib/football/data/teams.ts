@@ -1,5 +1,5 @@
 import 'server-only';
-import {LIVE_STATES, type SquadPlayer, type TeamPage, type TeamStandingLine} from '../types';
+import {LIVE_STATES, type SquadPlayer, type TeamPage, type TeamSeasonStats, type TeamStandingLine} from '../types';
 import {normalizePosition} from './matches';
 import {FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixtures, toStandingRow, toTeam, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
@@ -18,12 +18,13 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
         const team = teamRow as unknown as TeamRow & {country: string | null; venue_name: string | null; founded: number | null};
 
         const now = new Date().toISOString();
-        const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes] = await Promise.all([
+        const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, seasonStats] = await Promise.all([
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).lte('starting_at', now).order('starting_at', {ascending: false}).limit(8),
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).gt('starting_at', now).order('starting_at', {ascending: true}).limit(6),
             db.from('standings').select(`${STANDING_SELECT},season:seasons!inner(id,name,year,is_current,league:leagues(${LEAGUE_SELECT}))`).eq('team_id', team.id).eq('seasons.is_current', true),
             db.from('squad_members').select('jersey_number,season:seasons!inner(is_current),player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).eq('seasons.is_current', true),
             db.from('sidelined').select('category,description,player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).order('start_date', {ascending: false}).limit(30),
+            loadSeasonStats(db, team.id),
         ]);
         for (const res of [pastRes, futureRes, standingsRes, squadRes, sidelinedRes]) if (res.error) throw res.error;
 
@@ -79,9 +80,74 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
             live,
             squad,
             sidelined,
+            seasonStats,
         };
     } catch (error) {
         logReadError(`getTeamPage(${slug})`, error);
+        return null;
+    }
+}
+
+interface SeasonStatRow {
+    possession: number | null;
+    shots_total: number | null;
+    shots_on_target: number | null;
+    corners: number | null;
+    xg: number | null;
+    fixture: {home_team_id: number; away_team_id: number; home_score: number | null; away_score: number | null} | null;
+}
+
+/** Record and per-match averages over the finished matches of the current seasons. */
+async function loadSeasonStats(db: ReturnType<typeof footballDb>, teamId: number): Promise<TeamSeasonStats | null> {
+    try {
+        const [fixturesRes, statsRes] = await Promise.all([
+            db
+                .from('fixtures')
+                .select('id,home_team_id,away_team_id,home_score,away_score,season:seasons!inner(is_current)')
+                .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+                .eq('state', 'finished')
+                .eq('seasons.is_current', true)
+                .limit(80),
+            db
+                .from('fixture_team_stats')
+                .select('possession,shots_total,shots_on_target,corners,xg,fixture:fixtures!inner(home_team_id,away_team_id,home_score,away_score,state,season:seasons!inner(is_current))')
+                .eq('team_id', teamId)
+                .eq('fixtures.state', 'finished')
+                .eq('fixtures.seasons.is_current', true)
+                .limit(80),
+        ]);
+        if (fixturesRes.error) throw fixturesRes.error;
+        if (statsRes.error) throw statsRes.error;
+        const fixtures = (fixturesRes.data ?? []) as unknown as Array<{home_team_id: number; away_team_id: number; home_score: number | null; away_score: number | null}>;
+        if (fixtures.length === 0) return null;
+        const out: TeamSeasonStats = {played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, cleanSheets: 0, withStats: 0, avgPossession: null, avgShots: null, avgShotsOnTarget: null, avgCorners: null, avgXg: null};
+        for (const f of fixtures) {
+            if (f.home_score === null || f.away_score === null) continue;
+            const home = f.home_team_id === teamId;
+            const mine = home ? f.home_score : f.away_score;
+            const theirs = home ? f.away_score : f.home_score;
+            out.played += 1;
+            out.goalsFor += mine;
+            out.goalsAgainst += theirs;
+            if (theirs === 0) out.cleanSheets += 1;
+            if (mine > theirs) out.won += 1;
+            else if (mine < theirs) out.lost += 1;
+            else out.drawn += 1;
+        }
+        const rows = (statsRes.data ?? []) as unknown as SeasonStatRow[];
+        const avg = (pick: (r: SeasonStatRow) => number | null) => {
+            const values = rows.map(pick).filter((v): v is number => v !== null);
+            return values.length ? Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10 : null;
+        };
+        out.withStats = rows.length;
+        out.avgPossession = avg((r) => r.possession);
+        out.avgShots = avg((r) => r.shots_total);
+        out.avgShotsOnTarget = avg((r) => r.shots_on_target);
+        out.avgCorners = avg((r) => r.corners);
+        out.avgXg = avg((r) => (r.xg === null ? null : Number(r.xg)));
+        return out;
+    } catch (error) {
+        logReadError('loadSeasonStats', error);
         return null;
     }
 }

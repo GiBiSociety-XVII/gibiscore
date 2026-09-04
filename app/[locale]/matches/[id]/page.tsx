@@ -62,6 +62,36 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     const start = new Date(fixture.startingAt);
     const teamIds = [fixture.home.id, fixture.away.id];
 
+    // Goal lines under the scoreboard: "Lautaro 23', 67' (rig.)".
+    const goalEvents = page.events.filter((e) => e.type === 'goal' || e.type === 'penalty' || e.type === 'own_goal');
+    const scorersOf = (side: 'home' | 'away') => {
+        const map = new Map<string, {name: string; slug: string | null; minutes: string[]}>();
+        for (const e of goalEvents) {
+            // An own goal counts for the other side.
+            const creditedSide = e.type === 'own_goal' ? (e.side === 'home' ? 'away' : 'home') : e.side;
+            if (creditedSide !== side) continue;
+            const name = e.player.name ?? '?';
+            const key = e.player.id ? String(e.player.id) : name;
+            if (!map.has(key)) map.set(key, {name, slug: e.player.slug, minutes: []});
+            map.get(key)!.minutes.push(`${e.minute ?? ''}${e.extraMinute ? `+${e.extraMinute}` : ''}'${e.type === 'penalty' ? ' rig.' : e.type === 'own_goal' ? ' aut.' : ''}`);
+        }
+        return [...map.values()];
+    };
+    const homeScorers = scorersOf('home');
+    const awayScorers = scorersOf('away');
+    const jsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'SportsEvent',
+        name: `${fixture.home.name} - ${fixture.away.name}`,
+        startDate: fixture.startingAt,
+        eventStatus: isLive ? 'https://schema.org/EventScheduled' : fixture.state === 'postponed' ? 'https://schema.org/EventPostponed' : fixture.state === 'cancelled' ? 'https://schema.org/EventCancelled' : 'https://schema.org/EventScheduled',
+        homeTeam: {'@type': 'SportsTeam', name: fixture.home.name},
+        awayTeam: {'@type': 'SportsTeam', name: fixture.away.name},
+        location: fixture.venue ? {'@type': 'Place', name: fixture.venue} : undefined,
+        organizer: {'@type': 'Organization', name: fixture.competition.name},
+        sport: 'Soccer',
+    };
+
     const rail = (
         <>
             {page.standings.length > 0 && <StandingsPanel title={fixture.competition.name} slug={fixture.competition.slug} groups={page.standings} highlightTeamIds={teamIds} />}
@@ -110,6 +140,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
 
     return (
         <SiteShell rail={rail}>
+            <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
             <AutoRefresh seconds={30} enabled={isLive} aroundIso={fixture.state === 'scheduled' ? fixture.startingAt : undefined} />
             {/* Scoreboard */}
             <section className="bb-surface overflow-hidden">
@@ -140,6 +171,25 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                         <span className="text-[13px] md:text-base font-extrabold text-center leading-tight group-hover:underline decoration-accent decoration-[3px] underline-offset-2">{fixture.away.name}</span>
                     </Link>
                 </div>
+                {(homeScorers.length > 0 || awayScorers.length > 0) && (
+                    <div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-2 px-3 pb-2 -mt-1 text-[11px] font-semibold text-muted-foreground">
+                        <ul className="flex flex-col items-end text-right">
+                            {homeScorers.map((s) => (
+                                <li key={s.name} className="truncate max-w-full">
+                                    {s.slug ? <Link href={`/players/${s.slug}`} className="text-foreground hover:underline decoration-accent decoration-2 underline-offset-2">{s.name}</Link> : <span className="text-foreground">{s.name}</span>} <span className="font-mono">{s.minutes.join(', ')}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <span className="text-center" aria-hidden="true">⚽︎</span>
+                        <ul className="flex flex-col items-start">
+                            {awayScorers.map((s) => (
+                                <li key={s.name} className="truncate max-w-full">
+                                    <span className="font-mono">{s.minutes.join(', ')}</span> {s.slug ? <Link href={`/players/${s.slug}`} className="text-foreground hover:underline decoration-accent decoration-2 underline-offset-2">{s.name}</Link> : <span className="text-foreground">{s.name}</span>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
                 {(page.form.home.length > 0 || page.form.away.length > 0 || page.bestPlayer) && (
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 pb-2.5 -mt-1">
                         <span className="flex justify-center"><FormStrip entries={page.form.home} /></span>

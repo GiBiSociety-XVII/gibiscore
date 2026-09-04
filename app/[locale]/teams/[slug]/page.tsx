@@ -110,6 +110,31 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
         </div>
     );
 
+    const st = page.seasonStats;
+    const statsTab = !st ? (
+        <Panel title={t('statsTitle')}><p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('noStats')}</p></Panel>
+    ) : (
+        <Panel title={t('statsTitle')}>
+            <dl className="grid grid-cols-2 md:grid-cols-4 gap-px bg-muted">
+                {[
+                    [t('played'), st.played],
+                    [t('record'), `${st.won} · ${st.drawn} · ${st.lost}`],
+                    [t('goals'), `${st.goalsFor} / ${st.goalsAgainst}`],
+                    [t('cleanSheets'), st.cleanSheets],
+                    [t('avgPossession'), st.avgPossession !== null ? `${st.avgPossession}%` : '–'],
+                    [t('avgShots'), st.avgShots ?? '–'],
+                    [t('avgShotsOn'), st.avgShotsOnTarget ?? '–'],
+                    [t('avgXg'), st.avgXg ?? '–'],
+                ].map(([label, value]) => (
+                    <div key={String(label)} className="bg-card px-3 py-2.5 flex flex-col gap-0.5">
+                        <dd className="font-mono text-[20px] font-bold leading-none tabular-nums">{value}</dd>
+                        <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
+                    </div>
+                ))}
+            </dl>
+        </Panel>
+    );
+
     const standingsTab = tables.length === 0 ? (
         <Panel title={t('standings')}><p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{tFootball('empty.noStandings')}</p></Panel>
     ) : (
@@ -134,6 +159,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
                     {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.live.length},
                     {id: 'squad', label: t('tabs.squad'), content: squadTab},
                     {id: 'standings', label: t('tabs.standings'), content: standingsTab},
+                    {id: 'stats', label: t('tabs.stats'), content: statsTab},
                 ]}
             />
         </SiteShell>

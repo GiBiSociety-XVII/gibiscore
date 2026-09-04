@@ -4,6 +4,7 @@ import {Card} from "@/components/shared/ui/card";
 import {cn} from "@/components/shared/ui/cn";
 import {TeamCrest} from "@/components/football/team-crest";
 import type {LineupPlayer, TeamLineup} from "@/lib/football/types";
+import {Pitch} from "./pitch";
 
 function PlayerLine({p}: {p: LineupPlayer}) {
     const t = useTranslations('Football.positionsShort');
@@ -50,10 +51,13 @@ export function Lineups({home, away, title}: {home: TeamLineup | null; away: Tea
             {!home && !away ? (
                 <p className="text-sm font-semibold text-muted-foreground">{tEmpty('noLineups')}</p>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {home && <TeamColumn lineup={home} />}
-                    {away && <TeamColumn lineup={away} />}
-                </div>
+                <>
+                    <Pitch home={home} away={away} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {home && <TeamColumn lineup={home} />}
+                        {away && <TeamColumn lineup={away} />}
+                    </div>
+                </>
             )}
         </Card>
     );
