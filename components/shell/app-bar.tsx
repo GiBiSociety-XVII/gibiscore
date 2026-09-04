@@ -76,6 +76,7 @@ export default function AppBar() {
             title: m('stats.squadsTitle'),
             items: [
                 {label: m('stats.injuries'), href: '/injuries', hint: m('stats.injuriesHint')},
+                {label: m('stats.predictions'), href: '/predictions', hint: m('stats.predictionsHint')},
                 {label: m('stats.teamStats'), href: '/search', hint: m('stats.teamStatsHint')},
             ],
         },

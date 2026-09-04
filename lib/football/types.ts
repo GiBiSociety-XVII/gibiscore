@@ -1,3 +1,4 @@
+import type {ReturnEstimate} from './spells';
 /**
  * Read models used by the UI. They mirror the football.* tables in
  * supabase/migrations but stay independent of the provider payloads.
@@ -249,6 +250,8 @@ export interface MatchPage {
     form: {home: FormEntry[]; away: FormEntry[]};
     /** Highest rated player of the match, when ratings exist. */
     bestPlayer: PlayerMatchLine | null;
+    /** Players currently out on each side. */
+    absences: {home: SidelinedEntry[]; away: SidelinedEntry[]};
 }
 
 export interface FormEntry {
@@ -325,7 +328,23 @@ export interface TeamPage {
     upcoming: FixtureSummary[];
     live: FixtureSummary[];
     squad: SquadPlayer[];
-    sidelined: Array<{player: SquadPlayer; category: string; description: string | null}>;
+    sidelined: SidelinedEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Absences (injuries, suspensions), rebuilt from the fixtures missed
+// ---------------------------------------------------------------------------
+
+export interface SidelinedEntry {
+    player: {id: number; name: string; slug: string; imageUrl: string | null; position: string | null};
+    /** injury | suspension | doubtful | other */
+    category: string;
+    description: string | null;
+    /** First fixture missed, YYYY-MM-DD. */
+    since: string;
+    daysOut: number;
+    missed: number;
+    estimate: ReturnEstimate;
 }
 
 // ---------------------------------------------------------------------------

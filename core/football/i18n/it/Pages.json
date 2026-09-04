@@ -59,7 +59,9 @@
     "goals": "Gol fatti / subiti",
     "bestPlayer": "Migliore in campo",
     "noForm": "Nessun precedente in archivio.",
-    "scorers": "Marcatori"
+    "scorers": "Marcatori",
+    "absences": "Indisponibili",
+    "prediction": "Pronostico"
   },
   "team": {
     "notFound": "Squadra non trovata",
@@ -195,12 +197,14 @@
   "injuries": {
     "title": "Infortunati e squalificati",
     "metaTitle": "Infortunati e squalificati",
-    "metaDescription": "Giocatori infortunati e squalificati delle principali competizioni, squadra per squadra, aggiornati ogni sei ore.",
-    "intro": "Indisponibili delle competizioni principali, squadra per squadra. Aggiornamento ogni sei ore.",
+    "metaDescription": "Giocatori infortunati e squalificati delle principali competizioni: da quanto sono fuori e data di rientro indicativa, squadra per squadra.",
+    "intro": "Chi manca, da quanto e quando dovrebbe rientrare, squadra per squadra. Aggiornamento ogni sei ore.",
     "empty": "Nessun indisponibile in archivio al momento.",
     "category": {
       "injury": "Infortunio",
-      "suspension": "Squalifica"
+      "suspension": "Squalifica",
+      "doubtful": "In dubbio",
+      "other": "Non disponibile"
     }
   },
   "compare": {
@@ -228,5 +232,12 @@
       "rating": "Voto medio",
       "cards": "Cartellini"
     }
+  },
+  "predictions": {
+    "title": "Pronostici",
+    "metaTitle": "Pronostici partite",
+    "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione.",
+    "intro": "Le prossime partite delle competizioni principali con le probabilità del nostro modello statistico. Apri la partita per lo studio completo.",
+    "days": "Prossimi {count} giorni"
   }
 }

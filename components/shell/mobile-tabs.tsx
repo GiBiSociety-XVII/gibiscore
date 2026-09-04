@@ -13,7 +13,7 @@ export function MobileTabs() {
         {key: 'scores', href: '/', icon: CalendarDays, active: path === '/' || path.startsWith('/scores')},
         {key: 'live', href: '/live', icon: Radio, active: path.startsWith('/live')},
         {key: 'competitions', href: '/competitions', icon: Trophy, active: path.startsWith('/competitions')},
-        {key: 'stats', href: '/stats', icon: BarChart3, active: path.startsWith('/stats') || path.startsWith('/injuries') || path.startsWith('/compare')},
+        {key: 'stats', href: '/stats', icon: BarChart3, active: path.startsWith('/stats') || path.startsWith('/injuries') || path.startsWith('/compare') || path.startsWith('/predictions')},
         {key: 'search', href: '/search', icon: Search, active: path.startsWith('/search')},
     ] as const;
     return (

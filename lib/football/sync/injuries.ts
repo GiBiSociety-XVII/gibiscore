@@ -39,8 +39,10 @@ export async function syncInjuries(): Promise<SyncRun> {
             const {error: deleteError} = await db.from('sidelined').delete().eq('season_id', season.id);
             if (deleteError) failSync('sidelined.delete', deleteError);
 
+            // The provider repeats a listing for both sides of a fixture.
+            const seen = new Set<string>();
             const rows = response
-                .filter((r) => players.has(r.player.id))
+                .filter((r) => players.has(r.player.id) && !seen.has(`${r.player.id}:${r.fixture.id}`) && seen.add(`${r.player.id}:${r.fixture.id}`))
                 .map((r) => ({
                     season_id: season.id,
                     player_id: players.get(r.player.id)!,

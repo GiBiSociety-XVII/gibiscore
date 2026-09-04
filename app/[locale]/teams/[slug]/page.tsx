@@ -2,6 +2,7 @@ import type {Metadata} from "next";
 import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {Badge} from "@/components/shared/ui/badge";
+import {AbsenceList} from "@/components/football/absences";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {FavoriteStar} from "@/components/football/favorite-star";
@@ -98,18 +99,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
                 )}
             </Panel>
             <Panel title={t('sidelined')}>
-                {page.sidelined.length === 0 ? (
-                    <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">–</p>
-                ) : (
-                    <ul className="flex flex-col">
-                        {page.sidelined.map((s) => (
-                            <li key={s.player.id} className="flex items-center gap-3 px-3 h-8 border-t border-muted first:border-t-0">
-                                <Link href={`/players/${s.player.slug}`} className="font-bold text-[13px] truncate hover:underline decoration-accent decoration-[3px] underline-offset-2">{s.player.name}</Link>
-                                <Badge variant={s.category === 'suspension' ? 'ink' : 'outline'} className="ml-auto whitespace-nowrap">{s.description ?? s.category}</Badge>
-                            </li>
-                        ))}
-                    </ul>
-                )}
+                <AbsenceList entries={page.sidelined} hint={page.sidelined.length > 0} />
             </Panel>
         </div>
     );

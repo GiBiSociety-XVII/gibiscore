@@ -1,6 +1,7 @@
 import 'server-only';
-import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, TeamLineup, TeamMatchStats} from '../types';
+import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
 import type {FormEntry, StandingGroup} from '../types';
+import {loadTeamSidelined} from './sidelined';
 import {FIXTURE_LIST_SELECT, FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toFixtures, toTeam, toStandingRow, type FixtureRow, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
 interface EventRow {
@@ -175,11 +176,13 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         const away = playerLines(awayId);
 
         // Side rail: table of the competition (group of the two teams) and last meetings.
-        const [standings, headToHead, homeForm, awayForm] = await Promise.all([
+        const upcoming = row.state === 'scheduled' || row.state === 'postponed';
+        const [standings, headToHead, homeForm, awayForm, absences] = await Promise.all([
             row.season_id ? loadStandings(db, row.season_id, homeId, awayId) : Promise.resolve([]),
             loadHeadToHead(db, homeId, awayId, row.id),
             loadForm(db, homeId, row.starting_at, row.id),
             loadForm(db, awayId, row.starting_at, row.id),
+            upcoming ? loadTeamSidelined(db, [homeId, awayId]) : Promise.resolve(new Map<number, SidelinedEntry[]>()),
         ]);
         const rated = [...home, ...away].filter((p) => p.rating !== null && (p.minutes ?? 0) > 0);
         const bestPlayer = rated.length > 0 ? rated.reduce((best, p) => ((p.rating ?? 0) > (best.rating ?? 0) ? p : best)) : null;
@@ -189,6 +192,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
             headToHead,
             form: {home: homeForm, away: awayForm},
             bestPlayer,
+            absences: {home: absences.get(homeId) ?? [], away: absences.get(awayId) ?? []},
             fixture: {
                 ...base,
                 competition: toCompetition(row.league),

@@ -13,6 +13,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         {url: `${siteUrl}/`, lastModified: now, changeFrequency: 'always', priority: 1},
         {url: `${siteUrl}/live`, lastModified: now, changeFrequency: 'always', priority: 0.9},
         {url: `${siteUrl}/competitions`, lastModified: now, changeFrequency: 'daily', priority: 0.8},
+        {url: `${siteUrl}/stats`, lastModified: now, changeFrequency: 'daily', priority: 0.7},
+        {url: `${siteUrl}/predictions`, lastModified: now, changeFrequency: 'hourly', priority: 0.7},
+        {url: `${siteUrl}/injuries`, lastModified: now, changeFrequency: 'daily', priority: 0.6},
+        {url: `${siteUrl}/compare`, lastModified: now, changeFrequency: 'weekly', priority: 0.5},
     ];
     try {
         const db = createPublicClient().schema('football');

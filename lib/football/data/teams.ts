@@ -1,6 +1,7 @@
 import 'server-only';
 import {LIVE_STATES, type FixtureSummary, type SquadPlayer, type TeamPage, type TeamPlayerSeason, type TeamSeasonStats, type TeamStandingLine, type TeamSummary} from '../types';
 import {normalizePosition} from './matches';
+import {loadTeamSidelined} from './sidelined';
 import {FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixtures, toStandingRow, toTeam, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
 const POSITION_ORDER: Record<string, number> = {goalkeeper: 0, defender: 1, midfielder: 2, attacker: 3};
@@ -23,12 +24,12 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).gt('starting_at', now).order('starting_at', {ascending: true}).limit(6),
             db.from('standings').select(`${STANDING_SELECT},season:seasons!inner(id,name,year,is_current,league:leagues(${LEAGUE_SELECT}))`).eq('team_id', team.id).eq('seasons.is_current', true),
             db.from('squad_members').select('jersey_number,season:seasons!inner(is_current),player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).eq('seasons.is_current', true),
-            db.from('sidelined').select('category,description,player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).order('start_date', {ascending: false}).limit(30),
+            loadTeamSidelined(db, [team.id]),
             loadSeasonStats(db, team.id),
             loadPlayers(db, team.id),
             db.from('fixtures').select(`${FIXTURE_SELECT},season:seasons!inner(is_current)`).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).eq('seasons.is_current', true).order('starting_at', {ascending: true}).limit(120),
         ]);
-        for (const res of [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, calendarRes]) if (res.error) throw res.error;
+        for (const res of [pastRes, futureRes, standingsRes, squadRes, calendarRes]) if (res.error) throw res.error;
 
         const past = toFixtures(pastRes.data);
         const live = past.filter((f) => LIVE_STATES.includes(f.state));
@@ -69,10 +70,7 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
         const squad = [...byPlayer.values()]
             .sort((a, b) => (POSITION_ORDER[a.position ?? ''] ?? 9) - (POSITION_ORDER[b.position ?? ''] ?? 9) || (a.number ?? 99) - (b.number ?? 99));
 
-        const seen = new Set<number>();
-        const sidelined = ((sidelinedRes.data ?? []) as unknown as Array<{category: string; description: string | null; player: Parameters<typeof toSquadPlayer>[0] | null}>)
-            .filter((s) => s.player && !seen.has(s.player.id) && seen.add(s.player.id))
-            .map((s) => ({player: toSquadPlayer(s.player!, null), category: s.category, description: s.description}));
+        const sidelined = sidelinedRes.get(team.id) ?? [];
 
         return {
             team: {...toTeam(team), country: team.country, venue: team.venue_name, founded: team.founded},

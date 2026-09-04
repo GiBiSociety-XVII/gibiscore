@@ -45,7 +45,9 @@
       "teamStatsHint": "Cerca una squadra e apri la tab Statistiche",
       "overview": "Tutte le statistiche",
       "compare": "Confronto giocatori",
-      "compareHint": "Due giocatori a confronto, stessa stagione"
+      "compareHint": "Due giocatori a confronto, stessa stagione",
+      "predictions": "Pronostici",
+      "predictionsHint": "Probabilità 1-X-2 delle prossime partite"
     }
   }
 }

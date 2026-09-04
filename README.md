@@ -74,7 +74,7 @@ da `CRON_SECRET` (`vercel.json` definisce gli orari):
 | `sync-fixtures?window=month` | ogni giorno | 32 | finestra estesa a +30 giorni |
 | `sync-standings` | ogni 30 min | ~13 | classifiche delle leghe in evidenza |
 | `sync-standings?scope=all` | ogni giorno | ~300 | classifiche di ogni competizione attiva |
-| `sync-injuries` | ogni 6 ore | ~13 | infortuni e squalifiche, leghe in evidenza |
+| `sync-injuries` | ogni 6 ore | ~13 | infortuni e squalifiche, leghe in evidenza (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
 | `sync-backfill` | ogni ora | fino a ~20 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti |
 | `sync-player-seasons` | ogni ora | ~35 per lega-stagione, solo dopo una giornata giocata | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
 | `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso, altrimenti 1 + 1 ogni 20 partite in evidenza | punteggi ed eventi di tutte le partite in corso; formazioni, statistiche e voti per quelle in evidenza |
@@ -135,7 +135,8 @@ colonna di destra. URL in inglese, testi in italiano.
 | `/scores/2026-09-05` | partite di un giorno qualsiasi |
 | `/competitions` | competizioni principali e tutti i paesi (`?q=` filtra) |
 | `/stats` | marcatori, assist e voti migliori di ogni competizione principale |
-| `/injuries` | infortunati e squalificati delle competizioni principali, squadra per squadra |
+| `/injuries` | infortunati e squalificati delle competizioni principali: da quanto sono fuori, partite saltate e rientro indicativo |
+| `/predictions` | pronostici statistici delle prossime partite (probabilità 1-X-2, gol attesi, over, entrambe a segno) |
 | `/compare?a=&b=` | due giocatori a confronto sulla stessa stagione, con valori ogni 90 minuti |
 | `/search?q=` | ricerca squadre, giocatori e competizioni (suggerimenti live nella barra) |
 | `/competitions/serie-a` | partite per giornata, classifica, squadre, statistiche (gol, xG, over 2,5, casa/trasferta), marcatori e assist per stagione |

@@ -9,6 +9,9 @@ import {Flag} from "@/components/football/flag";
 import {FormStrip} from "@/components/football/form-strip";
 import {Lineups} from "@/components/football/lineups";
 import {MatchStudy} from "@/components/football/match-study";
+import {AbsenceList} from "@/components/football/absences";
+import {PredictionPanel} from "@/components/football/prediction";
+import {predictMatch} from "@/lib/football/prediction";
 import {getSeasonStudy} from "@/lib/football/data/study";
 import {NotFoundBox} from "@/components/football/page-header";
 import {PlayerMatchTable} from "@/components/football/player-match-table";
@@ -60,6 +63,8 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
 
     const {fixture} = page;
     const study = fixture.seasonId ? await getSeasonStudy(fixture.seasonId) : null;
+    const prediction = predictMatch(study, fixture.home.id, fixture.away.id);
+    const hasAbsences = page.absences.home.length > 0 || page.absences.away.length > 0;
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const isLive = LIVE_STATES.includes(fixture.state);
     const start = new Date(fixture.startingAt);
@@ -129,6 +134,19 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     const summaryTab = (
         <>
             {comparison}
+            <PredictionPanel prediction={prediction} home={fixture.home} away={fixture.away} title={fixture.state === 'scheduled' ? t('prediction') : undefined} />
+            {hasAbsences && (
+                <Panel title={t('absences')}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-muted">
+                        {(['home', 'away'] as const).map((side) => (
+                            <div key={side} className="min-w-0">
+                                <div className="px-3 h-7 flex items-center text-[11px] font-extrabold uppercase tracking-wide border-b border-muted bg-muted/40">{fixture[side].name}</div>
+                                <AbsenceList entries={page.absences[side]} compact />
+                            </div>
+                        ))}
+                    </div>
+                </Panel>
+            )}
             <MatchStudy study={study} homeId={fixture.home.id} awayId={fixture.away.id} />
             <EventsTimeline events={page.events} title={t('tabs.summary')} />
             <Panel title={t('info')}>
