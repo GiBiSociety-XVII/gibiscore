@@ -356,9 +356,7 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {power: 1.5, freeGap: 0.35};
-/** How far the list prices reach past what the league buys: the bets just outside are worth a few credits. */
-export const PRICE_TAIL = 1.5;
+export const PRICE_TUNING = {power: 2, freeGap: 0.35, tail: 1.2};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -415,7 +413,7 @@ export function suggestPrices<T extends PriceablePlayer>(players: T[], config: P
         const bought = Math.max(1, config.participants * config.slots[role]);
         const weights = valueWeights(pool, role, bought);
         // Priced: what the league buys plus the players just outside, who go for a few credits.
-        const priced = [...pool].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0)).slice(0, Math.max(1, Math.round(bought * PRICE_TAIL)));
+        const priced = [...pool].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0)).slice(0, Math.max(1, Math.round(bought * PRICE_TUNING.tail)));
         const budget = market * config.roleShare[role];
         for (const p of pool) prices.set(p.id, 1);
         // No fixed ceiling: a price is what the market money and the value say, bounded only by

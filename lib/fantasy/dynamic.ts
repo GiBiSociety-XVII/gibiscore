@@ -1,5 +1,5 @@
 import {ROLE_SHARE, type AuctionConfig, type Purchase} from './config';
-import {PRICE_TAIL, valueWeights, type FantaRole, type PriceablePlayer} from './scores';
+import {PRICE_TUNING, valueWeights, type FantaRole, type PriceablePlayer} from './scores';
 
 /**
  * Live prices during the auction. The list prices assume a full market;
@@ -164,7 +164,7 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         const left = players.filter((p) => p.role === role && !paidFor.has(p.id));
         const weights = valueWeights(left, role, Math.max(1, state.slotsLeft));
         const available = [...left].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0));
-        const toBuy = available.slice(0, Math.max(1, Math.round(state.slotsLeft * PRICE_TAIL)));
+        const toBuy = available.slice(0, Math.max(1, Math.round(state.slotsLeft * PRICE_TUNING.tail)));
         const weight = (p: PricedPlayer) => weights.get(p.id) ?? 0;
         const total = toBuy.reduce((s, p) => s + weight(p), 0);
         // A table that pays over list keeps doing it, softly: at most a tenth either way.

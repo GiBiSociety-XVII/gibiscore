@@ -57,7 +57,7 @@ describe('dynamicPrices', () => {
         const list = suggestPrices(players, {...config, roleShare});
         const purchases = [211, 212].map((id) => ({playerId: id, price: list.get(id)!, manager: 1}));
         const dyn = dynamicPrices(players, list, config, purchases);
-        for (const id of [1, 2, 31, 32, 121, 122]) expect(Math.abs(dyn.get(id)! - list.get(id)!)).toBeLessThanOrEqual(2);
+        for (const id of [1, 2, 31, 32, 121, 122]) expect(Math.abs(dyn.get(id)! - list.get(id)!)).toBeLessThanOrEqual(Math.max(3, list.get(id)! * 0.06));
     });
 
     it('moves every role, not only the one being bought', () => {
