@@ -87,7 +87,7 @@
     "cancel": "Annulla"
   },
   "board": {
-    "search": "Cerca giocatore o squadra",
+    "search": "Cerca giocatore o squadra (Invio = compra il primo)",
     "allRoles": "Tutti",
     "allTeams": "Tutte le squadre",
     "hideBought": "Nascondi acquistati",
@@ -166,7 +166,9 @@
     "viewTiers": "Fasce",
     "listPrice": "listino {price}",
     "paid": "Prezzo pagato",
-    "maxBidHint": "Secondo la tua strategia non superare {max} crediti."
+    "maxBidHint": "Secondo la tua strategia non superare {max} crediti.",
+    "quickList": "Listino",
+    "quickMax": "Max"
   },
   "roster": {
     "title": "La mia rosa",

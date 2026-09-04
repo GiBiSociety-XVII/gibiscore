@@ -11,7 +11,7 @@ import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {StrategyPanel} from "./strategy-panel";
 import {TierBadge, TierList} from "./tier-list";
-import {ROLE_SHARE, totalSlots, type AuctionConfig, type Purchase} from "@/lib/fantasy/config";
+import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
@@ -73,15 +73,18 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const [sort, setSort] = useState<SortKey>('overall');
     const [limit, setLimit] = useState(PAGE);
     const [open, setOpen] = useState<number | null>(null);
-    const [buying, setBuying] = useState<{player: AuctionPlayer; price: number; manager: number} | null>(null);
+    const [buying, setBuying] = useState<{player: AuctionPlayer; price: string; manager: number} | null>(null);
+    const [lastManager, setLastManager] = useState(0);
+    const openBuy = (player: AuctionPlayer) => setBuying({player, price: String(prices.get(player.id) ?? 1), manager: lastManager});
 
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {
         if (!pool || !config) return new Map<number, number>();
         return suggestPrices(pool.players, {credits: config.credits, participants: config.participants, slots: config.slots, roleShare: ROLE_SHARE});
     }, [pool, config]);
-    const prices = useMemo(() => (pool && config ? dynamicPrices(pool.players, listPrices, config, purchases) : listPrices), [pool, config, listPrices, purchases]);
-    const market = useMemo(() => (pool && config ? marketState(pool.players, listPrices, config, purchases) : null), [pool, config, listPrices, purchases]);
+    // Cheap enough to redo on every render: a few hundred players, a handful of purchases.
+    const prices = pool && config ? dynamicPrices(pool.players, listPrices, config, purchases) : listPrices;
+    const market = pool && config ? marketState(pool.players, listPrices, config, purchases) : null;
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
     const tiers = useMemo(() => (pool && config ? assignTiers(pool.players, config) : new Map<number, Tier>()), [pool, config]);
     // Strategies simulated on what is still on the market at live prices, starting from what I already own.
@@ -135,7 +138,9 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     };
     const confirmBuy = () => {
         if (!buying) return;
-        purchasesStore.write([...purchases.filter((p) => p.playerId !== buying.player.id), {playerId: buying.player.id, price: Math.max(1, Math.round(buying.price)), manager: buying.manager}]);
+        const price = Math.max(0, Math.round(Number(buying.price) || 0));
+        purchasesStore.write([...purchases.filter((p) => p.playerId !== buying.player.id), {playerId: buying.player.id, price, manager: buying.manager}]);
+        setLastManager(buying.manager);
         setBuying(null);
     };
     const release = (playerId: number) => purchasesStore.write(purchases.filter((p) => p.playerId !== playerId));
@@ -182,7 +187,20 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                 <div className="flex flex-wrap items-center gap-2">
                     <label className="flex items-center gap-2 bb-input px-2.5 h-8 min-w-[200px] flex-1">
                         <Search className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                        <input type="search" value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder={t('search')} aria-label={t('search')} className="w-full bg-transparent outline-none text-[13px] font-semibold" />
+                        <input
+                            type="search"
+                            value={q}
+                            onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }}
+                            onKeyDown={(e) => {
+                                // Enter: buy the first player still on the market among the results.
+                                if (e.key !== 'Enter' || q.trim().length < 2) return;
+                                const first = players.find((p) => !bought.has(p.id));
+                                if (first) { e.preventDefault(); openBuy(first); }
+                            }}
+                            placeholder={t('search')}
+                            aria-label={t('search')}
+                            className="w-full bg-transparent outline-none text-[13px] font-semibold"
+                        />
                     </label>
                     <div role="radiogroup" className="flex gap-1">
                         {(['all', ...ROLES] as const).map((r) => (
@@ -213,7 +231,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
 
                 {view === 'tiers' && (
                     <>
-                        <TierList players={players} tiers={tiers} prices={prices} bought={bought} targets={targets} onBuy={(p) => setBuying({player: p, price: prices.get(p.id) ?? 1, manager: 0})} />
+                        <TierList players={players} tiers={tiers} prices={prices} bought={bought} targets={targets} onBuy={openBuy} />
                         <p className="text-[11px] font-semibold text-muted-foreground">{tt('hint')}</p>
                     </>
                 )}
@@ -274,7 +292,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                                             <button type="button" onClick={() => release(p.id)} aria-label={t('release')} title={t('release')} className="inline-flex w-6 h-6 items-center justify-center rounded border border-foreground bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
                                                         </span>
                                                     ) : (
-                                                        <button type="button" onClick={() => setBuying({player: p, price: prices.get(p.id) ?? 1, manager: 0})} className="bb-btn bg-accent h-7 px-2.5 text-[11px] font-extrabold">{t('buy')}</button>
+                                                        <button type="button" onClick={() => openBuy(p)} className="bb-btn bg-accent h-7 px-2.5 text-[11px] font-extrabold">{t('buy')}</button>
                                                     )}
                                                 </span>
                                             </td>
@@ -397,7 +415,23 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1">
                                 <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('price')}</span>
-                                <input type="number" min={1} max={config.credits} autoFocus className="bb-input h-10 px-2.5 font-mono text-[16px] font-extrabold tabular-nums" value={buying.price} onChange={(e) => setBuying({...buying, price: Number(e.target.value) || 1})} />
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoFocus
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    className="bb-input h-10 px-2.5 font-mono text-[16px] font-extrabold tabular-nums"
+                                    value={buying.price}
+                                    onChange={(e) => setBuying({...buying, price: e.target.value.replace(/[^0-9]/g, '').slice(0, 5)})}
+                                />
+                                <span className="flex flex-wrap gap-1">
+                                    {[1, 5, 10].map((step) => (
+                                        <button key={step} type="button" onClick={() => setBuying({...buying, price: String((Number(buying.price) || 0) + step)})} className="bb-btn bg-card h-7 px-2 text-[11px] font-extrabold font-mono">+{step}</button>
+                                    ))}
+                                    <button type="button" onClick={() => setBuying({...buying, price: String(listPrices.get(buying.player.id) ?? 1)})} className="bb-btn bg-card h-7 px-2 text-[11px] font-extrabold">{t('quickList')}</button>
+                                    {strategy && maxBidOf(buying.player.id) !== null && <button type="button" onClick={() => setBuying({...buying, price: String(maxBidOf(buying.player.id))})} className="bb-btn bg-card h-7 px-2 text-[11px] font-extrabold">{t('quickMax')}</button>}
+                                </span>
                             </label>
                             <label className="flex flex-col gap-1">
                                 <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('manager')}</span>

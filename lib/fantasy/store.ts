@@ -58,7 +58,7 @@ function parsePurchases(raw: unknown): Purchase[] {
     if (!Array.isArray(raw)) return [];
     return raw
         .filter((p): p is Purchase => !!p && typeof p === 'object' && typeof (p as Purchase).playerId === 'number' && typeof (p as Purchase).price === 'number')
-        .map((p) => ({playerId: p.playerId, price: Math.max(1, Math.round(p.price)), manager: typeof p.manager === 'number' ? p.manager : 0}));
+        .map((p) => ({playerId: p.playerId, price: Math.max(0, Math.round(p.price)), manager: typeof p.manager === 'number' ? p.manager : 0}));
 }
 export const purchasesStore = createJsonStore<Purchase[]>(ROSTER_KEY, parsePurchases, []);
 
