@@ -24,7 +24,7 @@ export async function SiteShell({children, rail, wide = false, navigation}: {chi
                     {children}
                 </main>
                 {rail && !wide && (
-                    <aside className="hidden xl:flex w-[300px] shrink-0 sticky top-[92px] flex-col gap-3 max-h-[calc(100vh-104px)] overflow-y-auto [scrollbar-width:thin]">
+                    <aside className="hidden xl:flex w-[300px] shrink-0 flex-col gap-3 self-start">
                         {rail}
                     </aside>
                 )}

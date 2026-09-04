@@ -36,11 +36,6 @@ export async function HeadToHeadPanel({fixtures}: {fixtures: FixtureSummary[]}) 
     );
 }
 
-export async function AdPanel() {
-    const t = await getTranslations('Common.rail');
-    return <div className="border-2 border-dashed border-muted-foreground/60 rounded-2xl h-[100px] flex items-center justify-center text-[12px] font-bold text-muted-foreground">{t('adSlot')}</div>;
-}
-
 /**
  * Rail of the scores pages: the user's favourite competitions (browser
  * side), defaulting to the pinned competitions playing that day.
@@ -53,10 +48,5 @@ export async function ScoresRail({page}: {page: ScoresPage}) {
     const catalog = [...nav.pinned, ...today]
         .filter((c) => (seen.has(c.slug) ? false : (seen.add(c.slug), true)))
         .map((c) => ({slug: c.slug, name: c.name, logoUrl: c.logoUrl}));
-    return (
-        <>
-            <FavoritesRail defaults={defaults} catalog={catalog} />
-            <AdPanel />
-        </>
-    );
+    return <FavoritesRail defaults={defaults} catalog={catalog} />;
 }
