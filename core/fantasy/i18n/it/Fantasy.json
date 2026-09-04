@@ -16,7 +16,7 @@
     "metaTitle": "Asta fantacalcio",
     "metaDescription": "Asta del fantacalcio con voti da 1 a 100 per ogni giocatore: titolarità, bonus, rendimento, malus, affidabilità e squadra, con crediti consigliati.",
     "intro": "Voti da 1 a 100: la stagione scorsa è la base (55%), quella prima il 15%, quella in corso cresce con le giornate. La partenza di giocatore e club è un voto a parte. I crediti sono vivi: registra gli acquisti (tuoi e degli altri) e i prezzi si adattano ai soldi rimasti, ai top rimasti e a quanto il tavolo sta pagando; con una strategia attiva vedi anche la tua offerta massima.",
-    "empty": "Nessun giocatore disponibile per questo campionato: le rose non sono ancora state importate.",
+    "empty": "Listone non disponibile in questo momento: il database sta rispondendo lentamente o le rose non sono ancora state importate. Riprova tra qualche minuto.",
     "settings": "Impostazioni",
     "changeSettings": "Modifica impostazioni",
     "reset": "Nuova asta",

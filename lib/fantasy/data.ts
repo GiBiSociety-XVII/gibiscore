@@ -82,8 +82,9 @@ function chunk<T>(items: T[], size: number): T[][] {
     return out;
 }
 
-async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
-    try {
+/** Builds the pool, or throws: a failure must never be cached as an empty list. */
+async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
+    {
         const db = footballDb();
         const slugs = AUCTION_LEAGUES.find((l) => l.key === league)?.slugs ?? [];
         const {data: leagueRows, error: leagueError} = await db.from('leagues').select('id,name,slug,seasons(id,year,is_current)').in('slug', slugs);
@@ -92,7 +93,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
         const seasons = leagues
             .map((l) => ({league: l, season: l.seasons.filter((s) => s.is_current).sort((a, b) => b.year - a.year)[0] ?? null}))
             .filter((x): x is {league: (typeof leagues)[number]; season: {id: number; year: number; is_current: boolean}} => x.season !== null);
-        if (seasons.length === 0) return null;
+        if (seasons.length === 0) throw new Error(`no current season for ${league}`);
         const year = Math.max(...seasons.map((s) => s.season.year));
 
         // Current squads, plus anyone with statistics for a club of these
@@ -122,7 +123,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
         for (const m of squad) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueOfSeason.get(m.season_id)?.name ?? '', at: m.updated_at});
         for (const m of played) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueById.get(m.league_id)?.name ?? '', at: m.synced_at});
         const playerIds = [...members.keys()];
-        if (playerIds.length === 0) return null;
+        if (playerIds.length === 0) throw new Error(`no squad members for ${league}`);
 
         // Three seasons of statistics, every competition.
         const stats: StatRow[] = [];
@@ -244,10 +245,25 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
             players,
             generatedAt: `${romeDate(new Date())}T${new Date().toISOString().slice(11, 16)}Z`,
         };
-    } catch (error) {
-        logReadError(`getAuctionPool(${league})`, error);
-        return null;
     }
 }
 
-export const getAuctionPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600});
+const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600});
+
+/**
+ * The auction pool for a league, cached for an hour once built. A build
+ * that fails (a statement timeout while the database is busy, a sync in
+ * progress) is retried once and then reported as null without being
+ * cached, so the next request builds it again instead of serving an
+ * empty list for an hour.
+ */
+export async function getAuctionPool(league: AuctionLeague): Promise<AuctionPool | null> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            return await cachedPool(league);
+        } catch (error) {
+            logReadError(`getAuctionPool(${league}) attempt ${attempt + 1}`, error);
+        }
+    }
+    return null;
+}

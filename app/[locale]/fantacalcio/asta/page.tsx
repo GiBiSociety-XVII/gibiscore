@@ -6,7 +6,8 @@ import {AuctionBoard} from "@/components/fantasy/auction-board";
 import {isAuctionLeague} from "@/lib/fantasy/config";
 import {getAuctionPool} from "@/lib/fantasy/data";
 
-export const revalidate = 3600;
+// Short enough that a page rendered while the pool was unavailable does not linger; the pool itself is cached for an hour.
+export const revalidate = 600;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Fantasy.auction');
