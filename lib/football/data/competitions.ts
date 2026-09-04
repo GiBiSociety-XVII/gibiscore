@@ -129,17 +129,24 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
         const competition = toCompetition(league);
         const emptyRankings = {scorers: [], assists: []};
         if (!current) {
-            return {competition, season: null, standings: [], rounds: [], currentRound: null, results: [], upcoming: [], live: [], rankings: emptyRankings};
+            return {competition, season: null, standings: [], rounds: [], currentRound: null, results: [], upcoming: [], live: [], rankings: emptyRankings, pastRankings: []};
         }
 
-        const [standingsRes, fixturesRes, rankings] = await Promise.all([
+        const [standingsRes, fixturesRes, rankings, statSeasons] = await Promise.all([
             db.from('standings').select(STANDING_SELECT).eq('season_id', current.id).order('group').order('position'),
             db.from('fixtures').select(FIXTURE_LIST_SELECT).eq('season_id', current.id).order('starting_at', {ascending: true}).limit(1000),
             getRankings(competition.id, current.year).catch((error) => {
                 logReadError(`getRankings(${slug})`, error);
                 return emptyRankings;
             }),
+            getStatSeasons(competition.id),
         ]);
+        const pastRankings = await Promise.all(
+            statSeasons
+                .filter((s) => s.year !== current.year)
+                .slice(0, 5)
+                .map(async (s) => ({year: s.year, name: s.name, rankings: await getRankings(competition.id, s.year).catch(() => emptyRankings)})),
+        );
         if (standingsRes.error) throw standingsRes.error;
         if (fixturesRes.error) throw fixturesRes.error;
 
@@ -180,6 +187,7 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
             upcoming,
             live,
             rankings,
+            pastRankings,
         };
     } catch (error) {
         logReadError(`getCompetitionPage(${slug})`, error);
@@ -211,5 +219,25 @@ export async function getStandingsBySlug(slug: string): Promise<{competition: Co
     } catch (error) {
         logReadError(`getStandingsBySlug(${slug})`, error);
         return null;
+    }
+}
+
+export interface StatSeason {
+    id: number;
+    year: number;
+    name: string;
+    isCurrent: boolean;
+}
+
+/** Seasons of a league whose player statistics have been imported, newest first. */
+export async function getStatSeasons(leagueId: number): Promise<StatSeason[]> {
+    try {
+        const db = footballDb();
+        const {data, error} = await db.from('seasons').select('id,year,name,is_current').eq('league_id', leagueId).not('players_synced_at', 'is', null).order('year', {ascending: false}).limit(8);
+        if (error) throw error;
+        return ((data ?? []) as Array<{id: number; year: number; name: string; is_current: boolean}>).map((s) => ({id: s.id, year: s.year, name: s.name, isCurrent: s.is_current}));
+    } catch (error) {
+        logReadError(`getStatSeasons(${leagueId})`, error);
+        return [];
     }
 }

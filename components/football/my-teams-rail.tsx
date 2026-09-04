@@ -55,8 +55,8 @@ export function MyTeamsRail() {
                                         <TeamCrest team={b.team} size={18} />
                                         <span className="truncate">{b.team.name}</span>
                                     </Link>
-                                    {b.next ? <MatchRow fixture={b.next} showDate showCompetition highlightTeamId={b.team.id} /> : null}
-                                    {b.last ? <MatchRow fixture={b.last} showDate showCompetition highlightTeamId={b.team.id} /> : null}
+                                    {b.next ? <MatchRow fixture={b.next} showDate showCompetition highlightTeamId={b.team.id} compact /> : null}
+                                    {b.last ? <MatchRow fixture={b.last} showDate showCompetition highlightTeamId={b.team.id} compact /> : null}
                                     {!b.next && !b.last && <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground">{t('noMatches')}</p>}
                                 </>
                             )}

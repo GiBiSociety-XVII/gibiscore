@@ -43,7 +43,7 @@ function StatusCell({fixture}: {fixture: FixtureSummary}) {
  * `showDate` adds the day before the time (team and player pages);
  * `showCompetition` adds the competition under the time (team pages).
  */
-export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean}) {
+export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean}) {
     const format = useFormatter();
     const state = rowState(fixture);
     const isLive = state === 'live';
@@ -71,13 +71,13 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
             )}
         >
             <span className="flex flex-col leading-tight text-[11px] min-w-0">
-                {showDate && <span className="text-[10px] font-semibold text-muted-foreground">{format.dateTime(new Date(fixture.startingAt), {day: '2-digit', month: '2-digit'})}</span>}
+                {showDate && <span className="text-[10px] font-semibold text-muted-foreground">{format.dateTime(new Date(fixture.startingAt), compact ? {day: '2-digit', month: '2-digit', year: '2-digit'} : {day: '2-digit', month: '2-digit'})}</span>}
                 <span className="inline-flex"><StatusCell fixture={fixture} /></span>
                 {showCompetition && <span className="text-[10px] font-semibold text-muted-foreground truncate">{fixture.leagueName}</span>}
             </span>
 
             <span className="flex items-center justify-end gap-1.5 min-w-0">
-                <span className={cn(teamClass('home', fixture.home.id), "text-right")}>{fixture.home.name}</span>
+                <span className={cn(teamClass('home', fixture.home.id), "text-right")} title={fixture.home.name}>{compact ? (fixture.home.shortCode ?? fixture.home.name) : fixture.home.name}</span>
                 <TeamCrest team={fixture.home} size={18} />
             </span>
 
@@ -87,7 +87,7 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
 
             <span className="flex items-center gap-1.5 min-w-0">
                 <TeamCrest team={fixture.away} size={18} />
-                <span className={teamClass('away', fixture.away.id)}>{fixture.away.name}</span>
+                <span className={teamClass('away', fixture.away.id)} title={fixture.away.name}>{compact ? (fixture.away.shortCode ?? fixture.away.name) : fixture.away.name}</span>
             </span>
         </Link>
     );

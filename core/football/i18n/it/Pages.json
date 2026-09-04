@@ -30,7 +30,8 @@
     "notFound": "Competizione non trovata",
     "backToList": "Tutte le competizioni",
     "metaDescription": "{name}: classifica aggiornata, risultati e calendario della stagione {season}.",
-    "round": "Giornata"
+    "round": "Giornata",
+    "season": "Stagione"
   },
   "match": {
     "notFound": "Partita non trovata",
@@ -184,7 +185,8 @@
     "intro": "Classifiche di stagione per ogni competizione principale, aggiornate dopo ogni giornata.",
     "scorers": "Marcatori",
     "assists": "Assist",
-    "empty": "Dati non ancora disponibili per questa competizione."
+    "empty": "Dati non ancora disponibili per questa competizione.",
+    "seasonPicker": "Stagione"
   },
   "injuries": {
     "title": "Infortunati e squalificati",

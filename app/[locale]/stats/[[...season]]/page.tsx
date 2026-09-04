@@ -11,20 +11,48 @@ import {getStatsPage} from "@/lib/football/data/stats";
 
 export const revalidate = 600;
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({params}: PageProps<"/[locale]/stats/[[...season]]">): Promise<Metadata> {
+    const {season} = await params;
     const t = await getTranslations('Pages.stats');
-    return {title: t('metaTitle'), description: t('metaDescription')};
+    const year = parseYear(season);
+    return {title: year ? `${t('metaTitle')} ${year}/${year + 1}` : t('metaTitle'), description: t('metaDescription')};
 }
 
-export default async function StatsPage({params}: PageProps<"/[locale]/stats">) {
-    const {locale} = await params;
+function parseYear(raw: string[] | undefined): number | undefined {
+    const v = raw?.[0];
+    return v && /^\d{4}$/.test(v) ? Number(v) : undefined;
+}
+
+export default async function StatsPage({params}: PageProps<"/[locale]/stats/[[...season]]">) {
+    const {locale, season} = await params;
     setRequestLocale(locale);
     const t = await getTranslations('Pages.stats');
-    const blocks = await getStatsPage();
+    const page = await getStatsPage(parseYear(season));
+    const blocks = page.blocks;
+    const seasonHref = (year: number, isCurrent: boolean) => (isCurrent ? '/stats' : `/stats/${year}`);
 
     return (
         <SiteShell wide>
-            <PageHeader title={t('title')} meta={t('intro')} />
+            <PageHeader
+                title={t('title')}
+                meta={t('intro')}
+                aside={
+                    page.years.length > 1 ? (
+                        <nav aria-label={t('seasonPicker')} className="flex items-center gap-1 flex-wrap justify-end">
+                            {page.years.slice(0, 6).map((y) => (
+                                <Link
+                                    key={y.year}
+                                    href={seasonHref(y.year, y.isCurrent)}
+                                    aria-current={y.year === page.year ? 'page' : undefined}
+                                    className={`px-2 h-7 inline-flex items-center rounded-md border-2 border-foreground text-[12px] font-extrabold font-mono tabular-nums ${y.year === page.year ? 'bg-foreground text-background' : 'bg-card hover:bg-accent'}`}
+                                >
+                                    {y.label}
+                                </Link>
+                            ))}
+                        </nav>
+                    ) : null
+                }
+            />
             {blocks.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{t('empty')}</p>
             ) : (

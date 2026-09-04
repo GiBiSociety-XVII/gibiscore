@@ -32,7 +32,7 @@ export async function HeadToHeadPanel({fixtures}: {fixtures: FixtureSummary[]}) 
     if (fixtures.length === 0) return null;
     return (
         <Panel title={t('headToHead')}>
-            <div className="flex flex-col">{fixtures.map((f) => <MatchRow key={f.id} fixture={f} showDate />)}</div>
+            <div className="flex flex-col">{fixtures.map((f) => <MatchRow key={f.id} fixture={f} showDate compact />)}</div>
         </Panel>
     );
 }

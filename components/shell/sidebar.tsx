@@ -17,7 +17,7 @@ export function Sidebar({nav}: {nav: Navigation}) {
                             <span className="inline-flex w-[18px] h-[18px] items-center justify-center shrink-0">
                                 {c.logoUrl ? <Image src={c.logoUrl} alt="" width={18} height={18} unoptimized className="object-contain" /> : <Flag code={c.countryCode} size={16} />}
                             </span>
-                            <span className="truncate">{c.name}</span>
+                            <span className="truncate">{c.name.replace(/^UEFA /, '')}</span>
                         </Link>
                     </li>
                 ))}
@@ -58,7 +58,7 @@ export function PinnedChips({nav}: {nav: Navigation}) {
             {nav.pinned.map((c) => (
                 <Link key={c.slug} href={`/competitions/${c.slug}`} className="shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border-2 border-foreground bg-card text-xs font-extrabold whitespace-nowrap">
                     {c.logoUrl && <Image src={c.logoUrl} alt="" width={14} height={14} unoptimized className="object-contain" />}
-                    {c.name}
+                    {c.name.replace(/^UEFA /, '')}
                 </Link>
             ))}
             <Link href="/competitions" className="shrink-0 inline-flex items-center h-7 px-2.5 rounded-md border-2 border-foreground bg-foreground text-background text-xs font-extrabold whitespace-nowrap">

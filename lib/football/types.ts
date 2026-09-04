@@ -150,6 +150,8 @@ export interface CompetitionPage {
     upcoming: RoundFixtures[];
     live: FixtureSummary[];
     rankings: {scorers: RankedPlayer[]; assists: RankedPlayer[]};
+    /** Rankings of past seasons with imported statistics, newest first. */
+    pastRankings: Array<{year: number; name: string; rankings: {scorers: RankedPlayer[]; assists: RankedPlayer[]}}>;
 }
 
 // ---------------------------------------------------------------------------

@@ -68,11 +68,22 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
         </Panel>
     );
 
-    const playersTab = (
+    const rankingsGrid = (r: {scorers: typeof page.rankings.scorers; assists: typeof page.rankings.assists}) => (
         <div className="grid gap-3 grid-cols-1 2xl:grid-cols-2">
-            <Panel title={t('scorers')}><div className="px-1"><Rankings kind="scorers" players={page.rankings.scorers} /></div></Panel>
-            <Panel title={t('assists')}><div className="px-1"><Rankings kind="assists" players={page.rankings.assists} /></div></Panel>
+            <Panel title={t('scorers')}><div className="px-1"><Rankings kind="scorers" players={r.scorers} /></div></Panel>
+            <Panel title={t('assists')}><div className="px-1"><Rankings kind="assists" players={r.assists} /></div></Panel>
         </div>
+    );
+    const playersTab = page.pastRankings.length === 0 ? (
+        rankingsGrid(page.rankings)
+    ) : (
+        <SelectPanels
+            label={t('season')}
+            panels={[
+                {id: String(season?.year ?? 'current'), label: season?.name ?? '', content: rankingsGrid(page.rankings)},
+                ...page.pastRankings.map((p) => ({id: String(p.year), label: p.name, content: rankingsGrid(p.rankings)})),
+            ]}
+        />
     );
 
     return (

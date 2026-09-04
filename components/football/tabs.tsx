@@ -20,7 +20,7 @@ export function Tabs({items, defaultId, className}: {items: TabItem[]; defaultId
     const [active, setActive] = useState(defaultId && items.some((i) => i.id === defaultId) ? defaultId : items[0]?.id);
     return (
         <div className={cn("flex flex-col gap-3", className)}>
-            <div role="tablist" className="flex gap-1 overflow-x-auto border-b-2 border-foreground [scrollbar-width:none]">
+            <div role="tablist" className="flex gap-1 overflow-x-auto md:overflow-visible md:flex-wrap border-b-2 border-foreground [scrollbar-width:none]">
                 {items.map((item) => {
                     const selected = item.id === active;
                     return (
