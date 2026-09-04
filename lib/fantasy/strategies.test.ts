@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {suggestPrices, type FantaRole} from './scores';
-import {bestLineup, FORMATIONS, planStrategy, rankStrategies, slotFractions, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
+import {bestLineup, FORMATIONS, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
 
 function pool(): PoolPlayer[] {
     const out: PoolPlayer[] = [];
@@ -235,5 +235,39 @@ describe('re-budgeting after my purchases', () => {
         const plan = planStrategy(STRATEGIES[0], players, prices(), config, new Set(), mine);
         expect(plan.budget.D + plan.budget.C + plan.budget.A).toBeGreaterThanOrEqual(495);
         expect(plan.spent).toBeLessThanOrEqual(500);
+    });
+});
+
+describe('a fixed formation', () => {
+    const prices = () => suggestPrices(pool(), {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+
+    it('pays the starters of the formation plus one cover, the rest a credit', () => {
+        const f = slotFractionsFor(8, 0.4, 5);
+        expect(f).toHaveLength(8);
+        expect(f.reduce((s, v) => s + v, 0)).toBeCloseTo(1, 5);
+        expect(f[5]).toBeGreaterThan(f[6] * 5);
+        expect(f[6]).toBeCloseTo(f[7], 5);
+    });
+
+    it('bends the split towards the roles the formation fields more of', () => {
+        const five = shareFor(STRATEGIES[0].share, FORMATIONS.find((f) => f.key === '5-3-2')!);
+        const three = shareFor(STRATEGIES[0].share, FORMATIONS.find((f) => f.key === '3-4-3')!);
+        expect(five.D).toBeGreaterThan(three.D);
+        expect(three.A).toBeGreaterThan(five.A);
+        expect(Object.values(five).reduce((s, v) => s + v, 0)).toBeCloseTo(1, 5);
+    });
+
+    it('builds and values the plan in the formation asked for', () => {
+        const players = pool();
+        const five = planStrategy(STRATEGIES[0], players, prices(), {...config, formation: '5-3-2'});
+        const three = planStrategy(STRATEGIES[0], players, prices(), {...config, formation: '3-4-3'});
+        expect(five.formation).toBe('5-3-2');
+        expect(three.formation).toBe('3-4-3');
+        expect(five.formations[0].key).toBe('5-3-2');
+        expect(five.budget.D).toBeGreaterThan(three.budget.D);
+        // Five defenders worth paying for against three: the fifth best defender costs real money only with five at the back.
+        const fifth = (plan: typeof five) => [...plan.picks.D].sort((a, b) => b.price - a.price)[4].price;
+        expect(fifth(five)).toBeGreaterThan(fifth(three));
+        expect(three.picks.A.filter((p) => p.price >= 20).length).toBeGreaterThanOrEqual(3);
     });
 });

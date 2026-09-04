@@ -5,7 +5,7 @@ import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {FantaRole} from "@/lib/fantasy/scores";
-import type {HealthReason, HealthStatus, StrategyHealth, StrategyKey, StrategyPlan} from "@/lib/fantasy/strategies";
+import {FORMATIONS, type HealthReason, type HealthStatus, type StrategyHealth, type StrategyKey, type StrategyPlan} from "@/lib/fantasy/strategies";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROLE_BAR: Record<FantaRole, string> = {P: 'bg-amber-300', D: 'bg-emerald-300', C: 'bg-sky-300', A: 'bg-rose-300'};
@@ -58,13 +58,24 @@ export function HealthBox({health, onSelect}: {health: StrategyHealth; onSelect:
 }
 
 /** Ranked strategies for this pool and league: split of the credits, the lineup they buy, "use it" to drive my role budgets. */
-export function StrategyPanel({plans, selected, onSelect, credits, health = null}: {plans: StrategyPlan[]; selected: StrategyKey | null; onSelect: (key: StrategyKey | null) => void; credits: number; health?: StrategyHealth | null}) {
+export function StrategyPanel({plans, selected, onSelect, credits, health = null, formation = null, onFormation}: {plans: StrategyPlan[]; selected: StrategyKey | null; onSelect: (key: StrategyKey | null) => void; credits: number; health?: StrategyHealth | null; formation?: string | null; onFormation?: (key: string | null) => void}) {
     const t = useTranslations('Fantasy.strategies');
     const [open, setOpen] = useState<StrategyKey | null>(selected ?? plans[0]?.key ?? null);
     const best = plans[0];
+    const chip = (active: boolean) => cn("bb-btn h-7 px-2 font-mono text-[11px] font-extrabold", active ? "bg-accent" : "bg-card");
     return (
         <Panel title={t('title')} action={<span className="text-[11px] font-semibold text-muted-foreground">{t('ranked')}</span>}>
             <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground border-b border-muted">{t('intro')}</p>
+            {onFormation && (
+                <div className="px-3 py-2 border-b border-muted flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('formationPick')}</span>
+                    <button type="button" onClick={() => onFormation(null)} className={chip(formation === null)} title={t('formationAutoHint')}>{t('formationAuto')}</button>
+                    {FORMATIONS.map((f) => (
+                        <button key={f.key} type="button" onClick={() => onFormation(f.key)} className={chip(formation === f.key)}>{f.key}</button>
+                    ))}
+                    <span className="basis-full text-[11px] font-semibold text-muted-foreground">{formation ? t('formationFixed', {formation}) : t('formationAutoHint')}</span>
+                </div>
+            )}
             {health && <HealthBox health={health} onSelect={(key) => onSelect(key)} />}
             <ol className="flex flex-col">
                 {plans.map((plan, index) => {

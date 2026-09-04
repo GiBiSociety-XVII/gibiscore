@@ -468,7 +468,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                         {guide && (
                             <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
-                                {tr('formation', {formation: guide.formation})}
+                                {config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide.formation})}
                                 <span className="block font-mono text-[10px] text-muted-foreground tabular-nums">{guide.formations.slice(0, 3).map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}</span>
                             </span>
                         )}
@@ -543,7 +543,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             <button type="button" onClick={() => setShowStrategies(false)} aria-label={ts('cancel')} className="inline-flex items-center justify-center w-9 h-9 rounded-md border-2 border-foreground bg-background"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="bg-background rounded-xl">
-                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} health={health} />
+                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} />
                         </div>
                     </div>
                 </div>

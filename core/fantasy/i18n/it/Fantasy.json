@@ -228,7 +228,8 @@
     "formationHint": "Il modulo che rende di più con gli acquisti fatti più gli obiettivi della strategia. Cambia durante l'asta.",
     "byTeam": "Per squadra",
     "byTeamHint": "Quanti giocatori hai preso da ogni squadra del listone, divisi per ruolo.",
-    "byTeamTotal": "{count} giocatori · {teams} squadre"
+    "byTeamTotal": "{count} giocatori · {teams} squadre",
+    "formationChosen": "Modulo scelto: {formation}"
   },
   "strategies": {
     "title": "Strategie consigliate",
@@ -306,7 +307,11 @@
         "starved": "{role}: restano {left} cr. per {open} posti ancora da riempire.",
         "targetsLost": "{lost} obiettivi principali su {total} sono andati ad altre squadre."
       }
-    }
+    },
+    "formationPick": "Modulo",
+    "formationAuto": "Auto",
+    "formationAutoHint": "Auto: ogni strategia sceglie il modulo che rende di più con la rosa che compra. Scegli un modulo e i piani comprano i titolari di quel modulo, spostando i crediti verso i reparti con più titolari.",
+    "formationFixed": "Modulo {formation}: i piani pagano i titolari di questo modulo più una riserva per reparto, gli altri posti a un credito. Il valore XI è calcolato in questo modulo."
   },
   "tiers": {
     "title": "Fasce",
