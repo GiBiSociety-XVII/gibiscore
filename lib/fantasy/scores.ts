@@ -14,7 +14,7 @@ export interface SeasonLine {
     leagueName: string;
     teamId: number;
     teamName: string;
-    /** Matches the league (or cup) had in that season: the baseline for starter and availability rates. */
+    /** Matches the league (or cup) had in that season: the baseline for the availability rate. */
     games: number;
     /** 1 for top leagues, lower for weaker ones: rates there count less. */
     level: number;
@@ -38,6 +38,8 @@ export interface AuctionInput {
     role: FantaRole;
     age: number | null;
     currentYear: number;
+    /** The club he plays for now: his lines there weigh double (a transfer changes the role in the team). */
+    currentTeamId?: number | null;
     seasons: SeasonLine[];
     injury: {active: boolean; daysOut: number; longTerm: boolean} | null;
     /** 0..1, 0.5 = league average; null before the season has a shape. */
@@ -46,15 +48,15 @@ export interface AuctionInput {
 }
 
 export interface FantaScores {
-    /** How often the player starts (and finishes) matches. */
+    /** How often the player starts (and finishes) the matches he is available for. */
     starter: number;
-    /** Goals and assists per match, relative to the role. */
+    /** Goals and assists per 90, relative to the role. */
     bonus: number;
-    /** Average rating. */
+    /** Average rating (lower leagues discounted). */
     rating: number;
     /** Few cards (goals conceded for keepers). Higher is better. */
     discipline: number;
-    /** Availability: matches missed, current injury, age. */
+    /** Availability: matches in the squad over the season, current injury, age. */
     fitness: number;
     /** Strength of the club this season. */
     team: number;
@@ -71,7 +73,7 @@ const clamp = (v: number, min = 1, max = 100) => Math.max(min, Math.min(max, Mat
 /**
  * Season weights: the current season grows towards 50% as it goes (two
  * matches count ~1%, eight ~20%, fifteen or more 50%: a hot start does
- * not make a price), previous 35%, older 15%; missing seasons hand their
+ * not make a price), previous 40%, older 10%; missing seasons hand their
  * share to the others.
  */
 export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<number, number> {
@@ -79,7 +81,7 @@ export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<n
     const gamesOf = (y: number) => Math.max(0, ...seasons.filter((s) => s.year === y).map((s) => s.games));
     const raw = new Map<number, number>();
     for (const y of years) {
-        const base = y === currentYear ? 0.5 * Math.min(1, gamesOf(y) / 15) ** 1.5 : y === currentYear - 1 ? 0.35 : 0.15;
+        const base = y === currentYear ? 0.5 * Math.min(1, gamesOf(y) / 15) ** 1.5 : y === currentYear - 1 ? 0.4 : 0.1;
         if (base > 0) raw.set(y, base);
     }
     const total = [...raw.values()].reduce((s, v) => s + v, 0);
@@ -89,11 +91,17 @@ export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<n
 }
 
 interface YearAgg {
+    /** Longest competition of the season (the league): the availability baseline. */
     games: number;
     apps: number;
     lineups: number;
     bench: number;
     minutes: number;
+    /** Same, weighted towards the current club. */
+    wApps: number;
+    wLineups: number;
+    wBench: number;
+    wMinutes: number;
     ratingSum: number;
     ratingApps: number;
     goals: number;
@@ -105,18 +113,25 @@ interface YearAgg {
     level: number;
 }
 
-/** One season across its competitions: rates against the sum of the competitions' matches. */
-function aggregateYear(lines: SeasonLine[]): YearAgg {
-    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, penMissed: 0, yellow: 0, red: 0, conceded: 0, level: 0};
+/** One season across its competitions. Lines at the current club weigh double for the starter rates. */
+function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined): YearAgg {
+    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, penMissed: 0, yellow: 0, red: 0, conceded: 0, level: 0};
     let levelW = 0;
     for (const l of lines) {
-        a.games += l.games;
+        const w = currentTeamId !== null && currentTeamId !== undefined && l.teamId === currentTeamId ? 2 : 1;
+        const level = 0.5 + 0.5 * l.level;
+        a.games = Math.max(a.games, l.games);
         a.apps += l.appearances;
         a.lineups += l.lineups;
         a.bench += l.bench;
         a.minutes += l.minutes;
+        a.wApps += w * l.appearances;
+        a.wLineups += w * l.lineups;
+        a.wBench += w * l.bench;
+        a.wMinutes += w * l.minutes;
         if (l.rating !== null && l.appearances > 0) {
-            a.ratingSum += l.rating * l.appearances;
+            // Ratings in weaker leagues are worth less: the excess over 6 is discounted.
+            a.ratingSum += (6 + (l.rating - 6) * level) * l.appearances;
             a.ratingApps += l.appearances;
         }
         a.goals += l.goals;
@@ -125,21 +140,21 @@ function aggregateYear(lines: SeasonLine[]): YearAgg {
         a.yellow += l.yellow;
         a.red += l.red + l.yellowRed;
         a.conceded += l.goalsConceded;
-        a.level += l.level * Math.max(1, l.games);
-        levelW += Math.max(1, l.games);
+        a.level += l.level * Math.max(1, l.appearances);
+        levelW += Math.max(1, l.appearances);
     }
     a.level = levelW > 0 ? a.level / levelW : 1;
     return a;
 }
 
-/** Bonus points per 90 that mark 100 for the role (an elite season). */
-const BONUS_SCALE: Record<FantaRole, number> = {P: 0.12, D: 0.3, C: 0.75, A: 1.6};
+/** Bonus points per 90 (3 x goals + assists) that mark 100 for the role: an elite season. */
+const BONUS_SCALE: Record<FantaRole, number> = {P: 0.1, D: 0.25, C: 0.55, A: 1.0};
 
 const WEIGHTS: Record<FantaRole, Record<Exclude<keyof FantaScores, 'overall' | 'fantaAvg' | 'sample' | 'confidence'>, number>> = {
     P: {starter: 35, bonus: 0, rating: 25, discipline: 20, fitness: 10, team: 10},
-    D: {starter: 35, bonus: 15, rating: 20, discipline: 10, fitness: 10, team: 10},
-    C: {starter: 30, bonus: 30, rating: 15, discipline: 5, fitness: 10, team: 10},
-    A: {starter: 30, bonus: 40, rating: 10, discipline: 5, fitness: 10, team: 5},
+    D: {starter: 30, bonus: 20, rating: 20, discipline: 10, fitness: 10, team: 10},
+    C: {starter: 25, bonus: 35, rating: 15, discipline: 5, fitness: 10, team: 10},
+    A: {starter: 25, bonus: 40, rating: 15, discipline: 5, fitness: 10, team: 5},
 };
 
 export function scorePlayer(input: AuctionInput): FantaScores {
@@ -161,20 +176,21 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
     for (const y of years) {
         const w = weights.get(y)!;
-        const a = aggregateYear(input.seasons.filter((s) => s.year === y));
-        const games = Math.max(1, a.games);
+        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId);
         const per90 = a.minutes > 0 ? 90 / a.minutes : 0;
         const levelFactor = 0.7 + 0.3 * a.level;
 
-        // Starter: share of matches started, share of minutes played.
-        const startRate = Math.min(1, a.lineups / games);
-        const minuteRate = Math.min(1, a.minutes / (games * 90));
+        // Starter: of the matches he was in the squad for, how many he started
+        // and how much of them he played. A January transfer is judged on
+        // both clubs, the current one counting double.
+        const inSquad = Math.max(1, a.wApps + a.wBench);
+        const startRate = Math.min(1, a.wLineups / inSquad);
+        const minuteRate = Math.min(1, a.wMinutes / (inSquad * 90));
         starter += w * 100 * (0.6 * startRate + 0.4 * minuteRate) * levelFactor;
 
         // Bonus per 90 against the role's elite rate, saturating.
         const bonus90 = (3 * a.goals + a.assists) * per90 * a.level;
-        const scale = BONUS_SCALE[input.role];
-        bonus += w * 100 * (1 - Math.exp(-bonus90 / scale));
+        bonus += w * 100 * (1 - Math.exp(-bonus90 / BONUS_SCALE[input.role]));
 
         // Rating: 5.6 -> 0, 7.3 -> 100.
         if (a.ratingApps > 0) {
@@ -192,8 +208,8 @@ export function scorePlayer(input: AuctionInput): FantaScores {
             discipline += w * 100 * Math.exp(-malus90 / 0.25);
         }
 
-        // Fitness: matches in the squad (played or on the bench) over the season.
-        fitness += w * 100 * Math.min(1, (a.apps + a.bench) / games);
+        // Fitness: matches in the squad (played or on the bench) over the league's season.
+        fitness += w * 100 * Math.min(1, (a.apps + a.bench) / Math.max(1, a.games));
 
         sample += w * a.apps;
 
@@ -231,6 +247,7 @@ export function scorePlayer(input: AuctionInput): FantaScores {
     };
 }
 
+/** Club strength for the role, compressed to 20..80: it is one factor, not the whole story. */
 function teamScore(input: AuctionInput): number {
     const attack = input.teamAttack;
     const defence = input.teamDefence;
@@ -238,7 +255,7 @@ function teamScore(input: AuctionInput): number {
     const mix = input.role === 'A' ? [0.8, 0.2] : input.role === 'C' ? [0.6, 0.4] : input.role === 'D' ? [0.35, 0.65] : [0.15, 0.85];
     const a = attack ?? 0.5;
     const d = defence ?? 0.5;
-    return clamp(100 * (mix[0] * a + mix[1] * d));
+    return clamp(50 + (mix[0] * a + mix[1] * d - 0.5) * 60);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,14 +272,15 @@ export interface PriceConfig {
 }
 
 /**
- * Price curve down the ranking of a role: a plateau among the very top,
- * then a steady fall (a Hill curve, 1 / (1 + (rank / half)^2), "half" is
- * the rank that costs half the top price). Tuned on 8-team, 500-credit
- * Serie A auctions: the first attacker about 27% of one budget, the
- * eighth 60% of that, the sixteenth a quarter; keepers fall much faster
- * (two or three matter), defenders and midfielders are flatter.
+ * Price curve down the ranking of a role: a short plateau at the very
+ * top, then a steady fall (a Hill curve, 1 / (1 + (rank / half)^2),
+ * "half" is the rank that costs half the top price). Tuned on 8-team,
+ * 500-credit Serie A auctions: the first attacker about a third of one
+ * budget, the fifth three quarters of that, the twelfth a third, the
+ * twenty-fourth a tenth; keepers fall much faster (two or three
+ * matter), defenders and midfielders are a little flatter.
  */
-const RANK_HALF: Record<FantaRole, number> = {P: 4, D: 11, C: 9, A: 10};
+const RANK_HALF: Record<FantaRole, number> = {P: 3.5, D: 9, C: 8, A: 8};
 
 /**
  * Suggested credits per player. Each role gets its share of the market
@@ -280,7 +298,7 @@ export function suggestPrices<T extends {id: number; role: FantaRole; scores: Pi
         const bought = pool.slice(0, Math.max(1, config.participants * config.slots[role]));
         const budget = market * config.roleShare[role];
         const top = bought[0]?.scores.overall ?? 1;
-        const weight = (p: T, rank: number) => (1 / (1 + (rank / RANK_HALF[role]) ** 2)) * (0.5 + 0.5 * (p.scores.overall / top) ** 2);
+        const weight = (p: T, rank: number) => (1 / (1 + (rank / RANK_HALF[role]) ** 2)) * (0.6 + 0.4 * (p.scores.overall / top) ** 2);
         for (const p of pool) prices.set(p.id, 1);
         // Nobody pays more than 40% of a single budget: what a capped player
         // leaves on the table goes to the others, a few passes until stable.

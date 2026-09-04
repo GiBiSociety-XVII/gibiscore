@@ -12,8 +12,8 @@ describe('seasonWeights', () => {
         const w = seasonWeights([line(2026, {games: 2}), line(2025), line(2024)], 2026);
         const cur = 0.5 * (2 / 15) ** 1.5;
         expect(w.get(2026)!).toBeCloseTo(cur / (cur + 0.5), 5);
-        expect(w.get(2025)!).toBeCloseTo(0.35 / (cur + 0.5), 5);
-        expect(seasonWeights([line(2026, {games: 20}), line(2025)], 2026).get(2026)!).toBeCloseTo(0.5 / 0.85, 5);
+        expect(w.get(2025)!).toBeCloseTo(0.4 / (cur + 0.5), 5);
+        expect(seasonWeights([line(2026, {games: 20}), line(2025)], 2026).get(2026)!).toBeCloseTo(0.5 / 0.9, 5);
         expect([...w.values()].reduce((s, v) => s + v, 0)).toBeCloseTo(1, 5);
     });
 
@@ -41,7 +41,7 @@ describe('scorePlayer', () => {
         expect(s.bonus).toBeLessThan(10);
         expect(s.fitness).toBeGreaterThan(80);
         expect(s.team).toBe(50);
-        expect(s.overall).toBeLessThan(40);
+        expect(s.overall).toBeLessThan(45);
     });
 
     it('cuts fitness for a long injury and age', () => {
@@ -73,6 +73,31 @@ describe('scorePlayer', () => {
     });
 });
 
+describe('scorePlayer with a transfer', () => {
+    it('judges a January signing on his current club, not on the bench at the old one', () => {
+        // Half a season on the bench elsewhere, then a starter at the current club.
+        const seasons = [
+            line(2025, {teamId: 9, teamName: 'Old', appearances: 20, lineups: 4, bench: 16, minutes: 500, goals: 3, assists: 1, rating: 6.6}),
+            line(2025, {teamId: 1, appearances: 18, lineups: 18, bench: 0, minutes: 1500, goals: 14, assists: 2, rating: 7.2}),
+        ];
+        const here = scorePlayer({role: 'A', age: 26, currentYear: 2026, currentTeamId: 1, seasons, injury: null, teamAttack: null, teamDefence: null});
+        const nowhere = scorePlayer({role: 'A', age: 26, currentYear: 2026, currentTeamId: 99, seasons, injury: null, teamAttack: null, teamDefence: null});
+        expect(here.starter).toBeGreaterThan(nowhere.starter);
+        expect(here.starter).toBeGreaterThanOrEqual(50);
+        expect(here.bonus).toBeGreaterThan(80);
+        expect(here.fitness).toBeGreaterThan(90);
+        expect(here.overall).toBeGreaterThan(68);
+    });
+
+    it('discounts ratings and bonus earned in a weaker league', () => {
+        const top = scorePlayer({role: 'A', age: 26, currentYear: 2026, seasons: [line(2025)], injury: null, teamAttack: null, teamDefence: null});
+        const lower = scorePlayer({role: 'A', age: 26, currentYear: 2026, seasons: [line(2025, {level: 0.7})], injury: null, teamAttack: null, teamDefence: null});
+        expect(lower.rating).toBeLessThan(top.rating);
+        expect(lower.bonus).toBeLessThan(top.bonus);
+        expect(lower.overall).toBeLessThan(top.overall - 5);
+    });
+});
+
 describe('suggestPrices', () => {
     it('spends the role budget on the players that will be bought', () => {
         const players = Array.from({length: 40}, (_, i) => ({id: i + 1, role: 'A' as const, scores: {overall: 95 - i * 2}}));
@@ -80,10 +105,10 @@ describe('suggestPrices', () => {
         const spent = [...prices.values()].reduce((s, v) => s + v, 0);
         expect(prices.get(1)!).toBeGreaterThan(prices.get(20)!);
         expect(prices.get(1)!).toBeGreaterThanOrEqual(100);
-        expect(prices.get(1)!).toBeLessThanOrEqual(180);
-        expect(prices.get(9)!).toBeGreaterThan(prices.get(1)! * 0.4);
-        expect(prices.get(9)!).toBeLessThan(prices.get(1)! * 0.75);
-        expect(prices.get(17)!).toBeLessThan(prices.get(1)! * 0.4);
+        expect(prices.get(1)!).toBeLessThanOrEqual(190);
+        expect(prices.get(5)!).toBeGreaterThan(prices.get(1)! * 0.55);
+        expect(prices.get(12)!).toBeLessThan(prices.get(1)! * 0.45);
+        expect(prices.get(24)!).toBeLessThan(prices.get(1)! * 0.15);
         expect(prices.get(40)!).toBeLessThanOrEqual(8);
         expect(Math.abs(spent - 500 * 8 * 0.48)).toBeLessThan(60);
     });

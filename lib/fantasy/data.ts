@@ -156,7 +156,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
         ]);
         const teamShape = new Map<number, {attack: number; defence: number}>();
         for (const [, study] of studies) {
-            if (!study || study.played < study.teams.length) continue;
+            // A club's shape needs at least five rounds: earlier it is noise and every club is average.
+            if (!study || study.played < study.teams.length * 2.5) continue;
             const perTeam = study.goalsPerMatch / 2;
             const logistic = (ratio: number) => 1 / (1 + Math.exp(-(ratio - 1) * 3));
             for (const t of study.teams) {
@@ -206,6 +207,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
                 role,
                 age: player.age,
                 currentYear: year,
+                currentTeamId: team.id,
                 seasons: lines,
                 injury: injury ? {active: true, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm} : null,
                 teamAttack: shape?.attack ?? null,
