@@ -1,5 +1,5 @@
 import {ROLE_SHARE, type AuctionConfig, type Purchase} from './config';
-import {PRICE_TAIL, priceWeight, type FantaRole, type FantaScores} from './scores';
+import {PRICE_TAIL, valueWeights, type FantaRole, type PriceablePlayer} from './scores';
 
 /**
  * Live prices during the auction. The list prices assume a full market;
@@ -11,11 +11,7 @@ import {PRICE_TAIL, priceWeight, type FantaRole, type FantaScores} from './score
  * that overpays keeps overpaying). Pure and testable.
  */
 
-export interface PricedPlayer {
-    id: number;
-    role: FantaRole;
-    scores: Pick<FantaScores, 'overall'>;
-}
+export type PricedPlayer = PriceablePlayer;
 
 export interface RoleMarket {
     /** Players of the role the league still has to buy. */
@@ -164,11 +160,13 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
     for (const role of ROLES) {
         const cap = capFor(role);
         const state = market.byRole[role];
-        const available = players.filter((p) => p.role === role && !paidFor.has(p.id)).sort((a, b) => b.scores.overall - a.scores.overall);
+        // Value of what is left against the replacement level of what the league still buys.
+        const left = players.filter((p) => p.role === role && !paidFor.has(p.id));
+        const weights = valueWeights(left, role, Math.max(1, state.slotsLeft));
+        const available = [...left].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0));
         const toBuy = available.slice(0, Math.max(1, Math.round(state.slotsLeft * PRICE_TAIL)));
-        const top = toBuy[0]?.scores.overall ?? 1;
-        const weight = (p: PricedPlayer, rank: number) => priceWeight(role, rank, p.scores.overall, top);
-        const total = toBuy.reduce((s, p, i) => s + weight(p, i), 0);
+        const weight = (p: PricedPlayer) => weights.get(p.id) ?? 0;
+        const total = toBuy.reduce((s, p) => s + weight(p), 0);
         // A table that pays over list keeps doing it, softly: at most a tenth either way.
         const mood = Math.sqrt(clamp(state.inflation, 0.8, 1.2));
         const rest = Math.max(0, state.money - toBuy.length);
@@ -184,8 +182,8 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         // few, most of it once a good part of the role is gone.
         const progress = Math.min(1, state.bought / Math.max(1, config.participants * config.slots[role]));
         const marketWeight = Math.min(0.9, 0.35 + 0.55 * Math.sqrt(progress) + Math.min(0.15, purchases.length / 100));
-        toBuy.forEach((p, i) => {
-            const raw = total > 0 ? 1 + (rest * weight(p, i)) / total : 1;
+        toBuy.forEach((p) => {
+            const raw = total > 0 ? 1 + (rest * weight(p)) / total : 1;
             const list = listPrices.get(p.id) ?? 1;
             const premium = topIds.has(p.id) ? scarcity : semiIds.has(p.id) ? Math.sqrt(scarcity) : 1;
             const price = Math.round((raw * mood * marketWeight + list * (1 - marketWeight)) * premium);

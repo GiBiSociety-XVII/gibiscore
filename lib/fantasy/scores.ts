@@ -27,6 +27,8 @@ export interface SeasonLine {
     assists: number;
     penaltiesScored: number;
     penaltiesMissed: number;
+    /** Keepers. */
+    penaltiesSaved: number;
     yellow: number;
     yellowRed: number;
     red: number;
@@ -52,7 +54,7 @@ export interface AuctionInput {
 export interface FantaScores {
     /** How often the player starts (and finishes) the matches he is available for. */
     starter: number;
-    /** Goals and assists per 90, relative to the role. */
+    /** Goals and assists per 90, relative to the role. Keepers: clean sheets and penalties saved. */
     bonus: number;
     /** Average rating (lower leagues discounted). */
     rating: number;
@@ -113,6 +115,7 @@ interface YearAgg {
     goals: number;
     assists: number;
     penMissed: number;
+    penSaved: number;
     yellow: number;
     red: number;
     conceded: number;
@@ -121,7 +124,7 @@ interface YearAgg {
 
 /** One season across its competitions. Lines at the current club weigh double for the starter rates. */
 function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined): YearAgg {
-    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, penMissed: 0, yellow: 0, red: 0, conceded: 0, level: 0};
+    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0};
     let levelW = 0;
     for (const l of lines) {
         const w = currentTeamId !== null && currentTeamId !== undefined && l.teamId === currentTeamId ? 2 : 1;
@@ -143,6 +146,7 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         a.goals += l.goals;
         a.assists += l.assists;
         a.penMissed += l.penaltiesMissed;
+        a.penSaved += l.penaltiesSaved;
         a.yellow += l.yellow;
         a.red += l.red + l.yellowRed;
         a.conceded += l.goalsConceded;
@@ -157,7 +161,7 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
 const BONUS_SCALE: Record<FantaRole, number> = {P: 0.1, D: 0.25, C: 0.55, A: 1.0};
 
 const WEIGHTS: Record<FantaRole, Record<Exclude<keyof FantaScores, 'overall' | 'fantaAvg' | 'sample' | 'confidence'>, number>> = {
-    P: {starter: 32, bonus: 0, rating: 23, discipline: 18, fitness: 8, team: 9, form: 10},
+    P: {starter: 30, bonus: 14, rating: 20, discipline: 10, fitness: 8, team: 9, form: 9},
     D: {starter: 27, bonus: 18, rating: 18, discipline: 9, fitness: 8, team: 9, form: 11},
     C: {starter: 22, bonus: 32, rating: 14, discipline: 4, fitness: 8, team: 9, form: 11},
     A: {starter: 22, bonus: 36, rating: 14, discipline: 4, fitness: 8, team: 5, form: 11},
@@ -194,9 +198,20 @@ export function scorePlayer(input: AuctionInput): FantaScores {
         const minuteRate = Math.min(1, a.wMinutes / (inSquad * 90));
         starter += w * 100 * (0.6 * startRate + 0.4 * minuteRate) * levelFactor;
 
-        // Bonus per 90 against the role's elite rate, saturating.
-        const bonus90 = (3 * a.goals + a.assists) * per90 * a.level;
-        bonus += w * 100 * (1 - Math.exp(-bonus90 / BONUS_SCALE[input.role]));
+        if (input.role === 'P') {
+            // Keepers do not score: their bonus is the clean sheet and the penalty saved. With goals
+            // conceded per 90 as a Poisson rate, the chance of a clean sheet is exp(-rate): 0.9 a match
+            // (an elite season) gives 41%, 1.4 (average) 25%, 1.9 (a sieve) 15%. A penalty saved every
+            // twenty matches adds a few points.
+            const conceded90 = a.minutes > 0 ? a.conceded * per90 / Math.max(0.6, a.level) : 1.4;
+            const cleanSheet = Math.exp(-conceded90);
+            const penSaved90 = a.minutes > 0 ? a.penSaved * per90 : 0;
+            bonus += w * 100 * Math.min(1, Math.max(0, (cleanSheet - 0.1) / 0.35) + Math.min(0.15, penSaved90 * 3));
+        } else {
+            // Bonus per 90 against the role's elite rate, saturating.
+            const bonus90 = (3 * a.goals + a.assists) * per90 * a.level;
+            bonus += w * 100 * (1 - Math.exp(-bonus90 / BONUS_SCALE[input.role]));
+        }
 
         // Rating: 5.6 -> 0, 7.3 -> 100.
         if (a.ratingApps > 0) {
@@ -220,8 +235,9 @@ export function scorePlayer(input: AuctionInput): FantaScores {
         sample += w * a.apps;
 
         if (a.ratingApps > 0 && a.apps > 0) {
-            const malusPer = input.role === 'P' ? a.conceded / a.apps : 0;
-            const perMatch = (3 * a.goals + a.assists - 0.5 * a.yellow - a.red - 3 * a.penMissed) / a.apps - malusPer;
+            // Keepers: a goal conceded costs one, a clean sheet earns one, a penalty saved three.
+            const keeper = input.role === 'P' ? -a.conceded / a.apps + Math.exp(-(a.minutes > 0 ? a.conceded * per90 : 1.4)) + (3 * a.penSaved) / a.apps : 0;
+            const perMatch = (3 * a.goals + a.assists - 0.5 * a.yellow - a.red - 3 * a.penMissed) / a.apps + keeper;
             fantaAvg += w * (a.ratingSum / a.ratingApps + perMatch);
             fantaW += w;
         }
@@ -322,64 +338,100 @@ export interface PriceConfig {
     roleShare: Record<FantaRole, number>;
 }
 
+/** What the pricing reads of a player: the marks, or just the overall when the rest is unknown. */
+export interface PricedScores extends Pick<FantaScores, 'overall'>, Partial<Pick<FantaScores, 'fantaAvg' | 'starter' | 'fitness' | 'form' | 'sample' | 'confidence'>> {}
+
+export interface PriceablePlayer {
+    id: number;
+    role: FantaRole;
+    age?: number | null;
+    scores: PricedScores;
+}
+
+/** Typical fantamedia of a starter in the role: the fallback when a player has no estimate. */
+const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
 /**
- * Price curve down the ranking of a role: a short plateau at the very
- * top, then a steady fall (a Hill curve, 1 / (1 + (rank / half)^2),
- * "half" is the rank that costs half the top price). Tuned on 8-team,
- * 500-credit Serie A auctions: the first attacker about a third of one
- * budget, the fifth three quarters of that, the twelfth a third, the
- * twenty-fourth a tenth; keepers fall much faster (two or three
- * matter), defenders and midfielders are a little flatter.
+ * Tuning of the value model. `power`: scarcity, a player worth twice as
+ * much over the replacement costs 2^power times more. `freeGap`: what a
+ * free player brings below his fantamedia, since he does not play every
+ * week and is fielded only when the starter is out.
  */
-/**
- * Price curve down the ranking of a role: a Hill curve with a long
- * middle (exponent 1.5, half-way rank per role) so the money does not
- * collapse on the first handful, times a nudge for the mark itself.
- * The list prices the first `PRICE_TAIL` x bought players: the ones
- * just outside what the league buys are worth a few credits, not one.
- */
-const RANK_HALF: Record<FantaRole, number> = {P: 4, D: 12, C: 11, A: 10};
-const RANK_POWER = 1.5;
+export const PRICE_TUNING = {power: 1.5, freeGap: 0.35};
+/** How far the list prices reach past what the league buys: the bets just outside are worth a few credits. */
 export const PRICE_TAIL = 1.5;
-export function priceWeight(role: FantaRole, rank: number, overall: number, top: number): number {
-    return (1 / (1 + (rank / RANK_HALF[role]) ** RANK_POWER)) * (0.6 + 0.4 * (overall / Math.max(1, top)) ** 2);
+
+/**
+ * What a player is expected to bring over the free alternative, per
+ * match: his fantamedia over the replacement level of the role, times
+ * the chance he actually plays, plus an upside for the ones who may
+ * grow into a starter (young, hot start, thin evidence). The fantamedia
+ * of players with few matches is shrunk towards the role's level. Pure
+ * numbers, no fixed prices anywhere: the money then follows this value.
+ */
+/** Fantamedia shrunk towards the role's level when it rests on few matches. */
+function shrunkFanta(p: PriceablePlayer, roleLevel: number): number {
+    const sample = p.scores.sample ?? 30;
+    const shrink = sample / (sample + 8);
+    const raw = p.scores.fantaAvg ?? roleLevel + (p.scores.overall - 50) / 30;
+    return raw * shrink + roleLevel * (1 - shrink);
+}
+
+export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel: number): number {
+    const fm = shrunkFanta(p, roleLevel);
+    const play = Math.max(0, Math.min(1, (p.scores.starter ?? Math.min(100, p.scores.overall + 5)) / 100));
+    const young = p.age !== null && p.age !== undefined && p.age <= 23;
+    const hot = (p.scores.form ?? 50) >= 60;
+    const thin = p.scores.confidence !== undefined && p.scores.confidence !== 'high';
+    const upside = Math.min(0.45, 0.1 + (young ? 0.2 : 0) + (hot ? 0.1 : 0) + (thin ? 0.1 : 0));
+    const avail = 0.4 + (0.6 * (p.scores.fitness ?? 70)) / 100;
+    return Math.max(0, fm - replacement) * (play + (1 - play) * upside) * avail;
 }
 
 /**
- * Suggested credits per player. Each role gets its share of the market
- * (attackers cost the most, then midfielders, defenders, keepers); inside
- * the role prices follow the ranking with the role's curve, adjusted by
- * how far a player's mark sits from the top mark, so a clear number one
- * costs more than a crowded top. Only the players that will actually be
- * bought (participants x slots) share the money; everyone else is 1.
+ * Value weights of a role's players: the expected value over the
+ * replacement level, raised to the scarcity power. The replacement is
+ * the level of the last player the league buys (`count` of them), so
+ * everyone below is worth nothing on the market. Pure.
  */
-export function suggestPrices<T extends {id: number; role: FantaRole; scores: Pick<FantaScores, 'overall'>}>(players: T[], config: PriceConfig): Map<number, number> {
+export function valueWeights<T extends PriceablePlayer>(players: T[], role: FantaRole, count: number): Map<number, number> {
+    const pool = players.filter((p) => p.role === role);
+    const level = ROLE_FANTA[role];
+    // A first pass with the role's typical level finds the order, the replacement is read off it.
+    const first = pool.map((p) => [p, expectedValue(p, 0, level)] as const).sort((a, b) => b[1] - a[1]);
+    // The free alternative: the players just outside what the league buys, at their (shrunk)
+    // fantamedia less what a bench player loses by not playing every week.
+    const free = first.slice(Math.min(first.length - 1, Math.max(0, count)), Math.max(1, Math.round(count * 1.5))).map(([p]) => shrunkFanta(p, level));
+    const replacement = free.length > 0 ? free.reduce((s, v) => s + v, 0) / free.length - PRICE_TUNING.freeGap : level - PRICE_TUNING.freeGap;
+    const out = new Map<number, number>();
+    for (const p of pool) out.set(p.id, expectedValue(p, replacement, level) ** PRICE_TUNING.power);
+    return out;
+}
+
+export function suggestPrices<T extends PriceablePlayer>(players: T[], config: PriceConfig): Map<number, number> {
     const prices = new Map<number, number>();
     const market = config.credits * config.participants;
     for (const role of ['P', 'D', 'C', 'A'] as const) {
-        const pool = players.filter((p) => p.role === role).sort((a, b) => b.scores.overall - a.scores.overall);
+        const pool = players.filter((p) => p.role === role);
+        const bought = Math.max(1, config.participants * config.slots[role]);
+        const weights = valueWeights(pool, role, bought);
         // Priced: what the league buys plus the players just outside, who go for a few credits.
-        const bought = pool.slice(0, Math.max(1, Math.round(config.participants * config.slots[role] * PRICE_TAIL)));
+        const priced = [...pool].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0)).slice(0, Math.max(1, Math.round(bought * PRICE_TAIL)));
         const budget = market * config.roleShare[role];
-        const top = bought[0]?.scores.overall ?? 1;
-        const weight = (p: T, rank: number) => priceWeight(role, rank, p.scores.overall, top);
         for (const p of pool) prices.set(p.id, 1);
-        // No fixed ceiling: a price is what the market money and the ranking say,
-        // bounded only by what one manager can physically pay while keeping a
-        // credit for every other slot of the roster. What a bounded player leaves
-        // on the table goes to the others, a few passes until stable.
+        // No fixed ceiling: a price is what the market money and the value say, bounded only by
+        // what one manager can physically pay while keeping a credit for every other slot of the
+        // roster. What a bounded player leaves on the table goes to the others, a few passes until stable.
         const rosterSlots = config.slots.P + config.slots.D + config.slots.C + config.slots.A;
         const cap = Math.max(1, config.credits - (rosterSlots - 1));
         const fixed = new Map<number, number>();
-        const rankOf = new Map(bought.map((p, i) => [p.id, i]));
         for (let pass = 0; pass < 6; pass += 1) {
-            const open = bought.filter((p) => !fixed.has(p.id));
-            const total = open.reduce((s, p) => s + weight(p, rankOf.get(p.id) ?? 0), 0);
+            const open = priced.filter((p) => !fixed.has(p.id));
+            const total = open.reduce((s, p) => s + (weights.get(p.id) ?? 0), 0);
             if (open.length === 0 || total === 0) break;
             const rest = Math.max(0, budget - [...fixed.values()].reduce((s, v) => s + v, 0) - open.length);
             let capped = false;
             for (const p of open) {
-                const price = Math.max(1, Math.round(1 + (rest * weight(p, rankOf.get(p.id) ?? 0)) / total));
+                const price = Math.max(1, Math.round(1 + (rest * (weights.get(p.id) ?? 0)) / total));
                 if (price > cap) {
                     fixed.set(p.id, cap);
                     capped = true;

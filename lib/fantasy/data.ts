@@ -56,6 +56,7 @@ interface StatRow {
     assists: number | null;
     penalties_scored: number | null;
     penalties_missed: number | null;
+    penalties_saved: number | null;
     yellow_cards: number | null;
     yellow_red_cards: number | null;
     red_cards: number | null;
@@ -132,7 +133,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 (a, b) =>
                     db
                         .from('player_season_stats')
-                        .select('player_id,team_id,league_id,season_year,appearances,lineups,bench,minutes,rating,goals,assists,penalties_scored,penalties_missed,yellow_cards,yellow_red_cards,red_cards,goals_conceded,saves,team:teams(name),league:leagues(id,name,slug,tier,type)')
+                        .select('player_id,team_id,league_id,season_year,appearances,lineups,bench,minutes,rating,goals,assists,penalties_scored,penalties_missed,penalties_saved,yellow_cards,yellow_red_cards,red_cards,goals_conceded,saves,team:teams(name),league:leagues(id,name,slug,tier,type)')
                         .in('player_id', ids)
                         .gte('season_year', year - 2)
                         .lte('season_year', year)
@@ -197,6 +198,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 assists: r.assists ?? 0,
                 penaltiesScored: r.penalties_scored ?? 0,
                 penaltiesMissed: r.penalties_missed ?? 0,
+                penaltiesSaved: r.penalties_saved ?? 0,
                 yellow: r.yellow_cards ?? 0,
                 yellowRed: r.yellow_red_cards ?? 0,
                 red: r.red_cards ?? 0,

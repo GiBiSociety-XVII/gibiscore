@@ -3,7 +3,7 @@ import {scorePlayer, seasonWeights, suggestPrices, type SeasonLine} from './scor
 
 const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
     year, leagueId: 1, leagueName: 'Serie A', teamId: 1, teamName: 'Inter', games: 38, level: 1,
-    appearances: 34, lineups: 32, bench: 3, minutes: 2900, rating: 7.0, goals: 20, assists: 6, penaltiesScored: 4, penaltiesMissed: 0, yellow: 3, yellowRed: 0, red: 0, goalsConceded: 0, saves: 0,
+    appearances: 34, lineups: 32, bench: 3, minutes: 2900, rating: 7.0, goals: 20, assists: 6, penaltiesScored: 4, penaltiesMissed: 0, penaltiesSaved: 0, yellow: 3, yellowRed: 0, red: 0, goalsConceded: 0, saves: 0,
     ...over,
 });
 
@@ -55,11 +55,18 @@ describe('scorePlayer', () => {
         expect(old.fitness).toBeLessThan(fit.fitness);
     });
 
-    it('scores keepers on goals conceded, not bonus', () => {
+    it('scores keepers on clean sheets, penalties saved and goals conceded, not on goals', () => {
         const s = scorePlayer({role: 'P', age: 30, currentYear: 2026, seasons: [line(2025, {goals: 0, assists: 0, goalsConceded: 28, saves: 90, rating: 6.6})], injury: null, teamAttack: 0.5, teamDefence: 0.8});
         expect(s.discipline).toBeGreaterThan(70);
-        expect(s.bonus).toBeLessThan(5);
+        // 28 conceded in 2900 minutes: a clean sheet two matches in five.
+        expect(s.bonus).toBeGreaterThan(70);
         expect(s.fantaAvg).toBeLessThan(6.6);
+        const sieve = scorePlayer({role: 'P', age: 30, currentYear: 2026, seasons: [line(2025, {goals: 0, assists: 0, goalsConceded: 62, saves: 120, rating: 6.6})], injury: null, teamAttack: 0.5, teamDefence: 0.3});
+        expect(sieve.bonus).toBeLessThan(30);
+        expect(sieve.fantaAvg!).toBeLessThan(s.fantaAvg!);
+        const saver = scorePlayer({role: 'P', age: 30, currentYear: 2026, seasons: [line(2025, {goals: 0, assists: 0, goalsConceded: 28, saves: 90, rating: 6.6, penaltiesSaved: 3})], injury: null, teamAttack: 0.5, teamDefence: 0.8});
+        expect(saver.bonus).toBeGreaterThan(s.bonus);
+        expect(saver.fantaAvg!).toBeGreaterThan(s.fantaAvg!);
     });
 
     it('handles a player without any season', () => {
@@ -125,9 +132,9 @@ describe('suggestPrices', () => {
         expect(prices.get(1)!).toBeGreaterThanOrEqual(100);
         expect(prices.get(1)!).toBeLessThanOrEqual(220);
         expect(prices.get(5)!).toBeGreaterThan(prices.get(1)! * 0.55);
-        expect(prices.get(12)!).toBeLessThan(prices.get(1)! * 0.45);
-        expect(prices.get(24)!).toBeLessThan(prices.get(1)! * 0.25);
-        expect(prices.get(40)!).toBeLessThanOrEqual(12);
+        expect(prices.get(12)!).toBeLessThan(prices.get(1)! * 0.65);
+        expect(prices.get(24)!).toBeLessThan(prices.get(1)! * 0.4);
+        expect(prices.get(40)!).toBeLessThanOrEqual(15);
         expect(Math.abs(spent - 500 * 8 * 0.48)).toBeLessThan(60);
     });
 
@@ -137,7 +144,7 @@ describe('suggestPrices', () => {
         expect(prices.get(301)!).toBeGreaterThan(prices.get(201)!);
         expect(prices.get(201)!).toBeGreaterThan(prices.get(101)!);
         expect(prices.get(101)!).toBeGreaterThan(prices.get(1)! * 0.7);
-        // Keepers: a couple matter, the tenth costs a fraction.
-        expect(prices.get(10)!).toBeLessThan(prices.get(1)! * 0.3);
+        // Keepers: every synthetic keeper is a starter here, so only the mark separates them.
+        expect(prices.get(10)!).toBeLessThan(prices.get(1)! * 0.75);
     });
 });

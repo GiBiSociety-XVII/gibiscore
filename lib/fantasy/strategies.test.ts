@@ -63,10 +63,10 @@ describe('planStrategy', () => {
 describe('preferences', () => {
     it('penalty takers strategy picks the taker over a slightly better non-taker', () => {
         const players = pool();
-        players[220].penaltyTaker = true; // A11, overall 72, behind A1..A10
+        players[222].penaltyTaker = true; // A13, overall 68, behind A1..A12
         const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
         const plan = planStrategy(STRATEGIES.find((s) => s.key === 'penaltyTakers')!, players, prices, config);
-        expect(plan.picks.A.some((p) => p.id === players[220].id)).toBe(true);
+        expect(plan.picks.A.some((p) => p.id === players[222].id)).toBe(true);
     });
 
     it('young upside prefers the younger of two equal players', () => {

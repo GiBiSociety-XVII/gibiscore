@@ -2,6 +2,7 @@
 
 import {HelpCircle, X} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
+import {createPortal} from "react-dom";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -59,29 +60,39 @@ function useWhyText(role: FantaRole) {
 export function TierWhy({player, info}: {player: AuctionPlayer; info: TierInfo}) {
     const t = useTranslations('Fantasy.tiers');
     const text = useWhyText(player.role);
-    const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLSpanElement>(null);
+    const [open, setOpen] = useState<{top: number; left: number} | null>(null);
+    const button = useRef<HTMLButtonElement>(null);
+    const card = useRef<HTMLDivElement>(null);
+    // Rendered in a portal at a fixed position: the list scrolls sideways and would clip it.
+    const toggle = () => {
+        if (open || !button.current) return setOpen(null);
+        const r = button.current.getBoundingClientRect();
+        const width = Math.min(320, window.innerWidth - 16);
+        setOpen({top: Math.min(r.bottom + 6, window.innerHeight - 260), left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8))});
+    };
     useEffect(() => {
         if (!open) return;
-        const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+        const onDown = (e: MouseEvent) => { if (card.current && !card.current.contains(e.target as Node) && !button.current?.contains(e.target as Node)) setOpen(null); };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(null); };
+        const onScroll = () => setOpen(null);
         document.addEventListener('mousedown', onDown);
         document.addEventListener('keydown', onKey);
-        return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+        window.addEventListener('scroll', onScroll, true);
+        return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); window.removeEventListener('scroll', onScroll, true); };
     }, [open]);
     const strengths = SCORE_KEYS.filter((k) => player.scores[k] >= 70).map((k) => `${t(`why.scores.${k}`)} ${player.scores[k]}`);
     const weaknesses = SCORE_KEYS.filter((k) => player.scores[k] <= 40).map((k) => `${t(`why.scores.${k}`)} ${player.scores[k]}`);
     return (
-        <span ref={ref} className="relative inline-flex">
-            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={t('why.button')} title={t('why.button')} className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-foreground/40 bg-card text-muted-foreground hover:bg-accent hover:text-foreground">
+        <>
+            <button ref={button} type="button" onClick={toggle} aria-expanded={!!open} aria-label={t('why.button')} title={t('why.button')} className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-foreground/40 bg-card text-muted-foreground hover:bg-accent hover:text-foreground shrink-0">
                 <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
-            {open && (
-                <div role="dialog" className="absolute z-30 top-6 left-0 w-72 max-w-[80vw] rounded-lg border-2 border-foreground bg-background shadow-[4px_4px_0_0_var(--color-foreground)] p-3 flex flex-col gap-1.5 text-left normal-case tracking-normal">
+            {open && typeof document !== 'undefined' && createPortal(
+                <div ref={card} role="dialog" style={{top: open.top, left: open.left, width: Math.min(320, window.innerWidth - 16)}} className="fixed z-[70] rounded-lg border-2 border-foreground bg-background shadow-[4px_4px_0_0_var(--color-foreground)] p-3 flex flex-col gap-1.5 text-left normal-case tracking-normal">
                     <div className="flex items-center gap-2">
                         <TierBadge tier={info.tier} short={false} />
                         <span className="text-[12px] font-extrabold truncate">{player.name}</span>
-                        <button type="button" onClick={() => setOpen(false)} aria-label={t('why.close')} className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded border border-foreground bg-card"><X className="w-3 h-3" /></button>
+                        <button type="button" onClick={() => setOpen(null)} aria-label={t('why.close')} className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded border border-foreground bg-card shrink-0"><X className="w-3 h-3" /></button>
                     </div>
                     <p className="text-[12px] font-bold">{t('why.rank', {rank: info.rank, role: t(`roleOne.${player.role}`), total: info.ofRole, overall: player.scores.overall})}</p>
                     <ul className="flex flex-col gap-1 text-[11px] font-semibold leading-snug list-disc pl-4">
@@ -90,9 +101,10 @@ export function TierWhy({player, info}: {player: AuctionPlayer; info: TierInfo})
                         {weaknesses.length > 0 && <li className="text-red-800">{t('why.weaknesses', {list: weaknesses.join(', ')})}</li>}
                         <li className="text-muted-foreground">{t('why.confidence', {level: t(`why.levels.${player.scores.confidence}`), sample: Math.round(player.scores.sample)})}</li>
                     </ul>
-                </div>
+                </div>,
+                document.body,
             )}
-        </span>
+        </>
     );
 }
 
