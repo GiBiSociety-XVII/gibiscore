@@ -192,7 +192,10 @@
     "reserve": "Da tenere per completare la rosa: {reserve} cr.",
     "formation": "Modulo consigliato: {formation}",
     "formationNow": "Con la rosa attuale: {formation}",
-    "formationHint": "Il modulo che rende di più con gli acquisti fatti più gli obiettivi della strategia. Cambia durante l'asta."
+    "formationHint": "Il modulo che rende di più con gli acquisti fatti più gli obiettivi della strategia. Cambia durante l'asta.",
+    "byTeam": "Per squadra",
+    "byTeamHint": "Quanti giocatori hai preso da ogni squadra del listone, divisi per ruolo.",
+    "byTeamTotal": "{count} giocatori · {teams} squadre"
   },
   "strategies": {
     "title": "Strategie consigliate",

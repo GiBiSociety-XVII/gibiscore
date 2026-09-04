@@ -174,6 +174,17 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const ownPurchases = mine.filter((p) => byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
     const health = strategy ? strategyHealth(plans, strategy.key, baseline, config, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
+    // My players club by club: every club of the list, the ones I bought from first.
+    const teamsMine = pool.teams
+        .map((team) => {
+            const roles = {P: 0, D: 0, C: 0, A: 0} as Record<FantaRole, number>;
+            for (const pu of mine) {
+                const p = byId.get(pu.playerId);
+                if (p && p.team.id === team.id) roles[p.role] += 1;
+            }
+            return {team, roles, total: roles.P + roles.D + roles.C + roles.A};
+        })
+        .sort((a, b) => b.total - a.total || a.team.name.localeCompare(b.team.name));
     const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: config.modifiers.defence}) : null;
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
@@ -432,6 +443,23 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             }))}
                         </ul>
                     )}
+                </Panel>
+                {/* My players by club: every club of the list, count and roles */}
+                <Panel title={tr('byTeam')} action={<span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{tr('byTeamTotal', {count: mine.length, teams: teamsMine.filter((tm) => tm.total > 0).length})}</span>}>
+                    <ul className="flex flex-col max-h-[60vh] overflow-y-auto" title={tr('byTeamHint')}>
+                        {teamsMine.map((tm) => (
+                            <li key={tm.team.id} className={cn("flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0 text-[12px] font-bold", tm.total === 0 && "text-muted-foreground")}>
+                                <TeamCrest team={tm.team} size={16} />
+                                <span className="truncate">{tm.team.name}</span>
+                                <span className="ml-auto flex items-center gap-1 shrink-0">
+                                    {ROLES.map((r) => tm.roles[r] > 0 && (
+                                        <span key={r} className={cn("inline-flex items-center justify-center h-5 min-w-5 px-1 rounded border border-foreground font-mono text-[10px] font-extrabold tabular-nums", ROLE_CLASS[r])}>{r}{tm.roles[r]}</span>
+                                    ))}
+                                    <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded-md border-2 font-mono text-[12px] font-extrabold tabular-nums", tm.total > 0 ? "border-foreground bg-accent" : "border-foreground/30 bg-card")}>{tm.total}</span>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
                 </Panel>
                 {managers.length > 1 && (
                     <Panel title={tr('others')}>
