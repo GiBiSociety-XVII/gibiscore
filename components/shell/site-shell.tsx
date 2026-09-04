@@ -16,7 +16,7 @@ export async function SiteShell({children, rail, wide = false, navigation}: {chi
         <div className="min-h-screen flex flex-col bg-background">
             <AppBar />
             <div className="flex-1 w-full max-w-[1600px] mx-auto px-2 md:px-4 py-3 flex gap-3 items-start">
-                <aside className="hidden lg:block w-[228px] shrink-0 sticky top-[60px] max-h-[calc(100vh-72px)] overflow-y-auto [scrollbar-width:thin]">
+                <aside className="hidden lg:block w-[228px] shrink-0 sticky top-[92px] max-h-[calc(100vh-104px)] overflow-y-auto [scrollbar-width:thin]">
                     <Sidebar nav={nav} />
                 </aside>
                 <main className="flex-1 min-w-0 flex flex-col gap-3">
@@ -24,7 +24,7 @@ export async function SiteShell({children, rail, wide = false, navigation}: {chi
                     {children}
                 </main>
                 {rail && !wide && (
-                    <aside className="hidden xl:flex w-[300px] shrink-0 sticky top-[60px] flex-col gap-3 max-h-[calc(100vh-72px)] overflow-y-auto [scrollbar-width:thin]">
+                    <aside className="hidden xl:flex w-[300px] shrink-0 sticky top-[92px] flex-col gap-3 max-h-[calc(100vh-104px)] overflow-y-auto [scrollbar-width:thin]">
                         {rail}
                     </aside>
                 )}

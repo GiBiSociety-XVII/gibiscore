@@ -9,26 +9,39 @@
     "backHome": "Torna alla home"
   },
   "footer": {
-    "company": {
-      "name": "GiBiSociety",
-      "tagline": "Creatori di siti web",
-      "description": "La rete GiBi: risultati e statistiche di calcio con GiBiScore, strategie e strumenti per i tuoi giochi con GiBiArena."
-    },
-    "explore": "Esplora",
-    "network": "Rete GiBi",
-    "gibiarena": "GiBiArena",
-    "gibiarenaHint": "Gaming, guide e strumenti",
-    "gibiscore": "GiBiScore",
-    "gibiscoreHint": "Calcio, risultati e statistiche",
-    "legal": "Legale",
-    "privacy": "Informativa Privacy",
-    "terms": "Termini di Servizio",
-    "support": "Supporto",
-    "supportEmail": "service@gibiarena.com",
-    "supportMessage": "Per domande o problemi scrivici, rispondiamo volentieri.",
+    "email": "service@gibiscore.com",
     "instagram": "@gibiarena",
-    "copyright": "GiBiSociety. Tutti i diritti riservati.",
-    "dataCredit": "Dati forniti da API-Football."
+    "columns": {
+      "scores": {
+        "title": "Risultati",
+        "today": "Partite di oggi",
+        "live": "Partite live",
+        "yesterday": "Risultati di ieri",
+        "tomorrow": "Programma di domani"
+      },
+      "competitions": {
+        "title": "Competizioni",
+        "all": "Tutte le competizioni"
+      },
+      "stats": {
+        "title": "Statistiche",
+        "players": "Statistiche giocatori",
+        "scorers": "Marcatori",
+        "search": "Cerca squadra o giocatore"
+      },
+      "info": {
+        "title": "Info",
+        "privacy": "Informativa Privacy",
+        "terms": "Termini di Servizio",
+        "data": "Dati forniti da API-Football",
+        "gibiarena": "GiBiArena"
+      }
+    },
+    "productOf": "Un prodotto di",
+    "society": "GiBiSociety",
+    "discover": "Scopri anche",
+    "arena": "GiBiArena",
+    "copyright": "GiBiSociety · Tutti i diritti riservati."
   },
   "sidebar": {
     "label": "Competizioni",
