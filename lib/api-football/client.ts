@@ -52,7 +52,9 @@ export async function dailyRemaining(): Promise<number | null> {
     if (lastRateLimit.dayRemaining === null) {
         try {
             await apiFootballGet('status');
-        } catch {
+        } catch (error) {
+            // A day already spent answers even /status with the quota error: nothing is left.
+            if (error instanceof ApiFootballError && error.kind === 'quota') return 0;
             return null;
         }
     }
