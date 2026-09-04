@@ -30,7 +30,7 @@ export async function getUpcomingPredictions(days = 3): Promise<PredictionBlock[
             (a, b) =>
                 db
                     .from('fixtures')
-                    .select(`id,round,starting_at,state,minute,home_score,away_score,season_id,league:leagues!inner(${LEAGUE_SELECT}),home:teams!fixtures_home_team_id_fkey(${TEAM_SELECT}),away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT})`)
+                    .select(`id,round,starting_at,state,minute,extra_minute,last_synced_at,home_score,away_score,season_id,league:leagues!inner(${LEAGUE_SELECT}),home:teams!fixtures_home_team_id_fkey(${TEAM_SELECT}),away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT})`)
                     .eq('leagues.tier', 'featured')
                     .in('state', ['scheduled', ...LIVE_STATES])
                     .gte('starting_at', from)

@@ -2,6 +2,7 @@ import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {LIVE_STATES, type FixtureSummary} from "@/lib/football/types";
+import {LiveMinute} from "./live-minute";
 import {TeamCrest} from "./team-crest";
 
 export type RowState = 'live' | 'finished' | 'scheduled' | 'other';
@@ -20,7 +21,7 @@ function StatusCell({fixture}: {fixture: FixtureSummary}) {
     switch (fixture.state) {
         case 'live':
         case 'extra_time':
-            return <span className="text-accent-foreground bg-accent rounded px-1 font-mono font-extrabold tabular-nums">{fixture.minute !== null ? `${fixture.minute}'` : t('live')}</span>;
+            return <span className="text-accent-foreground bg-accent rounded px-1 font-mono font-extrabold tabular-nums"><LiveMinute fixture={fixture} fallback={t('live')} /></span>;
         case 'half_time':
             return <span className="bg-accent rounded px-1 font-extrabold">{t('halfTime')}</span>;
         case 'penalties':

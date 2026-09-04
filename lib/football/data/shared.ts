@@ -39,6 +39,8 @@ export interface FixtureRow {
     starting_at: string;
     state: FixtureState;
     minute: number | null;
+    extra_minute?: number | null;
+    last_synced_at?: string | null;
     home_score: number | null;
     away_score: number | null;
     league: LeagueRow | null;
@@ -51,7 +53,7 @@ export const TEAM_SELECT = 'id,name,short_code,logo_url,slug';
 export const LEAGUE_SELECT = 'id,name,slug,country,country_code,logo_url,type,tier';
 
 export const FIXTURE_SELECT =
-    'id,round,starting_at,state,minute,home_score,away_score,' +
+    'id,round,starting_at,state,minute,extra_minute,last_synced_at,home_score,away_score,' +
     `league:leagues(${LEAGUE_SELECT}),` +
     `home:teams!fixtures_home_team_id_fkey(${TEAM_SELECT}),` +
     `away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT}),` +
@@ -59,7 +61,7 @@ export const FIXTURE_SELECT =
 
 /** Lighter select for long lists (live page, day lists): no statistics join. */
 export const FIXTURE_LIST_SELECT =
-    'id,round,starting_at,state,minute,home_score,away_score,' +
+    'id,round,starting_at,state,minute,extra_minute,last_synced_at,home_score,away_score,' +
     `league:leagues(${LEAGUE_SELECT}),` +
     `home:teams!fixtures_home_team_id_fkey(${TEAM_SELECT}),` +
     `away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT})`;
@@ -111,6 +113,8 @@ export function toFixture(row: FixtureRow): FixtureSummary | null {
         startingAt: row.starting_at,
         state: row.state,
         minute: row.minute,
+        extraMinute: row.extra_minute ?? null,
+        syncedAt: row.last_synced_at ?? null,
         home: toTeam(row.home),
         away: toTeam(row.away),
         homeScore: row.home_score,

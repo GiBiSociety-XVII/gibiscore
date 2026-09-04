@@ -5,7 +5,7 @@ import {ScoresRail} from "@/components/football/rail";
 import {ScoresView} from "@/components/football/scores-view";
 import {getScores} from "@/lib/football/data/scores";
 
-export const revalidate = 30;
+export const revalidate = 15;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Pages.scores');

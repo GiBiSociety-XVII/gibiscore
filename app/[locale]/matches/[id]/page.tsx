@@ -24,7 +24,7 @@ import {getMatchPage} from "@/lib/football/data/matches";
 import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
 
-export const revalidate = 60;
+export const revalidate = 20;
 
 function parseId(raw: string): number | null {
     const n = Number(raw);
@@ -163,7 +163,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     return (
         <SiteShell rail={rail}>
             <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
-            <AutoRefresh seconds={30} enabled={isLive} aroundIso={fixture.state === 'scheduled' ? fixture.startingAt : undefined} />
+            <AutoRefresh seconds={20} enabled={isLive} aroundIso={fixture.state === 'scheduled' ? fixture.startingAt : undefined} />
             {/* Scoreboard */}
             <section className="bb-surface overflow-hidden">
                 <div className="flex items-center gap-2 px-3 h-8 border-b-2 border-foreground bg-muted/60 text-[12px] font-extrabold">

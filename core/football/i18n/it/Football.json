@@ -10,7 +10,9 @@
     "cancelled": "ANNULLATA",
     "abandoned": "SOSPESA",
     "today": "OGGI {time}",
-    "scheduled": "{date} {time}"
+    "scheduled": "{date} {time}",
+    "livePrefix": "LIVE",
+    "extraTimePrefix": "SUPPL."
   },
   "positions": {
     "goalkeeper": "Portiere",

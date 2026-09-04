@@ -59,6 +59,12 @@ export function extractMinute(status: {short: string; elapsed: number | null}, s
     return null;
 }
 
+/** Stoppage time ("90+3" -> 3) while a period runs past its length, null otherwise. */
+export function extractExtraMinute(status: {short: string; elapsed: number | null; extra?: number | null}, state: FixtureState): number | null {
+    if (isLiveState(state) && typeof status.extra === 'number' && status.extra > 0) return status.extra;
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // Seasons
 // ---------------------------------------------------------------------------

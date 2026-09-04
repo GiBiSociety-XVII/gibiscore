@@ -6,7 +6,7 @@ import {ScoresView} from "@/components/football/scores-view";
 import {getScores, romeDate} from "@/lib/football/data/scores";
 
 // Today's scores: the front page of the site. Rebuilt every minute.
-export const revalidate = 60;
+export const revalidate = 30;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Pages.scores');

@@ -76,7 +76,7 @@ export async function ScoresView({page}: {page: ScoresPage}) {
     const refresh = isLive || (page.date === page.today && page.liveCount + page.scheduledCount > 0);
     return (
         <div className="bb-surface overflow-hidden">
-            <AutoRefresh seconds={isLive ? 30 : 60} enabled={refresh} />
+            <AutoRefresh seconds={isLive ? 20 : 45} enabled={refresh} />
             <DateStrip page={page} />
             <div className="p-1.5 md:p-2 flex flex-col gap-2">
                 {isLive ? (

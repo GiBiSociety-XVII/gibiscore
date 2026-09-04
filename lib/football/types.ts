@@ -56,6 +56,10 @@ export interface FixtureSummary {
     startingAt: string; // ISO timestamp
     state: FixtureState;
     minute: number | null;
+    /** Stoppage time while a period runs past its length ("90+3"). */
+    extraMinute?: number | null;
+    /** When the row was last written by the live sync, ISO; lets the minute tick client-side. */
+    syncedAt?: string | null;
     home: TeamSummary;
     away: TeamSummary;
     homeScore: number | null;
