@@ -16,7 +16,7 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
 import {rankStrategies, type StrategyKey} from "@/lib/fantasy/strategies";
-import {dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
+import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, assignTiers, type Tier} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -142,17 +142,18 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const roleCount = (manager: number, r: FantaRole) => rosterOf(manager).filter((p) => byId.get(p.playerId)!.role === r).length;
     const roleFull = (manager: number, r: FantaRole) => roleCount(manager, r) >= config.slots[r];
     const creditsLeftOf = (manager: number) => config.credits - rosterOf(manager).reduce((s, p) => s + p.price, 0);
-    const openSlotsOf = (manager: number) => Math.max(0, slotsTotal - rosterOf(manager).length);
     /** Why a purchase cannot go through, or null. */
     const blocker = (player: AuctionPlayer, manager: number, price: number): string | null => {
         const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
         if (roleFull(manager, player.role) && !already) return t('blockRole', {manager: managers[manager] ?? t('me'), count: config.slots[player.role], role: ts(`roles.${player.role}`)});
+        const others = already ? purchases.filter((p) => p !== already) : purchases;
         const left = creditsLeftOf(manager) + (already?.price ?? 0);
-        const open = openSlotsOf(manager) + (already ? 1 : 0);
-        const maxPay = left - (open - 1);
+        const maxPay = left - completionReserve(pool.players, prices, config, others, manager, player.role);
         if (price > maxPay) return t('blockCredits', {manager: managers[manager] ?? t('me'), max: Math.max(0, maxPay)});
         return null;
     };
+    /** The most I can pay for a player of this role and still finish my roster with the cheapest players left. */
+    const myMaxFor = (r: FantaRole) => Math.max(0, left - completionReserve(pool.players, prices, config, purchases, 0, r));
     const confirmBuy = () => {
         if (!buying) return;
         const price = Math.max(0, Math.round(Number(buying.price) || 0));
@@ -166,12 +167,14 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
     const roleShare = strategy?.share ?? ROLE_SHARE;
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
-    // My ceiling per player: the strategy's slot for its targets, the live price for anyone else, never more than what leaves 1 credit per open slot.
-    const room = Math.max(1, left - Math.max(0, freeSlots - 1));
+    // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
+    // never more than what leaves me enough to finish the roster with the cheapest players left.
     const maxBidOf = (id: number): number | null => {
         if (!strategy || bought.has(id)) return null;
+        const player = byId.get(id);
+        if (!player) return null;
         const pick = ROLES.flatMap((r) => strategy.picks[r]).find((p) => p.id === id);
-        return Math.min(room, pick ? pick.maxBid : (prices.get(id) ?? 1));
+        return Math.min(myMaxFor(player.role), pick ? pick.maxBid : (prices.get(id) ?? 1));
     };
     const priceCell = (id: number) => {
         const live = prices.get(id) ?? 1;
@@ -377,6 +380,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                     </div>
                     <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
                         {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
+                        {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(pool.players, prices, config, purchases, 0), max: Math.max(0, left - completionReserve(pool.players, prices, config, purchases, 0, null))})}</span>}
                         {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                     </p>
                     {market && market.purchases > 0 && (

@@ -115,6 +115,31 @@ export function marketState(players: PricedPlayer[], listPrices: Map<number, num
 }
 
 /**
+ * Credits a manager must keep to finish his roster with the cheapest
+ * players still on the market: for every open slot of each role, the
+ * cheapest available players of that role at the given prices. The
+ * slot being filled right now (`exceptRole`) is left out.
+ */
+export function completionReserve(players: PricedPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'slots'>, purchases: Purchase[], manager: number, exceptRole: FantaRole | null = null): number {
+    const byId = new Map(players.map((p) => [p.id, p]));
+    const bought = new Set(purchases.map((p) => p.playerId));
+    const mine = purchases.filter((p) => p.manager === manager && byId.has(p.playerId));
+    let reserve = 0;
+    for (const role of ROLES) {
+        const have = mine.filter((p) => byId.get(p.playerId)!.role === role).length;
+        const open = Math.max(0, config.slots[role] - have - (role === exceptRole ? 1 : 0));
+        if (open === 0) continue;
+        const cheapest = players
+            .filter((p) => p.role === role && !bought.has(p.id))
+            .map((p) => prices.get(p.id) ?? 1)
+            .sort((a, b) => a - b)
+            .slice(0, open);
+        reserve += cheapest.reduce((s, v) => s + v, 0) + Math.max(0, open - cheapest.length);
+    }
+    return reserve;
+}
+
+/**
  * Prices of the players still available, from the money still on the
  * table for each role split down the ranking of what is left (same
  * curve as the list), nudged by how the table has been paying. Bought
@@ -127,16 +152,18 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
     const market = marketState(players, listPrices, config, purchases);
     const paidFor = new Map(purchases.map((p) => [p.playerId, p.price]));
     // No fixed ceiling: the only bound is what the richest manager at the table can still pay
-    // while keeping a credit for each of his other open slots (unnamed managers: untouched budget).
-    const rosterSlots = config.slots.P + config.slots.D + config.slots.C + config.slots.A;
-    let cap = 1;
-    for (let m = 0; m < config.participants; m += 1) {
-        const mine = purchases.filter((p) => p.manager === m);
-        const left = config.credits - mine.reduce((s, p) => s + p.price, 0);
-        const open = Math.max(1, rosterSlots - mine.length);
-        cap = Math.max(cap, left - (open - 1));
-    }
+    // for one player while keeping enough to finish his roster with the cheapest players left
+    // (unnamed managers: untouched budget). One ceiling per role, since the reserve depends on it.
+    const capFor = (role: FantaRole) => {
+        let cap = 1;
+        for (let m = 0; m < config.participants; m += 1) {
+            const left = config.credits - purchases.filter((p) => p.manager === m).reduce((s, p) => s + p.price, 0);
+            cap = Math.max(cap, left - completionReserve(players, listPrices, config, purchases, m, role));
+        }
+        return cap;
+    };
     for (const role of ROLES) {
+        const cap = capFor(role);
         const state = market.byRole[role];
         const available = players.filter((p) => p.role === role && !paidFor.has(p.id)).sort((a, b) => b.scores.overall - a.scores.overall);
         const toBuy = available.slice(0, Math.max(1, state.slotsLeft));
