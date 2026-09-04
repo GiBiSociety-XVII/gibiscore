@@ -43,13 +43,12 @@ export default async function StatsPage({params}: PageProps<"/[locale]/stats">) 
                                     <span>{b.competition.country ? `${b.competition.country} · ` : ''}{b.season.name}</span>
                                     <Link href={`/competitions/${b.competition.slug}`} className="font-extrabold text-foreground underline decoration-accent decoration-[2px] underline-offset-2">{b.competition.name} →</Link>
                                 </div>
-                                {b.rankings.scorers.length + b.rankings.assists.length + b.rankings.ratings.length === 0 ? (
+                                {b.rankings.scorers.length + b.rankings.assists.length === 0 ? (
                                     <p className="text-sm font-semibold text-muted-foreground">{t('empty')}</p>
                                 ) : (
-                                    <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
+                                    <div className="grid gap-3 grid-cols-1 xl:grid-cols-2 items-start">
                                         <Panel title={t('scorers')}><div className="px-1"><Rankings kind="scorers" players={b.rankings.scorers} /></div></Panel>
                                         <Panel title={t('assists')}><div className="px-1"><Rankings kind="assists" players={b.rankings.assists} /></div></Panel>
-                                        <Panel title={t('ratings')}><div className="px-1"><Rankings kind="ratings" players={b.rankings.ratings} /></div></Panel>
                                     </div>
                                 )}
                             </>

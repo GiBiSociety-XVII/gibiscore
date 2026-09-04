@@ -2,11 +2,13 @@ import type {Metadata} from "next";
 import {getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {Badge} from "@/components/shared/ui/badge";
+import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {MatchList} from "@/components/football/match-list";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
 import {Tabs} from "@/components/football/tabs";
 import {TeamCrest} from "@/components/football/team-crest";
+import Image from "next/image";
 import {StandingsTable} from "@/components/football/standings-table";
 import {getStandingsBySlug} from "@/lib/football/data/competitions";
 import {getTeamPage} from "@/lib/football/data/teams";
@@ -135,6 +137,53 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
         </Panel>
     );
 
+    const playersTab = (
+        <Panel title={t('playersTitle')}>
+            {page.players.length === 0 ? (
+                <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('noPlayers')}</p>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-[13px]">
+                        <thead>
+                            <tr className="text-muted-foreground text-[10px] font-extrabold tracking-wider uppercase">
+                                <th className="px-1.5 py-1 text-left">{tFootball('playerTable.player')}</th>
+                                {(['apps', 'lineups', 'minutes', 'goals', 'assists', 'rating', 'cards'] as const).map((k) => (
+                                    <th key={k} className={cn("px-1.5 py-1 text-right font-mono", (k === 'lineups' || k === 'minutes') && "hidden md:table-cell")}>{t(`playerCols.${k}`)}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {page.players.map((p) => {
+                                const pos = p.position && POSITIONS.includes(p.position as (typeof POSITIONS)[number]) ? p.position : 'unknown';
+                                return (
+                                    <tr key={p.player.id} className="border-t border-muted font-semibold">
+                                        <td className="px-1.5 py-1">
+                                            <Link href={`/players/${p.player.slug}`} className="flex items-center gap-2 min-w-0 hover:underline decoration-accent decoration-[3px] underline-offset-2">
+                                                <span className="inline-flex w-6 h-6 rounded-full bg-muted overflow-hidden shrink-0">
+                                                    {p.player.imageUrl && <Image src={p.player.imageUrl} alt="" width={24} height={24} unoptimized className="object-cover" />}
+                                                </span>
+                                                <span className="inline-flex w-5 h-5 items-center justify-center rounded-md border-2 border-foreground bg-card text-[10px] font-extrabold shrink-0">{tFootball(`positionsShort.${pos as 'goalkeeper'}`)}</span>
+                                                <span className="truncate">{p.player.name}</span>
+                                                {p.number !== null && <span className="font-mono text-[11px] text-muted-foreground">#{p.number}</span>}
+                                            </Link>
+                                        </td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{p.appearances}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums hidden md:table-cell">{p.lineups}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums hidden md:table-cell">{p.minutes}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums font-extrabold">{p.goals || ''}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{p.assists || ''}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{p.rating !== null ? <span className={cn("px-1 rounded", p.rating >= 7 && "bg-accent")}>{p.rating.toFixed(2)}</span> : '–'}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums text-muted-foreground">{p.yellowCards || p.redCards ? `${p.yellowCards} / ${p.redCards}` : ''}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </Panel>
+    );
+
     const standingsTab = tables.length === 0 ? (
         <Panel title={t('standings')}><p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{tFootball('empty.noStandings')}</p></Panel>
     ) : (
@@ -158,6 +207,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
                 items={[
                     {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.live.length},
                     {id: 'squad', label: t('tabs.squad'), content: squadTab},
+                    {id: 'players', label: t('tabs.players'), content: playersTab, count: page.players.length},
                     {id: 'standings', label: t('tabs.standings'), content: standingsTab},
                     {id: 'stats', label: t('tabs.stats'), content: statsTab},
                 ]}

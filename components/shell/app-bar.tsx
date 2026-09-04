@@ -1,10 +1,10 @@
 'use client';
 
-import {Search} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {Link, usePathname} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {BrandIcon, BrandLockup} from "@/components/shared/layout/logo";
+import {SearchBox} from "./search-box";
 
 // URLs are English like on GiBiArena; labels come from AppBar.json.
 const NAV_ITEMS = [
@@ -48,16 +48,7 @@ export default function AppBar() {
                         })}
                     </nav>
 
-                    <form action="/search" method="get" className="ml-auto flex items-center gap-2 h-10 md:h-12 px-3 md:px-4 w-11 md:w-[240px] rounded-xl border-[2.5px] border-foreground bg-card text-muted-foreground shadow-[4px_4px_0_rgb(var(--foreground))] focus-within:text-foreground focus-within:shadow-[2px_2px_0_rgb(var(--foreground))] focus-within:translate-x-[2px] focus-within:translate-y-[2px] transition-all">
-                        <Search className="w-4 h-4 shrink-0 text-foreground" />
-                        <input
-                            type="search"
-                            name="q"
-                            placeholder={t('search')}
-                            aria-label={t('search')}
-                            className="hidden md:block w-full bg-transparent outline-none text-[14px] font-bold placeholder:text-muted-foreground text-foreground"
-                        />
-                    </form>
+                    <SearchBox />
                 </div>
             </div>
         </header>

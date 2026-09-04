@@ -1,5 +1,4 @@
 import 'server-only';
-import {fantasyScore} from '../fantasy';
 import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, TeamLineup, TeamMatchStats} from '../types';
 import type {FormEntry, StandingGroup} from '../types';
 import {FIXTURE_LIST_SELECT, FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toFixtures, toTeam, toStandingRow, type FixtureRow, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
@@ -72,11 +71,6 @@ function toTeamStats(r: TeamStatRow | undefined): TeamMatchStats | null {
     };
 }
 
-function statNumber(stats: Record<string, number | string | null> | null, key: string): number {
-    const v = stats?.[key];
-    return typeof v === 'number' ? v : Number(v ?? 0) || 0;
-}
-
 export async function getMatchPage(id: number): Promise<MatchPage | null> {
     try {
         const db = footballDb();
@@ -116,12 +110,9 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         const awayId = row.away.id;
         const side = (teamId: number | null): 'home' | 'away' | null => (teamId === homeId ? 'home' : teamId === awayId ? 'away' : null);
 
-        // Own goals per player, needed by the fantasy score.
-        const ownGoals = new Map<number, number>();
         const events: MatchEvent[] = [...(row.events ?? [])]
             .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.minute ?? 0) - (b.minute ?? 0))
             .map((e) => {
-                if (e.type === 'own_goal' && e.player?.id) ownGoals.set(e.player.id, (ownGoals.get(e.player.id) ?? 0) + 1);
                 return {
                     id: e.id,
                     teamId: e.team_id,
@@ -156,19 +147,6 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
                         keyPasses: p.key_passes,
                         yellowCards: p.yellow_cards,
                         redCards: p.red_cards,
-                        fantasy: fantasyScore({
-                            rating: p.rating,
-                            position: normalizedPosition,
-                            minutes: p.minutes_played,
-                            goals: p.goals,
-                            assists: p.assists,
-                            yellowCards: p.yellow_cards,
-                            redCards: p.red_cards,
-                            ownGoals: ownGoals.get(p.player!.id) ?? 0,
-                            penaltiesMissed: statNumber(p.stats, 'penalty_missed'),
-                            penaltiesSaved: statNumber(p.stats, 'penalty_saved'),
-                            goalsConceded: statNumber(p.stats, 'goals_conceded'),
-                        }),
                     };
                 })
                 .sort((a, b) => Number(b.minutes !== null) - Number(a.minutes !== null) || (b.rating ?? 0) - (a.rating ?? 0));

@@ -69,13 +69,11 @@
     "player": "Giocatore",
     "minutes": "Min",
     "rating": "Voto",
-    "fantasy": "FV",
     "goals": "Gol",
     "assists": "Ast",
     "shots": "Tiri",
     "keyPasses": "Pass. chiave",
-    "cards": "Cart.",
-    "fantasyHint": "Fantavoto GiBi: voto della partita più bonus e malus (gol +3, assist +1, ammonizione -0,5, espulsione -1, rigore sbagliato -3, rigore parato +3, autogol -2, gol subito -1 e porta inviolata +1 per i portieri). Stima basata sul rating del fornitore dati, non sul voto dei giornali."
+    "cards": "Cart."
   },
   "empty": {
     "noFixtures": "Nessuna partita in questo periodo.",
@@ -112,7 +110,6 @@
     "apps": "PG",
     "goals": "Gol",
     "assists": "Ast",
-    "rating": "Voto",
     "empty": "Classifica giocatori non ancora disponibile per questa stagione."
   },
   "zones": {

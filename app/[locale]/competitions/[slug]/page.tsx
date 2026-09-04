@@ -69,10 +69,9 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
     );
 
     const playersTab = (
-        <div className="grid gap-3 grid-cols-1 2xl:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 2xl:grid-cols-2">
             <Panel title={t('scorers')}><div className="px-1"><Rankings kind="scorers" players={page.rankings.scorers} /></div></Panel>
             <Panel title={t('assists')}><div className="px-1"><Rankings kind="assists" players={page.rankings.assists} /></div></Panel>
-            <Panel title={t('ratings')}><div className="px-1"><Rankings kind="ratings" players={page.rankings.ratings} /></div></Panel>
         </div>
     );
 

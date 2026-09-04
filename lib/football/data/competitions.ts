@@ -105,18 +105,17 @@ function toRanked(r: RankingRow): RankedPlayer | null {
     };
 }
 
-/** Season rankings from player_season_stats: scorers, assists, best ratings (5+ appearances). */
+/** Season rankings from player_season_stats: scorers and assists. */
 export async function getRankings(leagueId: number, seasonYear: number): Promise<CompetitionPage['rankings']> {
     const db = footballDb();
     const base = () => db.from('player_season_stats').select(RANKING_SELECT).eq('league_id', leagueId).eq('season_year', seasonYear);
-    const [scorersRes, assistsRes, ratingsRes] = await Promise.all([
+    const [scorersRes, assistsRes] = await Promise.all([
         base().gt('goals', 0).order('goals', {ascending: false}).order('assists', {ascending: false}).order('minutes', {ascending: true}).limit(20),
         base().gt('assists', 0).order('assists', {ascending: false}).order('goals', {ascending: false}).order('minutes', {ascending: true}).limit(20),
-        base().gte('appearances', 5).not('rating', 'is', null).order('rating', {ascending: false}).limit(20),
     ]);
-    for (const res of [scorersRes, assistsRes, ratingsRes]) if (res.error) throw res.error;
+    for (const res of [scorersRes, assistsRes]) if (res.error) throw res.error;
     const map = (rows: unknown) => ((rows ?? []) as RankingRow[]).map(toRanked).filter((r): r is RankedPlayer => r !== null);
-    return {scorers: map(scorersRes.data), assists: map(assistsRes.data), ratings: map(ratingsRes.data)};
+    return {scorers: map(scorersRes.data), assists: map(assistsRes.data)};
 }
 
 export async function getCompetitionPage(slug: string): Promise<CompetitionPage | null> {
@@ -132,7 +131,7 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
         const league = leagueRow as unknown as LeagueRow & {seasons: Array<{id: number; name: string; year: number; is_current: boolean}>};
         const current = league.seasons?.find((s) => s.is_current) ?? null;
         const competition = toCompetition(league);
-        const emptyRankings = {scorers: [], assists: [], ratings: []};
+        const emptyRankings = {scorers: [], assists: []};
         if (!current) {
             return {competition, season: null, standings: [], rounds: [], currentRound: null, results: [], upcoming: [], live: [], rankings: emptyRankings};
         }

@@ -149,7 +149,7 @@ export interface CompetitionPage {
     results: RoundFixtures[];
     upcoming: RoundFixtures[];
     live: FixtureSummary[];
-    rankings: {scorers: RankedPlayer[]; assists: RankedPlayer[]; ratings: RankedPlayer[]};
+    rankings: {scorers: RankedPlayer[]; assists: RankedPlayer[]};
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,6 @@ export interface PlayerMatchLine {
     keyPasses: number | null;
     yellowCards: number;
     redCards: number;
-    fantasy: number | null;
 }
 
 export interface MatchPage {
@@ -295,9 +294,25 @@ export interface TeamSeasonStats {
     avgXg: number | null;
 }
 
+/** A squad member's season totals for this team, summed over its competitions. */
+export interface TeamPlayerSeason {
+    player: {id: number; name: string; slug: string; imageUrl: string | null};
+    position: string | null;
+    number: number | null;
+    appearances: number;
+    lineups: number;
+    minutes: number;
+    goals: number;
+    assists: number;
+    rating: number | null;
+    yellowCards: number;
+    redCards: number;
+}
+
 export interface TeamPage {
     team: TeamSummary & {country: string | null; venue: string | null; founded: number | null};
     seasonStats: TeamSeasonStats | null;
+    players: TeamPlayerSeason[];
     standings: TeamStandingLine[];
     recent: FixtureSummary[];
     upcoming: FixtureSummary[];
@@ -318,7 +333,6 @@ export interface PlayerSeasonTotals {
     yellowCards: number;
     redCards: number;
     averageRating: number | null;
-    averageFantasy: number | null;
 }
 
 export interface PlayerMatchRow {
@@ -330,7 +344,6 @@ export interface PlayerMatchRow {
     assists: number;
     yellowCards: number;
     redCards: number;
-    fantasy: number | null;
 }
 
 /** One row of football.player_season_stats: a player in a team, competition and season. */

@@ -7,5 +7,10 @@
     "live": "Live",
     "competitions": "Competizioni",
     "stats": "Statistiche"
-  }
+  },
+  "searchHint": "Invio per tutti i risultati",
+  "searchTeams": "Squadre",
+  "searchPlayers": "Giocatori",
+  "searchCompetitions": "Competizioni",
+  "searchNone": "Nessun risultato"
 }

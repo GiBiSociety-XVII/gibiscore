@@ -1,5 +1,5 @@
 import 'server-only';
-import {LIVE_STATES, type SquadPlayer, type TeamPage, type TeamSeasonStats, type TeamStandingLine} from '../types';
+import {LIVE_STATES, type SquadPlayer, type TeamPage, type TeamPlayerSeason, type TeamSeasonStats, type TeamStandingLine} from '../types';
 import {normalizePosition} from './matches';
 import {FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixtures, toStandingRow, toTeam, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
@@ -18,13 +18,14 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
         const team = teamRow as unknown as TeamRow & {country: string | null; venue_name: string | null; founded: number | null};
 
         const now = new Date().toISOString();
-        const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, seasonStats] = await Promise.all([
+        const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, seasonStats, players] = await Promise.all([
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).lte('starting_at', now).order('starting_at', {ascending: false}).limit(8),
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).gt('starting_at', now).order('starting_at', {ascending: true}).limit(6),
             db.from('standings').select(`${STANDING_SELECT},season:seasons!inner(id,name,year,is_current,league:leagues(${LEAGUE_SELECT}))`).eq('team_id', team.id).eq('seasons.is_current', true),
             db.from('squad_members').select('jersey_number,season:seasons!inner(is_current),player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).eq('seasons.is_current', true),
             db.from('sidelined').select('category,description,player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).order('start_date', {ascending: false}).limit(30),
             loadSeasonStats(db, team.id),
+            loadPlayers(db, team.id),
         ]);
         for (const res of [pastRes, futureRes, standingsRes, squadRes, sidelinedRes]) if (res.error) throw res.error;
 
@@ -81,6 +82,7 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
             squad,
             sidelined,
             seasonStats,
+            players,
         };
     } catch (error) {
         logReadError(`getTeamPage(${slug})`, error);
@@ -149,5 +151,67 @@ async function loadSeasonStats(db: ReturnType<typeof footballDb>, teamId: number
     } catch (error) {
         logReadError('loadSeasonStats', error);
         return null;
+    }
+}
+
+interface PlayerSeasonRow {
+    season_year: number;
+    position: string | null;
+    jersey_number: number | null;
+    appearances: number | null;
+    lineups: number | null;
+    minutes: number | null;
+    goals: number | null;
+    assists: number | null;
+    rating: number | null;
+    yellow_cards: number | null;
+    yellow_red_cards: number | null;
+    red_cards: number | null;
+    player: {id: number; name: string; slug: string; image_url: string | null} | null;
+    season: {is_current: boolean} | null;
+}
+
+/** Season totals of every player who played for the team this season, summed over competitions. */
+async function loadPlayers(db: ReturnType<typeof footballDb>, teamId: number): Promise<TeamPlayerSeason[]> {
+    try {
+        const {data, error} = await db
+            .from('player_season_stats')
+            .select('season_year,position,jersey_number,appearances,lineups,minutes,goals,assists,rating,yellow_cards,yellow_red_cards,red_cards,player:players(id,name,slug,image_url),season:seasons!inner(is_current)')
+            .eq('team_id', teamId)
+            .eq('seasons.is_current', true)
+            .limit(400);
+        if (error) throw error;
+        const byPlayer = new Map<number, TeamPlayerSeason & {ratingWeight: number; ratingSum: number}>();
+        for (const r of (data ?? []) as unknown as PlayerSeasonRow[]) {
+            if (!r.player) continue;
+            const apps = r.appearances ?? 0;
+            const cur = byPlayer.get(r.player.id) ?? {
+                player: {id: r.player.id, name: r.player.name, slug: r.player.slug, imageUrl: r.player.image_url},
+                position: normalizePosition(r.position),
+                number: r.jersey_number,
+                appearances: 0, lineups: 0, minutes: 0, goals: 0, assists: 0, rating: null, yellowCards: 0, redCards: 0,
+                ratingWeight: 0, ratingSum: 0,
+            };
+            cur.appearances += apps;
+            cur.lineups += r.lineups ?? 0;
+            cur.minutes += r.minutes ?? 0;
+            cur.goals += r.goals ?? 0;
+            cur.assists += r.assists ?? 0;
+            cur.yellowCards += (r.yellow_cards ?? 0) + (r.yellow_red_cards ?? 0);
+            cur.redCards += r.red_cards ?? 0;
+            if (r.rating !== null && apps > 0) {
+                cur.ratingSum += Number(r.rating) * apps;
+                cur.ratingWeight += apps;
+            }
+            if (cur.number === null && r.jersey_number !== null) cur.number = r.jersey_number;
+            byPlayer.set(r.player.id, cur);
+        }
+        const order: Record<string, number> = {goalkeeper: 0, defender: 1, midfielder: 2, attacker: 3};
+        return [...byPlayer.values()]
+            .map(({ratingSum, ratingWeight, ...p}) => ({...p, rating: ratingWeight > 0 ? Math.round((ratingSum / ratingWeight) * 100) / 100 : null}))
+            .sort((a, b) => (order[a.position ?? ''] ?? 9) - (order[b.position ?? ''] ?? 9) || b.minutes - a.minutes);
+    } catch (error) {
+        logReadError('loadPlayers', error);
+        return [];
     }
 }

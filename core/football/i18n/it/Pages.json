@@ -24,7 +24,6 @@
     "live": "In corso",
     "scorers": "Marcatori",
     "assists": "Assist",
-    "ratings": "Voti migliori",
     "previousRound": "Precedente",
     "nextRound": "Successiva",
     "allRounds": "Tutte le giornate",
@@ -74,7 +73,8 @@
       "matches": "Partite",
       "squad": "Rosa",
       "standings": "Classifica",
-      "stats": "Statistiche"
+      "stats": "Statistiche",
+      "players": "Giocatori"
     },
     "statsTitle": "Statistiche stagione",
     "played": "Partite",
@@ -86,7 +86,18 @@
     "avgShotsOn": "Tiri in porta a partita",
     "avgCorners": "Angoli a partita",
     "avgXg": "xG a partita",
-    "noStats": "Statistiche non ancora disponibili per questa stagione."
+    "noStats": "Statistiche non ancora disponibili per questa stagione.",
+    "playersTitle": "Statistiche giocatori · stagione in corso",
+    "noPlayers": "Statistiche dei giocatori non ancora disponibili per questa stagione.",
+    "playerCols": {
+      "apps": "PG",
+      "lineups": "Tit.",
+      "minutes": "Min",
+      "goals": "Gol",
+      "assists": "Ast",
+      "rating": "Voto",
+      "cards": "Cart."
+    }
   },
   "player": {
     "notFound": "Giocatore non trovato",
@@ -98,7 +109,6 @@
     "assists": "Assist",
     "cards": "Cartellini",
     "averageRating": "Voto medio",
-    "averageFantasy": "Fantamedia",
     "years": "{age} anni",
     "height": "{cm} cm",
     "noMatches": "Nessuna partita con statistiche in questa stagione.",
@@ -173,7 +183,6 @@
     "intro": "Classifiche di stagione per ogni competizione principale, aggiornate dopo ogni giornata.",
     "scorers": "Marcatori",
     "assists": "Assist",
-    "ratings": "Voti migliori",
     "empty": "Dati non ancora disponibili per questa competizione."
   }
 }

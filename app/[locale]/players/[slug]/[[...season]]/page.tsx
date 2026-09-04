@@ -142,7 +142,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                             <tr className="text-muted-foreground text-[10px] font-extrabold tracking-wider uppercase">
                                 <th className="px-1.5 py-1 text-left">Data</th>
                                 <th className="px-1.5 py-1 text-left">Partita</th>
-                                {(['minutes', 'rating', 'fantasy', 'goals', 'assists', 'cards'] as const).map((k) => <th key={k} className="px-1.5 py-1 text-right font-mono">{tFootball(`playerTable.${k}`)}</th>)}
+                                {(['minutes', 'rating', 'goals', 'assists', 'cards'] as const).map((k) => <th key={k} className="px-1.5 py-1 text-right font-mono">{tFootball(`playerTable.${k}`)}</th>)}
                             </tr>
                         </thead>
                         <tbody>
@@ -163,7 +163,6 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                         </td>
                                         <td className={cellClass}>{m.minutes ?? '–'}</td>
                                         <td className={cellClass}>{m.rating !== null ? m.rating.toFixed(1) : '–'}</td>
-                                        <td className={cn(cellClass, "font-extrabold")}>{m.fantasy !== null ? m.fantasy.toFixed(1) : '–'}</td>
                                         <td className={cellClass}>{m.goals || ''}</td>
                                         <td className={cellClass}>{m.assists || ''}</td>
                                         <td className="px-1.5 py-1 text-right">
@@ -177,7 +176,6 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                     </table>
                 </div>
             )}
-            <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{tFootball('playerTable.fantasyHint')}</p>
         </Panel>
     );
 
@@ -236,8 +234,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                     <Stat value={totals.goals} label={t('goals')} />
                     <Stat value={totals.assists} label={t('assists')} />
                     <Stat value={`${totals.yellowCards}/${totals.redCards}`} label={t('cards')} />
-                    <Stat value={totals.averageRating !== null ? totals.averageRating.toFixed(2) : '–'} label={t('averageRating')} />
-                    <Stat value={totals.averageFantasy !== null ? totals.averageFantasy.toFixed(2) : '–'} label={t('averageFantasy')} accent />
+                    <Stat value={totals.averageRating !== null ? totals.averageRating.toFixed(2) : '–'} label={t('averageRating')} accent />
                 </div>
             </section>
 
