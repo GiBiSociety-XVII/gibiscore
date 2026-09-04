@@ -19,8 +19,13 @@ body {
   --card-foreground: 20 19 26;
   --muted: 237 234 225;
   --muted-foreground: 107 105 118;
-  --accent: 182 255 60;
+  /* GiBiScore accent (identity GiBi): #3BC9FF, text on light #0A72A8 */
+  --accent: 59 201 255;
   --accent-foreground: 20 19 26;
+  --accent-text: 10 114 168;
+  /* Sister brands, for the GiBiSociety footer */
+  --brand-arena: 182 255 60;
+  --brand-society: 255 122 69;
   --border: 20 19 26;
   --ring: 20 19 26;
   --radius: 0.75rem;
@@ -36,6 +41,9 @@ body {
   --color-muted-foreground: rgb(var(--muted-foreground));
   --color-accent: rgb(var(--accent));
   --color-accent-foreground: rgb(var(--accent-foreground));
+  --color-accent-text: rgb(var(--accent-text));
+  --color-brand-arena: rgb(var(--brand-arena));
+  --color-brand-society: rgb(var(--brand-society));
   --color-border: rgb(var(--border));
   --color-ring: rgb(var(--ring));
   --radius-lg: var(--radius-lg);

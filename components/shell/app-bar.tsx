@@ -4,7 +4,7 @@ import {Search} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {Link, usePathname} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
-import {LogoMark} from "@/components/shared/layout/logo";
+import {BrandIcon, BrandLockup} from "@/components/shared/layout/logo";
 
 // URLs are English like on GiBiArena; labels come from AppBar.json.
 const NAV_ITEMS = [
@@ -23,9 +23,9 @@ export default function AppBar() {
         <header className="sticky top-0 z-50 w-full bg-background text-foreground border-b-[2.5px] border-foreground">
             <div className="w-full max-w-[1600px] mx-auto px-2 md:px-4">
                 <div className="flex h-12 items-center gap-2 md:gap-4">
-                    <Link href="/" className="flex items-center gap-2 shrink-0">
-                        <LogoMark size={30} />
-                        <span className="text-base font-black tracking-tight">GiBiScore</span>
+                    <Link href="/" className="flex items-center shrink-0" aria-label="GiBiScore">
+                        <BrandLockup height={30} className="hidden sm:block" />
+                        <BrandIcon size={32} className="sm:hidden" alt="GiBiScore" />
                     </Link>
 
                     <nav aria-label={t('sectionsLabel')} className="flex items-center gap-0.5 ml-1 md:ml-3 overflow-x-auto">

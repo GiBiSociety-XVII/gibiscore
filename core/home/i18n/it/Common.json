@@ -9,11 +9,26 @@
     "backHome": "Torna alla home"
   },
   "footer": {
-    "about": "GiBiScore è il sito di risultati e statistiche calcio di GiBiSociety: partite live, classifiche, xG e schede di squadre e giocatori.",
+    "company": {
+      "name": "GiBiSociety",
+      "tagline": "Creatori di siti web",
+      "description": "La rete GiBi: risultati e statistiche di calcio con GiBiScore, strategie e strumenti per i tuoi giochi con GiBiArena."
+    },
     "explore": "Esplora",
-    "network": "GiBiSociety",
+    "network": "Rete GiBi",
     "gibiarena": "GiBiArena",
-    "rights": "Tutti i diritti riservati."
+    "gibiarenaHint": "Gaming, guide e strumenti",
+    "gibiscore": "GiBiScore",
+    "gibiscoreHint": "Calcio, risultati e statistiche",
+    "legal": "Legale",
+    "privacy": "Informativa Privacy",
+    "terms": "Termini di Servizio",
+    "support": "Supporto",
+    "supportEmail": "service@gibiarena.com",
+    "supportMessage": "Per domande o problemi scrivici, rispondiamo volentieri.",
+    "instagram": "@gibiarena",
+    "copyright": "GiBiSociety. Tutti i diritti riservati.",
+    "dataCredit": "Dati forniti da API-Football."
   },
   "sidebar": {
     "label": "Competizioni",

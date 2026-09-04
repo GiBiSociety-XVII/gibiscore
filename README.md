@@ -114,6 +114,14 @@ Diagnostica del piano e della copertura per lega in evidenza:
 Ogni esecuzione scrive una riga in `football.sync_runs` con contatori,
 richieste usate e avvisi: è il primo posto dove guardare se qualcosa manca.
 
+## Identità
+
+I file del marchio (icone, favicon, lockup di GiBiScore, GiBiArena e
+GiBiSociety) e le regole d'uso stanno in `public/brand/` (`README.txt`).
+Accento di GiBiScore `#3BC9FF` (`--accent`), testo colorato su chiaro
+`#0A72A8` (`--accent-text`), tile e testo `#14131A`. Il favicon usa la
+variante ad accento pieno, iOS la tile nera, `theme-color` `#14131A`.
+
 ## Pagine
 
 Struttura alla Diretta/Sofascore: barra laterale con le competizioni
