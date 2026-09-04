@@ -237,7 +237,9 @@
     "change": "Cambia",
     "remove": "Rimuovi",
     "cancel": "Annulla",
-    "pickOther": "{name} è selezionato: ora scegli il giocatore con cui confrontarlo."
+    "pickOther": "{name} è selezionato: ora scegli il giocatore con cui confrontarlo.",
+    "seasonPicker": "Stagione",
+    "seasonOneOnly": "Solo uno dei due giocatori ha dati in questa stagione"
   },
   "predictions": {
     "title": "Pronostici",

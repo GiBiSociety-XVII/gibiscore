@@ -65,6 +65,13 @@ export default async function ComparePage({params, searchParams}: PageProps<"/[l
               [t('rows.cards'), `${data.a.totals.yellowCards} / ${data.a.totals.redCards}`, `${data.b.totals.yellowCards} / ${data.b.totals.redCards}`, 'none'],
           ] as Array<[string, string | number, string | number, 'high' | 'none']>)
         : [];
+    // Seasons on offer: every season of either player, those both played in first-class.
+    const seasons = data
+        ? [...new Map([...data.a.page.availableSeasons, ...data.b.page.availableSeasons].map((s) => [s.year, s.name])).entries()]
+              .map(([year, name]) => ({year, name, both: data.a.page.availableSeasons.some((s) => s.year === year) && data.b.page.availableSeasons.some((s) => s.year === year)}))
+              .sort((x, y) => y.year - x.year)
+              .slice(0, 6)
+        : [];
     const better = (x: string | number, y: string | number, mode: 'high' | 'none'): 'a' | 'b' | null => {
         if (mode === 'none') return null;
         const nx = Number(String(x).replace('%', ''));
@@ -83,7 +90,26 @@ export default async function ComparePage({params, searchParams}: PageProps<"/[l
             {(briefA || briefB) && !(briefA && briefB) && <p className="text-[12px] font-semibold text-muted-foreground">{t('pickOther', {name: (briefA ?? briefB)!.name})}</p>}
             {a && b && !data && <p className="text-sm font-semibold text-muted-foreground">{t('notFound')}</p>}
             {data && (
-                <Panel title={t('seasonTitle', {season: data.a.page.availableSeasons.find((s) => s.year === data.year)?.name ?? String(data.year)})}>
+                <Panel
+                    title={t('seasonTitle', {season: data.a.page.availableSeasons.find((s) => s.year === data.year)?.name ?? String(data.year)})}
+                    action={
+                        seasons.length > 1 ? (
+                            <nav aria-label={t('seasonPicker')} className="flex items-center gap-1 flex-wrap justify-end">
+                                {seasons.map((s) => (
+                                    <Link
+                                        key={s.year}
+                                        href={`/compare?a=${a}&b=${b}&season=${s.year}`}
+                                        aria-current={s.year === data.year ? 'page' : undefined}
+                                        title={s.both ? undefined : t('seasonOneOnly')}
+                                        className={cn("px-2 h-6 inline-flex items-center rounded-md border-2 border-foreground text-[11px] font-extrabold font-mono tabular-nums", s.year === data.year ? "bg-foreground text-background" : s.both ? "bg-card hover:bg-accent" : "bg-card text-muted-foreground hover:bg-accent")}
+                                    >
+                                        {s.name}
+                                    </Link>
+                                ))}
+                            </nav>
+                        ) : undefined
+                    }
+                >
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-3 py-3 border-b-2 border-foreground">
                         <Head side={data.a} align="left" />
                         <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">vs</span>
