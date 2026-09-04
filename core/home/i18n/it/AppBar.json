@@ -12,5 +12,37 @@
   "searchTeams": "Squadre",
   "searchPlayers": "Giocatori",
   "searchCompetitions": "Competizioni",
-  "searchNone": "Nessun risultato"
+  "searchNone": "Nessun risultato",
+  "menus": {
+    "scores": {
+      "matchesTitle": "Partite",
+      "today": "Partite di oggi",
+      "live": "Partite live",
+      "yesterday": "Risultati di ieri",
+      "tomorrow": "Programma di domani",
+      "toolsTitle": "Strumenti",
+      "search": "Cerca squadra o giocatore",
+      "searchHint": "Squadre, giocatori, competizioni",
+      "favorites": "Preferiti e le mie squadre",
+      "favoritesHint": "Usa la stella per seguirli nella home",
+      "overview": "Tutte le partite di oggi"
+    },
+    "competitions": {
+      "italyTitle": "Italia",
+      "europeTitle": "Coppe europee",
+      "topTitle": "Top campionati",
+      "overview": "Tutte le competizioni"
+    },
+    "stats": {
+      "playersTitle": "Giocatori",
+      "scorers": "Marcatori",
+      "assists": "Assist",
+      "squadsTitle": "Squadre e rose",
+      "injuries": "Infortunati e squalificati",
+      "injuriesHint": "Per competizione, squadra per squadra",
+      "teamStats": "Statistiche squadra",
+      "teamStatsHint": "Cerca una squadra e apri la tab Statistiche",
+      "overview": "Tutte le statistiche"
+    }
+  }
 }
