@@ -23,6 +23,15 @@ describe('assignTiers', () => {
         expect(tiers.get(125)).toBe('filler');
     });
 
+    it('keeps thin-evidence players out of the top two tiers', () => {
+        const players = pool('A', 70, 0).map((p, i) => ({...p, scores: {...p.scores, confidence: (i === 0 ? 'low' : 'high') as 'low' | 'high'}}));
+        const tiers = assignTiers(players, {participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}});
+        expect(tiers.get(1)).not.toBe('top');
+        expect(tiers.get(1)).not.toBe('semiTop');
+        expect(tiers.get(2)).toBe('top');
+        expect([...tiers.values()].filter((t) => t === 'top')).toHaveLength(4);
+    });
+
     it('groups by role and tier, best first', () => {
         const players = pool('D', 10, 0);
         const grouped = groupByTier(players, assignTiers(players, {participants: 2, slots: {P: 1, D: 3, C: 3, A: 2}}));

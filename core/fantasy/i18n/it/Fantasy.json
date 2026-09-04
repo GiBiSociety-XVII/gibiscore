@@ -21,7 +21,8 @@
     "changeSettings": "Modifica impostazioni",
     "reset": "Nuova asta",
     "resetConfirm": "Cancellare impostazioni e acquisti di questa asta?",
-    "updated": "Dati aggiornati ogni ora"
+    "updated": "Dati aggiornati ogni ora",
+    "strategies": "Strategie"
   },
   "setup": {
     "title": "Configura l'asta",
@@ -256,7 +257,7 @@
     },
     "all": "Tutte le fasce",
     "moreFillers": "e altri {count} riempitivi",
-    "hint": "Fasce per ruolo in base al voto totale: il numero di giocatori di ogni fascia segue quanti ne compra la tua lega (partecipanti × slot). Top e semi-top sono i pochi che tutti vogliono, terza fascia gli ultimi titolari, il resto riempitivi e scommesse.",
+    "hint": "Fasce per ruolo in base al voto totale: il numero di giocatori di ogni fascia segue quanti ne compra la tua lega (partecipanti × slot). Chi ha pochi dati alle spalle non può stare in top o semi-top: scende di una fascia. Top e semi-top sono i pochi che tutti vogliono, terza fascia gli ultimi titolari, il resto riempitivi e scommesse.",
     "top": {
       "name": "Top",
       "short": "TOP"

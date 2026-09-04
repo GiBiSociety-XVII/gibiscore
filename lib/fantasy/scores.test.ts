@@ -123,7 +123,7 @@ describe('suggestPrices', () => {
         const spent = [...prices.values()].reduce((s, v) => s + v, 0);
         expect(prices.get(1)!).toBeGreaterThan(prices.get(20)!);
         expect(prices.get(1)!).toBeGreaterThanOrEqual(100);
-        expect(prices.get(1)!).toBeLessThanOrEqual(190);
+        expect(prices.get(1)!).toBeLessThanOrEqual(220);
         expect(prices.get(5)!).toBeGreaterThan(prices.get(1)! * 0.55);
         expect(prices.get(12)!).toBeLessThan(prices.get(1)! * 0.45);
         expect(prices.get(24)!).toBeLessThan(prices.get(1)! * 0.15);

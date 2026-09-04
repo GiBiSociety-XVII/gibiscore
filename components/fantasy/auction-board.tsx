@@ -1,6 +1,6 @@
 'use client';
 
-import {ChevronDown, ChevronUp, Search, Settings2, X} from "lucide-react";
+import {ChevronDown, ChevronUp, Lightbulb, Search, Settings2, X} from "lucide-react";
 import {useMemo, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -63,6 +63,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const config = configStore.useValue();
     const purchases = purchasesStore.useValue();
     const [editing, setEditing] = useState(false);
+    const [showStrategies, setShowStrategies] = useState(false);
 
     const [q, setQ] = useState('');
     const [role, setRole] = useState<FantaRole | 'all'>('all');
@@ -178,6 +179,10 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                     <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)}</span>
                     <span className="text-[11px] font-semibold text-muted-foreground">· {ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr.</span>
                     <span className="ml-auto flex items-center gap-1.5">
+                        <button type="button" onClick={() => setShowStrategies(true)} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", strategy ? "bg-accent" : "bg-card")}>
+                            <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
+                            {strategy ? tst(`${strategy.key}.name`) : ta('strategies')}
+                        </button>
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
                         <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
@@ -399,8 +404,21 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         </ul>
                     </Panel>
                 )}
-                <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={selectStrategy} credits={config.credits} />
             </div>
+
+            {/* Strategies */}
+            {showStrategies && (
+                <div role="dialog" aria-modal="true" aria-label={ta('strategies')} className="fixed inset-0 z-[60] flex items-start justify-center bg-foreground/40 p-3 overflow-y-auto" onClick={() => setShowStrategies(false)}>
+                    <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl my-4 flex flex-col gap-2">
+                        <div className="flex justify-end">
+                            <button type="button" onClick={() => setShowStrategies(false)} aria-label={ts('cancel')} className="inline-flex items-center justify-center w-9 h-9 rounded-md border-2 border-foreground bg-background"><X className="w-4 h-4" /></button>
+                        </div>
+                        <div className="bg-background rounded-xl">
+                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Buy sheet */}
             {buying && (

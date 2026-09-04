@@ -126,7 +126,8 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
     const prices = new Map<number, number>();
     const market = marketState(players, listPrices, config, purchases);
     const paidFor = new Map(purchases.map((p) => [p.playerId, p.price]));
-    const cap = Math.max(1, Math.round(config.credits * 0.4));
+    // A live price can climb to 60% of one budget when the last top is contested.
+    const cap = Math.max(1, Math.round(config.credits * 0.6));
     for (const role of ROLES) {
         const state = market.byRole[role];
         const available = players.filter((p) => p.role === role && !paidFor.has(p.id)).sort((a, b) => b.scores.overall - a.scores.overall);
