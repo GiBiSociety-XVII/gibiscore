@@ -22,6 +22,45 @@ function Field({label, hint, children, className}: {label: string; hint?: string
 const input = "bb-input h-9 px-2.5 text-[14px] font-semibold w-full";
 const numberInput = `${input} font-mono tabular-nums`;
 
+/**
+ * Number typed freely (digits, and a sign or decimals when allowed):
+ * nothing is clamped while typing, the value is checked when the field
+ * is left, and the text is selected on focus so a new number replaces
+ * the old one.
+ */
+function NumberField({value, onCommit, min, max, decimals = false, className}: {value: number; onCommit: (n: number) => void; min: number; max: number; decimals?: boolean; className?: string}) {
+    const [text, setText] = useState(String(value));
+    const [editing, setEditing] = useState(false);
+    const shown = editing ? text : String(value);
+    const commit = () => {
+        setEditing(false);
+        const n = Number(text.replace(',', '.'));
+        if (text.trim() === '' || !Number.isFinite(n)) return;
+        onCommit(Math.min(max, Math.max(min, decimals ? Math.round(n * 2) / 2 : Math.round(n))));
+    };
+    return (
+        <input
+            type="text"
+            inputMode={decimals ? 'decimal' : 'numeric'}
+            className={cn(numberInput, className)}
+            value={shown}
+            onFocus={(e) => {
+                setText(String(value));
+                setEditing(true);
+                e.currentTarget.select();
+            }}
+            onChange={(e) => setText(e.target.value.replace(decimals ? /[^0-9.,-]/g : /[^0-9]/g, '').slice(0, 6))}
+            onBlur={commit}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                }
+            }}
+        />
+    );
+}
+
 /** Auction settings form: league, mode, credits, squad, scoring rules, modifiers, managers. */
 export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfig | null; onSave: (config: AuctionConfig) => void; onCancel?: () => void}) {
     const t = useTranslations('Fantasy.setup');
@@ -29,10 +68,6 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
     const [managersText, setManagersText] = useState((initial?.managers ?? []).join('\n'));
     const set = <K extends keyof AuctionConfig>(key: K, value: AuctionConfig[K]) => setConfig((c) => ({...c, [key]: value}));
     const setMode = (mode: AuctionMode) => setConfig((c) => ({...c, mode, slots: DEFAULT_SLOTS[mode]}));
-    const num = (raw: string, min: number, max: number, fallback: number) => {
-        const n = Number(raw);
-        return Number.isFinite(n) && raw !== '' ? Math.min(max, Math.max(min, Math.round(n))) : fallback;
-    };
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         const managers = managersText.split('\n').map((m) => m.trim()).filter(Boolean).slice(0, 20);
@@ -62,10 +97,10 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                         </Field>
                         <div className="grid grid-cols-2 gap-3">
                             <Field label={t('participants')}>
-                                <input type="number" min={2} max={20} className={numberInput} value={config.participants} onChange={(e) => set('participants', num(e.target.value, 2, 20, 8))} />
+                                <NumberField value={config.participants} min={2} max={20} onCommit={(n) => set('participants', n)} />
                             </Field>
                             <Field label={t('credits')}>
-                                <input type="number" min={50} max={5000} step={50} className={numberInput} value={config.credits} onChange={(e) => set('credits', num(e.target.value, 50, 5000, 500))} />
+                                <NumberField value={config.credits} min={50} max={5000} onCommit={(n) => set('credits', n)} />
                             </Field>
                         </div>
                     </div>
@@ -77,7 +112,7 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                     <div className="grid grid-cols-4 gap-2 px-3 py-3">
                         {ROLES.map((r) => (
                             <Field key={r} label={t(`roles.${r}`)}>
-                                <input type="number" min={1} max={12} className={numberInput} value={config.slots[r]} onChange={(e) => set('slots', {...config.slots, [r]: num(e.target.value, 1, 12, config.slots[r])})} />
+                                <NumberField value={config.slots[r]} min={1} max={12} onCommit={(n) => set('slots', {...config.slots, [r]: n})} />
                             </Field>
                         ))}
                     </div>
@@ -99,7 +134,7 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 py-3">
                         {(Object.keys(config.rules) as Array<keyof AuctionConfig['rules']>).map((k) => (
                             <Field key={k} label={t(`rule.${k}`)}>
-                                <input type="number" step={0.5} min={-10} max={10} className={numberInput} value={config.rules[k]} onChange={(e) => set('rules', {...config.rules, [k]: Number(e.target.value) || 0})} />
+                                <NumberField value={config.rules[k]} min={-10} max={10} decimals onCommit={(n) => set('rules', {...config.rules, [k]: n})} />
                             </Field>
                         ))}
                         <p className="col-span-full text-[11px] font-semibold text-muted-foreground">{t('rulesHint')}</p>
