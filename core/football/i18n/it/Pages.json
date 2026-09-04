@@ -147,7 +147,8 @@
       "seasons": "Stagioni",
       "matches": "Partite"
     },
-    "ratingTrend": "Andamento voti"
+    "ratingTrend": "Andamento voti",
+    "compare": "Confronta"
   },
   "scores": {
     "metaTitle": "Risultati calcio in tempo reale",
@@ -231,7 +232,12 @@
       "passAccuracy": "Precisione passaggi",
       "rating": "Voto medio",
       "cards": "Cartellini"
-    }
+    },
+    "selected": "Selezionato",
+    "change": "Cambia",
+    "remove": "Rimuovi",
+    "cancel": "Annulla",
+    "pickOther": "{name} è selezionato: ora scegli il giocatore con cui confrontarlo."
   },
   "predictions": {
     "title": "Pronostici",

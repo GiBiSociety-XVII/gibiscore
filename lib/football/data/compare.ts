@@ -1,6 +1,7 @@
 import 'server-only';
 import type {PlayerPage, PlayerSeasonStat} from '../types';
 import {getPlayerPage} from './players';
+import {TEAM_SELECT, footballDb, logReadError, type TeamRow} from './shared';
 
 export interface CompareSide {
     page: PlayerPage;
@@ -59,4 +60,34 @@ export async function getPlayerCompare(slugA: string, slugB: string, seasonYear?
     if (!a || !b) return null;
     const side = (page: PlayerPage): CompareSide => ({page, totals: sum(page.seasons.filter((s) => s.seasonYear === year))});
     return {a: side(a), b: side(b), year};
+}
+
+export interface PlayerBrief {
+    name: string;
+    slug: string;
+    imageUrl: string | null;
+    /** Current team, when known. */
+    team: string | null;
+}
+
+/** Name, photo and current team of one player: the "selected" card of the compare page. */
+export async function getPlayerBrief(slug: string): Promise<PlayerBrief | null> {
+    try {
+        const db = footballDb();
+        const {data, error} = await db.from('players').select('id,name,slug,image_url').eq('slug', slug).maybeSingle();
+        if (error) throw error;
+        if (!data) return null;
+        const player = data as {id: number; name: string; slug: string; image_url: string | null};
+        const {data: squad} = await db
+            .from('squad_members')
+            .select(`team:teams(${TEAM_SELECT}),season:seasons!inner(is_current)`)
+            .eq('player_id', player.id)
+            .eq('seasons.is_current', true)
+            .limit(1);
+        const team = ((squad ?? []) as unknown as Array<{team: TeamRow | null}>)[0]?.team ?? null;
+        return {name: player.name, slug: player.slug, imageUrl: player.image_url, team: team?.name ?? null};
+    } catch (error) {
+        logReadError(`getPlayerBrief(${slug})`, error);
+        return null;
+    }
 }

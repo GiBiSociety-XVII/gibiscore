@@ -7,7 +7,7 @@ import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
 import {PlayerPicker} from "@/components/football/player-picker";
 import {TeamCrest} from "@/components/football/team-crest";
-import {getPlayerCompare, type CompareSide} from "@/lib/football/data/compare";
+import {getPlayerBrief, getPlayerCompare, type CompareSide} from "@/lib/football/data/compare";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Pages.compare');
@@ -46,7 +46,8 @@ export default async function ComparePage({params, searchParams}: PageProps<"/[l
     const a = typeof sp.a === 'string' ? sp.a : null;
     const b = typeof sp.b === 'string' ? sp.b : null;
     const yearRaw = typeof sp.season === 'string' && /^\d{4}$/.test(sp.season) ? Number(sp.season) : undefined;
-    const data = a && b ? await getPlayerCompare(a, b, yearRaw) : null;
+    const [data, briefA, briefB] = await Promise.all([a && b ? getPlayerCompare(a, b, yearRaw) : null, a ? getPlayerBrief(a) : null, b ? getPlayerBrief(b) : null]);
+    const picked = (brief: Awaited<ReturnType<typeof getPlayerBrief>>) => (brief ? {name: brief.name, slug: brief.slug, imageUrl: brief.imageUrl, hint: brief.team} : null);
 
     const rows = data
         ? ([
@@ -76,9 +77,10 @@ export default async function ComparePage({params, searchParams}: PageProps<"/[l
         <SiteShell wide>
             <PageHeader title={t('title')} meta={t('intro')} />
             <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-                <PlayerPicker param="a" other={b} otherParam="b" placeholder={t('pickA')} />
-                <PlayerPicker param="b" other={a} otherParam="a" placeholder={t('pickB')} />
+                <PlayerPicker param="a" other={b} otherParam="b" placeholder={t('pickA')} selected={picked(briefA)} season={yearRaw} />
+                <PlayerPicker param="b" other={a} otherParam="a" placeholder={t('pickB')} selected={picked(briefB)} season={yearRaw} />
             </div>
+            {(briefA || briefB) && !(briefA && briefB) && <p className="text-[12px] font-semibold text-muted-foreground">{t('pickOther', {name: (briefA ?? briefB)!.name})}</p>}
             {a && b && !data && <p className="text-sm font-semibold text-muted-foreground">{t('notFound')}</p>}
             {data && (
                 <Panel title={t('seasonTitle', {season: data.a.page.availableSeasons.find((s) => s.year === data.year)?.name ?? String(data.year)})}>

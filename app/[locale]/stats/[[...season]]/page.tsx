@@ -29,7 +29,8 @@ export default async function StatsPage({params}: PageProps<"/[locale]/stats/[[.
     const t = await getTranslations('Pages.stats');
     const page = await getStatsPage(parseYear(season));
     const blocks = page.blocks;
-    const seasonHref = (year: number, isCurrent: boolean) => (isCurrent ? '/stats' : `/stats/${year}`);
+    // Only the default season lives at /stats: a one-off competition (Supercoppa 2025) can still be "current" in an older year.
+    const seasonHref = (year: number) => (year === page.defaultYear ? '/stats' : `/stats/${year}`);
 
     return (
         <SiteShell wide>
@@ -42,7 +43,7 @@ export default async function StatsPage({params}: PageProps<"/[locale]/stats/[[.
                             {page.years.slice(0, 6).map((y) => (
                                 <Link
                                     key={y.year}
-                                    href={seasonHref(y.year, y.isCurrent)}
+                                    href={seasonHref(y.year)}
                                     aria-current={y.year === page.year ? 'page' : undefined}
                                     className={`px-2 h-7 inline-flex items-center rounded-md border-2 border-foreground text-[12px] font-extrabold font-mono tabular-nums ${y.year === page.year ? 'bg-foreground text-background' : 'bg-card hover:bg-accent'}`}
                                 >

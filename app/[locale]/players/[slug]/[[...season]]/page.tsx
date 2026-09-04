@@ -1,5 +1,6 @@
 import type {Metadata} from "next";
 import Image from "next/image";
+import {ArrowLeftRight} from "lucide-react";
 import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -215,7 +216,12 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                     </>
                 }
                 aside={
-                    page.availableSeasons.length > 1 ? (
+                    <div className="flex flex-col items-end gap-1.5">
+                        <Link href={`/compare?a=${player.slug}&season=${page.selectedSeason}`} className="bb-btn bg-accent px-3 h-7 inline-flex items-center gap-1.5 text-[12px] font-extrabold whitespace-nowrap">
+                            <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
+                            {t('compare')}
+                        </Link>
+                    {page.availableSeasons.length > 1 ? (
                         <nav aria-label={t('seasonPicker')} className="flex items-center gap-1 flex-wrap justify-end">
                             {page.availableSeasons.slice(0, 5).map((s) => (
                                 <Link
@@ -228,7 +234,8 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                 </Link>
                             ))}
                         </nav>
-                    ) : null
+                    ) : null}
+                    </div>
                 }
             />
 

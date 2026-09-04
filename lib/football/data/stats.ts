@@ -14,6 +14,8 @@ export interface CompetitionStats {
 export interface StatsPage {
     /** Season shown (year the season starts). */
     year: number;
+    /** Season shown when none is requested: the newest current one. */
+    defaultYear: number;
     /** Years with imported player statistics in at least one pinned competition, newest first. */
     years: Array<{year: number; label: string; isCurrent: boolean}>;
     blocks: CompetitionStats[];
@@ -21,7 +23,7 @@ export interface StatsPage {
 
 /** Season rankings of every pinned competition, for the requested year (default: the current season). */
 export async function getStatsPage(requestedYear?: number): Promise<StatsPage> {
-    const empty: StatsPage = {year: requestedYear ?? new Date().getFullYear(), years: [], blocks: []};
+    const empty: StatsPage = {year: requestedYear ?? new Date().getFullYear(), defaultYear: new Date().getFullYear(), years: [], blocks: []};
     try {
         const nav = await getNavigation();
         if (nav.pinned.length === 0) return empty;
@@ -56,7 +58,7 @@ export async function getStatsPage(requestedYear?: number): Promise<StatsPage> {
                 }
             }),
         );
-        return {year, years, blocks: out.filter((x): x is CompetitionStats => x !== null)};
+        return {year, defaultYear: currentYear ?? year, years, blocks: out.filter((x): x is CompetitionStats => x !== null)};
     } catch (error) {
         logReadError('getStatsPage', error);
         return empty;
