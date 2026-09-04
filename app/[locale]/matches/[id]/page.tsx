@@ -8,6 +8,8 @@ import {EventsTimeline} from "@/components/football/events-timeline";
 import {Flag} from "@/components/football/flag";
 import {FormStrip} from "@/components/football/form-strip";
 import {Lineups} from "@/components/football/lineups";
+import {MatchStudy} from "@/components/football/match-study";
+import {getSeasonStudy} from "@/lib/football/data/study";
 import {NotFoundBox} from "@/components/football/page-header";
 import {PlayerMatchTable} from "@/components/football/player-match-table";
 import {HeadToHeadPanel, StandingsPanel} from "@/components/football/rail";
@@ -57,6 +59,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     }
 
     const {fixture} = page;
+    const study = fixture.seasonId ? await getSeasonStudy(fixture.seasonId) : null;
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const isLive = LIVE_STATES.includes(fixture.state);
     const start = new Date(fixture.startingAt);
@@ -126,6 +129,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     const summaryTab = (
         <>
             {comparison}
+            <MatchStudy study={study} homeId={fixture.home.id} awayId={fixture.away.id} />
             <EventsTimeline events={page.events} title={t('tabs.summary')} />
             <Panel title={t('info')}>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 px-3 py-2 text-[13px]">

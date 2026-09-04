@@ -192,6 +192,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
             fixture: {
                 ...base,
                 competition: toCompetition(row.league),
+                seasonId: row.season_id,
                 venue: row.venue_name,
                 referee: row.referee,
                 homeScoreHt: row.home_score_ht,

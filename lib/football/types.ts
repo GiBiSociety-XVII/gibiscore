@@ -231,6 +231,7 @@ export interface PlayerMatchLine {
 export interface MatchPage {
     fixture: FixtureSummary & {
         competition: CompetitionSummary;
+        seasonId: number | null;
         venue: string | null;
         referee: string | null;
         homeScoreHt: number | null;

@@ -5,7 +5,9 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
+import {PlayerAnalysis} from "@/components/football/player-analysis";
 import {RatingTrend} from "@/components/football/rating-trend";
+import {getPositionBenchmark} from "@/lib/football/data/study";
 import {Tabs} from "@/components/football/tabs";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
@@ -54,6 +56,9 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
     }
 
     const {player, team, totals} = page;
+    // Main competition of the selected season (most minutes) and the average of the same role there.
+    const mainStat = page.seasons.filter((s) => s.seasonYear === page.selectedSeason).sort((a, b) => b.minutes - a.minutes)[0] ?? null;
+    const benchmark = mainStat && mainStat.position ? await getPositionBenchmark(mainStat.competition.id, mainStat.seasonYear, mainStat.position) : null;
     const pos = player.position && ['goalkeeper', 'defender', 'midfielder', 'attacker'].includes(player.position) ? player.position : 'unknown';
     const isKeeper = pos === 'goalkeeper' || page.seasons.some((s) => s.position === 'goalkeeper');
     const seasonHref = (year: number) => (year === page.availableSeasons[0]?.year ? `/players/${player.slug}` : `/players/${player.slug}/${year}`);
@@ -240,7 +245,10 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                 </div>
             </section>
 
-            <Tabs items={[{id: 'seasons', label: t('tabs.seasons'), content: seasonsTab, count: page.seasons.length}, {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.matches.length}]} />
+            <div className="grid gap-3 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] items-start">
+                <Tabs items={[{id: 'seasons', label: t('tabs.seasons'), content: seasonsTab, count: page.seasons.length}, {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.matches.length}]} />
+                <PlayerAnalysis stat={mainStat} benchmark={benchmark} competitionName={mainStat?.competition.name ?? null} />
+            </div>
         </SiteShell>
     );
 }

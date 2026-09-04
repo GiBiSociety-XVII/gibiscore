@@ -138,7 +138,7 @@ colonna di destra. URL in inglese, testi in italiano.
 | `/injuries` | infortunati e squalificati delle competizioni principali, squadra per squadra |
 | `/compare?a=&b=` | due giocatori a confronto sulla stessa stagione, con valori ogni 90 minuti |
 | `/search?q=` | ricerca squadre, giocatori e competizioni (suggerimenti live nella barra) |
-| `/competitions/serie-a` | partite per giornata, classifica, marcatori / assist / voti |
+| `/competitions/serie-a` | partite per giornata, classifica, squadre, statistiche (gol, xG, over 2,5, casa/trasferta), marcatori e assist per stagione |
 | `/matches/123` | tabellino: cronaca, formazioni, statistiche, voti; classifica e precedenti a lato |
 | `/teams/inter-505` | partite, rosa, posizioni in classifica |
 | `/players/n-gonzalez-1234` (`/2024` per una stagione) | totali, statistiche per stagione, partita per partita |

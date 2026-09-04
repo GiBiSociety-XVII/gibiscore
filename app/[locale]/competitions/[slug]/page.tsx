@@ -13,7 +13,9 @@ import {StandingsTable} from "@/components/football/standings-table";
 import {Tabs} from "@/components/football/tabs";
 import {TeamCrest} from "@/components/football/team-crest";
 import {Link} from "@/i18n/navigation";
+import {SeasonStudyView} from "@/components/football/season-study";
 import {getCompetitionPage} from "@/lib/football/data/competitions";
+import {getSeasonStudy} from "@/lib/football/data/study";
 import {roundLabel} from "@/lib/football/data/shared";
 
 export const revalidate = 120;
@@ -42,6 +44,7 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
     }
 
     const {competition, season} = page;
+    const study = season ? await getSeasonStudy(season.id) : null;
     const rail = (
         <>
             {page.standings.length > 0 && <StandingsPanel title={t('standings')} slug={competition.slug} groups={page.standings.slice(0, 1)} />}
@@ -135,6 +138,7 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
                     {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.live.length},
                     {id: 'standings', label: t('tabs.standings'), content: standingsTab},
                     {id: 'teams', label: t('tabs.teams'), content: teamsTab},
+                    {id: 'study', label: t('tabs.study'), content: <SeasonStudyView study={study} />},
                     {id: 'players', label: t('tabs.players'), content: playersTab},
                 ]}
             />
