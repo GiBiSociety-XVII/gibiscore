@@ -85,11 +85,11 @@ export default function Footer() {
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                         <span className="inline-flex items-center gap-2">
                             <BrandIcon site="gibisociety" size={26} />
-                            {t('productOf')} <b className="font-extrabold text-brand-society-text">{t('society')}</b>
+                            {t('productOf')} <b className="font-extrabold text-foreground">GiBi<span className="text-brand-society-text">Society</span></b>
                         </span>
                         <a href="https://gibiarena.com" className="inline-flex items-center gap-2 hover:text-foreground transition-colors">
                             <BrandIcon site="gibiarena" size={26} />
-                            {t('discover')} <b className="font-extrabold text-brand-arena-text">{t('arena')}</b>
+                            {t('discover')} <b className="font-extrabold text-foreground">GiBi<span className="text-brand-arena-text">Arena</span></b>
                             <ArrowUpRight className="w-3.5 h-3.5" />
                         </a>
                     </div>
