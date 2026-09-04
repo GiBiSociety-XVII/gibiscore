@@ -190,7 +190,7 @@
     "balanced": {
       "name": "Equilibrata",
       "tagline": "Nessun buco, un buon titolare in ogni ruolo",
-      "description": "Divisione classica dei crediti (8-17-27-48). In ogni reparto un top e titolari affidabili dietro, senza svenarsi per nessuno. È la scelta più sicura quando conosci poco gli avversari o quando il listone non ha fuoriclasse isolati."
+      "description": "Divisione classica dei crediti (7-17-28-48). In ogni reparto un top e titolari affidabili dietro, senza svenarsi per nessuno. È la scelta più sicura quando conosci poco gli avversari o quando il listone non ha fuoriclasse isolati."
     },
     "topPerRole": {
       "name": "Un top per reparto",
@@ -210,12 +210,27 @@
     "defenceBlock": {
       "name": "Blocco difesa + portiere",
       "tagline": "Difensori della stessa squadra e portiere da top",
-      "description": "Con il modificatore difesa attivo, investe su portiere e difensori con voto alto (idealmente il blocco di una squadra che subisce poco), tenendo un attacco solido ma non da top. Il modificatore aggiunge punti ogni giornata anche senza bonus."
+      "description": "Con il modificatore difesa attivo, investe su portiere e difensori con voto alto delle squadre che subiscono poco, preferendo i difensori dello stesso club del portiere scelto (il blocco). Attacco solido ma non da top. Il modificatore aggiunge punti ogni giornata anche senza bonus."
     },
-    "valueHunting": {
-      "name": "Caccia al valore",
-      "tagline": "Tanti titolari sottovalutati, nessuna spesa folle",
-      "description": "Spesa piatta: nessun giocatore sopra il 15-20% del budget, tanti titolari con buon rapporto voto/prezzo e scommesse su chi ha guadagnato posto quest'anno. Ideale per chi segue le probabili formazioni e vuole profondità di rosa."
+    "threeStars": {
+      "name": "Tre stelle",
+      "tagline": "Due attaccanti e un centrocampista d'élite, poi risparmio",
+      "description": "Circa l'85% dei crediti su tre giocatori: i due migliori attaccanti che riesci a prendere, pagati quasi uguale, e il centrocampista con più bonus. Tutto il resto titolari a poco. Regge se le tre stelle restano sane: in leghe con molte squadre è la strategia che fa più differenza a fine stagione."
+    },
+    "penaltyTakers": {
+      "name": "Rigoristi e bonus sicuri",
+      "tagline": "Chi tira i rigori e chi garantisce gol e assist",
+      "description": "Priorità ai rigoristi e ai giocatori con bonus stabili negli ultimi due anni, anche se non sono i nomi più famosi. Un rigorista vale 6-10 gol a stagione a prescindere dalla forma: con 8-10 squadre al tavolo di solito si pagano meno di quanto rendono."
+    },
+    "safeStarters": {
+      "name": "Tutti titolari",
+      "tagline": "Venticinque titolari, nessuna spesa sopra il 20%",
+      "description": "Spesa piatta: nessun giocatore oltre il 15-20% del budget, solo titolari fissi con buona affidabilità fisica e rapporto voto/prezzo. Rosa profonda che non soffre infortuni e squalifiche; perde qualcosa nei bonus di vertice ma la formazione è sempre completa."
+    },
+    "youngUpside": {
+      "name": "Giovani in rampa",
+      "tagline": "Under 25 titolari, prezzi bassi e margine di crescita",
+      "description": "Preferenza ai giovani che hanno già un posto da titolare e ai 23-25enni che hanno cambiato marcia: costano meno dei veterani con lo stesso voto e tendono a migliorare durante la stagione. Da abbinare a uno o due top per non restare senza bonus."
     }
   },
   "tiers": {

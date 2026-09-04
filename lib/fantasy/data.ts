@@ -26,6 +26,8 @@ export interface AuctionPlayer {
     team: TeamSummary;
     league: string;
     injury: {category: string; description: string | null; daysOut: number; longTerm: boolean; returnKind: SidelinedEntry['estimate']['kind']} | null;
+    /** Took penalties recently: two or more scored in a season of the last two. */
+    penaltyTaker: boolean;
     scores: FantaScores;
     /** Last seasons, newest first, for the detail row. */
     seasons: Array<{year: number; league: string; team: string; apps: number; lineups: number; minutes: number; goals: number; assists: number; rating: number | null}>;
@@ -219,6 +221,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool | null> {
                 team: toTeam(team),
                 league: leagueName,
                 injury: injury ? {category: injury.category, description: injury.description, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm, returnKind: injury.estimate.kind} : null,
+                penaltyTaker: lines.some((l) => l.year >= year - 1 && l.penaltiesScored >= 2),
                 scores,
                 seasons: lines
                     .filter((l) => l.appearances > 0)

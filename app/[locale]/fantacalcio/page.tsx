@@ -16,7 +16,7 @@ export default async function FantasyHome({params}: PageProps<"/[locale]/fantaca
     setRequestLocale(locale);
     const t = await getTranslations('Fantasy.home');
     return (
-        <SiteShell>
+        <SiteShell wide sidebar={false}>
             <PageHeader title={t('title')} meta={t('intro')} />
             <div className="grid gap-3 grid-cols-1 md:grid-cols-2 items-start">
                 <Panel title={t('auctionTitle')}>

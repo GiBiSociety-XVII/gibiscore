@@ -9,7 +9,7 @@ function pool(): PoolPlayer[] {
         for (let i = 0; i < n; i += 1) {
             id += 1;
             const overall = Math.max(5, 92 - i * 2);
-            out.push({id, name: `${role}${i + 1}`, role, team: {name: 'T'}, scores: {overall, starter: Math.min(100, overall + 5), fantaAvg: 5.5 + overall / 40}});
+            out.push({id, name: `${role}${i + 1}`, role, team: {name: 'T'}, penaltyTaker: false, scores: {overall, starter: Math.min(100, overall + 5), fantaAvg: 5.5 + overall / 40}});
         }
     };
     make('P', 30);
@@ -57,6 +57,27 @@ describe('planStrategy', () => {
         const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
         const plan = planStrategy(STRATEGIES[0], players, prices, config, new Set([1]));
         expect(plan.picks.P.some((p) => p.id === 1)).toBe(false);
+    });
+});
+
+describe('preferences', () => {
+    it('penalty takers strategy picks the taker over a slightly better non-taker', () => {
+        const players = pool();
+        players[220].penaltyTaker = true; // A11, overall 72, behind A1..A10
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        const plan = planStrategy(STRATEGIES.find((s) => s.key === 'penaltyTakers')!, players, prices, config);
+        expect(plan.picks.A.some((p) => p.id === players[220].id)).toBe(true);
+    });
+
+    it('young upside prefers the younger of two equal players', () => {
+        const players = pool();
+        players[210].age = 33; // A1, overall 92
+        players[211].age = 21; // A2, overall 90
+        for (const p of players) if (p.age === undefined) p.age = 27;
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        // Enough credits that the first attacker slot can afford either: the younger one wins.
+        const plan = planStrategy(STRATEGIES.find((s) => s.key === 'youngUpside')!, players, prices, {...config, credits: 1000});
+        expect(plan.picks.A[0].id).toBe(players[211].id);
     });
 });
 

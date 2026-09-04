@@ -255,17 +255,19 @@ export interface PriceConfig {
 }
 
 /**
- * How fast prices fall down the ranking of a role, in ranks: the top
- * attacker takes about a third of one budget, the eighth about a sixth,
- * the sixteenth a tenth; keepers fall much faster (two or three matter),
- * defenders are flat. Tuned on 8-team, 500-credit Serie A auctions.
+ * Price curve down the ranking of a role: a plateau among the very top,
+ * then a steady fall (a Hill curve, 1 / (1 + (rank / half)^2), "half" is
+ * the rank that costs half the top price). Tuned on 8-team, 500-credit
+ * Serie A auctions: the first attacker about 27% of one budget, the
+ * eighth 60% of that, the sixteenth a quarter; keepers fall much faster
+ * (two or three matter), defenders and midfielders are flatter.
  */
-const RANK_DECAY: Record<FantaRole, number> = {P: 5, D: 14, C: 12, A: 11};
+const RANK_HALF: Record<FantaRole, number> = {P: 4, D: 11, C: 9, A: 10};
 
 /**
  * Suggested credits per player. Each role gets its share of the market
  * (attackers cost the most, then midfielders, defenders, keepers); inside
- * the role prices follow the ranking with the role's decay, adjusted by
+ * the role prices follow the ranking with the role's curve, adjusted by
  * how far a player's mark sits from the top mark, so a clear number one
  * costs more than a crowded top. Only the players that will actually be
  * bought (participants x slots) share the money; everyone else is 1.
@@ -278,11 +280,11 @@ export function suggestPrices<T extends {id: number; role: FantaRole; scores: Pi
         const bought = pool.slice(0, Math.max(1, config.participants * config.slots[role]));
         const budget = market * config.roleShare[role];
         const top = bought[0]?.scores.overall ?? 1;
-        const weight = (p: T, rank: number) => Math.exp(-rank / RANK_DECAY[role]) * (0.35 + 0.65 * (p.scores.overall / top) ** 3);
+        const weight = (p: T, rank: number) => (1 / (1 + (rank / RANK_HALF[role]) ** 2)) * (0.5 + 0.5 * (p.scores.overall / top) ** 2);
         for (const p of pool) prices.set(p.id, 1);
-        // Nobody pays more than 60% of a single budget: what a capped player
+        // Nobody pays more than 40% of a single budget: what a capped player
         // leaves on the table goes to the others, a few passes until stable.
-        const cap = Math.max(1, Math.round(config.credits * 0.6));
+        const cap = Math.max(1, Math.round(config.credits * 0.4));
         const fixed = new Map<number, number>();
         const rankOf = new Map(bought.map((p, i) => [p.id, i]));
         for (let pass = 0; pass < 6; pass += 1) {

@@ -21,7 +21,7 @@ export default async function AuctionPage({params, searchParams}: PageProps<"/[l
     const league = isAuctionLeague(typeof sp.league === 'string' ? sp.league : null) ? (sp.league as Parameters<typeof getAuctionPool>[0]) : 'serie-a';
     const pool = await getAuctionPool(league);
     return (
-        <SiteShell wide>
+        <SiteShell wide sidebar={false}>
             <PageHeader title={t('title')} meta={t('intro')} />
             <AuctionBoard pool={pool} />
         </SiteShell>

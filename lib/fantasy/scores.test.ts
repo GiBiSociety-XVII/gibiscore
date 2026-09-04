@@ -79,10 +79,12 @@ describe('suggestPrices', () => {
         const prices = suggestPrices(players, {credits: 500, participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
         const spent = [...prices.values()].reduce((s, v) => s + v, 0);
         expect(prices.get(1)!).toBeGreaterThan(prices.get(20)!);
-        expect(prices.get(1)!).toBeGreaterThanOrEqual(120);
-        expect(prices.get(1)!).toBeLessThanOrEqual(300);
-        expect(prices.get(8)!).toBeLessThan(prices.get(1)! * 0.6);
-        expect(prices.get(40)!).toBeLessThanOrEqual(5);
+        expect(prices.get(1)!).toBeGreaterThanOrEqual(100);
+        expect(prices.get(1)!).toBeLessThanOrEqual(180);
+        expect(prices.get(9)!).toBeGreaterThan(prices.get(1)! * 0.4);
+        expect(prices.get(9)!).toBeLessThan(prices.get(1)! * 0.75);
+        expect(prices.get(17)!).toBeLessThan(prices.get(1)! * 0.4);
+        expect(prices.get(40)!).toBeLessThanOrEqual(8);
         expect(Math.abs(spent - 500 * 8 * 0.48)).toBeLessThan(60);
     });
 
