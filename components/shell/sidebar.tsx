@@ -1,7 +1,6 @@
 import Image from "next/image";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
-import {FavoriteStar} from "@/components/football/favorite-star";
 import {Flag} from "@/components/football/flag";
 import type {Navigation} from "@/lib/football/data/navigation";
 
@@ -13,14 +12,13 @@ export function Sidebar({nav}: {nav: Navigation}) {
             <h2 className="px-2 pt-1.5 pb-0.5 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">{t('pinned')}</h2>
             <ul className="flex flex-col">
                 {nav.pinned.map((c) => (
-                    <li key={c.slug} className="flex items-center group/row">
-                        <Link href={`/competitions/${c.slug}`} className="flex-1 min-w-0 flex items-center gap-2 px-2 h-7 rounded-md font-bold hover:bg-muted">
+                    <li key={c.slug}>
+                        <Link href={`/competitions/${c.slug}`} className="flex items-center gap-2 px-2 h-7 rounded-md font-bold hover:bg-muted">
                             <span className="inline-flex w-[18px] h-[18px] items-center justify-center shrink-0">
                                 {c.logoUrl ? <Image src={c.logoUrl} alt="" width={18} height={18} unoptimized className="object-contain" /> : <Flag code={c.countryCode} size={16} />}
                             </span>
                             <span className="truncate">{c.name}</span>
                         </Link>
-                        <FavoriteStar slug={c.slug} />
                     </li>
                 ))}
             </ul>

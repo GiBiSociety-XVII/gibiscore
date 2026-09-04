@@ -23,7 +23,7 @@ export default function AppBar() {
             <div className="w-full max-w-[1600px] mx-auto px-2 md:px-4">
                 <div className="flex h-12 items-center gap-2 md:gap-4">
                     <Link href="/" className="flex items-center gap-2 shrink-0">
-                        <LogoMark className="h-8 w-8 rounded-lg shadow-[3px_3px_0_rgb(var(--foreground))]" />
+                        <LogoMark size={30} />
                         <span className="text-base font-black tracking-tight">GiBiScore</span>
                     </Link>
 

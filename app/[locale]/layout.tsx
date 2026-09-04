@@ -31,7 +31,7 @@ export const metadata: Metadata = {
         template: "%s | GiBiScore",
     },
     description:
-        "GiBiScore: risultati live, classifiche, xG e statistiche di squadre e giocatori di Serie A e delle principali competizioni europee.",
+        "GiBiScore: risultati live, classifiche e statistiche di squadre e giocatori di tutte le competizioni di calcio del mondo.",
     applicationName: "GiBiScore",
     openGraph: {
         type: "website",
