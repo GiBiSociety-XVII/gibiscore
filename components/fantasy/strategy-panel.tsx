@@ -5,19 +5,67 @@ import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {FantaRole} from "@/lib/fantasy/scores";
-import type {StrategyKey, StrategyPlan} from "@/lib/fantasy/strategies";
+import type {HealthReason, HealthStatus, StrategyHealth, StrategyKey, StrategyPlan} from "@/lib/fantasy/strategies";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROLE_BAR: Record<FantaRole, string> = {P: 'bg-amber-300', D: 'bg-emerald-300', C: 'bg-sky-300', A: 'bg-rose-300'};
+export const HEALTH_CLASS: Record<HealthStatus, string> = {ok: 'bg-emerald-200', warn: 'bg-amber-200', switch: 'bg-red-200'};
+
+/** One warning of the strategy health, in words. */
+export function useHealthReason() {
+    const t = useTranslations('Fantasy.strategies');
+    const ts = useTranslations('Fantasy.setup');
+    const pct = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v * 100)}`;
+    return (r: HealthReason): string => {
+        switch (r.kind) {
+            case 'behind': return t('health.reasons.behind', {name: t(`${r.best}.name`), gap: r.gap.toFixed(1), pct: pct(r.pct)});
+            case 'drift': return t('health.reasons.drift', {pct: Math.abs(Math.round(r.pct * 100))});
+            case 'overspent': return t('health.reasons.overspent', {role: ts(`roles.${r.role}`), spent: r.spent, budget: r.budget});
+            case 'starved': return t('health.reasons.starved', {role: ts(`roles.${r.role}`), left: r.left, open: r.open});
+            case 'targetsLost': return t('health.reasons.targetsLost', {lost: r.lost, total: r.total});
+        }
+    };
+}
+
+/** How the strategy in use is going: status, the reasons, and the switch when another plan does better from here. */
+export function HealthBox({health, onSelect}: {health: StrategyHealth; onSelect: (key: StrategyKey) => void}) {
+    const t = useTranslations('Fantasy.strategies');
+    const reason = useHealthReason();
+    const better = health.best.key !== health.current.key && health.gapPct >= 0.02;
+    return (
+        <div className={cn("mx-3 my-2 rounded-lg border-2 border-foreground px-3 py-2 flex flex-col gap-1.5", HEALTH_CLASS[health.status])}>
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-extrabold uppercase tracking-wide">{t('health.title')}</span>
+                <span className="bb-badge bg-card text-[10px] h-5 px-1.5">{t(`health.${health.status}`)}</span>
+                <span className="ml-auto font-mono text-[12px] font-extrabold tabular-nums">{health.current.lineupValue.toFixed(1)} · {health.current.formation}</span>
+            </div>
+            {health.reasons.length === 0 ? (
+                <p className="text-[12px] font-semibold">{t('health.fine')}</p>
+            ) : (
+                <ul className="flex flex-col gap-0.5 text-[12px] font-semibold list-disc pl-4">
+                    {health.reasons.map((r, i) => <li key={i}>{reason(r)}</li>)}
+                </ul>
+            )}
+            {better ? (
+                <button type="button" onClick={() => onSelect(health.best.key)} className="bb-btn bg-card self-start px-3 h-8 text-[12px] font-extrabold">
+                    {t('health.switchTo', {name: t(`${health.best.key}.name`)})} · {health.best.lineupValue.toFixed(1)} · {health.best.formation}
+                </button>
+            ) : (
+                <p className="text-[11px] font-semibold text-muted-foreground">{t('health.keep', {name: t(`${health.current.key}.name`)})}</p>
+            )}
+        </div>
+    );
+}
 
 /** Ranked strategies for this pool and league: split of the credits, the lineup they buy, "use it" to drive my role budgets. */
-export function StrategyPanel({plans, selected, onSelect, credits}: {plans: StrategyPlan[]; selected: StrategyKey | null; onSelect: (key: StrategyKey | null) => void; credits: number}) {
+export function StrategyPanel({plans, selected, onSelect, credits, health = null}: {plans: StrategyPlan[]; selected: StrategyKey | null; onSelect: (key: StrategyKey | null) => void; credits: number; health?: StrategyHealth | null}) {
     const t = useTranslations('Fantasy.strategies');
     const [open, setOpen] = useState<StrategyKey | null>(selected ?? plans[0]?.key ?? null);
     const best = plans[0];
     return (
         <Panel title={t('title')} action={<span className="text-[11px] font-semibold text-muted-foreground">{t('ranked')}</span>}>
             <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground border-b border-muted">{t('intro')}</p>
+            {health && <HealthBox health={health} onSelect={(key) => onSelect(key)} />}
             <ol className="flex flex-col">
                 {plans.map((plan, index) => {
                     const isOpen = open === plan.key;
@@ -35,8 +83,8 @@ export function StrategyPanel({plans, selected, onSelect, credits}: {plans: Stra
                                     <span className="text-[11px] font-semibold text-muted-foreground truncate">{plan.available ? t(`${plan.key}.tagline`) : t('needsDefence')}</span>
                                 </span>
                                 <span className="flex flex-col items-end leading-tight shrink-0">
-                                    <span className="font-mono text-[13px] font-extrabold tabular-nums">{plan.lineupValue.toFixed(1)}</span>
-                                    <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{t('lineupValue')}</span>
+                                    <span className="font-mono text-[13px] font-extrabold tabular-nums">{plan.lineupValue.toFixed(1)} <span className="text-[11px]">· {plan.formation}</span></span>
+                                    <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{t('lineupValue')} · {t('formation')}</span>
                                 </span>
                             </button>
                             {isOpen && (
@@ -53,6 +101,15 @@ export function StrategyPanel({plans, selected, onSelect, credits}: {plans: Stra
                                     <div className="grid grid-cols-4 gap-1 text-center">
                                         {ROLES.map((r) => (
                                             <span key={r} className="font-mono text-[11px] font-bold tabular-nums">{plan.budget[r]} cr.</span>
+                                        ))}
+                                    </div>
+                                    {/* Formations */}
+                                    <div className="flex flex-wrap items-center gap-1">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('formations')}</span>
+                                        {plan.formations.map((f, i) => (
+                                            <span key={f.key} className={cn("inline-flex items-center gap-1 px-1.5 h-6 rounded border border-foreground/60 font-mono text-[11px] font-bold tabular-nums", i === 0 ? "bg-accent/40" : "bg-card")}>
+                                                {f.key} <span className="text-muted-foreground">{f.value.toFixed(1)}</span>
+                                            </span>
                                         ))}
                                     </div>
                                     {/* Targets */}

@@ -1,6 +1,6 @@
 'use client';
 
-import {ChevronDown, ChevronUp, Lightbulb, Search, Settings2, X} from "lucide-react";
+import {Activity, ChevronDown, ChevronUp, Lightbulb, Search, Settings2, X} from "lucide-react";
 import {useMemo, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -9,13 +9,13 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
-import {StrategyPanel} from "./strategy-panel";
+import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TierBadge, TierList} from "./tier-list";
 import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
-import {rankStrategies, type StrategyKey} from "@/lib/fantasy/strategies";
+import {bestLineup, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, assignTiers, type Tier} from "@/lib/fantasy/tiers";
 
@@ -58,6 +58,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const ts = useTranslations('Fantasy.setup');
     const tst = useTranslations('Fantasy.strategies');
     const tt = useTranslations('Fantasy.tiers');
+    const healthReason = useHealthReason();
     const router = useRouter();
     const hydrated = useHydrated();
     const config = configStore.useValue();
@@ -96,6 +97,8 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
         const mine = purchases.filter((p) => p.manager === 0 && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
         return rankStrategies(pool.players, prices, config, taken, mine);
     }, [pool, config, prices, purchases]);
+    // The same strategies on the full list at list prices: what each was worth when the auction started.
+    const baseline = useMemo(() => (pool && config ? rankStrategies(pool.players, listPrices, config) : []), [pool, config, listPrices]);
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
@@ -166,6 +169,12 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const strategy = plans.find((p) => p.key === config.strategy) ?? null;
     const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
     const roleShare = strategy?.share ?? ROLE_SHARE;
+    // How the strategy in use is going, and the formation that gets the most out of my roster plus the plan's targets.
+    const takenByOthers = new Set(purchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
+    const ownPurchases = mine.filter((p) => byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
+    const health = strategy ? strategyHealth(plans, strategy.key, baseline, config, ownPurchases, takenByOthers) : null;
+    const guide = strategy ?? plans.find((p) => p.available) ?? null;
+    const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: config.modifiers.defence}) : null;
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
     // never more than what leaves me enough to finish the roster with the cheapest players left.
@@ -198,11 +207,18 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                 <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
                     <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)}</span>
                     <span className="text-[11px] font-semibold text-muted-foreground">· {ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr.</span>
-                    <span className="ml-auto flex items-center gap-1.5">
+                    <span className="ml-auto flex flex-wrap items-center gap-1.5">
                         <button type="button" onClick={() => setShowStrategies(true)} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", strategy ? "bg-accent" : "bg-card")}>
                             <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
                             {strategy ? tst(`${strategy.key}.name`) : ta('strategies')}
                         </button>
+                        {health && (
+                            <button type="button" onClick={() => setShowStrategies(true)} title={health.reasons.length > 0 ? health.reasons.map(healthReason).join('\n') : tst('health.fine')} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", HEALTH_CLASS[health.status])}>
+                                <Activity className="w-3.5 h-3.5" aria-hidden="true" />
+                                {tst(`health.${health.status}`)}
+                                {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: tst(`${health.best.key}.name`)})}</span>}
+                            </button>
+                        )}
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
                         <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
@@ -382,6 +398,13 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
                         {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(pool.players, prices, config, purchases, 0), max: Math.max(0, left - completionReserve(pool.players, prices, config, purchases, 0, null))})}</span>}
                         {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
+                        {guide && (
+                            <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
+                                {tr('formation', {formation: guide.formation})}
+                                <span className="block font-mono text-[10px] text-muted-foreground tabular-nums">{guide.formations.slice(0, 3).map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}</span>
+                            </span>
+                        )}
+                        {rosterLineup && <span className="block">{tr('formationNow', {formation: rosterLineup.formation})} <span className="font-mono text-[10px] tabular-nums">{rosterLineup.value.toFixed(1)}</span></span>}
                     </p>
                     {market && market.purchases > 0 && (
                         <div className="px-3 py-1.5 border-b border-muted text-[11px] font-semibold text-muted-foreground flex flex-col gap-0.5">
@@ -435,7 +458,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             <button type="button" onClick={() => setShowStrategies(false)} aria-label={ts('cancel')} className="inline-flex items-center justify-center w-9 h-9 rounded-md border-2 border-foreground bg-background"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="bg-background rounded-xl">
-                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} />
+                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} health={health} />
                         </div>
                     </div>
                 </div>
