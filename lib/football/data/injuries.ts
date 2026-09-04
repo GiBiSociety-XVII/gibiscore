@@ -1,6 +1,7 @@
 import 'server-only';
 import {featuredPriority} from '../competitions';
 import type {CompetitionSummary, TeamSummary} from '../types';
+import {fetchAll} from '@/lib/db/paginate';
 import {LEAGUE_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toTeam, type LeagueRow, type TeamRow} from './shared';
 
 export interface SidelinedPlayer {
@@ -34,15 +35,19 @@ interface Row {
 export async function getSidelined(): Promise<SidelinedCompetition[]> {
     try {
         const db = footballDb();
-        const {data, error} = await db
-            .from('sidelined')
-            .select(`category,description,start_date,player:players(id,name,slug,image_url,position),team:teams(${TEAM_SELECT}),season:seasons!inner(is_current,league:leagues!inner(${LEAGUE_SELECT}))`)
-            .eq('seasons.is_current', true)
-            .order('start_date', {ascending: false})
-            .limit(3000);
-        if (error) throw error;
+        const data = await fetchAll(
+            (a, b) =>
+                db
+                    .from('sidelined')
+                    .select(`category,description,start_date,player:players(id,name,slug,image_url,position),team:teams(${TEAM_SELECT}),season:seasons!inner(is_current,league:leagues!inner(${LEAGUE_SELECT}))`)
+                    .eq('seasons.is_current', true)
+                    .order('start_date', {ascending: false})
+                    .order('id')
+                    .range(a, b),
+            {max: 6000},
+        );
         const byLeague = new Map<number, SidelinedCompetition>();
-        for (const r of (data ?? []) as unknown as Row[]) {
+        for (const r of data as unknown as Row[]) {
             const league = r.season?.league;
             if (!league || !r.player || !r.team) continue;
             if (!byLeague.has(league.id)) byLeague.set(league.id, {competition: toCompetition(league), teams: [], total: 0});

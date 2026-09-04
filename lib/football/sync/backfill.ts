@@ -2,6 +2,7 @@ import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
 import {apiFootballGet, waitForMinuteWindow} from '@/lib/api-football/client';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
+import {fetchAll} from '@/lib/db/paginate';
 import {chunk, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
 import {upsertFixtures} from './fixtures';
 
@@ -53,16 +54,20 @@ export async function syncBackfill(limit = 400): Promise<SyncRun> {
         }
 
         // 2. Detail of finished fixtures, most recent first.
-        const {data, error} = await db
-            .from('fixtures')
-            .select('provider_id')
-            .eq('state', 'finished')
-            .is('details_synced_at', null)
-            .in('season_id', seasons.map((s) => s.id))
-            .order('starting_at', {ascending: false})
-            .limit(limit);
-        if (error) failSync('fixtures.select', error);
-        const ids = (data ?? []).map((r) => r.provider_id as number);
+        const data = await fetchAll(
+            (a, b) =>
+                db
+                    .from('fixtures')
+                    .select('provider_id')
+                    .eq('state', 'finished')
+                    .is('details_synced_at', null)
+                    .in('season_id', seasons.map((s) => s.id))
+                    .order('starting_at', {ascending: false})
+                    .order('id')
+                    .range(a, b),
+            {max: limit},
+        );
+        const ids = data.map((r) => r.provider_id as number);
         run.bump('pending', ids.length);
 
         const fixtures: AfFixtureResponse[] = [];

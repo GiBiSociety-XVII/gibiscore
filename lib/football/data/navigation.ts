@@ -2,6 +2,7 @@ import 'server-only';
 import {unstable_cache} from 'next/cache';
 import {featuredPriority} from '../competitions';
 import type {CompetitionSummary} from '../types';
+import {fetchAll} from '@/lib/db/paginate';
 import {LEAGUE_SELECT, footballDb, logReadError, toCompetition, type LeagueRow} from './shared';
 
 /**
@@ -28,9 +29,8 @@ const EMPTY: Navigation = {pinned: [], countries: [], total: 0};
 async function loadNavigation(): Promise<Navigation> {
     try {
         const db = footballDb();
-        const {data, error} = await db.from('leagues').select(LEAGUE_SELECT).eq('is_active', true).order('name').limit(3000);
-        if (error) throw error;
-        const items = ((data ?? []) as unknown as LeagueRow[]).map(toCompetition);
+        const data = await fetchAll((a, b) => db.from('leagues').select(LEAGUE_SELECT).eq('is_active', true).order('name').order('id').range(a, b), {max: 5000});
+        const items = (data as unknown as LeagueRow[]).map(toCompetition);
         const pinned = items.filter((c) => c.featured).sort((a, b) => featuredPriority(a.slug) - featuredPriority(b.slug));
         const byCountry = new Map<string, NavCountry>();
         for (const c of items) {

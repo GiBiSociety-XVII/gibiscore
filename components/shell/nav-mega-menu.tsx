@@ -27,10 +27,10 @@ export function NavMegaMenu({label, icon, overviewHref, overviewLabel, columns, 
 
     useEffect(() => {
         function onClickOutside(e: MouseEvent) {
-            if (wrapper.current && !wrapper.current.contains(e.target as Node)) setOpen(false);
+            if (wrapper.current && !wrapper.current.contains(e.target as Node)) setOpenedOn(null);
         }
         function onKeyDown(e: KeyboardEvent) {
-            if (e.key === 'Escape') setOpen(false);
+            if (e.key === 'Escape') setOpenedOn(null);
         }
         document.addEventListener('mousedown', onClickOutside);
         document.addEventListener('keydown', onKeyDown);

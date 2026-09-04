@@ -18,6 +18,7 @@ import {
     type TeamRow,
 } from './shared';
 import {normalizePosition} from './matches';
+import {fetchAll} from '@/lib/db/paginate';
 
 export interface CompetitionListItem extends CompetitionSummary {
     season: {id: number; name: string; year: number} | null;
@@ -33,13 +34,8 @@ export interface CompetitionList {
 export async function listCompetitions(): Promise<CompetitionList> {
     try {
         const db = footballDb();
-        const {data, error} = await db
-            .from('leagues')
-            .select(`${LEAGUE_SELECT},seasons(id,name,year,is_current)`)
-            .eq('is_active', true)
-            .limit(3000);
-        if (error) throw error;
-        const items = ((data ?? []) as unknown as Array<LeagueRow & {seasons: Array<{id: number; name: string; year: number; is_current: boolean}>}>).map((row) => {
+        const data = await fetchAll((a, b) => db.from('leagues').select(`${LEAGUE_SELECT},seasons(id,name,year,is_current)`).eq('is_active', true).order('id').range(a, b), {max: 5000});
+        const items = (data as unknown as Array<LeagueRow & {seasons: Array<{id: number; name: string; year: number; is_current: boolean}>}>).map((row) => {
             const season = row.seasons?.find((s) => s.is_current) ?? null;
             return {...toCompetition(row), season: season ? {id: season.id, name: season.name, year: season.year} : null};
         });

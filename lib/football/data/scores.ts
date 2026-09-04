@@ -1,6 +1,7 @@
 import 'server-only';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionFixtures, type FixtureSummary} from '../types';
+import {fetchAll} from '@/lib/db/paginate';
 import {FIXTURE_LIST_SELECT, footballDb, logReadError, toFixtures} from './shared';
 
 const ROME = 'Europe/Rome';
@@ -107,9 +108,8 @@ export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: st
             rows = data;
         } else {
             const {from, to} = romeDayBounds(day);
-            const {data, error} = await db.from('fixtures').select(FIXTURE_LIST_SELECT).gte('starting_at', from).lte('starting_at', to).order('starting_at').limit(3000);
-            if (error) throw error;
-            rows = data;
+            // A busy Saturday has well over 1000 matches worldwide: page through them.
+            rows = await fetchAll((a, b) => db.from('fixtures').select(FIXTURE_LIST_SELECT).gte('starting_at', from).lte('starting_at', to).order('starting_at').order('id').range(a, b), {max: 6000});
         }
         const fixtures = toFixtures(rows).filter((f) => mode === 'live' || romeDate(new Date(f.startingAt)) === day);
         const {pinned, countries} = group(fixtures);
