@@ -234,7 +234,7 @@
     "title": "Strategie consigliate",
     "ranked": "In ordine per questo listone",
     "intro": "Ogni strategia è simulata sul listone con i crediti consigliati: vedi come divide il budget, chi comprerebbe e quanto vale la formazione che ne esce. \"Usa\" imposta i budget per ruolo nella tua rosa e segna gli obiettivi nel listone.",
-    "hint": "Il valore XI è la somma delle fantamedie stimate dei migliori undici pesate per la titolarità, nel modulo che rende di più tra i sette classici (3-4-3, 4-3-3, 3-5-2, 4-4-2, 4-5-1, 5-3-2, 5-4-1). Con il modificatore difesa attivo i moduli a quattro o cinque difensori contano anche il bonus stimato. Obiettivi e modulo cambiano man mano che i giocatori vengono comprati: ogni strategia riparte da quello che hai già in rosa, quindi puoi cambiarla in qualsiasi momento dell'asta.",
+    "hint": "Il valore XI è la somma delle fantamedie stimate dei migliori undici pesate per la probabilità che giochino, nel modulo che rende di più tra i sette classici (3-4-3, 4-3-3, 3-5-2, 4-4-2, 4-5-1, 5-3-2, 5-4-1): quando un titolare non gioca conta la riserva del suo ruolo, quindi una rosa senza copertura paga. Con il modificatore difesa attivo i moduli a quattro o cinque difensori contano anche il bonus stimato. Se due moduli valgono quasi uguale (entro il 2%) vince quello naturale della strategia. Obiettivi e modulo cambiano man mano che i giocatori vengono comprati: ogni strategia riparte da quello che hai già in rosa, quindi puoi cambiarla in qualsiasi momento dell'asta.",
     "lineupValue": "Valore XI",
     "overallShort": "tot.",
     "best": "Migliore",

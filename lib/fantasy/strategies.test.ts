@@ -130,7 +130,7 @@ describe('bestLineup', () => {
         const roster = [
             player('P', 5.2),
             ...[6.4, 6.3, 6.2, 5.9, 5.8].map((v) => player('D', v)),
-            ...[7.2, 7.0, 6.9, 6.8, 6.7].map((v) => player('C', v)),
+            ...[7.2, 7.0, 6.9, 6.8, 6.7, 6.2].map((v) => player('C', v)),
             player('A', 8.5), player('A', 8.0), player('A', 5.5, 40),
         ];
         expect(bestLineup(roster).formation).toBe('3-5-2');
