@@ -71,6 +71,7 @@ export default function Footer() {
                         <Link href="/stats" className={link}>{t('columns.stats.scorers')}</Link>
                         <Link href="/injuries" className={link}>{t('columns.stats.injuries')}</Link>
                         <Link href="/predictions" className={link}>{t('columns.stats.predictions')}</Link>
+                        <Link href="/fantacalcio" className={link}>{t('columns.stats.fantasy')}</Link>
                         <Link href="/compare" className={link}>{t('columns.stats.compare')}</Link>
                         <Link href="/search" className={link}>{t('columns.stats.search')}</Link>
                     </Column>

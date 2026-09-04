@@ -137,6 +137,8 @@ colonna di destra. URL in inglese, testi in italiano.
 | `/stats` | marcatori, assist e voti migliori di ogni competizione principale |
 | `/injuries` | infortunati e squalificati delle competizioni principali: da quanto sono fuori, partite saltate e rientro indicativo |
 | `/predictions` | pronostici statistici delle prossime partite (probabilità 1-X-2, gol attesi, over, entrambe a segno) |
+| `/fantacalcio` | sezione fantacalcio (pagine dedicate: il fantacalcio non compare nelle pagine generali) |
+| `/fantacalcio/asta` | asta: configurazione della lega (campionato, Classic/Mantra, crediti, rosa, punteggi, modificatori) e listone con voti 1-100 (titolarità, bonus, voto, malus, fisico, club), fantamedia stimata, crediti consigliati e tabellone acquisti; impostazioni e acquisti restano nel browser (`lib/fantasy/`) |
 | `/compare?a=&b=` | due giocatori a confronto sulla stessa stagione, con valori ogni 90 minuti |
 | `/search?q=` | ricerca squadre, giocatori e competizioni (suggerimenti live nella barra) |
 | `/competitions/serie-a` | partite per giornata, classifica, squadre, statistiche (gol, xG, over 2,5, casa/trasferta), marcatori e assist per stagione |

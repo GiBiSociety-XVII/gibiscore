@@ -1,6 +1,6 @@
 'use client';
 
-import {BarChart3, CalendarDays, Trophy} from "lucide-react";
+import {BarChart3, CalendarDays, Trophy, Sparkles} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {Link, usePathname} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -83,6 +83,8 @@ export default function AppBar() {
     ];
 
     const liveActive = path.startsWith('/live');
+    const fantaActive = path.startsWith('/fantacalcio');
+    const tf = useTranslations('Fantasy');
 
     return (
         <header className="sticky top-0 z-50 w-full bg-background border-b-[2.5px] border-foreground">
@@ -129,6 +131,17 @@ export default function AppBar() {
                             columns={statsColumns}
                             active={path.startsWith('/stats') || path.startsWith('/injuries')}
                         />
+                        <Link
+                            href="/fantacalcio"
+                            aria-current={fantaActive ? 'page' : undefined}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 h-9 md:h-10 px-2.5 md:px-3.5 rounded-lg text-[14px] md:text-[17px] font-bold whitespace-nowrap transition-colors",
+                                fantaActive ? "text-foreground bg-accent/40 border-2 border-foreground" : "text-foreground/70 hover:text-foreground hover:bg-muted",
+                            )}
+                        >
+                            <Sparkles className="w-5 h-5" aria-hidden="true" />
+                            {tf('nav')}
+                        </Link>
                     </nav>
 
                     <SearchBox />
