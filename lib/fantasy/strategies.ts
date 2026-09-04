@@ -91,6 +91,15 @@ export interface StrategyPick {
     role: FantaRole;
     price: number;
     overall: number;
+    /** The most the strategy would pay for this slot. */
+    maxBid: number;
+}
+
+/** What the user has already bought: reduces the role budgets and uses up the biggest slots first. */
+export interface OwnPurchase {
+    playerId: number;
+    role: FantaRole;
+    price: number;
 }
 
 export interface StrategyPlan {
@@ -137,20 +146,27 @@ function lineupValue(picks: Record<FantaRole, StrategyPick[]>, byId: Map<number,
 }
 
 /** Simulates one strategy on the pool: fills every slot with the best player (by mark plus what the strategy prefers) affordable for that slot's budget. */
-export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'>, taken: Set<number> = new Set()): StrategyPlan {
+export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan {
     const budget = {P: 0, D: 0, C: 0, A: 0} as Record<FantaRole, number>;
     const picks = {P: [], D: [], C: [], A: []} as Record<FantaRole, StrategyPick[]>;
     const byId = new Map(players.map((p) => [p.id, p]));
-    const chosen: PoolPlayer[] = [];
-    let spent = 0;
-    let depth = 0;
+    const chosen: PoolPlayer[] = mine.map((m) => byId.get(m.playerId)).filter((p): p is PoolPlayer => !!p);
+    let spent = mine.reduce((s, m) => s + m.price, 0);
+    let depth = chosen.reduce((s, p) => s + p.scores.overall, 0);
     for (const role of ROLES) {
         budget[role] = Math.round(config.credits * strategy.share[role]);
-        const candidates = players.filter((p) => p.role === role && !taken.has(p.id));
+        const owned = mine.filter((m) => m.role === role);
+        // What I already have in the role fills the plan first, then the biggest slots are gone.
+        for (const m of owned) {
+            const p = byId.get(m.playerId);
+            if (p) picks[role].push({id: p.id, name: p.name, team: p.team.name, role, price: m.price, overall: p.scores.overall, maxBid: m.price});
+        }
+        const candidates = players.filter((p) => p.role === role && !taken.has(p.id) && !owned.some((m) => m.playerId === p.id));
         const used = new Set<number>();
-        let left = budget[role];
+        let left = budget[role] - owned.reduce((s, m) => s + m.price, 0);
         const custom = strategy.fractions?.[role];
-        const fractions = custom && custom.length === config.slots[role] ? custom : slotFractions(config.slots[role], strategy.focus[role]);
+        const all = custom && custom.length === config.slots[role] ? custom : slotFractions(config.slots[role], strategy.focus[role]);
+        const fractions = [...all].sort((a, b) => b - a).slice(owned.length);
         fractions.forEach((fraction, index) => {
             const slotsLeft = fractions.length - index;
             // The strategy's preferences shift the order (a penalty taker, a starter, a youngster...).
@@ -170,13 +186,13 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             left -= price;
             spent += price;
             depth += pick.scores.overall;
-            picks[role].push({id: pick.id, name: pick.name, team: pick.team.name, role, price, overall: pick.scores.overall});
+            picks[role].push({id: pick.id, name: pick.name, team: pick.team.name, role, price, overall: pick.scores.overall, maxBid: Math.max(price, cap)});
         });
     }
     return {key: strategy.key, share: strategy.share, budget, picks, spent, lineupValue: lineupValue(picks, byId), depth, available: true};
 }
 
 /** Every strategy planned on the pool, best lineup first; strategies that need a modifier the league lacks are marked unavailable. */
-export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'>, taken: Set<number> = new Set()): StrategyPlan[] {
-    return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken), available: !s.needsDefenceModifier || config.modifiers.defence})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
+export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan[] {
+    return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken, mine), available: !s.needsDefenceModifier || config.modifiers.defence})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
 }

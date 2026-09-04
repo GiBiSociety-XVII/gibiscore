@@ -81,6 +81,20 @@ describe('preferences', () => {
     });
 });
 
+describe('own purchases', () => {
+    it('keeps what I bought, spends the rest of the role budget and gives a max bid per target', () => {
+        const players = pool();
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        const mine = [{playerId: 211, role: 'A' as const, price: 160}];
+        const plan = planStrategy(STRATEGIES[0], players, prices, config, new Set(), mine);
+        expect(plan.picks.A[0]).toMatchObject({id: 211, price: 160});
+        expect(plan.picks.A).toHaveLength(6);
+        expect(plan.picks.A.slice(1).reduce((s, p) => s + p.price, 0)).toBeLessThanOrEqual(plan.budget.A - 160);
+        for (const p of plan.picks.A.slice(1)) expect(p.maxBid).toBeGreaterThanOrEqual(p.price);
+        expect(plan.spent).toBeGreaterThanOrEqual(160);
+    });
+});
+
 describe('rankStrategies', () => {
     it('ranks available strategies first and marks the defence block unavailable without the modifier', () => {
         const players = pool();

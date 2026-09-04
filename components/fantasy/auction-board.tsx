@@ -16,6 +16,7 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
 import {rankStrategies, type StrategyKey} from "@/lib/fantasy/strategies";
+import {dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, assignTiers, type Tier} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -74,17 +75,22 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const [open, setOpen] = useState<number | null>(null);
     const [buying, setBuying] = useState<{player: AuctionPlayer; price: number; manager: number} | null>(null);
 
-    const prices = useMemo(() => {
+    // List prices assume a full market; the live prices follow what has been bought and paid.
+    const listPrices = useMemo(() => {
         if (!pool || !config) return new Map<number, number>();
         return suggestPrices(pool.players, {credits: config.credits, participants: config.participants, slots: config.slots, roleShare: ROLE_SHARE});
     }, [pool, config]);
+    const prices = useMemo(() => (pool && config ? dynamicPrices(pool.players, listPrices, config, purchases) : listPrices), [pool, config, listPrices, purchases]);
+    const market = useMemo(() => (pool && config ? marketState(pool.players, listPrices, config, purchases) : null), [pool, config, listPrices, purchases]);
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
     const tiers = useMemo(() => (pool && config ? assignTiers(pool.players, config) : new Map<number, Tier>()), [pool, config]);
-    // Strategies simulated on what is still on the market (players bought by others are gone).
+    // Strategies simulated on what is still on the market at live prices, starting from what I already own.
     const plans = useMemo(() => {
         if (!pool || !config) return [];
+        const byId = new Map(pool.players.map((p) => [p.id, p]));
         const taken = new Set(purchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
-        return rankStrategies(pool.players, prices, config, taken);
+        const mine = purchases.filter((p) => p.manager === 0 && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
+        return rankStrategies(pool.players, prices, config, taken, mine);
     }, [pool, config, prices, purchases]);
     const players = useMemo(() => {
         if (!pool) return [];
@@ -136,7 +142,25 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const strategy = plans.find((p) => p.key === config.strategy) ?? null;
     const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
     const roleShare = strategy?.share ?? ROLE_SHARE;
-    const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].map((p) => p.id)) : []);
+    const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
+    // My ceiling per player: the strategy's slot for its targets, the live price for anyone else, never more than what leaves 1 credit per open slot.
+    const room = Math.max(1, left - Math.max(0, freeSlots - 1));
+    const maxBidOf = (id: number): number | null => {
+        if (!strategy || bought.has(id)) return null;
+        const pick = ROLES.flatMap((r) => strategy.picks[r]).find((p) => p.id === id);
+        return Math.min(room, pick ? pick.maxBid : (prices.get(id) ?? 1));
+    };
+    const priceCell = (id: number) => {
+        const live = prices.get(id) ?? 1;
+        const list = listPrices.get(id) ?? 1;
+        const delta = live - list;
+        return (
+            <span className="inline-flex items-center justify-end gap-1" title={bought.has(id) ? t('paid') : t('listPrice', {price: list})}>
+                <span className="font-mono font-extrabold tabular-nums">{live}</span>
+                {!bought.has(id) && Math.abs(delta) >= Math.max(2, list * 0.05) && <span className={cn("font-mono text-[10px] font-bold tabular-nums", delta > 0 ? "text-red-700" : "text-emerald-700")}>{delta > 0 ? '▲' : '▼'}{Math.abs(delta)}</span>}
+            </span>
+        );
+    };
 
     const shown = players.slice(0, limit);
     const selectClass = "bb-input h-8 px-2 text-[12px] font-bold";
@@ -208,6 +232,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.overall')}>{t('columns.overall')}</th>
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.price')}>{t('columns.price')}</th>
+                                {strategy && <th className="px-1 py-1.5 text-right" title={t('columnHints.maxBid')}>{t('columns.maxBid')}</th>}
                                 <th className="px-2 py-1.5 text-right">{t('columns.status')}</th>
                             </tr>
                         </thead>
@@ -238,7 +263,8 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                             {SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
                                             <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>
-                                            <td className="px-1 py-1 text-right font-mono font-extrabold tabular-nums">{prices.get(p.id) ?? 1}</td>
+                                            <td className="px-1 py-1 text-right">{priceCell(p.id)}</td>
+                                            {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
                                                     <Status p={p} t={t} />
@@ -255,7 +281,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={13} className="px-3 py-2">
+                                                <td colSpan={14} className="px-3 py-2">
                                                     {p.seasons.length === 0 ? (
                                                         <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
                                                     ) : (
@@ -313,6 +339,14 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
                         {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                     </p>
+                    {market && market.purchases > 0 && (
+                        <div className="px-3 py-1.5 border-b border-muted text-[11px] font-semibold text-muted-foreground flex flex-col gap-0.5">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wide">{tr('market')}</span>
+                            <span>{tr('marketMoney', {left: market.remaining, pct: Math.round((market.remaining / (config.credits * config.participants)) * 100)})}</span>
+                            <span>{tr('marketTops')}: {ROLES.map((r) => `${r} ${market.byRole[r].topLeft}/${market.byRole[r].topTotal}`).join(' · ')}</span>
+                            {market.inflation !== 1 && <span className={cn(market.inflation > 1 ? "text-red-700" : "text-emerald-700")}>{tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}</span>}
+                        </div>
+                    )}
                     {mine.length === 0 ? (
                         <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{tr('empty')}</p>
                     ) : (
@@ -372,7 +406,10 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                 </select>
                             </label>
                         </div>
-                        <p className="text-[11px] font-semibold text-muted-foreground">{t('columns.price')}: {prices.get(buying.player.id) ?? 1} · {t('columns.fantaAvg')}: {buying.player.scores.fantaAvg?.toFixed(2) ?? '–'}</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground">
+                            {t('columns.price')}: {prices.get(buying.player.id) ?? 1} · {t('listPrice', {price: listPrices.get(buying.player.id) ?? 1})} · {t('columns.fantaAvg')}: {buying.player.scores.fantaAvg?.toFixed(2) ?? '–'}
+                            {strategy && maxBidOf(buying.player.id) !== null && <span className="block text-foreground">{t('maxBidHint', {max: maxBidOf(buying.player.id)!})}</span>}
+                        </p>
                         <button type="submit" className="bb-btn bg-accent h-10 px-4 text-[13px] font-extrabold">{t('confirm')}</button>
                     </form>
                 </div>
