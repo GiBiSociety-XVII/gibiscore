@@ -42,7 +42,7 @@ function ScoreCell({value}: {value: number}) {
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 /** Absence badge with the return in short, plus the small flags that matter at the auction. */
-function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer[]}) {
+function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']}) {
     const t = useTranslations('Fantasy.board');
     const format = useFormatter();
     const short = (iso: string) => format.dateTime(day(iso), {day: 'numeric', month: 'short'});
@@ -60,7 +60,7 @@ function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer[]}) {
                     </span>
                 );
             })()}
-            {rivals.length > 0 && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.rivals', {names: rivals.map((r) => r.name).join(', ')})}>{t('info.rivalsBadge')}</Badge>}
+            {rivals.length > 0 && p.scores.starter < 85 && rivals[0].shared >= 2 && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.rivals', {names: rivals.map((r) => r.name).join(', ')})}>{t('info.rivalsBadge')}</Badge>}
             {p.newSigning && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.newSigning', {club: p.newSigning})}>{t('info.newSigningBadge')}</Badge>}
             {p.penaltyTaker && <Badge variant="accent" className="text-[9px] h-4 px-1" title={t('info.penaltyTaker')}>{t('info.penaltyBadge')}</Badge>}
         </span>
@@ -68,18 +68,23 @@ function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer[]}) {
 }
 
 /** The notes of the detail row: absence in full, rivals for the spot, new signing, penalties, European cups. */
-function Notes({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer[]}) {
+function Notes({p}: {p: AuctionPlayer}) {
     const t = useTranslations('Fantasy.board');
+    const ts = useTranslations('Fantasy.setup');
     const format = useFormatter();
     const short = (iso: string) => format.dateTime(day(iso), {day: 'numeric', month: 'short'});
     const lines: Array<{key: string; text: string; tone?: string}> = [];
+    const breakdown = (['P', 'D', 'C', 'A'] as const).filter((r) => (p.roleBreakdown[r] ?? 0) > 0).map((r) => `${Math.round(p.roleBreakdown[r]!)} ${ts(`roles.${r}`).toLowerCase()}`).join(', ');
+    if (p.roleSource === 'listone') lines.push({key: 'role', text: p.listQuote !== null ? t('info.roleListoneQuote', {role: p.role, quote: p.listQuote}) : t('info.roleListone', {role: p.role})});
+    else if (p.roleSource === 'lineups') lines.push({key: 'role', text: t('info.roleLineups', {role: p.role, breakdown})});
+    else lines.push({key: 'role', text: t('info.roleProfile', {role: p.role})});
     if (p.injury) {
         const e = p.injury.estimate;
         const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
         const back = e.kind === 'range' && e.from && e.to ? t('info.backWindow', {from: short(e.from), to: short(e.to)}) : e.kind === 'range' && e.date ? t('info.backDate', {date: short(e.date)}) : e.kind === 'soon' ? t('info.backSoon') : e.kind === 'nextMatch' ? t('info.backNext') : t('info.backUnknown');
         lines.push({key: 'injury', text: t('info.injury', {label, description: p.injury.description ? ` (${p.injury.description})` : '', since: short(p.injury.since), days: t('info.injuryDays', {count: p.injury.daysOut}), back}) + (p.injury.longTerm ? ` · ${t('longTerm')}` : ''), tone: 'text-red-800'});
     }
-    if (rivals.length > 0) lines.push({key: 'rivals', text: t('info.rivals', {names: rivals.map((r) => `${r.name} (${r.scores.starter})`).join(', ')})});
+    if (p.rivals.length > 0) lines.push({key: 'rivals', text: t('info.rivalsShared', {names: p.rivals.map((r) => t('info.rivalOne', {name: r.name, shared: Math.round(r.shared)})).join(', ')})});
     if (p.newSigning) lines.push({key: 'new', text: t('info.newSigning', {club: p.newSigning})});
     if (p.penaltyTaker) lines.push({key: 'pen', text: t('info.penaltyTaker')});
     if (p.europe) lines.push({key: 'europe', text: t('info.europe', {competition: p.europe})});
@@ -147,22 +152,6 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     }, [pool, config, prices, purchases]);
     // The same strategies on the full list at list prices: what each was worth when the auction started.
     const baseline = useMemo(() => (pool && config ? rankStrategies(pool.players, listPrices, config) : []), [pool, config, listPrices]);
-    // Who competes for the same spot: teammates of the role with a starting rate close to his, when he is not a fixed starter.
-    const rivalsOf = useMemo(() => {
-        const byTeamRole = new Map<string, AuctionPlayer[]>();
-        for (const p of pool?.players ?? []) {
-            const key = `${p.team.id}:${p.role}`;
-            byTeamRole.set(key, [...(byTeamRole.get(key) ?? []), p]);
-        }
-        return (p: AuctionPlayer): AuctionPlayer[] => {
-            const st = p.scores.starter;
-            if (st >= 85 || st < 20) return [];
-            return (byTeamRole.get(`${p.team.id}:${p.role}`) ?? [])
-                .filter((o) => o.id !== p.id && o.scores.starter >= 25 && o.scores.starter < 90 && Math.abs(o.scores.starter - st) <= 30)
-                .sort((a, b) => b.scores.starter - a.scores.starter)
-                .slice(0, 2);
-        };
-    }, [pool]);
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
@@ -401,7 +390,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                             {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={rivalsOf(p)} />
+                                                    <Status p={p} rivals={p.rivals} />
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">
                                                             <span className="text-[11px] font-bold">{t('boughtBy', {manager: managers[purchase.manager] ?? t('me'), price: purchase.price})}</span>
@@ -416,7 +405,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
                                                 <td colSpan={14} className="px-3 py-2">
-                                                    <Notes p={p} rivals={rivalsOf(p)} />
+                                                    <Notes p={p} />
                                                     {p.seasons.length === 0 ? (
                                                         <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
                                                     ) : (

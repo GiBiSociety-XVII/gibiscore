@@ -8,7 +8,10 @@ import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getSeasonStudy} from '@/lib/football/data/study';
 import type {ReturnEstimate} from '@/lib/football/spells';
 import type {SidelinedEntry, TeamSummary} from '@/lib/football/types';
+import serieAListone from '@/core/fantasy/listone/serie-a.json';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
+import {matchListone, parseListone, type ListoneMatch, type ListoneRow} from './listone';
+import {deriveRole, findRivals, type SlotStart, type SlotUse} from './roles';
 import {scorePlayer, type FantaRole, type FantaScores, type SeasonLine} from './scores';
 
 /**
@@ -31,6 +34,14 @@ export interface AuctionPlayer {
     newSigning: string | null;
     /** European cup the club plays this season, when someone in the squad already has a line in it. */
     europe: string | null;
+    /** Where the fantasy role comes from: the official list, the formations fielded, or the provider's profile. */
+    roleSource: 'listone' | 'lineups' | 'profile';
+    /** Weighted starts per role from the formations fielded (current season counts three times). */
+    roleBreakdown: Partial<Record<FantaRole, number>>;
+    /** The official list's own quotation, when he is on it. */
+    listQuote: number | null;
+    /** Teammates who started in the same slots of the formation: who he competes with for the pitch. */
+    rivals: Array<{id: number; name: string; shared: number}>;
     /** Took penalties recently: two or more scored in a season of the last two. */
     penaltyTaker: boolean;
     scores: FantaScores;
@@ -52,6 +63,7 @@ interface StatRow {
     team_id: number;
     league_id: number;
     season_year: number;
+    position: string | null;
     appearances: number | null;
     lineups: number | null;
     bench: number | null;
@@ -72,6 +84,18 @@ interface StatRow {
 }
 
 const ROLE_OF: Record<string, FantaRole> = {goalkeeper: 'P', defender: 'D', midfielder: 'C', attacker: 'A'};
+
+/** Official fantasy lists by league slug (core/fantasy/listone). */
+const LISTONE: Partial<Record<string, ListoneRow[]>> = {'serie-a': serieAListone as ListoneRow[]};
+
+interface SlotRow {
+    player_id: number;
+    team_id: number;
+    season_id: number;
+    formation: string | null;
+    formation_position: number;
+    starts: number;
+}
 
 /** How much a season in this competition says about the next one in a top league. */
 function leagueLevel(slug: string, tier: string | null, type: string | null): number {
@@ -106,7 +130,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         // leagues this season: the provider's squads lag behind transfers,
         // the season statistics list a player under his new club as soon as
         // he plays. Whichever source was written last decides the club.
-        type Member = {player: {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null}; team: TeamRow; league: string; at: string};
+        type Member = {player: {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null}; team: TeamRow; league: string; leagueSlug: string; at: string};
         const [squad, played] = await Promise.all([
             fetchAll(
                 (a, b) => db.from('squad_members').select(`season_id,team_id,updated_at,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('season_id', seasons.map((s) => s.season.id)).order('player_id').range(a, b),
@@ -126,8 +150,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             const known = members.get(m.player.id);
             if (!known || m.at > known.at) members.set(m.player.id, m);
         };
-        for (const m of squad) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueOfSeason.get(m.season_id)?.name ?? '', at: m.updated_at});
-        for (const m of played) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueById.get(m.league_id)?.name ?? '', at: m.synced_at});
+        for (const m of squad) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueOfSeason.get(m.season_id)?.name ?? '', leagueSlug: leagueOfSeason.get(m.season_id)?.slug ?? '', at: m.updated_at});
+        for (const m of played) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueById.get(m.league_id)?.name ?? '', leagueSlug: leagueById.get(m.league_id)?.slug ?? '', at: m.synced_at});
         const playerIds = [...members.keys()];
         if (playerIds.length === 0) throw new Error(`no squad members for ${league}`);
 
@@ -138,7 +162,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 (a, b) =>
                     db
                         .from('player_season_stats')
-                        .select('player_id,team_id,league_id,season_year,appearances,lineups,bench,minutes,rating,goals,assists,penalties_scored,penalties_missed,penalties_saved,yellow_cards,yellow_red_cards,red_cards,goals_conceded,saves,team:teams(name),league:leagues(id,name,slug,tier,type)')
+                        .select('player_id,team_id,league_id,season_year,position,appearances,lineups,bench,minutes,rating,goals,assists,penalties_scored,penalties_missed,penalties_saved,yellow_cards,yellow_red_cards,red_cards,goals_conceded,saves,team:teams(name),league:leagues(id,name,slug,tier,type)')
                         .in('player_id', ids)
                         .gte('season_year', year - 2)
                         .lte('season_year', year)
@@ -185,9 +209,46 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             byPlayer.get(r.player_id)!.push(r);
         }
 
+        // Formations fielded this season and last: the slots every player started in, for the
+        // role he really plays and for who competes with him for a spot at his current club.
+        const currentIds = seasons.map((s) => s.season.id);
+        const previousIds = leagues.flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => s.id));
+        const {data: slotRows, error: slotError} = await (db as unknown as {rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{data: SlotRow[] | null; error: {message: string} | null}>}).rpc('lineup_slots', {p_season_ids: [...currentIds, ...previousIds]});
+        if (slotError) throw slotError;
+        const currentSet = new Set(currentIds);
+        const slotsByPlayer = new Map<number, SlotStart[]>();
+        const useByTeam = new Map<number, Map<number, SlotUse>>();
+        for (const r of slotRows ?? []) {
+            const weight = currentSet.has(r.season_id) ? 3 : 1;
+            slotsByPlayer.set(r.player_id, [...(slotsByPlayer.get(r.player_id) ?? []), {formation: r.formation, position: r.formation_position, starts: r.starts, weight}]);
+            // Only the starts at his current club say who he competes with today.
+            if (members.get(r.player_id)?.team.id !== r.team_id) continue;
+            const team = useByTeam.get(r.team_id) ?? new Map<number, SlotUse>();
+            const use = team.get(r.player_id) ?? {playerId: r.player_id, slots: new Map<number, number>(), total: 0};
+            use.slots.set(r.formation_position, (use.slots.get(r.formation_position) ?? 0) + r.starts * weight);
+            use.total += r.starts * weight;
+            team.set(r.player_id, use);
+            useByTeam.set(r.team_id, team);
+        }
+
+        // The official list, league by league: the role it gives wins over everything else.
+        const listoneOf = new Map<number, ListoneMatch>();
+        for (const slug of new Set([...members.values()].map((m) => m.leagueSlug))) {
+            const rows = LISTONE[slug];
+            if (!rows) continue;
+            const pool = [...members.values()].filter((m) => m.leagueSlug === slug).map((m) => ({id: m.player.id, name: m.player.name, team: m.team.name}));
+            for (const [id, match] of matchListone(parseListone(rows), pool).byPlayer) listoneOf.set(id, match);
+        }
+
         const players: AuctionPlayer[] = [];
         for (const {player, team, league: leagueName} of members.values()) {
-            const role = ROLE_OF[normalizePosition(player.position) ?? ''] ?? null;
+            // The role: the official list, else the formations fielded, else the provider's profile
+            // (or, failing that, the position of his latest statistics line).
+            const statsPosition = (byPlayer.get(player.id) ?? []).sort((a, b) => b.season_year - a.season_year).find((r) => r.position)?.position ?? null;
+            const profileRole = ROLE_OF[normalizePosition(player.position) ?? ''] ?? ROLE_OF[normalizePosition(statsPosition) ?? ''] ?? null;
+            const call = deriveRole(slotsByPlayer.get(player.id) ?? [], profileRole);
+            const listed = listoneOf.get(player.id) ?? null;
+            const role = listed?.role ?? call?.role ?? null;
             if (!role) continue;
             const lines: SeasonLine[] = (byPlayer.get(player.id) ?? []).map((r) => ({
                 year: r.season_year,
@@ -241,6 +302,10 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                     return prev.length > 0 && !prev.some((l) => l.teamId === team.id) ? prev[0].teamName : null;
                 })(),
                 europe: europeByTeam.get(team.id) ?? null,
+                roleSource: listed ? 'listone' : call?.source === 'lineups' ? 'lineups' : 'profile',
+                roleBreakdown: call?.breakdown ?? {},
+                listQuote: listed?.quote ?? null,
+                rivals: [],
                 penaltyTaker: lines.some((l) => l.year >= year - 1 && l.penaltiesScored >= 2),
                 scores,
                 seasons: lines
@@ -249,6 +314,18 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                     .slice(0, 6)
                     .map((l) => ({year: l.year, league: l.leagueName, team: l.teamName, apps: l.appearances, lineups: l.lineups, minutes: l.minutes, goals: l.goals, assists: l.assists, rating: l.rating})),
             });
+        }
+        // Rivals: teammates who started in the same slots, named once everyone has a role.
+        const nameOf = new Map(players.map((p) => [p.id, p]));
+        for (const p of players) {
+            const team = useByTeam.get(p.team.id);
+            const use = team?.get(p.id);
+            if (!team || !use) continue;
+            p.rivals = findRivals(use, [...team.values()], 4)
+                .map((r) => ({rival: nameOf.get(r.id), shared: r.shared}))
+                .filter((x): x is {rival: AuctionPlayer; shared: number} => !!x.rival && (x.rival.role === p.role || x.shared >= 3))
+                .slice(0, 2)
+                .map((x) => ({id: x.rival.id, name: x.rival.name, shared: x.shared}));
         }
         players.sort((a, b) => b.scores.overall - a.scores.overall || a.name.localeCompare(b.name));
 
