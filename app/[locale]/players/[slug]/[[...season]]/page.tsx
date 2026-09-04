@@ -5,6 +5,7 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
+import {RatingTrend} from "@/components/football/rating-trend";
 import {Tabs} from "@/components/football/tabs";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
@@ -235,6 +236,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                     <Stat value={totals.assists} label={t('assists')} />
                     <Stat value={`${totals.yellowCards}/${totals.redCards}`} label={t('cards')} />
                     <Stat value={totals.averageRating !== null ? totals.averageRating.toFixed(2) : '–'} label={t('averageRating')} accent />
+                    <RatingTrend matches={page.matches} average={totals.averageRating} label={t('ratingTrend')} />
                 </div>
             </section>
 

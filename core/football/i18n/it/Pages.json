@@ -139,7 +139,8 @@
     "tabs": {
       "seasons": "Stagioni",
       "matches": "Partite"
-    }
+    },
+    "ratingTrend": "Andamento voti"
   },
   "scores": {
     "metaTitle": "Risultati calcio in tempo reale",
@@ -184,5 +185,16 @@
     "scorers": "Marcatori",
     "assists": "Assist",
     "empty": "Dati non ancora disponibili per questa competizione."
+  },
+  "injuries": {
+    "title": "Infortunati e squalificati",
+    "metaTitle": "Infortunati e squalificati",
+    "metaDescription": "Giocatori infortunati e squalificati delle principali competizioni, squadra per squadra, aggiornati ogni sei ore.",
+    "intro": "Indisponibili delle competizioni principali, squadra per squadra. Aggiornamento ogni sei ore.",
+    "empty": "Nessun indisponibile in archivio al momento.",
+    "category": {
+      "injury": "Infortunio",
+      "suspension": "Squalifica"
+    }
   }
 }

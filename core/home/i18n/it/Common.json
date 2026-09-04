@@ -27,7 +27,8 @@
         "title": "Statistiche",
         "players": "Statistiche giocatori",
         "scorers": "Marcatori",
-        "search": "Cerca squadra o giocatore"
+        "search": "Cerca squadra o giocatore",
+        "injuries": "Infortunati e squalificati"
       },
       "info": {
         "title": "Info",
@@ -57,6 +58,8 @@
     "favorites": "Classifiche preferite",
     "noFavorites": "Nessuna competizione: usa la stella accanto a un campionato per vederne qui la classifica.",
     "addFavorite": "Aggiungi ai preferiti",
-    "removeFavorite": "Togli dai preferiti"
+    "removeFavorite": "Togli dai preferiti",
+    "myTeams": "Le mie squadre",
+    "noMatches": "Nessuna partita in archivio."
   }
 }

@@ -5,6 +5,7 @@ import {getNavigation} from "@/lib/football/data/navigation";
 import type {ScoresPage} from "@/lib/football/data/scores";
 import type {FixtureSummary, RankedPlayer, StandingGroup} from "@/lib/football/types";
 import {FavoritesRail} from "./favorites-rail";
+import {MyTeamsRail} from "./my-teams-rail";
 import {MatchRow} from "./match-row";
 import {Rankings} from "./rankings";
 import {StandingsTable} from "./standings-table";
@@ -48,5 +49,10 @@ export async function ScoresRail({page}: {page: ScoresPage}) {
     const catalog = [...nav.pinned, ...today]
         .filter((c) => (seen.has(c.slug) ? false : (seen.add(c.slug), true)))
         .map((c) => ({slug: c.slug, name: c.name, logoUrl: c.logoUrl}));
-    return <FavoritesRail defaults={defaults} catalog={catalog} />;
+    return (
+        <>
+            <MyTeamsRail />
+            <FavoritesRail defaults={defaults} catalog={catalog} />
+        </>
+    );
 }

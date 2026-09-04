@@ -69,6 +69,7 @@ export default function Footer() {
                     <Column title={t('columns.stats.title')}>
                         <Link href="/stats" className={link}>{t('columns.stats.players')}</Link>
                         <Link href="/stats" className={link}>{t('columns.stats.scorers')}</Link>
+                        <Link href="/injuries" className={link}>{t('columns.stats.injuries')}</Link>
                         <Link href="/search" className={link}>{t('columns.stats.search')}</Link>
                     </Column>
                     <Column title={t('columns.info.title')}>

@@ -169,6 +169,12 @@ body {
 /* data-row (live / finished / scheduled / other) and the wrapper's       */
 /* data-filter hides what does not match. Blocks left empty disappear.    */
 /* ---------------------------------------------------------------------- */
+/* Rows of a favourite team (marked by the client from localStorage). */
+[data-row][data-fav] {
+  background-color: rgb(var(--accent) / 0.16);
+  box-shadow: inset 3px 0 0 rgb(var(--accent));
+}
+
 [data-filter="live"] [data-row]:not([data-row="live"]),
 [data-filter="finished"] [data-row]:not([data-row="finished"]),
 [data-filter="scheduled"] [data-row]:not([data-row="scheduled"]) {

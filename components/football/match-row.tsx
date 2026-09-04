@@ -61,6 +61,7 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
         <Link
             href={`/matches/${fixture.id}`}
             data-row={state}
+            data-teams={`${fixture.home.slug ?? ''}|${fixture.away.slug ?? ''}`}
             className={cn(
                 "grid items-center gap-1.5 px-2 min-h-8 border-t border-muted first:border-t-0 hover:bg-muted/70 transition-colors",
                 showDate || showCompetition

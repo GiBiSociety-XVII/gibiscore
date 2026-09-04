@@ -1,5 +1,5 @@
 import 'server-only';
-import {LIVE_STATES, type SquadPlayer, type TeamPage, type TeamPlayerSeason, type TeamSeasonStats, type TeamStandingLine} from '../types';
+import {LIVE_STATES, type FixtureSummary, type SquadPlayer, type TeamPage, type TeamPlayerSeason, type TeamSeasonStats, type TeamStandingLine, type TeamSummary} from '../types';
 import {normalizePosition} from './matches';
 import {FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixtures, toStandingRow, toTeam, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
@@ -213,5 +213,39 @@ async function loadPlayers(db: ReturnType<typeof footballDb>, teamId: number): P
     } catch (error) {
         logReadError('loadPlayers', error);
         return [];
+    }
+}
+
+export interface TeamBrief {
+    team: TeamSummary;
+    /** Match in play, else the next scheduled one. */
+    next: FixtureSummary | null;
+    last: FixtureSummary | null;
+}
+
+/** For the "my teams" rail: the team, its last result and its next (or live) match. */
+export async function getTeamBrief(slug: string): Promise<TeamBrief | null> {
+    try {
+        const db = footballDb();
+        const {data: teamRow, error} = await db.from('teams').select(TEAM_SELECT).eq('slug', slug).maybeSingle();
+        if (error) throw error;
+        if (!teamRow) return null;
+        const team = toTeam(teamRow as unknown as TeamRow);
+        const now = new Date().toISOString();
+        const filter = `home_team_id.eq.${team.id},away_team_id.eq.${team.id}`;
+        const [liveRes, nextRes, lastRes] = await Promise.all([
+            db.from('fixtures').select(FIXTURE_SELECT).or(filter).in('state', [...LIVE_STATES]).limit(1),
+            db.from('fixtures').select(FIXTURE_SELECT).or(filter).gt('starting_at', now).eq('state', 'scheduled').order('starting_at', {ascending: true}).limit(1),
+            db.from('fixtures').select(FIXTURE_SELECT).or(filter).eq('state', 'finished').order('starting_at', {ascending: false}).limit(1),
+        ]);
+        for (const res of [liveRes, nextRes, lastRes]) if (res.error) throw res.error;
+        return {
+            team,
+            next: toFixtures(liveRes.data)[0] ?? toFixtures(nextRes.data)[0] ?? null,
+            last: toFixtures(lastRes.data)[0] ?? null,
+        };
+    } catch (error) {
+        logReadError(`getTeamBrief(${slug})`, error);
+        return null;
     }
 }

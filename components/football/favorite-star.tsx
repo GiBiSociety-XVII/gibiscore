@@ -3,20 +3,22 @@
 import {Star} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
-import {useFavorites} from "@/lib/favorites";
+import {useFavoriteTeams, useFavorites} from "@/lib/favorites";
 
-/** Star toggle: adds the competition to the favourites shown in the home rail. */
-export function FavoriteStar({slug, className, size = 14}: {slug: string; className?: string; size?: number}) {
+/** Star toggle for a competition (default) or a team, kept in the browser. */
+export function FavoriteStar({slug, kind = 'competition', className, size = 14}: {slug: string; kind?: 'competition' | 'team'; className?: string; size?: number}) {
     const t = useTranslations('Common.rail');
-    const {isFavorite, toggle} = useFavorites();
-    const on = isFavorite(slug);
+    const competitions = useFavorites();
+    const teams = useFavoriteTeams();
+    const store = kind === 'team' ? teams : competitions;
+    const on = store.isFavorite(slug);
     return (
         <button
             type="button"
             onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                toggle(slug);
+                store.toggle(slug);
             }}
             aria-pressed={on}
             aria-label={on ? t('removeFavorite') : t('addFavorite')}

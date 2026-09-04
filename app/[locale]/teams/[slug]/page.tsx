@@ -4,6 +4,7 @@ import {Link} from "@/i18n/navigation";
 import {Badge} from "@/components/shared/ui/badge";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
+import {FavoriteStar} from "@/components/football/favorite-star";
 import {MatchList} from "@/components/football/match-list";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
 import {Tabs} from "@/components/football/tabs";
@@ -202,6 +203,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
                 visual={<TeamCrest team={team} size={48} />}
                 title={team.name}
                 meta={[team.country, team.venue, team.founded ? t('founded', {year: team.founded}) : null].filter(Boolean).join(' · ')}
+                aside={team.slug ? <FavoriteStar slug={team.slug} kind="team" size={18} className="w-8 h-8 border-2 border-foreground bg-card" /> : null}
             />
             <Tabs
                 items={[

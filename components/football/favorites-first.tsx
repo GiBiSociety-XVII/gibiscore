@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useRef} from "react";
-import {useFavorites} from "@/lib/favorites";
+import {useFavoriteTeams, useFavorites} from "@/lib/favorites";
 
 /**
  * Moves the blocks of the starred competitions to the top of the scores
@@ -10,7 +10,19 @@ import {useFavorites} from "@/lib/favorites";
  */
 export function FavoritesFirst({label}: {label: string}) {
     const {favorites} = useFavorites();
+    const {favorites: teams} = useFavoriteTeams();
     const anchor = useRef<HTMLDivElement>(null);
+
+    // Rows of favourite teams get a mark (styled in globals.css).
+    useEffect(() => {
+        const list = anchor.current?.parentElement;
+        if (!list) return;
+        for (const row of list.querySelectorAll<HTMLElement>('[data-row][data-teams]')) {
+            const slugs = (row.dataset.teams ?? '').split('|');
+            if (slugs.some((s) => s && teams.includes(s))) row.dataset.fav = '1';
+            else delete row.dataset.fav;
+        }
+    }, [teams]);
 
     useEffect(() => {
         const host = anchor.current;
