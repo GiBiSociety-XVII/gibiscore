@@ -43,6 +43,24 @@ export interface RateLimitInfo {
 /** Last rate-limit headers seen; handy for the status route and job logs. */
 export let lastRateLimit: RateLimitInfo = {dayLimit: null, dayRemaining: null, minuteLimit: null, minuteRemaining: null};
 
+/**
+ * Requests left today, from the last answer's headers or, when nothing
+ * has been asked yet in this process, from the free /status endpoint.
+ * Null when the provider does not say.
+ */
+export async function dailyRemaining(): Promise<number | null> {
+    if (lastRateLimit.dayRemaining === null) {
+        try {
+            await apiFootballGet('status');
+        } catch {
+            return null;
+        }
+    }
+    return lastRateLimit.dayRemaining;
+}
+
+export {quotaAllows} from './quota';
+
 function apiKey(): string {
     const value = process.env.API_FOOTBALL_KEY;
     if (!value) {

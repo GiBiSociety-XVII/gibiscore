@@ -1,6 +1,6 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet, waitForMinuteWindow} from '@/lib/api-football/client';
+import {apiFootballGet, dailyRemaining, quotaAllows, waitForMinuteWindow} from '@/lib/api-football/client';
 import {mapPlayerProfile, mapPlayerSeason} from '@/lib/api-football/mappers';
 import type {AfPlayerResponse} from '@/lib/api-football/types';
 import {
@@ -20,6 +20,8 @@ import {
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** No new season is started after this, well inside the route's maxDuration. */
+/** Requests to leave for the rest of the day: live scores, fixtures, injuries. */
+const DAILY_RESERVE = 1500;
 const DEADLINE_MS = 200_000;
 const RETRY = {retryOnMinuteLimit: true};
 
@@ -73,19 +75,38 @@ export async function syncPlayerSeasons(options: PlayerSeasonsOptions = {}): Pro
         }
         run.bump('seasons_due', due.length);
 
+        // A league-season costs up to a hundred requests: never start on a day whose quota
+        // the live and fixture jobs still need.
+        const remaining = due.length > 0 ? await dailyRemaining() : null;
+        if (!quotaAllows(remaining, DAILY_RESERVE)) {
+            run.warn(`daily quota low (${remaining} left): player seasons wait for tomorrow`);
+            run.bump('seasons_skipped_quota', due.length);
+            await finishRun(db, run, 'ok');
+            return run;
+        }
+
+        let failed = 0;
         for (const s of due) {
             if (run.requests >= budget || Date.now() - startedAt > DEADLINE_MS) {
                 run.bump('seasons_deferred');
                 continue;
             }
-            const players = await syncSeason(db, run, s);
-            const {error} = await db.from('seasons').update({players_synced_at: new Date().toISOString()}).eq('id', s.id);
-            if (error) failSync('seasons.update', error);
-            run.bump('seasons_synced');
-            console.info(`[sync-player-seasons] ${s.leagueSlug} ${s.year}: ${players} players, ${run.requests} requests so far`);
+            // One season failing (a bad payload, a rejected row) must not stop the others, nor
+            // make the run retry every season on the hour.
+            try {
+                const players = await syncSeason(db, run, s);
+                const {error} = await db.from('seasons').update({players_synced_at: new Date().toISOString()}).eq('id', s.id);
+                if (error) failSync('seasons.update', error);
+                run.bump('seasons_synced');
+                console.info(`[sync-player-seasons] ${s.leagueSlug} ${s.year}: ${players} players, ${run.requests} requests so far`);
+            } catch (error) {
+                failed += 1;
+                run.bump('seasons_failed');
+                run.warn(`${s.leagueSlug} ${s.year}: ${(error as Error).message}`);
+            }
         }
 
-        await finishRun(db, run, 'ok');
+        await finishRun(db, run, failed > 0 && run.counters.seasons_synced === undefined ? 'error' : 'ok', failed > 0 ? `${failed} season(s) failed, see warnings` : undefined);
         return run;
     } catch (error) {
         await finishRun(db, run, 'error', (error as Error).message);
@@ -154,16 +175,24 @@ async function syncSeason(db: FootballClient, run: SyncRun, s: SeasonRow): Promi
     // duplicated statistics blocks): keep one row per key or Postgres
     // rejects the whole upsert ("cannot affect row a second time").
     const byKey = new Map<string, Record<string, unknown>>();
+    const rawByKey = new Map<string, Record<string, unknown>>();
     for (const {playerProviderId, st} of stats) {
         const playerId = players.get(playerProviderId);
         const teamId = teams.get(st.team.id);
         if (!playerId || !teamId) continue;
-        byKey.set(`${playerId}:${teamId}`, {player_id: playerId, team_id: teamId, league_id: s.leagueId, season_id: s.id, ...mapPlayerSeason(st)});
+        // The provider's full payload goes to its own table: nobody reads it on the site.
+        const {raw, ...row} = mapPlayerSeason(st);
+        byKey.set(`${playerId}:${teamId}`, {player_id: playerId, team_id: teamId, league_id: s.leagueId, season_id: s.id, ...row});
+        rawByKey.set(`${playerId}:${teamId}`, {player_id: playerId, team_id: teamId, league_id: s.leagueId, season_year: row.season_year, raw, synced_at: row.synced_at});
     }
     const rows = [...byKey.values()];
     for (const group of chunk(rows, 300)) {
         const {error} = await db.from('player_season_stats').upsert(group, {onConflict: 'player_id,team_id,league_id,season_year'});
         if (error) failSync('player_season_stats.upsert', error);
+    }
+    for (const group of chunk([...rawByKey.values()], 100)) {
+        const {error} = await db.from('player_season_raw').upsert(group, {onConflict: 'player_id,team_id,league_id,season_year'});
+        if (error) failSync('player_season_raw.upsert', error);
     }
     run.bump('player_seasons', rows.length);
     return unique.size;

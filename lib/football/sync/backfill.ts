@@ -1,12 +1,14 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet, waitForMinuteWindow} from '@/lib/api-football/client';
+import {apiFootballGet, dailyRemaining, quotaAllows, waitForMinuteWindow} from '@/lib/api-football/client';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {fetchAll} from '@/lib/db/paginate';
 import {chunk, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
 import {upsertFixtures} from './fixtures';
 
 const DAY = 86_400_000;
+/** Requests to leave for the rest of the day: live scores, fixtures, injuries. */
+const DAILY_RESERVE = 1500;
 /** Stop starting new requests after this, well inside the route's maxDuration. */
 const DEADLINE_MS = 230_000;
 const RETRY = {retryOnMinuteLimit: true};
@@ -32,6 +34,14 @@ export async function syncBackfill(limit = 400): Promise<SyncRun> {
     const startedAt = Date.now();
     const outOfTime = () => Date.now() - startedAt > DEADLINE_MS;
     try {
+        // The archive can wait: never eat into the requests the live and fixture jobs need today.
+        const remaining = await dailyRemaining();
+        if (!quotaAllows(remaining, DAILY_RESERVE)) {
+            run.warn(`daily quota low (${remaining} left): backfill waits for tomorrow`);
+            run.bump('skipped_quota');
+            await finishRun(db, run, 'ok');
+            return run;
+        }
         const seasons = await featuredSeasons(db, historySeasonCount(), run);
 
         // 1. Season fixture lists.
