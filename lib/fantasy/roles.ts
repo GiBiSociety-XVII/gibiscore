@@ -139,3 +139,22 @@ export function findRivals(player: SlotUse, teammates: SlotUse[], limit = 2): Ri
     }
     return out.sort((a, b) => b.shared - a.shared).slice(0, limit);
 }
+
+export interface Availability {
+    /** Weighted matches started at the club. */
+    starts: number;
+    /** Weighted matches on the bench at the club. */
+    benches: number;
+}
+
+/**
+ * Whether a player's place is contested: he sat on the bench in at
+ * least a fifth of the matches he was available for (with enough of
+ * them to say so). A player who starts whenever he is fit is never in a
+ * "ballottaggio", whatever his injuries did to his season.
+ */
+export function isContested(a: Availability, minMatches = 3): boolean {
+    const total = a.starts + a.benches;
+    if (total < minMatches) return false;
+    return a.benches / total >= 0.2;
+}

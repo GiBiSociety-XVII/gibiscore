@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {deriveRole, findRivals, formationSpots, parseFormation, slotRole} from './roles';
+import {deriveRole, findRivals, formationSpots, isContested, parseFormation, slotRole} from './roles';
 
 describe('slotRole', () => {
     it('reads the back line and the keeper', () => {
@@ -73,5 +73,14 @@ describe('findRivals', () => {
             {playerId: 4, slots: new Map([[21, 30]]), total: 30},
         ];
         expect(findRivals(me, mates)).toEqual([{id: 2, shared: 12}, {id: 3, shared: 6}]);
+    });
+});
+
+describe('isContested', () => {
+    it('is false for a starter who sits only now and then, true from a bench in five', () => {
+        expect(isContested({starts: 27, benches: 2})).toBe(false);
+        expect(isContested({starts: 20, benches: 6})).toBe(true);
+        expect(isContested({starts: 2, benches: 0})).toBe(false);
+        expect(isContested({starts: 0, benches: 5})).toBe(true);
     });
 });

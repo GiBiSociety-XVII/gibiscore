@@ -60,7 +60,7 @@ function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']}
                     </span>
                 );
             })()}
-            {rivals.length > 0 && p.scores.starter < 85 && rivals[0].shared >= 2 && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.rivals', {names: rivals.map((r) => r.name).join(', ')})}>{t('info.rivalsBadge')}</Badge>}
+            {p.contested && rivals.length > 0 && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.rivals', {names: rivals.map((r) => r.name).join(', ')})}>{t('info.rivalsBadge')}</Badge>}
             {p.newSigning && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.newSigning', {club: p.newSigning})}>{t('info.newSigningBadge')}</Badge>}
             {p.penaltyTaker && <Badge variant="accent" className="text-[9px] h-4 px-1" title={t('info.penaltyTaker')}>{t('info.penaltyBadge')}</Badge>}
         </span>
@@ -84,7 +84,10 @@ function Notes({p}: {p: AuctionPlayer}) {
         const back = e.kind === 'range' && e.from && e.to ? t('info.backWindow', {from: short(e.from), to: short(e.to)}) : e.kind === 'range' && e.date ? t('info.backDate', {date: short(e.date)}) : e.kind === 'soon' ? t('info.backSoon') : e.kind === 'nextMatch' ? t('info.backNext') : t('info.backUnknown');
         lines.push({key: 'injury', text: t('info.injury', {label, description: p.injury.description ? ` (${p.injury.description})` : '', since: short(p.injury.since), days: t('info.injuryDays', {count: p.injury.daysOut}), back}) + (p.injury.longTerm ? ` · ${t('longTerm')}` : ''), tone: 'text-red-800'});
     }
-    if (p.rivals.length > 0) lines.push({key: 'rivals', text: t('info.rivalsShared', {names: p.rivals.map((r) => t('info.rivalOne', {name: r.name, shared: Math.round(r.shared)})).join(', ')})});
+    const avail = p.availability.starts + p.availability.benches;
+    if (p.contested && p.rivals.length > 0) lines.push({key: 'rivals', text: t('info.contested', {benches: Math.round(p.availability.benches), total: Math.round(avail), names: p.rivals.map((r) => t('info.rivalOne', {name: r.name, shared: r.shared})).join(', ')}), tone: 'text-amber-800'});
+    else if (p.contested) lines.push({key: 'rivals', text: t('info.contestedUnknown', {benches: Math.round(p.availability.benches), total: Math.round(avail)}), tone: 'text-amber-800'});
+    else if (avail >= 3) lines.push({key: 'rivals', text: t('info.fixedStarter', {starts: Math.round(p.availability.starts), total: Math.round(avail)}) + (p.rivals.length > 0 ? ` ${t('info.backup', {names: p.rivals.map((r) => r.name).join(', ')})}` : '')});
     if (p.newSigning) lines.push({key: 'new', text: t('info.newSigning', {club: p.newSigning})});
     if (p.penaltyTaker) lines.push({key: 'pen', text: t('info.penaltyTaker')});
     if (p.europe) lines.push({key: 'europe', text: t('info.europe', {competition: p.europe})});

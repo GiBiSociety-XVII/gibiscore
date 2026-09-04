@@ -196,12 +196,15 @@
       "europe": "Il club gioca la {competition}: più partite, turnover possibile",
       "europeBadge": "Coppe",
       "none": "Nessuna nota particolare.",
-      "rivalsShared": "Si è alternato nello stesso posto del modulo con {names}",
-      "rivalOne": "{name} ({shared} partite in comune, pesate)",
       "roleListoneQuote": "Ruolo {role} dal listone ufficiale (quotazione {quote})",
       "roleListone": "Ruolo {role} dal listone ufficiale",
       "roleLineups": "Ruolo {role} dedotto dalle formazioni schierate: {breakdown} (partite pesate, la stagione in corso conta il triplo)",
-      "roleProfile": "Ruolo {role} dalla scheda del provider: non è nel listone e ha poche formazioni alle spalle"
+      "roleProfile": "Ruolo {role} dalla scheda del provider: non è nel listone e ha poche formazioni alle spalle",
+      "rivalOne": "{name} ({shared})",
+      "contested": "In ballottaggio: in panchina {benches} volte su {total} in cui era convocato (partite pesate, questa stagione conta il triplo). Al suo posto hanno giocato {names}.",
+      "contestedUnknown": "In ballottaggio: in panchina {benches} volte su {total} in cui era convocato (partite pesate).",
+      "fixedStarter": "Titolare fisso: ha iniziato {starts} partite su {total} in cui era convocato (pesate).",
+      "backup": "Chi lo sostituisce nel suo ruolo: {names}."
     }
   },
   "roster": {
