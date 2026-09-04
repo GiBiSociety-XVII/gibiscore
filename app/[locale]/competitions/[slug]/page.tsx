@@ -2,6 +2,7 @@ import type {Metadata} from "next";
 import Image from "next/image";
 import {getTranslations, setRequestLocale} from "next-intl/server";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
+import {FavoriteStar} from "@/components/football/favorite-star";
 import {Flag} from "@/components/football/flag";
 import {MatchList} from "@/components/football/match-list";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
@@ -42,7 +43,7 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
     const others = page.rounds.filter((r) => r.round !== page.currentRound);
     const rail = (
         <>
-            {page.standings.length > 0 && <StandingsPanel title={t('standings')} slug={competition.slug} groups={page.standings.slice(0, 1)} limit={10} />}
+            {page.standings.length > 0 && <StandingsPanel title={t('standings')} slug={competition.slug} groups={page.standings.slice(0, 1)} />}
             {page.rankings.scorers.length > 0 && <ScorersPanel title={t('scorers')} players={page.rankings.scorers} />}
         </>
     );
@@ -102,7 +103,12 @@ export default async function CompetitionPage({params}: PageProps<"/[locale]/com
                         {season && <span>· {tFootball('labels.season', {season: season.name})}</span>}
                     </>
                 }
-                aside={page.live.length > 0 ? <span className="bb-badge bg-accent">{t('live')} · {page.live.length}</span> : null}
+                aside={
+                    <span className="inline-flex items-center gap-2">
+                        {page.live.length > 0 && <span className="bb-badge bg-accent">{t('live')} · {page.live.length}</span>}
+                        <FavoriteStar slug={competition.slug} size={18} className="w-8 h-8 border-2 border-foreground bg-card" />
+                    </span>
+                }
             />
             <Tabs
                 items={[

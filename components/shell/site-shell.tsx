@@ -34,17 +34,4 @@ export async function SiteShell({children, rail, wide = false, navigation}: {chi
     );
 }
 
-/** Panel used by the rail and by secondary boxes: card with a compact title row. */
-export function Panel({title, action, children, className}: {title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string}) {
-    return (
-        <section className={`bb-surface overflow-hidden ${className ?? ''}`}>
-            {title && (
-                <div className="flex items-center justify-between gap-2 px-3 h-9 border-b-2 border-foreground bg-card">
-                    <h2 className="text-[13px] font-extrabold uppercase tracking-wide truncate">{title}</h2>
-                    {action}
-                </div>
-            )}
-            {children}
-        </section>
-    );
-}
+export {Panel} from "./panel";

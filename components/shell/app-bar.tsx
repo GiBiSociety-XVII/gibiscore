@@ -19,11 +19,11 @@ export default function AppBar() {
     const t = useTranslations("AppBar");
 
     return (
-        <header className="sticky top-0 z-50 w-full bg-foreground text-background border-b-[2.5px] border-foreground">
+        <header className="sticky top-0 z-50 w-full bg-background text-foreground border-b-[2.5px] border-foreground">
             <div className="w-full max-w-[1600px] mx-auto px-2 md:px-4">
                 <div className="flex h-12 items-center gap-2 md:gap-4">
                     <Link href="/" className="flex items-center gap-2 shrink-0">
-                        <LogoMark className="h-8 w-8 rounded-lg border-background shadow-[3px_3px_0_rgb(var(--accent))]" />
+                        <LogoMark className="h-8 w-8 rounded-lg shadow-[3px_3px_0_rgb(var(--foreground))]" />
                         <span className="text-base font-black tracking-tight">GiBiScore</span>
                     </Link>
 
@@ -37,17 +37,17 @@ export default function AppBar() {
                                     aria-current={active ? 'page' : undefined}
                                     className={cn(
                                         "px-2.5 md:px-3 h-8 inline-flex items-center rounded-md text-[13px] font-extrabold whitespace-nowrap transition-colors",
-                                        active ? "bg-accent text-accent-foreground" : "text-background/80 hover:text-background hover:bg-background/10",
+                                        active ? "bg-accent text-accent-foreground border-2 border-foreground" : "text-foreground/70 hover:text-foreground hover:bg-muted",
                                     )}
                                 >
-                                    {key === 'live' && <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", active ? "bg-foreground" : "bg-accent")} aria-hidden="true" />}
+                                    {key === 'live' && <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5 border border-foreground", active ? "bg-foreground" : "bg-accent")} aria-hidden="true" />}
                                     {t(`nav.${key}`)}
                                 </Link>
                             );
                         })}
                     </nav>
 
-                    <form action="/competitions" method="get" className="ml-auto hidden md:flex items-center gap-2 h-8 px-2.5 w-[220px] rounded-md bg-background/10 text-background/70 focus-within:bg-background focus-within:text-foreground transition-colors">
+                    <form action="/competitions" method="get" className="ml-auto hidden md:flex items-center gap-2 h-8 px-2.5 w-[220px] rounded-md border-2 border-foreground/20 bg-card text-muted-foreground focus-within:border-foreground focus-within:text-foreground transition-colors">
                         <Search className="w-4 h-4 shrink-0" />
                         <input
                             type="search"

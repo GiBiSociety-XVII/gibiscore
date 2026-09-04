@@ -1,18 +1,19 @@
 import {getTranslations} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {Panel} from "@/components/shell/site-shell";
-import {getStandingsBySlug} from "@/lib/football/data/competitions";
+import {getNavigation} from "@/lib/football/data/navigation";
 import type {ScoresPage} from "@/lib/football/data/scores";
 import type {FixtureSummary, RankedPlayer, StandingGroup} from "@/lib/football/types";
+import {FavoritesRail} from "./favorites-rail";
 import {MatchRow} from "./match-row";
 import {Rankings} from "./rankings";
 import {StandingsTable} from "./standings-table";
 
-export async function StandingsPanel({title, slug, groups, highlightTeamIds, limit = 10}: {title: string; slug: string; groups: StandingGroup[]; highlightTeamIds?: number[]; limit?: number}) {
+export async function StandingsPanel({title, slug, groups, highlightTeamIds}: {title: string; slug: string; groups: StandingGroup[]; highlightTeamIds?: number[]}) {
     const t = await getTranslations('Common.rail');
     return (
-        <Panel title={title} action={<Link href={`/competitions/${slug}`} className="text-[11px] font-extrabold underline decoration-accent decoration-[2px] underline-offset-2">{t('fullStandings')}</Link>}>
-            <StandingsTable groups={groups} compact limit={limit} highlightTeamIds={highlightTeamIds} />
+        <Panel scroll title={title} action={<Link href={`/competitions/${slug}`} className="text-[11px] font-extrabold underline decoration-accent decoration-[2px] underline-offset-2">{t('fullStandings')}</Link>}>
+            <StandingsTable groups={groups} compact highlightTeamIds={highlightTeamIds} />
         </Panel>
     );
 }
@@ -40,16 +41,21 @@ export async function AdPanel() {
     return <div className="border-2 border-dashed border-muted-foreground/60 rounded-2xl h-[100px] flex items-center justify-center text-[12px] font-bold text-muted-foreground">{t('adSlot')}</div>;
 }
 
-/** Rail of the scores pages: tables of the first pinned competitions playing that day. */
+/**
+ * Rail of the scores pages: the user's favourite competitions (browser
+ * side), defaulting to the pinned competitions playing that day.
+ */
 export async function ScoresRail({page}: {page: ScoresPage}) {
-    const t = await getTranslations('Common.rail');
-    const slugs = page.pinned.slice(0, 2).map((g) => g.competition.slug);
-    const tables = (await Promise.all(slugs.map((slug) => getStandingsBySlug(slug)))).filter((x): x is NonNullable<typeof x> => x !== null && x.groups.length > 0);
+    const nav = await getNavigation();
+    const today = page.pinned.map((g) => g.competition);
+    const defaults = (today.length > 0 ? today : nav.pinned).slice(0, 2).map((c) => c.slug);
+    const seen = new Set<string>();
+    const catalog = [...nav.pinned, ...today]
+        .filter((c) => (seen.has(c.slug) ? false : (seen.add(c.slug), true)))
+        .map((c) => ({slug: c.slug, name: c.name, logoUrl: c.logoUrl}));
     return (
         <>
-            {tables.map((table) => (
-                <StandingsPanel key={table.competition.slug} title={`${t('standings')} ${table.competition.name}`} slug={table.competition.slug} groups={table.groups} limit={8} />
-            ))}
+            <FavoritesRail defaults={defaults} catalog={catalog} />
             <AdPanel />
         </>
     );
