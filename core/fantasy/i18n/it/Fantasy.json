@@ -174,7 +174,29 @@
     "quickMax": "Max",
     "blockRole": "{manager} ha già {count} {role}: rosa piena in questo ruolo.",
     "blockCredits": "{manager} non può pagare più di {max} crediti: gli servono gli altri per completare la rosa con i giocatori più economici rimasti.",
-    "full": "pieno"
+    "full": "pieno",
+    "info": {
+      "title": "Note per l'asta",
+      "injury": "{label}{description}: fuori dal {since} ({days}), {back}",
+      "injuryDays": "{count, plural, =0 {da oggi} =1 {1 giorno} other {# giorni}}",
+      "backDate": "rientro stimato {date}",
+      "backWindow": "rientro stimato tra il {from} e il {to}",
+      "backSoon": "rientro previsto a breve",
+      "backNext": "rientra alla prossima partita",
+      "backUnknown": "rientro non prevedibile",
+      "backShort": "rientro {date}",
+      "backSoonShort": "a breve",
+      "backNextShort": "prossima",
+      "rivals": "In ballottaggio con {names}",
+      "rivalsBadge": "Ballott.",
+      "newSigning": "Nuovo arrivo: l'anno scorso al {club}",
+      "newSigningBadge": "Nuovo",
+      "penaltyTaker": "Rigorista: ha segnato almeno due rigori in una delle ultime due stagioni",
+      "penaltyBadge": "Rig.",
+      "europe": "Il club gioca la {competition}: più partite, turnover possibile",
+      "europeBadge": "Coppe",
+      "none": "Nessuna nota particolare."
+    }
   },
   "roster": {
     "title": "La mia rosa",

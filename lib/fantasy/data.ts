@@ -6,6 +6,7 @@ import {romeDate} from '@/lib/football/data/scores';
 import {TEAM_SELECT, footballDb, logReadError, toTeam, type TeamRow} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getSeasonStudy} from '@/lib/football/data/study';
+import type {ReturnEstimate} from '@/lib/football/spells';
 import type {SidelinedEntry, TeamSummary} from '@/lib/football/types';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
 import {scorePlayer, type FantaRole, type FantaScores, type SeasonLine} from './scores';
@@ -25,7 +26,11 @@ export interface AuctionPlayer {
     imageUrl: string | null;
     team: TeamSummary;
     league: string;
-    injury: {category: string; description: string | null; daysOut: number; longTerm: boolean; returnKind: SidelinedEntry['estimate']['kind']} | null;
+    injury: {category: string; description: string | null; since: string; daysOut: number; longTerm: boolean; estimate: ReturnEstimate} | null;
+    /** Club he played for last season, when it is not the current one. */
+    newSigning: string | null;
+    /** European cup the club plays this season, when someone in the squad already has a line in it. */
+    europe: string | null;
     /** Took penalties recently: two or more scored in a season of the last two. */
     penaltyTaker: boolean;
     scores: FantaScores;
@@ -168,6 +173,9 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 teamShape.set(t.team.id, {attack: logistic(t.goalsFor / t.played / perTeam), defence: logistic(perTeam / Math.max(0.2, t.goalsAgainst / t.played)), rounds: t.played});
             }
         }
+        // Clubs in Europe this season: any squad member with a line in a European cup this year.
+        const europeByTeam = new Map<number, string>();
+        for (const r of stats) if (r.season_year === year && /champions|europa|conference/i.test(r.league?.slug ?? '')) europeByTeam.set(r.team_id, r.league?.name ?? '');
         const injuryOf = new Map<number, SidelinedEntry>();
         for (const entries of sidelined.values()) for (const e of entries) injuryOf.set(e.player.id, e);
 
@@ -227,7 +235,12 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 imageUrl: player.image_url,
                 team: toTeam(team),
                 league: leagueName,
-                injury: injury ? {category: injury.category, description: injury.description, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm, returnKind: injury.estimate.kind} : null,
+                injury: injury ? {category: injury.category, description: injury.description, since: injury.since, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm, estimate: injury.estimate} : null,
+                newSigning: (() => {
+                    const prev = lines.filter((l) => l.year === year - 1 && l.appearances > 0).sort((a, b) => b.minutes - a.minutes);
+                    return prev.length > 0 && !prev.some((l) => l.teamId === team.id) ? prev[0].teamName : null;
+                })(),
+                europe: europeByTeam.get(team.id) ?? null,
                 penaltyTaker: lines.some((l) => l.year >= year - 1 && l.penaltiesScored >= 2),
                 scores,
                 seasons: lines
