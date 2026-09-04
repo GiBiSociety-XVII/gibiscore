@@ -126,8 +126,16 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
     const prices = new Map<number, number>();
     const market = marketState(players, listPrices, config, purchases);
     const paidFor = new Map(purchases.map((p) => [p.playerId, p.price]));
-    // A live price can climb to 60% of one budget when the last top is contested.
-    const cap = Math.max(1, Math.round(config.credits * 0.6));
+    // No fixed ceiling: the only bound is what the richest manager at the table can still pay
+    // while keeping a credit for each of his other open slots (unnamed managers: untouched budget).
+    const rosterSlots = config.slots.P + config.slots.D + config.slots.C + config.slots.A;
+    let cap = 1;
+    for (let m = 0; m < config.participants; m += 1) {
+        const mine = purchases.filter((p) => p.manager === m);
+        const left = config.credits - mine.reduce((s, p) => s + p.price, 0);
+        const open = Math.max(1, rosterSlots - mine.length);
+        cap = Math.max(cap, left - (open - 1));
+    }
     for (const role of ROLES) {
         const state = market.byRole[role];
         const available = players.filter((p) => p.role === role && !paidFor.has(p.id)).sort((a, b) => b.scores.overall - a.scores.overall);

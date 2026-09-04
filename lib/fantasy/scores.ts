@@ -351,9 +351,12 @@ export function suggestPrices<T extends {id: number; role: FantaRole; scores: Pi
         const top = bought[0]?.scores.overall ?? 1;
         const weight = (p: T, rank: number) => (1 / (1 + (rank / RANK_HALF[role]) ** 2)) * (0.6 + 0.4 * (p.scores.overall / top) ** 2);
         for (const p of pool) prices.set(p.id, 1);
-        // Nobody pays more than 60% of a single budget: what a capped player
-        // leaves on the table goes to the others, a few passes until stable.
-        const cap = Math.max(1, Math.round(config.credits * 0.6));
+        // No fixed ceiling: a price is what the market money and the ranking say,
+        // bounded only by what one manager can physically pay while keeping a
+        // credit for every other slot of the roster. What a bounded player leaves
+        // on the table goes to the others, a few passes until stable.
+        const rosterSlots = config.slots.P + config.slots.D + config.slots.C + config.slots.A;
+        const cap = Math.max(1, config.credits - (rosterSlots - 1));
         const fixed = new Map<number, number>();
         const rankOf = new Map(bought.map((p, i) => [p.id, i]));
         for (let pass = 0; pass < 6; pass += 1) {

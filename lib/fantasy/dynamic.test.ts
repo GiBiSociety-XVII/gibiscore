@@ -74,6 +74,15 @@ describe('dynamicPrices', () => {
         expect(moved([230, 235, 240])).toBeGreaterThanOrEqual(2);
     });
 
+    it('never asks more than the richest manager can still pay', () => {
+        const players = pool();
+        const list = suggestPrices(players, {...config, roleShare});
+        // Everyone but manager 7 has spent 450 of 500; manager 7 has 500 and 25 open slots: 476 is the most anyone can pay.
+        const purchases = Array.from({length: 7}, (_, i) => ({playerId: 250 + i, price: 450, manager: i}));
+        const dyn = dynamicPrices(players, list, config, purchases);
+        for (const price of dyn.values()) expect(price).toBeLessThanOrEqual(476);
+    });
+
     it('reports the market: money left, slots left, tops left, inflation', () => {
         const players = pool();
         const list = suggestPrices(players, {...config, roleShare});
