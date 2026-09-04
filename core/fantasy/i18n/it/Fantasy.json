@@ -284,8 +284,8 @@
       "A": "Attaccanti"
     },
     "all": "Tutte le fasce",
-    "moreFillers": "e altri {count} riempitivi",
-    "hint": "Fasce per ruolo in base al voto totale: il numero di giocatori di ogni fascia segue quanti ne compra la tua lega (partecipanti × slot). Chi ha pochi dati alle spalle non può stare in top o semi-top: scende di una fascia. Top e semi-top sono i pochi che tutti vogliono, terza fascia gli ultimi titolari, il resto riempitivi e scommesse.",
+    "more": "e altri {count}",
+    "hint": "Sette fasce per ruolo in base al voto totale: il numero di giocatori di ogni fascia segue quanti ne compra la tua lega (partecipanti × slot), dalla Top alla Quinta che è l'ultima fascia che una lega compra davvero. Chi ha pochi dati alle spalle non può stare in Top o Semi-top: scende di una fascia. Sotto le fasce comprate: Jolly sono le scommesse con margine (giovani con bonus, partenze a razzo, nuovi arrivi con numeri buoni ma poche partite), Da evitare chi ha un infortunio lungo o non gioca mai, Riempitivi tutti gli altri.",
     "top": {
       "name": "Top",
       "short": "TOP"
@@ -306,9 +306,25 @@
       "name": "Terza fascia",
       "short": "3ª"
     },
+    "fourth": {
+      "name": "Quarta fascia",
+      "short": "4ª"
+    },
+    "fifth": {
+      "name": "Quinta fascia",
+      "short": "5ª"
+    },
+    "jolly": {
+      "name": "Jolly",
+      "short": "JOLLY"
+    },
     "filler": {
-      "name": "Riempitivi e scommesse",
+      "name": "Riempitivi",
       "short": "RIEMP."
+    },
+    "avoid": {
+      "name": "Da evitare",
+      "short": "EVITA"
     }
   }
 }

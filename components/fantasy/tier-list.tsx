@@ -16,8 +16,15 @@ export const TIER_CLASS: Record<Tier, string> = {
     first: 'bg-accent/45 border-foreground/70',
     second: 'bg-muted border-foreground/50',
     third: 'bg-card border-foreground/40',
+    fourth: 'bg-card border-foreground/30 text-foreground/80',
+    fifth: 'bg-card border-foreground/25 text-muted-foreground',
+    jolly: 'bg-amber-200 border-foreground',
     filler: 'bg-card border-dashed border-foreground/30 text-muted-foreground',
+    avoid: 'bg-red-100 border-red-700 text-red-800',
 };
+
+/** Tiers listed in short in the tier view: the long tail is cut. */
+const CUT: Partial<Record<Tier, number>> = {filler: 12, avoid: 8};
 
 export function TierBadge({tier, short = true, className}: {tier: Tier; short?: boolean; className?: string}) {
     const t = useTranslations('Fantasy.tiers');
@@ -36,7 +43,7 @@ export function TierList({players, tiers, prices, bought, targets, onBuy}: {play
                     {TIERS.map((tier) => {
                         const list = grouped[role][tier];
                         if (list.length === 0) return null;
-                        const shown = tier === 'filler' ? list.slice(0, 12) : list;
+                        const shown = CUT[tier] ? list.slice(0, CUT[tier]) : list;
                         return (
                             <div key={tier} className="border-t border-muted first:border-t-0">
                                 <div className="flex items-center gap-2 px-3 h-7 bg-muted/40">
@@ -57,7 +64,7 @@ export function TierList({players, tiers, prices, bought, targets, onBuy}: {play
                                             </li>
                                         );
                                     })}
-                                    {shown.length < list.length && <li className="px-3 py-1 text-[11px] font-semibold text-muted-foreground">{t('moreFillers', {count: list.length - shown.length})}</li>}
+                                    {shown.length < list.length && <li className="px-3 py-1 text-[11px] font-semibold text-muted-foreground">{t('more', {count: list.length - shown.length})}</li>}
                                 </ul>
                             </div>
                         );
