@@ -115,6 +115,7 @@ export function SearchBox() {
                     }}
                     placeholder={t('search')}
                     aria-label={t('search')}
+                    role="combobox"
                     aria-autocomplete="list"
                     aria-controls={listId}
                     aria-expanded={show}
