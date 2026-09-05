@@ -49,8 +49,10 @@ export interface AuctionPlayer {
     /** Took penalties recently: two or more scored in a season of the last two. */
     penaltyTaker: boolean;
     scores: FantaScores;
+    /** The same marks with only the main leagues, for leagues that ignore the cups. */
+    scoresLeagueOnly: FantaScores;
     /** Last seasons, newest first, for the detail row. */
-    seasons: Array<{year: number; league: string; team: string; apps: number; lineups: number; minutes: number; goals: number; assists: number; rating: number | null}>;
+    seasons: Array<{year: number; league: string; cup: boolean; team: string; apps: number; lineups: number; minutes: number; goals: number; assists: number; rating: number | null}>;
 }
 
 export interface AuctionPool {
@@ -344,7 +346,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             }));
             const injury = injuryOf.get(player.id) ?? null;
             const shape = teamShape.get(team.id) ?? null;
-            const scores = scorePlayer({
+            const inputBase = {
                 role,
                 age: player.age,
                 currentYear: year,
@@ -355,7 +357,9 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 teamDefence: shape?.defence ?? null,
                 teamRounds: shape?.rounds ?? 0,
                 clubConcededPer90: clubConcededOf(team.id),
-            });
+            };
+            const scores = scorePlayer(inputBase);
+            const scoresLeagueOnly = scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)});
             players.push({
                 id: player.id,
                 name: player.name,
@@ -379,11 +383,12 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 rivals: [],
                 penaltyTaker: lines.some((l) => l.year >= year - 1 && l.penaltiesScored >= 2),
                 scores,
+                scoresLeagueOnly,
                 seasons: lines
                     .filter((l) => l.appearances > 0)
                     .sort((a, b) => b.year - a.year || b.minutes - a.minutes)
                     .slice(0, 6)
-                    .map((l) => ({year: l.year, league: l.leagueName, team: l.teamName, apps: l.appearances, lineups: l.lineups, minutes: l.minutes, goals: l.goals, assists: l.assists, rating: l.rating})),
+                    .map((l) => ({year: l.year, league: l.leagueName, cup: l.cup === true, team: l.teamName, apps: l.appearances, lineups: l.lineups, minutes: l.minutes, goals: l.goals, assists: l.assists, rating: l.rating})),
             });
         }
         // Rivals, named once everyone has a role: who started in his slots while he sat on the

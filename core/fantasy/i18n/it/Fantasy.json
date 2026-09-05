@@ -87,7 +87,9 @@
     "managers": "Squadre al tavolo",
     "managersHint": "Un nome per riga, il primo sei tu. Facoltativo: serve per segnare a chi va ogni giocatore.",
     "save": "Salva e apri il listone",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "cupsCount": "Conta le coppe nel calcolo",
+    "cupsCountHint": "Acceso: voti, titolarità e bonus tengono conto anche di Coppa Italia, Supercoppa e coppe europee (le coppe pesano la metà nella titolarità). Spento: conta solo il campionato principale di ogni paese."
   },
   "board": {
     "search": "Cerca giocatore o squadra (Invio = compra il primo)",

@@ -106,7 +106,7 @@ function Notes({p}: {p: AuctionPlayer}) {
 }
 
 /** The auction: settings gate, filters, the list with marks and suggested credits, my roster. */
-export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
+export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const t = useTranslations('Fantasy.board');
     const ta = useTranslations('Fantasy.auction');
     const tr = useTranslations('Fantasy.roster');
@@ -134,6 +134,11 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const [lastManager, setLastManager] = useState(0);
     const openBuy = (player: AuctionPlayer) => setBuying({player, price: String(prices.get(player.id) ?? 1), manager: lastManager});
 
+    // The marks the league wants: with the cups, or the main leagues only.
+    const pool = useMemo(() => {
+        if (!rawPool || !config || config.cupsCount) return rawPool;
+        return {...rawPool, players: rawPool.players.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}))};
+    }, [rawPool, config]);
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {
         if (!pool || !config) return new Map<number, number>();
