@@ -147,6 +147,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             .filter((x): x is {league: (typeof leagues)[number]; season: {id: number; year: number; is_current: boolean}} => x.season !== null);
         if (seasons.length === 0) throw new Error(`no current season for ${league}`);
         const year = Math.max(...seasons.map((s) => s.season.year));
+        const currentIds = seasons.map((s) => s.season.id);
+        const previousIds = leagues.flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => s.id));
 
         // Current squads, plus anyone with statistics for a club of these
         // leagues this season: the provider's squads lag behind transfers,
@@ -203,10 +205,29 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         }
 
         // Team shape this season and current absences.
-        const [studies, sidelined] = await Promise.all([
+        const [studies, previousStudies, sidelined] = await Promise.all([
             Promise.all(seasons.map(async (s) => [s.season.id, await getSeasonStudy(s.season.id)] as const)),
+            Promise.all(previousIds.map(async (id) => [id, await getSeasonStudy(id)] as const)),
             loadTeamSidelined(db, [...teams.keys()]),
         ]);
+        // What each club concedes per match: last season and this one (counting double).
+        const conceded = new Map<number, {goals: number; played: number}>();
+        for (const [list, weight] of [[previousStudies, 1], [studies, 2]] as const) {
+            for (const [, study] of list) {
+                if (!study) continue;
+                for (const t of study.teams) {
+                    if (t.played === 0) continue;
+                    const c = conceded.get(t.team.id) ?? {goals: 0, played: 0};
+                    c.goals += t.goalsAgainst * weight;
+                    c.played += t.played * weight;
+                    conceded.set(t.team.id, c);
+                }
+            }
+        }
+        const clubConcededOf = (teamId: number): number | null => {
+            const c = conceded.get(teamId);
+            return c && c.played >= 5 ? c.goals / c.played : null;
+        };
         // Club shape from the first round: the scoring uses it softly as
         // "form" at once and as "team" strength only from the fifth round.
         const teamShape = new Map<number, {attack: number; defence: number; rounds: number}>();
@@ -233,8 +254,6 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
 
         // Formations fielded this season and last: the slots every player started in, for the
         // role he really plays and for who competes with him for a spot at his current club.
-        const currentIds = seasons.map((s) => s.season.id);
-        const previousIds = leagues.flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => s.id));
         const rpc = db as unknown as Rpc;
         const seasonIds = [...currentIds, ...previousIds];
         const [slotRes, benchRes, replacementRes] = await Promise.all([
@@ -306,6 +325,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 teamName: r.team?.name ?? '',
                 games: Math.max(games.get(`${r.league_id}:${r.season_year}`) ?? 0, r.appearances ?? 0, 1),
                 level: leagueLevel(r.league?.slug ?? '', r.league?.tier ?? null, r.league?.type ?? null),
+                cup: r.league?.type === 'cup',
                 appearances: r.appearances ?? 0,
                 lineups: r.lineups ?? 0,
                 bench: r.bench ?? 0,
@@ -334,6 +354,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 teamAttack: shape?.attack ?? null,
                 teamDefence: shape?.defence ?? null,
                 teamRounds: shape?.rounds ?? 0,
+                clubConcededPer90: clubConcededOf(team.id),
             });
             players.push({
                 id: player.id,

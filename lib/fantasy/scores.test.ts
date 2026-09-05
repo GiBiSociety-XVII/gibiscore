@@ -92,7 +92,8 @@ describe('scorePlayer with a transfer', () => {
         ];
         const here = scorePlayer({role: 'A', age: 26, currentYear: 2026, currentTeamId: 1, seasons, injury: null, teamAttack: null, teamDefence: null});
         const nowhere = scorePlayer({role: 'A', age: 26, currentYear: 2026, currentTeamId: 99, seasons, injury: null, teamAttack: null, teamDefence: null});
-        expect(here.starter).toBeGreaterThan(nowhere.starter);
+        // Away from both clubs he is a new signing of quality, expected to play: the two come out close.
+        expect(here.starter).toBeGreaterThanOrEqual(nowhere.starter - 3);
         expect(here.starter).toBeGreaterThanOrEqual(50);
         expect(here.bonus).toBeGreaterThan(80);
         expect(here.fitness).toBeGreaterThan(90);
@@ -146,5 +147,36 @@ describe('suggestPrices', () => {
         expect(prices.get(101)!).toBeGreaterThan(prices.get(1)! * 0.7);
         // Keepers: every synthetic keeper is a starter here, so only the mark separates them.
         expect(prices.get(10)!).toBeLessThan(prices.get(1)! * 0.75);
+    });
+});
+
+describe('a player who changed club', () => {
+    it('keeper: the goals he let in elsewhere are replaced by what the new club concedes', () => {
+        const leaky = scorePlayer({role: 'P', age: 28, currentYear: 2026, currentTeamId: 1, seasons: [line(2025, {goalsConceded: 55, saves: 100, rating: 6.9, teamId: 2})], injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: null});
+        const moved = scorePlayer({role: 'P', age: 28, currentYear: 2026, currentTeamId: 1, seasons: [line(2025, {goalsConceded: 55, saves: 100, rating: 6.9, teamId: 2})], injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 0.9});
+        expect(moved.bonus).toBeGreaterThan(leaky.bonus + 20);
+        expect(moved.discipline).toBeGreaterThan(leaky.discipline);
+        expect(moved.fantaAvg!).toBeGreaterThan(leaky.fantaAvg! + 0.4);
+        // At his own club the rate is his: nothing replaced.
+        const home = scorePlayer({role: 'P', age: 28, currentYear: 2026, currentTeamId: 2, seasons: [line(2025, {goalsConceded: 55, saves: 100, rating: 6.9, teamId: 2})], injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 0.9});
+        expect(home.bonus).toBe(leaky.bonus);
+    });
+
+    it('rotation in a cup weighs half of rotation in the league', () => {
+        const base = {role: 'A' as const, age: 27, currentYear: 2026, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null};
+        const leagueBench = scorePlayer({...base, seasons: [line(2025, {appearances: 30, lineups: 20, bench: 10, minutes: 1900, teamId: 2}), line(2025, {appearances: 10, lineups: 3, bench: 7, minutes: 300, teamId: 2, leagueId: 9})]});
+        const cupBench = scorePlayer({...base, seasons: [line(2025, {appearances: 30, lineups: 20, bench: 10, minutes: 1900, teamId: 2}), line(2025, {appearances: 10, lineups: 3, bench: 7, minutes: 300, teamId: 2, leagueId: 9, cup: true})]});
+        expect(cupBench.starter).toBeGreaterThan(leagueBench.starter);
+    });
+
+    it('a new signing of quality is expected to play more than his old rotation says, until the club shows otherwise', () => {
+        const base = {role: 'A' as const, age: 26, currentYear: 2026, injury: null, teamAttack: null, teamDefence: null};
+        const rotated = [line(2025, {appearances: 30, lineups: 15, bench: 15, minutes: 1500, goals: 12, assists: 4, rating: 7.1, teamId: 2})];
+        const fresh = scorePlayer({...base, currentTeamId: 1, seasons: rotated});
+        const stayed = scorePlayer({...base, currentTeamId: 2, seasons: rotated});
+        expect(fresh.starter).toBeGreaterThan(stayed.starter + 5);
+        // With the club's matches piling up the prior fades: ten in the squad and it is gone.
+        const settled = scorePlayer({...base, currentTeamId: 1, seasons: [...rotated, line(2026, {games: 10, appearances: 4, lineups: 2, bench: 6, minutes: 250, teamId: 1})]});
+        expect(settled.starter).toBeLessThan(fresh.starter);
     });
 });
