@@ -17,10 +17,11 @@ describe('names', () => {
     });
 
     it('reads the list, with initials', () => {
-        const entries = parseListone([['P', 'Martinez J.', 'Inter', 29], ['D', 'De Gea', 'Fiorentina', 16], ['X', 'Nobody', '', 1]]);
-        expect(entries).toHaveLength(2);
-        expect(entries[0]).toMatchObject({surname: 'martinez', initial: 'j', team: 'inter', role: 'P'});
-        expect(entries[1]).toMatchObject({surname: 'de gea', initial: null});
+        const entries = parseListone([['P', 'Martinez J.', 'Inter', 29], ['D', 'De Gea', 'Fiorentina', 16, 'Dc', 40, false], ['P', 'Suzuki', 'Parma', 7, 'Por', 20, true], ['X', 'Nobody', '', 1]]);
+        expect(entries).toHaveLength(3);
+        expect(entries[0]).toMatchObject({surname: 'martinez', initial: 'j', team: 'inter', role: 'P', mantra: '', fvm: 0, gone: false});
+        expect(entries[1]).toMatchObject({surname: 'de gea', initial: null, mantra: 'Dc', fvm: 40});
+        expect(entries[2]).toMatchObject({gone: true});
     });
 
     it('finds the club inside the database club name', () => {

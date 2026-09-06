@@ -198,8 +198,8 @@
       "europe": "Il club gioca la {competition}: più partite, turnover possibile",
       "europeBadge": "Coppe",
       "none": "Nessuna nota particolare.",
-      "roleListoneQuote": "Ruolo {role} dal listone ufficiale (quotazione {quote})",
-      "roleListone": "Ruolo {role} dal listone ufficiale",
+      "roleListoneQuote": "Ruolo {role} dal listone Fantacalcio.it (quotazione {quote})",
+      "roleListone": "Ruolo {role} dal listone Fantacalcio.it",
       "roleLineups": "Ruolo {role} dedotto dalle formazioni schierate: {breakdown} (partite pesate, la stagione in corso conta il triplo)",
       "roleProfile": "Ruolo {role} dalla scheda del provider: non è nel listone e ha poche formazioni alle spalle",
       "rivalOne": "{name} ({shared})",
@@ -210,7 +210,9 @@
       "roleManual": "Ruolo {role} impostato da te",
       "fixRole": "Correggi ruolo",
       "fixRoleReset": "Torna al listone",
-      "fixRoleHint": "Se la tua lega usa un listone con un ruolo diverso, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine."
+      "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
+      "fvm": "FVM {fvm}",
+      "mantra": "Mantra: {roles}"
     }
   },
   "roster": {

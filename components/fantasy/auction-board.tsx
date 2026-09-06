@@ -76,7 +76,7 @@ function Notes({p, onRole}: {p: AuctionPlayer; onRole: (role: FantaRole | null) 
     const lines: Array<{key: string; text: string; tone?: string}> = [];
     const breakdown = (['P', 'D', 'C', 'A'] as const).filter((r) => (p.roleBreakdown[r] ?? 0) > 0).map((r) => `${Math.round(p.roleBreakdown[r]!)} ${ts(`roles.${r}`).toLowerCase()}`).join(', ');
     if (p.roleSource === 'manual') lines.push({key: 'role', text: t('info.roleManual', {role: p.role})});
-    else if (p.roleSource === 'listone') lines.push({key: 'role', text: p.listQuote !== null ? t('info.roleListoneQuote', {role: p.role, quote: p.listQuote}) : t('info.roleListone', {role: p.role})});
+    else if (p.roleSource === 'listone') lines.push({key: 'role', text: (p.listQuote !== null ? t('info.roleListoneQuote', {role: p.role, quote: p.listQuote}) : t('info.roleListone', {role: p.role})) + (p.listFvm !== null ? ` · ${t('info.fvm', {fvm: p.listFvm})}` : '') + (p.mantraRoles ? ` · ${t('info.mantra', {roles: p.mantraRoles.replace(/;/g, ', ')})}` : '')});
     else if (p.roleSource === 'lineups') lines.push({key: 'role', text: t('info.roleLineups', {role: p.role, breakdown})});
     else lines.push({key: 'role', text: t('info.roleProfile', {role: p.role})});
     if (p.injury) {
