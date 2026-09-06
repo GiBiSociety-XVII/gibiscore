@@ -206,7 +206,11 @@
       "contested": "In ballottaggio: in panchina {benches} volte su {total} in cui era convocato (partite pesate, questa stagione conta il triplo). Al suo posto hanno giocato {names}.",
       "contestedUnknown": "In ballottaggio: in panchina {benches} volte su {total} in cui era convocato (partite pesate).",
       "fixedStarter": "Titolare fisso: ha iniziato {starts} partite su {total} in cui era convocato (pesate).",
-      "backup": "Chi lo sostituisce nel suo ruolo: {names}."
+      "backup": "Chi lo sostituisce nel suo ruolo: {names}.",
+      "roleManual": "Ruolo {role} impostato da te",
+      "fixRole": "Correggi ruolo",
+      "fixRoleReset": "Torna al listone",
+      "fixRoleHint": "Se la tua lega usa un listone con un ruolo diverso, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine."
     }
   },
   "roster": {

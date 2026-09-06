@@ -62,6 +62,8 @@ export interface AuctionConfig {
     formation: string | null;
     /** Whether cups (domestic and European) count in the marks; off = only the main league of each country. */
     cupsCount: boolean;
+    /** Roles corrected by hand, by player id. */
+    roleOverrides: Record<string, FantaRole>;
     /**
      * Level of the prices, percent. 100 = the list prices add up exactly to the credits at the
      * table; higher = the list of a contested auction, where the money piles up on the players
@@ -90,6 +92,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     strategy: null,
     formation: null,
     cupsCount: true,
+    roleOverrides: {},
     priceLevel: 135,
 };
 
@@ -132,6 +135,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : true,
+        roleOverrides: Object.fromEntries(Object.entries(r.roleOverrides ?? {}).filter(([, v]) => v === 'P' || v === 'D' || v === 'C' || v === 'A')) as Record<string, FantaRole>,
         priceLevel: num(r.priceLevel, DEFAULT_CONFIG.priceLevel, 50, 300),
     };
 }

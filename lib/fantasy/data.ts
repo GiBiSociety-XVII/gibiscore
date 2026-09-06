@@ -35,7 +35,7 @@ export interface AuctionPlayer {
     /** European cup the club plays this season, when someone in the squad already has a line in it. */
     europe: string | null;
     /** Where the fantasy role comes from: the official list, the formations fielded, or the provider's profile. */
-    roleSource: 'listone' | 'lineups' | 'profile';
+    roleSource: 'listone' | 'lineups' | 'profile' | 'manual';
     /** Weighted starts per role from the formations fielded (current season counts three times). */
     roleBreakdown: Partial<Record<FantaRole, number>>;
     /** The official list's own quotation, when he is on it. */
@@ -427,7 +427,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
     }
 }
 
-const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600});
+const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600, tags: ['fantasy-pool']});
 
 /**
  * The auction pool for a league, cached for an hour once built. A build
