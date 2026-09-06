@@ -129,6 +129,10 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                             </label>
                         ))}
                     </div>
+                    <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
+                        <input type="checkbox" checked={config.cupsCount} onChange={(e) => set('cupsCount', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
+                        <span className="flex flex-col"><span className="text-[13px] font-bold">{t('cupsCount')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('cupsCountHint')}</span></span>
+                    </label>
                 </Panel>
             </div>
 

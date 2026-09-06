@@ -18,6 +18,8 @@ export interface SeasonLine {
     games: number;
     /** 1 for top leagues, lower for weaker ones: rates there count less. */
     level: number;
+    /** A cup: rotation there says half as much about his place in the league side. */
+    cup?: boolean;
     appearances: number;
     lineups: number;
     bench: number;
@@ -49,6 +51,11 @@ export interface AuctionInput {
     teamDefence: number | null;
     /** Rounds the club has played this season: the shape counts as "team" from five, as "form" from the first. */
     teamRounds?: number;
+    /**
+     * Goals the current club concedes per match (last season and this one). Goals conceded
+     * belong to the club, not the keeper: what he let in elsewhere is replaced by this rate.
+     */
+    clubConcededPer90?: number | null;
 }
 
 export interface FantaScores {
@@ -120,15 +127,20 @@ interface YearAgg {
     red: number;
     conceded: number;
     level: number;
+    /** Matches in the squad at the current club (played or on the bench). */
+    atClub: number;
 }
 
 /** One season across its competitions. Lines at the current club weigh double for the starter rates. */
-function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined): YearAgg {
-    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0};
+function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined, clubConcededPer90: number | null = null): YearAgg {
+    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0, atClub: 0};
     let levelW = 0;
     for (const l of lines) {
-        const w = currentTeamId !== null && currentTeamId !== undefined && l.teamId === currentTeamId ? 2 : 1;
+        const atClub = currentTeamId !== null && currentTeamId !== undefined && l.teamId === currentTeamId;
+        // The current club counts double, a cup half: rotation in Europe is not rotation in the league.
+        const w = (atClub ? 2 : 1) * (l.cup ? 0.5 : 1);
         const level = 0.5 + 0.5 * l.level;
+        if (atClub) a.atClub += l.appearances + l.bench;
         a.games = Math.max(a.games, l.games);
         a.apps += l.appearances;
         a.lineups += l.lineups;
@@ -149,7 +161,8 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         a.penSaved += l.penaltiesSaved;
         a.yellow += l.yellow;
         a.red += l.red + l.yellowRed;
-        a.conceded += l.goalsConceded;
+        // Goals conceded belong to the club: elsewhere they are replaced by what the current club concedes.
+        a.conceded += !atClub && clubConcededPer90 !== null ? (clubConcededPer90 * l.minutes) / 90 : l.goalsConceded;
         a.level += l.level * Math.max(1, l.appearances);
         levelW += Math.max(1, l.appearances);
     }
@@ -186,7 +199,7 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
     for (const y of years) {
         const w = weights.get(y)!;
-        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId);
+        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId, input.clubConcededPer90 ?? null);
         const per90 = a.minutes > 0 ? 90 / a.minutes : 0;
         const levelFactor = 0.7 + 0.3 * a.level;
 
@@ -241,6 +254,18 @@ export function scorePlayer(input: AuctionInput): FantaScores {
             fantaAvg += w * (a.ratingSum / a.ratingApps + perMatch);
             fantaW += w;
         }
+    }
+
+    // A new signing is bought to play: with little history at the current club, what he did
+    // elsewhere counts for half and the other half is what a player of his quality is expected
+    // to get in a new side (a better rating and more bonus, a surer place). Fades out as the
+    // matches at the club come in, never lowers a rate the numbers already back.
+    const atClub = years.reduce((s, y) => s + aggregateYear(input.seasons.filter((l) => l.year === y), input.currentTeamId).atClub, 0);
+    if (atClub < 10) {
+        const quality = ratingW > 0 ? rating / ratingW : 50;
+        const prior = Math.max(35, Math.min(85, 45 + 0.5 * (quality - 50) + 0.3 * (bonus - 50)));
+        const k = 0.5 * (1 - atClub / 10);
+        starter = starter * (1 - k) + Math.max(starter, prior) * k;
     }
 
     // Current injury and age weigh on fitness.

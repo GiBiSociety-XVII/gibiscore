@@ -106,7 +106,7 @@ function Notes({p}: {p: AuctionPlayer}) {
 }
 
 /** The auction: settings gate, filters, the list with marks and suggested credits, my roster. */
-export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
+export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const t = useTranslations('Fantasy.board');
     const ta = useTranslations('Fantasy.auction');
     const tr = useTranslations('Fantasy.roster');
@@ -134,6 +134,11 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
     const [lastManager, setLastManager] = useState(0);
     const openBuy = (player: AuctionPlayer) => setBuying({player, price: String(prices.get(player.id) ?? 1), manager: lastManager});
 
+    // The marks the league wants: with the cups, or the main leagues only.
+    const pool = useMemo(() => {
+        if (!rawPool || !config || config.cupsCount) return rawPool;
+        return {...rawPool, players: rawPool.players.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}))};
+    }, [rawPool, config]);
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {
         if (!pool || !config) return new Map<number, number>();
@@ -468,7 +473,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                         {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                         {guide && (
                             <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
-                                {tr('formation', {formation: guide.formation})}
+                                {config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide.formation})}
                                 <span className="block font-mono text-[10px] text-muted-foreground tabular-nums">{guide.formations.slice(0, 3).map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}</span>
                             </span>
                         )}
@@ -543,7 +548,7 @@ export function AuctionBoard({pool}: {pool: AuctionPool | null}) {
                             <button type="button" onClick={() => setShowStrategies(false)} aria-label={ts('cancel')} className="inline-flex items-center justify-center w-9 h-9 rounded-md border-2 border-foreground bg-background"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="bg-background rounded-xl">
-                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} health={health} />
+                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} />
                         </div>
                     </div>
                 </div>

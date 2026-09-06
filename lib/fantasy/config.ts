@@ -58,6 +58,10 @@ export interface AuctionConfig {
     managers: string[];
     /** Chosen auction strategy (lib/fantasy/strategies.ts), drives my role budgets. */
     strategy: string | null;
+    /** Formation the plans must be built for (e.g. "3-4-3"); null = the one that gets the most out of the roster. */
+    formation: string | null;
+    /** Whether cups (domestic and European) count in the marks; off = only the main league of each country. */
+    cupsCount: boolean;
     /**
      * Level of the prices, percent. 100 = the list prices add up exactly to the credits at the
      * table; higher = the list of a contested auction, where the money piles up on the players
@@ -84,6 +88,8 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     modifiers: {defence: true, captain: false, fairPlay: false, midfield: false},
     managers: [],
     strategy: null,
+    formation: null,
+    cupsCount: true,
     priceLevel: 135,
 };
 
@@ -124,6 +130,8 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         modifiers: {...DEFAULT_CONFIG.modifiers, ...(r.modifiers ?? {})},
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
+        formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
+        cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : true,
         priceLevel: num(r.priceLevel, DEFAULT_CONFIG.priceLevel, 50, 300),
     };
 }

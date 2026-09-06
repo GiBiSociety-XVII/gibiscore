@@ -53,26 +53,30 @@ export interface Strategy {
     prefer?: (p: PoolPlayer, context: {chosen: PoolPlayer[]}) => number;
     /** Explicit slot split of a role's budget (used when the league has that many slots), otherwise the geometric split from focus. */
     fractions?: Partial<Record<FantaRole, number[]>>;
+    /** The formations the strategy is built for: they win when the values are within a hair. */
+    formations?: FormationKey[];
 }
 
 const starterBonus = (p: PoolPlayer) => (p.scores.starter >= 75 ? 8 : p.scores.starter >= 60 ? 3 : p.scores.starter < 40 ? -12 : 0);
 
 export const STRATEGIES: Strategy[] = [
-    {key: 'balanced', share: {P: 0.07, D: 0.17, C: 0.28, A: 0.48}, focus: {P: 0.6, D: 0.4, C: 0.45, A: 0.45}},
-    {key: 'topPerRole', share: {P: 0.08, D: 0.18, C: 0.28, A: 0.46}, focus: {P: 0.8, D: 0.7, C: 0.7, A: 0.75}},
+    {key: 'balanced', share: {P: 0.07, D: 0.17, C: 0.28, A: 0.48}, focus: {P: 0.6, D: 0.4, C: 0.45, A: 0.45}, formations: ['4-3-3', '3-4-3', '4-4-2']},
+    {key: 'topPerRole', share: {P: 0.08, D: 0.18, C: 0.28, A: 0.46}, focus: {P: 0.8, D: 0.7, C: 0.7, A: 0.75}, formations: ['3-4-3', '4-3-3']},
     {
         key: 'threeStars',
         share: {P: 0.04, D: 0.09, C: 0.27, A: 0.6},
         focus: {P: 0.6, D: 0.3, C: 0.75, A: 0.6},
+        formations: ['3-5-2', '4-4-2', '3-4-3'],
         // Two attackers of the same weight, one star midfielder, fillers everywhere else.
         fractions: {A: [0.46, 0.4, 0.05, 0.04, 0.03, 0.02], C: [0.72, 0.08, 0.05, 0.04, 0.03, 0.03, 0.03, 0.02]},
     },
-    {key: 'strongMidfield', share: {P: 0.06, D: 0.12, C: 0.42, A: 0.4}, focus: {P: 0.6, D: 0.3, C: 0.4, A: 0.5}},
-    {key: 'topAttack', share: {P: 0.05, D: 0.1, C: 0.2, A: 0.65}, focus: {P: 0.6, D: 0.3, C: 0.35, A: 0.75}},
+    {key: 'strongMidfield', share: {P: 0.06, D: 0.12, C: 0.42, A: 0.4}, focus: {P: 0.6, D: 0.3, C: 0.4, A: 0.5}, formations: ['3-5-2', '4-5-1', '4-4-2']},
+    {key: 'topAttack', share: {P: 0.05, D: 0.1, C: 0.2, A: 0.65}, focus: {P: 0.6, D: 0.3, C: 0.35, A: 0.75}, formations: ['3-4-3', '4-3-3']},
     {
         key: 'defenceBlock',
         share: {P: 0.12, D: 0.28, C: 0.22, A: 0.38},
         focus: {P: 0.8, D: 0.35, C: 0.4, A: 0.5},
+        formations: ['5-3-2', '4-4-2', '5-4-1'],
         needsDefenceModifier: true,
         // Keeper and defenders of clubs that concede little, ideally the same club as the keeper.
         prefer: (p, {chosen}) => {
@@ -151,6 +155,33 @@ export function slotFractions(slots: number, focus: number): number[] {
     return raw.map((v) => v / total);
 }
 
+/**
+ * Slot budgets when the formation is fixed: the money goes to the
+ * starters of the role in that formation plus one cover, split with
+ * the strategy's focus; the other slots are fillers at a credit or two.
+ */
+export function slotFractionsFor(slots: number, focus: number, starters: number): number[] {
+    if (slots <= 0) return [];
+    const paid = Math.min(slots, Math.max(1, starters) + 1);
+    const r = 1 - 0.85 * Math.max(0, Math.min(1, focus));
+    const raw = Array.from({length: slots}, (_, i) => (i < paid ? r ** i : 0.01));
+    const total = raw.reduce((s, v) => s + v, 0);
+    return raw.map((v) => v / total);
+}
+
+/** Starters per role the strategy shares were drawn for: between a 3-4-3 and a 4-3-3. */
+const BASE_NEED: Record<FantaRole, number> = {P: 1, D: 3.5, C: 3.5, A: 3};
+
+/** The strategy's split of the credits bent towards the roles a formation fields more of, renormalized. */
+export function shareFor(share: Record<FantaRole, number>, formation: Formation | null): Record<FantaRole, number> {
+    if (!formation) return share;
+    const raw = {} as Record<FantaRole, number>;
+    for (const role of ROLES) raw[role] = share[role] * (formation.need[role] / BASE_NEED[role]) ** 0.6;
+    const total = ROLES.reduce((s, role) => s + raw[role], 0);
+    for (const role of ROLES) raw[role] = raw[role] / total;
+    return raw;
+}
+
 export interface LineupPlayer {
     role: FantaRole;
     scores: Pick<FantaScores, 'starter' | 'fantaAvg'>;
@@ -172,10 +203,15 @@ export interface Lineup {
 export interface LineupOptions {
     /** The league plays the defence modifier: formations with four or more defenders earn it. */
     defenceModifier?: boolean;
+    /** Formations to prefer when the values are within a hair of the best (a strategy's natural shape). */
+    prefer?: FormationKey[];
 }
 
 /** What a player is expected to bring per match: his fantamedia, discounted when he is not a sure starter. */
-export const playerValue = (p: LineupPlayer) => (p.scores.fantaAvg ?? 5.5) * (0.4 + (0.6 * p.scores.starter) / 100);
+/** Chance he is on the pitch on a given matchday, from the starter mark. */
+export const playChance = (p: LineupPlayer) => Math.max(0.05, Math.min(1, p.scores.starter / 100));
+/** What a player is expected to bring per match when fielded: his fantamedia, weighted by the chance he actually plays. */
+export const playerValue = (p: LineupPlayer) => (p.scores.fantaAvg ?? 5.5) * playChance(p);
 
 /**
  * Classic defence modifier, estimated: the average rating of the keeper and
@@ -191,10 +227,13 @@ function defenceModifier(keeper: LineupPlayer | undefined, defenders: LineupPlay
 }
 
 /**
- * Best eleven of a roster in every classic formation, valued by fantamedia
- * and starter chances, plus a little for the bench (the next two of each
- * role count a tenth: injuries, rotations). Slots the roster cannot fill
- * are worth nothing, so a formation the roster cannot field yet ranks low.
+ * Best eleven of a roster in every classic formation. A fielded player
+ * brings his fantamedia when he plays; when he does not, the best man
+ * left on the bench in his role plays instead (the automatic
+ * substitution), so a rotation-prone striker is not worth nothing and
+ * a roster with no cover pays for it. Slots the roster cannot fill are
+ * worth nothing. When formations are within a hair of each other, the
+ * preferred ones win.
  */
 export function bestLineup(players: LineupPlayer[], options: LineupOptions = {}): Lineup {
     const sorted = {} as Record<FantaRole, LineupPlayer[]>;
@@ -203,24 +242,32 @@ export function bestLineup(players: LineupPlayer[], options: LineupOptions = {})
         let value = 0;
         for (const role of ROLES) {
             const need = f.need[role];
-            value += sorted[role].slice(0, need).reduce((s, p) => s + playerValue(p), 0);
-            value += sorted[role].slice(need, need + 2).reduce((s, p) => s + playerValue(p) * 0.1, 0);
+            const fielded = sorted[role].slice(0, need);
+            const bench = sorted[role][need];
+            const cover = bench ? playerValue(bench) : 0;
+            for (const p of fielded) value += playerValue(p) + (1 - playChance(p)) * cover;
         }
         if (options.defenceModifier && f.need.D >= 4) value += defenceModifier(sorted.P[0], sorted.D.slice(0, f.need.D));
         return {key: f.key, value: Math.round(value * 10) / 10};
     }).sort((a, b) => b.value - a.value || FORMATIONS.findIndex((f) => f.key === a.key) - FORMATIONS.findIndex((f) => f.key === b.key));
-    return {formation: formations[0].key, value: formations[0].value, formations};
+    const best = formations[0];
+    const preferred = options.prefer?.map((key) => formations.find((f) => f.key === key)).find((f) => f && f.value >= best.value * 0.98);
+    const chosen = preferred ?? best;
+    return {formation: chosen.key, value: chosen.value, formations: [chosen, ...formations.filter((f) => f !== chosen)]};
 }
 
 /** Simulates one strategy on the pool: fills every slot with the best player (by mark plus what the strategy prefers) affordable for that slot's budget. */
-export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan {
+export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers' | 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan {
+    // A fixed formation bends the split towards the roles it fields more of and pays its starters first.
+    const forced = FORMATIONS.find((f) => f.key === config.formation) ?? null;
+    const share = shareFor(strategy.share, forced);
     const budget = {P: 0, D: 0, C: 0, A: 0} as Record<FantaRole, number>;
     const picks = {P: [], D: [], C: [], A: []} as Record<FantaRole, StrategyPick[]>;
     const byId = new Map(players.map((p) => [p.id, p]));
     const chosen: PoolPlayer[] = mine.map((m) => byId.get(m.playerId)).filter((p): p is PoolPlayer => !!p);
     let spent = mine.reduce((s, m) => s + m.price, 0);
     let depth = chosen.reduce((s, p) => s + p.scores.overall, 0);
-    for (const role of ROLES) budget[role] = Math.round(config.credits * strategy.share[role]);
+    for (const role of ROLES) budget[role] = Math.round(config.credits * share[role]);
     // What I overpaid in a role comes off the roles still to fill (leaving a credit per open
     // slot); what I saved in a role already complete goes to them. The split follows the auction.
     const spentOn = {} as Record<FantaRole, number>;
@@ -255,7 +302,7 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
         const used = new Set<number>();
         let left = budget[role] - owned.reduce((s, m) => s + m.price, 0);
         const custom = strategy.fractions?.[role];
-        const all = custom && custom.length === config.slots[role] ? custom : slotFractions(config.slots[role], strategy.focus[role]);
+        const all = forced ? slotFractionsFor(config.slots[role], strategy.focus[role], forced.need[role]) : custom && custom.length === config.slots[role] ? custom : slotFractions(config.slots[role], strategy.focus[role]);
         const fractions = [...all].sort((a, b) => b - a).slice(owned.length);
         fractions.forEach((fraction, index) => {
             const slotsLeft = fractions.length - index;
@@ -267,7 +314,9 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             const cheapestLeft = pool.map((p) => prices.get(p.id) ?? 1).sort((a, b) => a - b);
             const reserve = cheapestLeft.slice(1, slotsLeft).reduce((s, v) => s + v, 0) + Math.max(0, slotsLeft - cheapestLeft.length);
             const room = left - reserve;
-            let cap = Math.max(1, Math.min(Math.round(budget[role] * fraction * 1.15), room));
+            // The slot's share of what is left in the role, so money a slot did not need flows to the next ones.
+            const restFractions = fractions.slice(index).reduce((sum, f) => sum + f, 0);
+            let cap = Math.max(1, Math.min(Math.round(((left * fraction) / Math.max(fraction, restFractions)) * 1.15), room));
             // A slot too small for anyone still on the market takes the cheapest player left, when the budget allows it.
             const cheapest = pool.reduce((m, p) => Math.min(m, prices.get(p.id) ?? 1), Infinity);
             if (cheapest > cap && cheapest <= room) cap = cheapest;
@@ -282,12 +331,18 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             picks[role].push({id: pick.id, name: pick.name, team: pick.team.name, role, price, overall: pick.scores.overall, maxBid: Math.max(price, cap)});
         });
     }
-    const lineup = bestLineup(ROLES.flatMap((role) => picks[role].map((p) => byId.get(p.id))).filter((p): p is PoolPlayer => !!p), {defenceModifier: config.modifiers?.defence});
-    return {key: strategy.key, share: strategy.share, budget, picks, spent, lineupValue: lineup.value, formation: lineup.formation, formations: lineup.formations, depth, available: true};
+    const roster = ROLES.flatMap((role) => picks[role].map((p) => byId.get(p.id))).filter((p): p is PoolPlayer => !!p);
+    let lineup = bestLineup(roster, {defenceModifier: config.modifiers?.defence, prefer: forced ? [forced.key] : strategy.formations});
+    if (forced) {
+        // Valued in the formation asked for, whatever the roster would prefer.
+        const chosen = lineup.formations.find((f) => f.key === forced.key)!;
+        lineup = {formation: chosen.key, value: chosen.value, formations: [chosen, ...lineup.formations.filter((f) => f !== chosen)]};
+    }
+    return {key: strategy.key, share, budget, picks, spent, lineupValue: lineup.value, formation: lineup.formation, formations: lineup.formations, depth, available: true};
 }
 
 /** Every strategy planned on the pool, best lineup first; strategies that need a modifier the league lacks are marked unavailable. */
-export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan[] {
+export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'> & Partial<Pick<AuctionConfig, 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan[] {
     return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken, mine), available: !s.needsDefenceModifier || config.modifiers.defence})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
 }
 
