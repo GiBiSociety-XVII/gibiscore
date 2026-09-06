@@ -170,10 +170,10 @@ Su Vercel, **Settings → Cron Jobs** deve elencare i nove job di `vercel.json`:
 | `sync-live` | ogni minuto |
 
 I cron girano **solo sul deploy di produzione** (branch `master`), non sulle
-preview. Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro.
-Con il piano Free i cron automatici esauriscono la quota in poche ore:
-attivali solo dopo il passaggio a Pro, oppure lascia i cron e accetta che i
-job falliscano con `quota` finche' non aggiorni il piano.
+preview. Consumo tipico: 1.500-3.000 richieste al giorno, una frazione del
+piano Mega. Con il piano Free i cron automatici esauriscono la quota in poche
+ore: attivali solo su un piano a pagamento, oppure lascia i cron e accetta
+che i job falliscano con `quota` finche' non aggiorni il piano.
 
 ## 8. Dominio
 
