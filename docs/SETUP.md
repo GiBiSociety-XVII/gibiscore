@@ -6,14 +6,12 @@ Tempo stimato: 20-30 minuti, di cui la maggior parte in attesa dei job.
 ## 0. Prerequisiti gia' fatti
 
 - Repo `GiBiSociety-XVII/gibiscore` collegato al progetto Vercel, branch `master` = produzione.
-- Progetto Supabase "GiBiScore" creato, migrazioni `0001` e `0002` gia' applicate.
+- Progetto Supabase "GiBiScore" creato, migrazione `0001_public_schema` applicata.
 
 ## 1. Supabase (5 minuti)
 
 1. Apri il progetto **GiBiScore** su supabase.com.
-2. **Project Settings → Data API → Exposed schemas**: aggiungi `football` accanto
-   a `public` e salva. Senza questo passaggio il sito non puo' leggere le tabelle
-   e continua a mostrare i dati di esempio.
+2. Le tabelle sono nello schema `public`, gia' esposto: niente da configurare.
 3. **Project Settings → API Keys**:
    - copia la **Publishable key** (`sb_publishable_...`);
    - crea o mostra la **Secret key** (`sb_secret_...`). E' la chiave che i job
@@ -56,7 +54,6 @@ Facoltative, utili con il piano Free durante i test:
 |---|---|---|
 | `API_FOOTBALL_SCOPE` | `featured` | segue solo le leghe in evidenza invece di tutte le ~1.100 |
 | `API_FOOTBALL_FEATURED_LEAGUE_IDS` | `135,2` | cambia la lista delle leghe in evidenza senza toccare il codice |
-| `API_FOOTBALL_SKIP_SQUADS` | `1` | il job competizioni non scarica le rose (~260 richieste in meno) |
 
 Per generare `CRON_SECRET` da terminale:
 
@@ -98,27 +95,32 @@ nell'ordine giusto. Dal tuo computer, nella cartella del repo:
 export CRON_SECRET=ilsegreto
 export BASE_URL=https://<deploy>
 
-pnpm cron sync-competitions                 # tutte le leghe e stagioni; squadre e rose delle leghe in evidenza (~275 richieste)
+pnpm cron sync-competitions                 # tutte le leghe e stagioni; squadre delle leghe in evidenza (~15 richieste)
+pnpm cron sync-squads                       # rose e feed cessioni dei club in evidenza (~520 richieste; ripeti se `clubs_deferred` > 0)
 pnpm cron "sync-fixtures?window=month"      # tutte le partite da ieri a +30 giorni (32 richieste)
-pnpm cron "sync-standings?scope=all"        # classifiche di ogni competizione attiva (~300)
+pnpm cron sync-standings                    # classifiche delle leghe in evidenza (~13)
+pnpm cron "sync-standings?scope=all"        # classifiche delle altre competizioni con un risultato ieri (fino a 300)
 pnpm cron sync-injuries                     # infortuni e squalifiche delle leghe in evidenza (~13)
-pnpm cron "sync-backfill?limit=2000"        # calendario completo della stagione + eventi, formazioni e voti delle partite gia' giocate (~150 richieste)
-pnpm cron "sync-player-seasons?scope=current"   # statistiche stagionali di ogni giocatore delle leghe in evidenza (~450 richieste)
+pnpm cron "sync-backfill?limit=1000"        # calendario completo della stagione + eventi, formazioni e voti delle partite gia' giocate (~100 richieste a giro)
+pnpm cron "sync-player-seasons?scope=current&budget=600"   # statistiche stagionali di ogni giocatore delle leghe in evidenza (~450 richieste)
 pnpm cron sync-live                         # partite in corso, se ce ne sono adesso
 ```
 
-Le stagioni passate (default 3, `API_FOOTBALL_HISTORY_SEASONS`) arrivano da
-sole con i cron orari di `sync-backfill` e `sync-player-seasons` nel giro di
-un paio di giorni. Per averle subito, ripeti finche' `pending` e `seasons_due`
-nella risposta non sono 0 (ogni chiamata dura al massimo 5 minuti):
+I job di archivio (`sync-squads`, `sync-backfill`, `sync-player-seasons`)
+partono solo con piu' di 2.500 richieste ancora disponibili nella giornata:
+se rispondono `skipped_quota` si riprende il giorno dopo. Le stagioni passate
+(default 3, `API_FOOTBALL_HISTORY_SEASONS`) arrivano da sole con i cron orari
+nel giro di tre o quattro giorni. Per averle prima, nei giorni senza partite,
+ripeti finche' `pending` e `seasons_due` nella risposta non sono 0 (ogni
+chiamata dura al massimo 5 minuti):
 
 ```bash
 pnpm cron "sync-backfill?limit=2000"                 # ~100 richieste a chiamata
-pnpm cron "sync-player-seasons?scope=history&budget=1500"   # ~35 richieste per lega-stagione
+pnpm cron "sync-player-seasons?scope=history&budget=1000"   # ~35 richieste per lega-stagione
 ```
 
 Con il piano **Free** (100 richieste al giorno) imposta prima
-`API_FOOTBALL_SCOPE=featured` e `API_FOOTBALL_SKIP_SQUADS=1`.
+`API_FOOTBALL_SCOPE=featured` e non lanciare i job di archivio.
 
 Senza `pnpm` va bene anche `curl`:
 
@@ -140,9 +142,10 @@ Cosa controllare:
 - Nei **log di Vercel** il job competizioni stampa una riga per lega:
   `serie-a: API-Football #135 = "Serie A" (Italy)`. Se un nome non
   corrisponde, l'id in `lib/football/competitions.ts` va corretto.
-- Su Supabase, **Table Editor → schema `football`**: `leagues`, `teams`,
+- Su Supabase, **Table Editor** (schema `public`): `leagues`, `teams`,
   `fixtures`, `standings` devono avere righe; `sync_runs` ha una riga per ogni
-  esecuzione con `status`, contatori e avvisi.
+  esecuzione con `status`, contatori e avvisi; `sync_state` l'ultima lettura
+  della quota giornaliera.
 
 ## 6. Il sito con i dati reali
 
@@ -191,10 +194,11 @@ CRON_SECRET=... pnpm cron sync-fixtures   # BASE_URL predefinito: localhost:3000
 
 | Sintomo | Causa probabile | Rimedio |
 |---|---|---|
-| Homepage sempre con "Dati di esempio" | schema `football` non esposto, oppure tabelle vuote | passo 1.2, poi passo 5 |
+| Homepage sempre con "Dati di esempio" | migrazione non applicata, oppure tabelle vuote | passo 0, poi passo 5 |
 | Job risponde `401` | `CRON_SECRET` mancante o diverso | passo 3, poi Redeploy |
 | Job risponde `502` con `kind: "auth"` | chiave API-Football errata o assente | passo 2.3 e 3, poi Redeploy |
-| Job risponde `502` con `kind: "quota"` | richieste giornaliere esaurite | aspetta la mezzanotte UTC o passa a Pro; nel frattempo `API_FOOTBALL_SKIP_SQUADS=1` |
+| Job risponde `502` con `kind: "quota"` | richieste giornaliere esaurite | aspetta la mezzanotte UTC; i job di archivio si fermano da soli sotto la riserva |
+| Job con `skipped_quota` nei contatori | quota del giorno sotto la riserva della sua classe | normale: riparte il giorno dopo, o lancialo a mano in un giorno senza partite |
 | Avviso "partial coverage" per una lega | API-Football non copre eventi/formazioni/statistiche per quella stagione | nessuna azione: il sito mostra i dati disponibili |
 | Classifica assente per una coppa | la competizione non ha una tabella in quella fase | normale, `seasons_without_table` nei contatori |
 | Partita live senza statistiche | statistiche pubblicate a fine partita da API-Football per quella lega | arrivano con il job live dopo il fischio finale |

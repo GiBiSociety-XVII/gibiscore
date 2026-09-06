@@ -187,15 +187,15 @@ Piano in due tempi:
    GiBiArena, oppure un piccolo servizio di collegamento account via email
    verificata. Da studiare nel dettaglio in quel momento, non ora.
 
-Nel DB di GiBiScore i dati calcio vanno in uno schema dedicato (`football.*`)
-e i dati utente in `public.*`, cosi' la parte calcio resta indipendente
-dall'autenticazione qualunque strada si scelga.
+Nel DB di GiBiScore i dati calcio stanno nello schema `public` (lettura
+pubblica via RLS, scrittura solo con la chiave di servizio); i dati utente,
+quando arriveranno, vivranno in tabelle proprie con RLS per utente.
 
 ### Flusso dati
 
 ```
 API-Football  --cron Vercel (ogni 1-2 min durante le partite, ogni ora altrimenti)-->
-Supabase (tabelle football.*: fixtures, standings, players, teams, stats)  -->
+Supabase (tabelle public: fixtures, standings, players, teams, stats)  -->
 Next.js (Server Components + SWR per il live)  -->  utente
 ```
 

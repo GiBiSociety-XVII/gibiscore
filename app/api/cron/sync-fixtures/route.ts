@@ -3,11 +3,11 @@ import {cronRoute} from '@/lib/football/sync/run-job';
 import {syncFixtures} from '@/lib/football/sync/fixtures';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300;
+export const maxDuration = 120;
 
 /**
- * Hourly: every competition, yesterday to +7 days (9 requests).
- * With `?window=month` (daily cron): yesterday to +30 days.
+ * Hourly: every competition, yesterday to tomorrow (3 requests).
+ * With `?window=month` (daily cron): yesterday to +30 days (32).
  */
 export async function GET(request: NextRequest) {
     const month = request.nextUrl.searchParams.get('window') === 'month';

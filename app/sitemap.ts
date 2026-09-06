@@ -21,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         {url: `${siteUrl}/fantacalcio/asta`, lastModified: now, changeFrequency: 'daily', priority: 0.6},
     ];
     try {
-        const db = createPublicClient().schema('football');
+        const db = createPublicClient();
         const [leagues, teams] = await Promise.all([
             fetchAll((a, b) => db.from('leagues').select('slug,tier,updated_at').eq('is_active', true).order('id').range(a, b), {max: 5000}),
             fetchAll((a, b) => db.from('squad_members').select('team:teams!inner(slug,updated_at),season:seasons!inner(is_current,league:leagues!inner(tier))').eq('seasons.is_current', true).eq('seasons.leagues.tier', 'featured').order('team_id').range(a, b), {max: 20000}),

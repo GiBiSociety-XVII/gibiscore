@@ -1,20 +1,17 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet, dailyRemaining, quotaAllows, waitForMinuteWindow} from '@/lib/api-football/client';
+import {apiFootballGet} from '@/lib/api-football/client';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {fetchAll} from '@/lib/db/paginate';
-import {chunk, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
+import {allowance, chunk, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
 import {upsertFixtures} from './fixtures';
 
 const DAY = 86_400_000;
-/** Requests to leave for the rest of the day: live scores, fixtures, injuries. */
-const DAILY_RESERVE = 1500;
 /** Stop starting new requests after this, well inside the route's maxDuration. */
 const DEADLINE_MS = 230_000;
-const RETRY = {retryOnMinuteLimit: true};
 
 /**
- * sync-backfill (hourly, and by hand with a bigger limit after the install)
+ * sync-backfill (hourly, archive class; by hand with a bigger limit after the install)
  *
  * Fills the archive of the featured leagues, current season plus
  * API_FOOTBALL_HISTORY_SEASONS past ones, without ever touching the API at
@@ -28,17 +25,14 @@ const RETRY = {retryOnMinuteLimit: true};
  *    and player ratings were never stored, newest first, 20 per request,
  *    `limit` fixtures per run.
  */
-export async function syncBackfill(limit = 400): Promise<SyncRun> {
+export async function syncBackfill(limit = 200): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-backfill');
     const startedAt = Date.now();
     const outOfTime = () => Date.now() - startedAt > DEADLINE_MS;
     try {
         // The archive can wait: never eat into the requests the live and fixture jobs need today.
-        const remaining = await dailyRemaining();
-        if (!quotaAllows(remaining, DAILY_RESERVE)) {
-            run.warn(`daily quota low (${remaining} left): backfill waits for tomorrow`);
-            run.bump('skipped_quota');
+        if (!(await allowance(db, run, 'archive'))) {
             await finishRun(db, run, 'ok');
             return run;
         }
@@ -53,8 +47,7 @@ export async function syncBackfill(limit = 400): Promise<SyncRun> {
                 run.bump('seasons_deferred');
                 continue;
             }
-            await waitForMinuteWindow();
-            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {league: s.leagueProviderId, season: s.year}, RETRY);
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {league: s.leagueProviderId, season: s.year});
             run.requests += 1;
             await upsertFixtures(db, run, response);
             const {error} = await db.from('seasons').update({fixtures_listed_at: new Date().toISOString()}).eq('id', s.id);
@@ -84,8 +77,7 @@ export async function syncBackfill(limit = 400): Promise<SyncRun> {
         const requested: number[] = [];
         for (const group of chunk(ids, 20)) {
             if (outOfTime()) break;
-            await waitForMinuteWindow();
-            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')}, RETRY);
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')});
             run.requests += 1;
             requested.push(...group);
             fixtures.push(...response);

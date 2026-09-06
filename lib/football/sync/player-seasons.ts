@@ -1,9 +1,10 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet, dailyRemaining, quotaAllows, waitForMinuteWindow} from '@/lib/api-football/client';
+import {apiFootballGet} from '@/lib/api-football/client';
 import {mapPlayerProfile, mapPlayerSeason} from '@/lib/api-football/mappers';
 import type {AfPlayerResponse} from '@/lib/api-football/types';
 import {
+    allowance,
     chunk,
     ensureTeams,
     failSync,
@@ -20,10 +21,9 @@ import {
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** No new season is started after this, well inside the route's maxDuration. */
-/** Requests to leave for the rest of the day: live scores, fixtures, injuries. */
-const DAILY_RESERVE = 1500;
 const DEADLINE_MS = 200_000;
-const RETRY = {retryOnMinuteLimit: true};
+/** Requests per run unless asked otherwise: about eight league-seasons an hour. */
+const DEFAULT_BUDGET = 300;
 
 export type PlayerSeasonsScope = 'auto' | 'current' | 'history' | 'all';
 
@@ -44,7 +44,7 @@ export interface PlayerSeasonsOptions {
 }
 
 /**
- * sync-player-seasons (hourly)
+ * sync-player-seasons (hourly; archive class, ~35 requests per league-season)
  *
  * Season aggregates of every player of the featured leagues, as computed
  * by API-Football (/players?league&season, ~20 players per page, ~35
@@ -55,13 +55,14 @@ export interface PlayerSeasonsOptions {
  * Current season: refreshed after each matchday (a fixture finished since
  * the previous run) and in any case weekly. Past seasons: imported once,
  * within the request budget, until API_FOOTBALL_HISTORY_SEASONS are done.
+ * Never starts when the day's reserve for the live jobs would be eaten.
  */
 export async function syncPlayerSeasons(options: PlayerSeasonsOptions = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-player-seasons');
     const startedAt = Date.now();
     try {
-        const budget = options.budget ?? 500;
+        const budget = options.budget ?? DEFAULT_BUDGET;
         const scope = options.scope ?? 'auto';
         let seasons = await featuredSeasons(db, historySeasonCount(), run);
         if (options.leagues && options.leagues.length > 0) seasons = seasons.filter((s) => options.leagues!.includes(s.leagueSlug));
@@ -75,12 +76,9 @@ export async function syncPlayerSeasons(options: PlayerSeasonsOptions = {}): Pro
         }
         run.bump('seasons_due', due.length);
 
-        // A league-season costs up to a hundred requests: never start on a day whose quota
+        // A league-season costs dozens of requests: never start on a day whose quota
         // the live and fixture jobs still need.
-        const remaining = due.length > 0 ? await dailyRemaining() : null;
-        if (!quotaAllows(remaining, DAILY_RESERVE)) {
-            run.warn(`daily quota low (${remaining} left): player seasons wait for tomorrow`);
-            run.bump('seasons_skipped_quota', due.length);
+        if (due.length > 0 && !(await allowance(db, run, 'archive'))) {
             await finishRun(db, run, 'ok');
             return run;
         }
@@ -130,10 +128,9 @@ async function currentSeasonDue(db: FootballClient, s: SeasonRow): Promise<boole
     return (count ?? 0) > 0;
 }
 
-/** One page, sequentially: the per-minute allowance of the plan is shared with the live job. */
+/** One page at a time: the client's gate keeps the minute under the plan. */
 async function fetchPage(run: SyncRun, s: SeasonRow, page: number) {
-    await waitForMinuteWindow();
-    const envelope = await apiFootballGet<AfPlayerResponse[]>('players', {league: s.leagueProviderId, season: s.year, page}, RETRY);
+    const envelope = await apiFootballGet<AfPlayerResponse[]>('players', {league: s.leagueProviderId, season: s.year, page});
     run.requests += 1;
     return envelope;
 }

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const scope = SCOPES.find((s) => s === q.get('scope')) ?? 'auto';
     const year = q.get('year') ? Number(q.get('year')) : undefined;
     const leagues = q.get('leagues')?.split(',').map((s) => s.trim()).filter(Boolean);
-    const budget = Math.min(Number(q.get('budget')) || 500, 2000);
+    const budget = Math.min(Number(q.get('budget')) || 300, 2000);
     return cronRoute(async () => {
         const run = await syncPlayerSeasons({scope, year: Number.isFinite(year) ? year : undefined, leagues, budget});
         // The auction list reads squads and season statistics: fresh on the next request.

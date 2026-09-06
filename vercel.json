@@ -1,16 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/sync-competitions",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/sync-fixtures?window=month",
-      "schedule": "30 4 * * *"
-    },
-    {
-      "path": "/api/cron/sync-standings?scope=all",
-      "schedule": "0 5 * * *"
+      "path": "/api/cron/sync-live",
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/sync-fixtures",
@@ -18,11 +10,7 @@
     },
     {
       "path": "/api/cron/sync-standings",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/sync-injuries",
-      "schedule": "45 */6 * * *"
+      "schedule": "5 * * * *"
     },
     {
       "path": "/api/cron/sync-backfill",
@@ -33,8 +21,24 @@
       "schedule": "40 * * * *"
     },
     {
-      "path": "/api/cron/sync-live",
-      "schedule": "* * * * *"
+      "path": "/api/cron/sync-injuries",
+      "schedule": "35 */8 * * *"
+    },
+    {
+      "path": "/api/cron/sync-competitions",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-fixtures?window=month",
+      "schedule": "10 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-standings?scope=all",
+      "schedule": "25 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-squads",
+      "schedule": "30 4 * * 1,4"
     }
   ]
 }

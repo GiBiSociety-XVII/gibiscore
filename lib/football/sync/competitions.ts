@@ -1,30 +1,25 @@
 import 'server-only';
 import {basicScope, getFeaturedCompetitions, historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet, ApiFootballError, waitForMinuteWindow} from '@/lib/api-football/client';
-import {currentSeason, positionName, seasonName, slugify} from '@/lib/api-football/mappers';
-import type {AfLeagueResponse, AfPlayerProfileResponse, AfSquadResponse, AfTeamResponse, AfTransferResponse} from '@/lib/api-football/types';
-import {seasonWindowStart, squadChanges} from './transfers';
+import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
+import {currentSeason, seasonName, slugify} from '@/lib/api-football/mappers';
+import type {AfLeagueResponse, AfTeamResponse} from '@/lib/api-football/types';
 import {fetchAll} from '@/lib/db/paginate';
-import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type FootballClient, type SyncRun} from './context';
+import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type SyncRun} from './context';
 
 /**
- * sync-competitions (daily)
+ * sync-competitions (daily, ~15 requests)
  *
  * 1. GET /leagues once: every competition API-Football publishes, with its
  *    seasons and coverage. Upsert them all (tier basic) or only the featured
  *    ones when API_FOOTBALL_SCOPE=featured.
- * 2. Mark the current season of each league.
- * 3. Featured leagues only: teams of the season and, unless
- *    API_FOOTBALL_SKIP_SQUADS=1, their squads.
+ * 2. Mark the current season of each league; featured leagues also get
+ *    their past seasons (history archive), not current.
+ * 3. Featured leagues only: the teams of the current season (one request
+ *    per league), stored in season_teams for the squads job.
  *
- * Request budget: 1 + featured teams (~13) + squads (~260) = ~275 requests.
+ * Squads and transfers are not here any more: see squads.ts.
  */
-/** Stop starting new squads after this: the route allows five minutes. */
-const SQUADS_DEADLINE_MS = 240_000;
-/** Clubs asked at the same time: within the minute allowance, well ahead of doing them one by one. */
-const SQUAD_CONCURRENCY = 4;
-
-export async function syncCompetitions(options: {squads?: boolean} = {}): Promise<SyncRun> {
+export async function syncCompetitions(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-competitions');
 
@@ -32,15 +27,6 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
         const featured = getFeaturedCompetitions();
         const featuredIds = new Set(featured.map((c) => c.providerId));
         const scope = basicScope();
-        // Squads change rarely: fetched on Monday and Thursday (or on request), ~500 requests each time.
-        // During the transfer windows (January, February, August, September) every day: the provider's
-        // squads lag behind moves and the fantasy auction reads them.
-        const now = new Date();
-        const day = now.getUTCDay();
-        const transferWindow = [0, 1, 7, 8].includes(now.getUTCMonth());
-        const squadsDue = options.squads ?? (transferWindow || day === 1 || day === 4);
-        const skipSquads = process.env.API_FOOTBALL_SKIP_SQUADS === '1' || !squadsDue;
-        if (skipSquads) run.bump('squads_skipped');
 
         const {response: all} = await apiFootballGet<AfLeagueResponse[]>('leagues');
         run.requests += 1;
@@ -125,13 +111,11 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
         }
         run.bump('history_seasons', historyRows.length);
         // Older seasons of the same leagues are no longer current.
-        for (const rows of chunk(seasonRows, 200)) {
-            for (const r of rows) {
-                await db.from('seasons').update({is_current: false}).eq('league_id', r.league_id).neq('year', r.year).eq('is_current', true);
-            }
+        for (const r of seasonRows) {
+            await db.from('seasons').update({is_current: false}).eq('league_id', r.league_id).neq('year', r.year).eq('is_current', true);
         }
 
-        // Featured leagues: teams and squads.
+        // Featured leagues: the teams of the season.
         const {data: featuredSeasons, error: fsError} = await db
             .from('seasons')
             .select('id,year,league:leagues!inner(id,provider_id,name,tier)')
@@ -139,18 +123,7 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
             .eq('leagues.tier', 'featured');
         if (fsError) failSync('seasons.select', fsError);
 
-        // A club in league, cup and Europe is asked its squad once per run.
-        const squadCache = new Map<number, AfSquadResponse['players']>();
-        const transferCache = new Set<number>();
-        // The auction reads Serie A first: the featured order decides who gets the time.
-        const rank = (providerId: number) => {
-            const index = featured.findIndex((c) => c.providerId === providerId);
-            return index === -1 ? featured.length : index;
-        };
-        const orderedSeasons = [...(featuredSeasons ?? [])].sort((a, b) => rank((a.league as unknown as {provider_id: number}).provider_id) - rank((b.league as unknown as {provider_id: number}).provider_id));
-        const startedAt = Date.now();
-        const outOfTime = () => Date.now() - startedAt > SQUADS_DEADLINE_MS;
-        for (const s of orderedSeasons) {
+        for (const s of featuredSeasons ?? []) {
             const league = s.league as unknown as {id: number; provider_id: number; name: string};
             let teamEntries: AfTeamResponse[] = [];
             try {
@@ -176,37 +149,14 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
                 })),
             );
             run.bump('teams', teamEntries.length);
-
-            if (skipSquads) continue;
-            // Squads and transfers a few clubs at a time: one request each, the function has five minutes.
-            const teams = teamEntries.filter((t) => teamIds.has(t.team.id));
-            for (const group of chunk(teams, SQUAD_CONCURRENCY)) {
-                if (outOfTime()) {
-                    run.bump('squads_deferred', teams.length - teams.indexOf(group[0]));
-                    break;
-                }
-                await Promise.all(
-                    group.map(async (t) => {
-                        const dbTeamId = teamIds.get(t.team.id)!;
-                        try {
-                            await syncSquad(db, run, s.id as number, t.team.id, dbTeamId, squadCache);
-                        } catch (error) {
-                            run.warn(`squad ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
-                            if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
-                        }
-                        // The transfer feed moves faster than the squads: arrivals join, departures leave, today.
-                        if (transferCache.has(t.team.id)) return;
-                        transferCache.add(t.team.id);
-                        try {
-                            await syncTransfers(db, run, s.id as number, s.year as number, t.team.id, dbTeamId);
-                        } catch (error) {
-                            run.warn(`transfers ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
-                            if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
-                        }
-                    }),
-                );
+            const rows = [...new Set([...teamIds.values()])].map((teamId) => ({season_id: s.id as number, team_id: teamId}));
+            if (rows.length > 0) {
+                const {error} = await db.from('season_teams').upsert(rows, {onConflict: 'season_id,team_id'});
+                if (error) failSync('season_teams.upsert', error);
+                // A club relegated or out of a cup is no longer in the season.
+                const {error: pruneError} = await db.from('season_teams').delete().eq('season_id', s.id as number).not('team_id', 'in', `(${rows.map((r) => r.team_id).join(',')})`);
+                if (pruneError) failSync('season_teams.delete', pruneError);
             }
-            if (outOfTime()) run.warn(`out of time after ${s.league ? (s.league as unknown as {name: string}).name : s.id}: the rest waits for the next run`);
         }
 
         if (leagueRows.length === 0) {
@@ -218,132 +168,5 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
     } catch (error) {
         await finishRun(db, run, 'error', (error as Error).message);
         throw error;
-    }
-}
-
-async function syncSquad(db: FootballClient, run: SyncRun, dbSeasonId: number, teamProviderId: number, dbTeamId: number, cache: Map<number, AfSquadResponse['players']>) {
-    let members = cache.get(teamProviderId);
-    if (!members) {
-        await waitForMinuteWindow();
-        const {response} = await apiFootballGet<AfSquadResponse[]>('players/squads', {team: teamProviderId});
-        run.requests += 1;
-        members = response[0]?.players ?? [];
-        cache.set(teamProviderId, members);
-    }
-    if (members.length === 0) return;
-    // The provider lists a player twice now and then: one row per id, or Postgres rejects the upsert.
-    members = [...new Map(members.map((p) => [p.id, p])).values()];
-
-    const playerRows = members.map((p) => {
-        const name = p.name && p.name.trim() !== '' ? p.name : `Giocatore ${p.id}`;
-        return {
-            provider_id: p.id,
-            name,
-            position: positionName(p.position),
-            age: p.age ?? null,
-            image_url: p.photo ?? null,
-            slug: slugify(name, p.id),
-        };
-    });
-    const {error} = await db.from('players').upsert(playerRows, {onConflict: 'provider_id'});
-    if (error) failSync('players.upsert', error);
-    run.bump('players', playerRows.length);
-
-    const {data: playerIds, error: selectError} = await db
-        .from('players')
-        .select('id,provider_id')
-        .in('provider_id', members.map((m) => m.id));
-    if (selectError) failSync('players.select', selectError);
-    const idOf = new Map<number, number>((playerIds ?? []).map((r) => [r.provider_id as number, r.id as number]));
-
-    const squadRows = members
-        .filter((m) => idOf.has(m.id))
-        .map((m) => ({
-            season_id: dbSeasonId,
-            team_id: dbTeamId,
-            player_id: idOf.get(m.id)!,
-            jersey_number: m.number ?? null,
-            is_captain: false,
-        }));
-    if (squadRows.length > 0) {
-        const {error: squadError} = await db.from('squad_members').upsert(squadRows, {onConflict: 'season_id,team_id,player_id'});
-        if (squadError) failSync('squad_members.upsert', squadError);
-        run.bump('squad_members', squadRows.length);
-    }
-    // Whoever the provider no longer lists has left: out of the squad. A short answer is a
-    // partial one (a page missing, a club being rebuilt) and must not empty the squad.
-    if (squadRows.length >= 15) {
-        const {data: gone, error: goneError} = await db
-            .from('squad_members')
-            .delete()
-            .eq('season_id', dbSeasonId)
-            .eq('team_id', dbTeamId)
-            .not('player_id', 'in', `(${squadRows.map((r) => r.player_id).join(',')})`)
-            .select('player_id');
-        if (goneError) failSync('squad_members.delete', goneError);
-        if (gone && gone.length > 0) run.bump('squad_departures', gone.length);
-    }
-}
-
-/** Profiles fetched per run for players the database has never seen: bounded, they cost a request each. */
-const MAX_PROFILES_PER_TEAM = 6;
-
-/**
- * Arrivals and departures from the transfer feed since the season started:
- * arrivals join the squad (a profile is fetched for the unknown ones),
- * departures leave it. One request per club, plus the profiles.
- */
-async function syncTransfers(db: FootballClient, run: SyncRun, dbSeasonId: number, year: number, teamProviderId: number, dbTeamId: number) {
-    await waitForMinuteWindow();
-    const {response} = await apiFootballGet<AfTransferResponse[]>('transfers', {team: teamProviderId});
-    run.requests += 1;
-    const moves = response.flatMap((entry) =>
-        (entry.transfers ?? []).map((t) => ({playerId: entry.player.id, name: entry.player.name, date: t.date, inTeam: t.teams?.in?.id ?? null, outTeam: t.teams?.out?.id ?? null})),
-    );
-    const until = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-    const changes = squadChanges(moves, teamProviderId, seasonWindowStart(year), until);
-    if (changes.arrivals.size === 0 && changes.departures.size === 0) return;
-
-    const known = new Map<number, number>();
-    const providerIds = [...changes.arrivals.keys(), ...changes.departures];
-    for (const ids of chunk(providerIds, 200)) {
-        const {data, error} = await db.from('players').select('id,provider_id').in('provider_id', ids);
-        if (error) failSync('players.select', error);
-        for (const r of data ?? []) known.set(r.provider_id as number, r.id as number);
-    }
-
-    // Departures: out of this squad (the feed knows before the squad endpoint does).
-    const outIds = [...changes.departures].map((id) => known.get(id)).filter((id): id is number => id !== undefined);
-    if (outIds.length > 0) {
-        const {data: gone, error} = await db.from('squad_members').delete().eq('season_id', dbSeasonId).eq('team_id', dbTeamId).in('player_id', outIds).select('player_id');
-        if (error) failSync('squad_members.delete', error);
-        if (gone && gone.length > 0) run.bump('transfers_out', gone.length);
-    }
-
-    // Arrivals: known players join at once; unknown ones get a profile first, a few per club per run.
-    let profiles = 0;
-    for (const [providerId, name] of changes.arrivals) {
-        if (!known.has(providerId)) {
-            if (profiles >= MAX_PROFILES_PER_TEAM) continue;
-            profiles += 1;
-            await waitForMinuteWindow();
-            const {response: found} = await apiFootballGet<AfPlayerProfileResponse[]>('players/profiles', {player: providerId});
-            run.requests += 1;
-            const profile = found[0]?.player;
-            const fullName = profile?.name && profile.name.trim() !== '' ? profile.name : name;
-            const {data: inserted, error} = await db
-                .from('players')
-                .upsert({provider_id: providerId, name: fullName, position: positionName(profile?.position ?? null), age: profile?.age ?? null, image_url: profile?.photo ?? null, slug: slugify(fullName, providerId)}, {onConflict: 'provider_id'})
-                .select('id')
-                .single();
-            if (error) failSync('players.upsert', error);
-            if (inserted) known.set(providerId, inserted.id as number);
-            run.bump('transfer_profiles');
-        }
-        const playerId = known.get(providerId);
-        if (!playerId) continue;
-        const {error} = await db.from('squad_members').upsert({season_id: dbSeasonId, team_id: dbTeamId, player_id: playerId, jersey_number: null, is_captain: false}, {onConflict: 'season_id,team_id,player_id'});
-        if (error) failSync('squad_members.upsert', error);
-        run.bump('transfers_in');
     }
 }
