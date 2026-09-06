@@ -243,3 +243,15 @@ export interface AfPlayerResponse {
     player: AfPlayerProfile;
     statistics: AfPlayerSeasonStats[];
 }
+
+/** GET /transfers?team=ID */
+export interface AfTransferResponse {
+    player: {id: number; name: string};
+    update: string;
+    transfers: Array<{date: string; type: string | null; teams: {in: {id: number | null; name: string | null; logo: string | null}; out: {id: number | null; name: string | null; logo: string | null}}}>;
+}
+
+/** GET /players/profiles?player=ID */
+export interface AfPlayerProfileResponse {
+    player: {id: number; name: string; firstname: string | null; lastname: string | null; age: number | null; nationality: string | null; number: number | null; position: string | null; photo: string | null};
+}

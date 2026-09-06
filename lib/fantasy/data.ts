@@ -35,11 +35,15 @@ export interface AuctionPlayer {
     /** European cup the club plays this season, when someone in the squad already has a line in it. */
     europe: string | null;
     /** Where the fantasy role comes from: the official list, the formations fielded, or the provider's profile. */
-    roleSource: 'listone' | 'lineups' | 'profile';
+    roleSource: 'listone' | 'lineups' | 'profile' | 'manual';
     /** Weighted starts per role from the formations fielded (current season counts three times). */
     roleBreakdown: Partial<Record<FantaRole, number>>;
     /** The official list's own quotation, when he is on it. */
     listQuote: number | null;
+    /** The official list's market value (FVM), when it gives one. */
+    listFvm: number | null;
+    /** Mantra roles from the official list ("E;W"), when it gives them. */
+    mantraRoles: string | null;
     /** Starts and benches at the current club, this season counting three times. */
     availability: Availability;
     /** His place is contested: on the bench in at least a fifth of the matches he was available for. */
@@ -344,6 +348,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 goalsConceded: r.goals_conceded ?? 0,
                 saves: r.saves ?? 0,
             }));
+            // Listed among the players who left the league: out, unless he has actually played for his club this season.
+            if (listed?.gone && !lines.some((l) => l.year === year && l.teamId === team.id && l.appearances > 0)) continue;
             const injury = injuryOf.get(player.id) ?? null;
             const shape = teamShape.get(team.id) ?? null;
             const inputBase = {
@@ -378,6 +384,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 roleSource: listed ? 'listone' : call?.source === 'lineups' ? 'lineups' : 'profile',
                 roleBreakdown: call?.breakdown ?? {},
                 listQuote: listed?.quote ?? null,
+                listFvm: listed && listed.fvm > 0 ? listed.fvm : null,
+                mantraRoles: listed && listed.mantra ? listed.mantra : null,
                 availability: availabilityOf.get(player.id) ?? {starts: 0, benches: 0},
                 contested: isContested(availabilityOf.get(player.id) ?? {starts: 0, benches: 0}),
                 rivals: [],
@@ -427,7 +435,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
     }
 }
 
-const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600});
+const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600, tags: ['fantasy-pool']});
 
 /**
  * The auction pool for a league, cached for an hour once built. A build

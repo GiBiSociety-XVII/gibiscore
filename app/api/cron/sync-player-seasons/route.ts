@@ -1,3 +1,4 @@
+import {revalidateTag} from 'next/cache';
 import type {NextRequest} from 'next/server';
 import {cronRoute} from '@/lib/football/sync/run-job';
 import {syncPlayerSeasons, type PlayerSeasonsScope} from '@/lib/football/sync/player-seasons';
@@ -18,5 +19,10 @@ export async function GET(request: NextRequest) {
     const year = q.get('year') ? Number(q.get('year')) : undefined;
     const leagues = q.get('leagues')?.split(',').map((s) => s.trim()).filter(Boolean);
     const budget = Math.min(Number(q.get('budget')) || 500, 2000);
-    return cronRoute(() => syncPlayerSeasons({scope, year: Number.isFinite(year) ? year : undefined, leagues, budget}))(request);
+    return cronRoute(async () => {
+        const run = await syncPlayerSeasons({scope, year: Number.isFinite(year) ? year : undefined, leagues, budget});
+        // The auction list reads squads and season statistics: fresh on the next request.
+        revalidateTag('fantasy-pool', 'max');
+        return run;
+    })(request);
 }

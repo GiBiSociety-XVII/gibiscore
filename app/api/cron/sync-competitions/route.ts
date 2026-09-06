@@ -1,3 +1,4 @@
+import {revalidateTag} from 'next/cache';
 import type {NextRequest} from 'next/server';
 import {cronRoute} from '@/lib/football/sync/run-job';
 import {syncCompetitions} from '@/lib/football/sync/competitions';
@@ -11,5 +12,10 @@ export const maxDuration = 300;
  */
 export async function GET(request: NextRequest) {
     const squads = request.nextUrl.searchParams.get('squads');
-    return cronRoute(() => syncCompetitions({squads: squads === '1' ? true : squads === '0' ? false : undefined}))(request);
+    return cronRoute(async () => {
+        const run = await syncCompetitions({squads: squads === '1' ? true : squads === '0' ? false : undefined});
+        // The auction list reads squads and season statistics: fresh on the next request.
+        revalidateTag('fantasy-pool', 'max');
+        return run;
+    })(request);
 }

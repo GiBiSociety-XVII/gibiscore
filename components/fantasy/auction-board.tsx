@@ -68,14 +68,15 @@ function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']}
 }
 
 /** The notes of the detail row: absence in full, rivals for the spot, new signing, penalties, European cups. */
-function Notes({p}: {p: AuctionPlayer}) {
+function Notes({p, onRole}: {p: AuctionPlayer; onRole: (role: FantaRole | null) => void}) {
     const t = useTranslations('Fantasy.board');
     const ts = useTranslations('Fantasy.setup');
     const format = useFormatter();
     const short = (iso: string) => format.dateTime(day(iso), {day: 'numeric', month: 'short'});
     const lines: Array<{key: string; text: string; tone?: string}> = [];
     const breakdown = (['P', 'D', 'C', 'A'] as const).filter((r) => (p.roleBreakdown[r] ?? 0) > 0).map((r) => `${Math.round(p.roleBreakdown[r]!)} ${ts(`roles.${r}`).toLowerCase()}`).join(', ');
-    if (p.roleSource === 'listone') lines.push({key: 'role', text: p.listQuote !== null ? t('info.roleListoneQuote', {role: p.role, quote: p.listQuote}) : t('info.roleListone', {role: p.role})});
+    if (p.roleSource === 'manual') lines.push({key: 'role', text: t('info.roleManual', {role: p.role})});
+    else if (p.roleSource === 'listone') lines.push({key: 'role', text: (p.listQuote !== null ? t('info.roleListoneQuote', {role: p.role, quote: p.listQuote}) : t('info.roleListone', {role: p.role})) + (p.listFvm !== null ? ` · ${t('info.fvm', {fvm: p.listFvm})}` : '') + (p.mantraRoles ? ` · ${t('info.mantra', {roles: p.mantraRoles.replace(/;/g, ', ')})}` : '')});
     else if (p.roleSource === 'lineups') lines.push({key: 'role', text: t('info.roleLineups', {role: p.role, breakdown})});
     else lines.push({key: 'role', text: t('info.roleProfile', {role: p.role})});
     if (p.injury) {
@@ -101,6 +102,14 @@ function Notes({p}: {p: AuctionPlayer}) {
                     {lines.map((l) => <li key={l.key} className={l.tone}>{l.text}</li>)}
                 </ul>
             )}
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('info.fixRole')}</span>
+                {ROLES.map((r) => (
+                    <button key={r} type="button" onClick={() => onRole(r)} className={cn("bb-btn h-6 w-7 font-mono text-[11px] font-extrabold", p.role === r ? "bg-accent" : "bg-card")} aria-pressed={p.role === r}>{r}</button>
+                ))}
+                {p.roleSource === 'manual' && <button type="button" onClick={() => onRole(null)} className="bb-btn h-6 px-2 text-[11px] font-extrabold bg-card">{t('info.fixRoleReset')}</button>}
+                <span className="basis-full text-[10px] font-semibold text-muted-foreground">{t('info.fixRoleHint')}</span>
+            </div>
         </div>
     );
 }
@@ -136,8 +145,11 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
     // The marks the league wants: with the cups, or the main leagues only.
     const pool = useMemo(() => {
-        if (!rawPool || !config || config.cupsCount) return rawPool;
-        return {...rawPool, players: rawPool.players.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}))};
+        if (!rawPool || !config) return rawPool;
+        const overrides = config.roleOverrides;
+        const fixed = Object.keys(overrides).length > 0 ? rawPool.players.map((p) => (overrides[String(p.id)] && overrides[String(p.id)] !== p.role ? {...p, role: overrides[String(p.id)], roleSource: 'manual' as const} : p)) : rawPool.players;
+        if (config.cupsCount) return fixed === rawPool.players ? rawPool : {...rawPool, players: fixed};
+        return {...rawPool, players: fixed.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}))};
     }, [rawPool, config]);
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {
@@ -413,7 +425,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
                                                 <td colSpan={14} className="px-3 py-2">
-                                                    <Notes p={p} />
+                                                    <Notes p={p} onRole={(r) => { const next = {...config.roleOverrides}; if (r === null) delete next[String(p.id)]; else next[String(p.id)] = r; configStore.write({...config, roleOverrides: next}); }} />
                                                     {p.seasons.length === 0 ? (
                                                         <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
                                                     ) : (
