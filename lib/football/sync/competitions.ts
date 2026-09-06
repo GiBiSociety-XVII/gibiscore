@@ -1,6 +1,6 @@
 import 'server-only';
 import {basicScope, getFeaturedCompetitions, historySeasonCount} from '@/lib/football/competitions';
-import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
+import {apiFootballGet, ApiFootballError, waitForMinuteWindow} from '@/lib/api-football/client';
 import {currentSeason, positionName, seasonName, slugify} from '@/lib/api-football/mappers';
 import type {AfLeagueResponse, AfPlayerProfileResponse, AfSquadResponse, AfTeamResponse, AfTransferResponse} from '@/lib/api-football/types';
 import {seasonWindowStart, squadChanges} from './transfers';
@@ -19,6 +19,11 @@ import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncE
  *
  * Request budget: 1 + featured teams (~13) + squads (~260) = ~275 requests.
  */
+/** Stop starting new squads after this: the route allows five minutes. */
+const SQUADS_DEADLINE_MS = 240_000;
+/** Clubs asked at the same time: within the minute allowance, well ahead of doing them one by one. */
+const SQUAD_CONCURRENCY = 4;
+
 export async function syncCompetitions(options: {squads?: boolean} = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-competitions');
@@ -137,7 +142,15 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
         // A club in league, cup and Europe is asked its squad once per run.
         const squadCache = new Map<number, AfSquadResponse['players']>();
         const transferCache = new Set<number>();
-        for (const s of featuredSeasons ?? []) {
+        // The auction reads Serie A first: the featured order decides who gets the time.
+        const rank = (providerId: number) => {
+            const index = featured.findIndex((c) => c.providerId === providerId);
+            return index === -1 ? featured.length : index;
+        };
+        const orderedSeasons = [...(featuredSeasons ?? [])].sort((a, b) => rank((a.league as unknown as {provider_id: number}).provider_id) - rank((b.league as unknown as {provider_id: number}).provider_id));
+        const startedAt = Date.now();
+        const outOfTime = () => Date.now() - startedAt > SQUADS_DEADLINE_MS;
+        for (const s of orderedSeasons) {
             const league = s.league as unknown as {id: number; provider_id: number; name: string};
             let teamEntries: AfTeamResponse[] = [];
             try {
@@ -165,25 +178,35 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
             run.bump('teams', teamEntries.length);
 
             if (skipSquads) continue;
-            for (const t of teamEntries) {
-                const dbTeamId = teamIds.get(t.team.id);
-                if (!dbTeamId) continue;
-                try {
-                    await syncSquad(db, run, s.id as number, t.team.id, dbTeamId, squadCache);
-                } catch (error) {
-                    run.warn(`squad ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
-                    if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
+            // Squads and transfers a few clubs at a time: one request each, the function has five minutes.
+            const teams = teamEntries.filter((t) => teamIds.has(t.team.id));
+            for (const group of chunk(teams, SQUAD_CONCURRENCY)) {
+                if (outOfTime()) {
+                    run.bump('squads_deferred', teams.length - teams.indexOf(group[0]));
+                    break;
                 }
-                // The transfer feed moves faster than the squads: arrivals join, departures leave, today.
-                if (transferCache.has(t.team.id)) continue;
-                transferCache.add(t.team.id);
-                try {
-                    await syncTransfers(db, run, s.id as number, s.year as number, t.team.id, dbTeamId);
-                } catch (error) {
-                    run.warn(`transfers ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
-                    if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
-                }
+                await Promise.all(
+                    group.map(async (t) => {
+                        const dbTeamId = teamIds.get(t.team.id)!;
+                        try {
+                            await syncSquad(db, run, s.id as number, t.team.id, dbTeamId, squadCache);
+                        } catch (error) {
+                            run.warn(`squad ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
+                            if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
+                        }
+                        // The transfer feed moves faster than the squads: arrivals join, departures leave, today.
+                        if (transferCache.has(t.team.id)) return;
+                        transferCache.add(t.team.id);
+                        try {
+                            await syncTransfers(db, run, s.id as number, s.year as number, t.team.id, dbTeamId);
+                        } catch (error) {
+                            run.warn(`transfers ${t.team.name} (#${t.team.id}): ${(error as Error).message}`);
+                            if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
+                        }
+                    }),
+                );
             }
+            if (outOfTime()) run.warn(`out of time after ${s.league ? (s.league as unknown as {name: string}).name : s.id}: the rest waits for the next run`);
         }
 
         if (leagueRows.length === 0) {
@@ -201,12 +224,15 @@ export async function syncCompetitions(options: {squads?: boolean} = {}): Promis
 async function syncSquad(db: FootballClient, run: SyncRun, dbSeasonId: number, teamProviderId: number, dbTeamId: number, cache: Map<number, AfSquadResponse['players']>) {
     let members = cache.get(teamProviderId);
     if (!members) {
+        await waitForMinuteWindow();
         const {response} = await apiFootballGet<AfSquadResponse[]>('players/squads', {team: teamProviderId});
         run.requests += 1;
         members = response[0]?.players ?? [];
         cache.set(teamProviderId, members);
     }
     if (members.length === 0) return;
+    // The provider lists a player twice now and then: one row per id, or Postgres rejects the upsert.
+    members = [...new Map(members.map((p) => [p.id, p])).values()];
 
     const playerRows = members.map((p) => {
         const name = p.name && p.name.trim() !== '' ? p.name : `Giocatore ${p.id}`;
@@ -268,6 +294,7 @@ const MAX_PROFILES_PER_TEAM = 6;
  * departures leave it. One request per club, plus the profiles.
  */
 async function syncTransfers(db: FootballClient, run: SyncRun, dbSeasonId: number, year: number, teamProviderId: number, dbTeamId: number) {
+    await waitForMinuteWindow();
     const {response} = await apiFootballGet<AfTransferResponse[]>('transfers', {team: teamProviderId});
     run.requests += 1;
     const moves = response.flatMap((entry) =>
@@ -299,6 +326,7 @@ async function syncTransfers(db: FootballClient, run: SyncRun, dbSeasonId: numbe
         if (!known.has(providerId)) {
             if (profiles >= MAX_PROFILES_PER_TEAM) continue;
             profiles += 1;
+            await waitForMinuteWindow();
             const {response: found} = await apiFootballGet<AfPlayerProfileResponse[]>('players/profiles', {player: providerId});
             run.requests += 1;
             const profile = found[0]?.player;
