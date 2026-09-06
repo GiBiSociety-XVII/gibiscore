@@ -76,7 +76,7 @@ rispettare il client (`lib/api-football/client.ts`), non i singoli job:
 - ogni risposta aggiorna il conteggio giornaliero, salvato in `sync_state` e
   letto da tutti i job prima di partire. Tre classi di job: **essenziali**
   (live, calendario, competizioni) girano sempre; **ordinari** (classifiche,
-  infortuni, mercato) tengono 800 richieste di riserva; **archivio** (rose,
+  infortuni) tengono 800 richieste di riserva; **archivio** (rose,
   statistiche stagionali, partite passate) partono solo con più di 2.500
   richieste ancora disponibili.
 
@@ -88,9 +88,8 @@ rispettare il client (`lib/api-football/client.ts`), non i singoli job:
 | `sync-standings` | ogni ora | 0-13 | classifiche delle leghe in evidenza, solo se una loro partita è finita da quando la tabella è stata salvata |
 | `sync-standings?scope=all` | ogni giorno | fino a 300 | classifiche delle altre competizioni con un risultato nelle ultime 24 ore |
 | `sync-injuries` | ogni 8 ore | ~13 | infortuni e squalifiche, leghe in evidenza (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
-| `sync-market` | ogni 4 ore | ~20 | feed cessioni dei club delle leghe d'asta (Serie A, `API_FOOTBALL_MARKET_LEAGUE_IDS`): arrivi in rosa e partenze nel giro di ore; fuori dalle finestre di mercato solo il primo giro del giorno |
 | `sync-competitions` | ogni giorno | ~15 | tutte le leghe e stagioni correnti, stagioni passate delle leghe in evidenza, squadre di ogni stagione in evidenza (`season_teams`) |
-| `sync-squads` | lunedì e giovedì | ~2 per club (~520) | rose e feed cessioni di ogni club in evidenza, i più vecchi prima; quel che non entra nei 4 minuti passa al giro dopo |
+| `sync-squads` | lunedì e giovedì | ~2 per club (~520) | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, tutti allo stesso modo, i più vecchi prima; quel che non entra nei 4 minuti passa al giro dopo |
 | `sync-backfill` | ogni ora | fino a ~15 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti, 200 partite per giro |
 | `sync-player-seasons` | ogni ora | ~35 per lega-stagione, solo dopo una giornata giocata, max 300 per giro | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
 

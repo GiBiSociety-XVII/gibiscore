@@ -15,7 +15,7 @@ import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncE
  * 2. Mark the current season of each league; featured leagues also get
  *    their past seasons (history archive), not current.
  * 3. Featured leagues only: the teams of the current season (one request
- *    per league), stored in season_teams for the squads and market jobs.
+ *    per league), stored in season_teams for the squads job.
  *
  * Squads and transfers are not here any more: see squads.ts.
  */

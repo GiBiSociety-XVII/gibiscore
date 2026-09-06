@@ -1,5 +1,5 @@
 import 'server-only';
-import {getFeaturedCompetitions, getMarketCompetitionIds, inTransferWindow} from '@/lib/football/competitions';
+import {getFeaturedCompetitions} from '@/lib/football/competitions';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {positionName, slugify} from '@/lib/api-football/mappers';
 import type {AfPlayerProfileResponse, AfSquadResponse, AfTransferResponse} from '@/lib/api-football/types';
@@ -25,10 +25,10 @@ interface Club {
 }
 
 /**
- * The featured clubs with the seasons they play in, from season_teams.
- * Market clubs (the auction leagues) first, then the ones waited longest.
+ * The featured clubs with the seasons they play in, from season_teams,
+ * the ones that waited longest first (then the featured order, for ties).
  */
-async function featuredClubs(db: FootballClient, only?: 'market'): Promise<Club[]> {
+async function featuredClubs(db: FootballClient): Promise<Club[]> {
     const rows = await fetchAll(
         (a, b) =>
             db
@@ -40,7 +40,6 @@ async function featuredClubs(db: FootballClient, only?: 'market'): Promise<Club[
                 .range(a, b),
         {max: 5000},
     );
-    const market = new Set(getMarketCompetitionIds());
     const rank = new Map(getFeaturedCompetitions().map((c, i) => [c.providerId, i]));
     const clubs = new Map<number, Club>();
     for (const r of rows) {
@@ -50,11 +49,8 @@ async function featuredClubs(db: FootballClient, only?: 'market'): Promise<Club[
         club.seasons.push({id: season.id, year: season.year, leagueProviderId: season.league.provider_id});
         clubs.set(team.id, club);
     }
-    const isMarket = (c: Club) => c.seasons.some((s) => market.has(s.leagueProviderId));
     const best = (c: Club) => Math.min(...c.seasons.map((s) => rank.get(s.leagueProviderId) ?? 999));
-    return [...clubs.values()]
-        .filter((c) => (only === 'market' ? isMarket(c) : true))
-        .sort((a, b) => Number(isMarket(b)) - Number(isMarket(a)) || (a.squadSyncedAt ?? '').localeCompare(b.squadSyncedAt ?? '') || best(a) - best(b));
+    return [...clubs.values()].sort((a, b) => (a.squadSyncedAt ?? '').localeCompare(b.squadSyncedAt ?? '') || best(a) - best(b));
 }
 
 /**
@@ -96,50 +92,6 @@ export async function syncSquads(options: {limit?: number} = {}): Promise<SyncRu
                 }),
             );
             done += group.length;
-        }
-        await finishRun(db, run, 'ok');
-        return run;
-    } catch (error) {
-        await finishRun(db, run, 'error', (error as Error).message);
-        throw error;
-    }
-}
-
-/**
- * sync-market (every 4 hours; routine class, ~1 request per club)
- *
- * The transfer feed of the auction leagues' clubs (Serie A by default):
- * the fantasy list follows the announcements within hours. Outside the
- * transfer windows one run a day is enough (the first of the day); `force`
- * runs it now.
- */
-export async function syncMarket(options: {force?: boolean} = {}): Promise<SyncRun> {
-    const db = footballClient();
-    const run = await startRun(db, 'sync-market');
-    try {
-        const now = new Date();
-        if (!options.force && !inTransferWindow(now) && now.getUTCHours() >= 4) {
-            run.bump('skipped_closed_window');
-            await finishRun(db, run, 'ok');
-            return run;
-        }
-        if (!(await allowance(db, run, 'routine'))) {
-            await finishRun(db, run, 'ok');
-            return run;
-        }
-        const clubs = await featuredClubs(db, 'market');
-        run.bump('clubs', clubs.length);
-        for (const group of chunk(clubs, CONCURRENCY)) {
-            await Promise.all(
-                group.map(async (club) => {
-                    try {
-                        await syncTransfers(db, run, club);
-                    } catch (error) {
-                        run.warn(`${club.name} (#${club.providerId}): ${(error as Error).message}`);
-                        if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
-                    }
-                }),
-            );
         }
         await finishRun(db, run, 'ok');
         return run;

@@ -21,10 +21,6 @@
       "schedule": "40 * * * *"
     },
     {
-      "path": "/api/cron/sync-market",
-      "schedule": "50 */4 * * *"
-    },
-    {
       "path": "/api/cron/sync-injuries",
       "schedule": "35 */8 * * *"
     },
