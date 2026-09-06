@@ -29,6 +29,9 @@ import {
     type SyncRun,
 } from './context';
 
+/** The live job never waits for a slot: the next tick is a minute away. */
+const LIVE = {lane: 'live' as const};
+
 function ymd(date: Date): string {
     return date.toISOString().slice(0, 10);
 }
@@ -39,18 +42,19 @@ function inScope(f: AfFixtureResponse): boolean {
 }
 
 /**
- * sync-fixtures (hourly)
+ * sync-fixtures (hourly: yesterday, today, tomorrow = 3 requests; daily
+ * with a month window: yesterday to +30 days = 32 requests)
  *
  * One request per day: GET /fixtures?date=YYYY-MM-DD returns every match of
- * every competition that day. Default window: yesterday to +7 days (9
- * requests). The daily run extends it to +30 days.
+ * every competition that day, kick-off times and final scores included.
+ * Essential class: runs whatever is left of the day.
  */
 export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?: number} = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-fixtures');
     try {
         const fromDaysAgo = options.fromDaysAgo ?? 1;
-        const toDaysAhead = options.toDaysAhead ?? 7;
+        const toDaysAhead = options.toDaysAhead ?? 1;
         const fixtures: AfFixtureResponse[] = [];
         for (let offset = -fromDaysAgo; offset <= toDaysAhead; offset += 1) {
             const day = ymd(new Date(Date.now() + offset * 86_400_000));
@@ -69,26 +73,37 @@ export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?:
     }
 }
 
+/** Featured fixtures in play get their lineups, statistics and ratings refreshed this often. */
+const DETAIL_EVERY_MS = 3 * 60_000;
+/** A featured fixture that should have kicked off but is not in the live feed is asked this often. */
+const DUE_EVERY_MS = 10 * 60_000;
+
 /**
  * sync-live (every minute)
  *
+ * 0. No request at all when nothing can be in play (no live fixture in
+ *    the database, no kick-off in the last 3 hours or the next 2 minutes).
  * 1. GET /fixtures?live=all: every match in play worldwide, with events.
- *    Scores, minute and events are stored for all of them.
- * 2. Featured fixtures in play, plus fixtures our DB still marks as live
- *    but the feed no longer lists (they just ended) and fixtures that should
- *    have kicked off in the last 3 hours, are re-fetched by id (20 per
- *    request) for lineups, statistics and player stats.
+ *    Scores, minute and events are stored for all of them. One request.
+ * 2. Featured fixtures only, by id (20 per request), for lineups,
+ *    statistics and player ratings: those in play whose detail is older
+ *    than three minutes, those the feed no longer lists (they just ended:
+ *    the final detail), and those that should have kicked off in the last
+ *    three hours but are not in the feed, asked every ten minutes.
+ *
+ * Basic-tier fixtures never cost a request beyond the live feed.
+ * Budget: 1 request a minute while matches are on, plus one per 20
+ * featured fixtures every three minutes.
  */
 export async function syncLive(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-live');
     try {
-        // Nothing in play and no kick-off in the last 3 hours or the next
-        // 2 minutes: no request at all (saves ~700 requests a day at night).
+        const now = Date.now();
         const {count: possible, error: possibleError} = await db
             .from('fixtures')
             .select('id', {count: 'exact', head: true})
-            .or(`state.in.(live,half_time,extra_time,penalties),and(state.eq.scheduled,starting_at.gte.${new Date(Date.now() - 3 * 3_600_000).toISOString()},starting_at.lte.${new Date(Date.now() + 2 * 60_000).toISOString()})`);
+            .or(`state.in.(live,half_time,extra_time,penalties),and(state.eq.scheduled,starting_at.gte.${new Date(now - 3 * 3_600_000).toISOString()},starting_at.lte.${new Date(now + 2 * 60_000).toISOString()})`);
         if (possibleError) failSync('fixtures.count', possibleError);
         if ((possible ?? 0) === 0) {
             run.bump('idle');
@@ -96,43 +111,67 @@ export async function syncLive(): Promise<SyncRun> {
             return run;
         }
 
-        const {response: inplayAll} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {live: 'all'});
+        const {response: inplayAll} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {live: 'all'}, LIVE);
         run.requests += 1;
         const inplay = inplayAll.filter(inScope);
         run.bump('inplay', inplay.length);
-
         const inplayIds = new Set(inplay.map((f) => f.fixture.id));
-        const detailIds = new Set<number>(inplay.filter((f) => isFeaturedProviderId(f.league.id)).map((f) => f.fixture.id));
 
-        const {data: staleRows, error} = await db
+        // Featured fixtures worth a request of their own.
+        const detailIds = new Set<number>();
+        const featuredLive = inplay.filter((f) => isFeaturedProviderId(f.league.id)).map((f) => f.fixture.id);
+        if (featuredLive.length > 0) {
+            const {data: fresh, error} = await db
+                .from('fixtures')
+                .select('provider_id')
+                .in('provider_id', featuredLive)
+                .gt('details_synced_at', new Date(now - DETAIL_EVERY_MS).toISOString());
+            if (error) failSync('fixtures.select', error);
+            const freshIds = new Set((fresh ?? []).map((r) => r.provider_id as number));
+            for (const id of featuredLive) if (!freshIds.has(id)) detailIds.add(id);
+        }
+
+        // Featured fixtures our database still marks as live but the feed no longer lists: they just ended.
+        const {data: staleRows, error: staleError} = await db
             .from('fixtures')
-            .select('provider_id')
-            .in('state', ['live', 'half_time', 'extra_time', 'penalties']);
-        if (error) failSync('fixtures.select', error);
+            .select('provider_id,league:leagues!inner(tier)')
+            .in('state', ['live', 'half_time', 'extra_time', 'penalties'])
+            .eq('leagues.tier', 'featured');
+        if (staleError) failSync('fixtures.select', staleError);
         for (const r of staleRows ?? []) if (!inplayIds.has(r.provider_id as number)) detailIds.add(r.provider_id as number);
 
-        const threeHoursAgo = new Date(Date.now() - 3 * 3_600_000).toISOString();
+        // Featured fixtures that should have kicked off but are not in the feed (delayed, postponed, feed lag).
         const {data: dueRows, error: dueError} = await db
             .from('fixtures')
-            .select('provider_id')
+            .select('provider_id,league:leagues!inner(tier)')
             .eq('state', 'scheduled')
-            .lte('starting_at', new Date().toISOString())
-            .gte('starting_at', threeHoursAgo);
+            .eq('leagues.tier', 'featured')
+            .lte('starting_at', new Date(now).toISOString())
+            .gte('starting_at', new Date(now - 3 * 3_600_000).toISOString())
+            .or(`last_synced_at.is.null,last_synced_at.lt.${new Date(now - DUE_EVERY_MS).toISOString()}`);
         if (dueError) failSync('fixtures.select', dueError);
         for (const r of dueRows ?? []) if (!inplayIds.has(r.provider_id as number)) detailIds.add(r.provider_id as number);
 
-        // Basic-tier live fixtures: scores and events straight from the feed.
-        const basicLive = inplay.filter((f) => !detailIds.has(f.fixture.id));
-        await upsertFixtures(db, run, basicLive, {withDetails: true, eventsOnly: true});
+        // Everything else in play: scores and events straight from the feed, no request.
+        const fromFeed = inplay.filter((f) => !detailIds.has(f.fixture.id));
+        await upsertFixtures(db, run, fromFeed, {withDetails: true, eventsOnly: true});
 
         const detailed: AfFixtureResponse[] = [];
         for (const group of chunk([...detailIds], 20)) {
-            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')});
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')}, LIVE);
             run.requests += 1;
             detailed.push(...response.filter(inScope));
         }
         run.bump('detailed', detailed.length);
         await upsertFixtures(db, run, detailed, {withDetails: true});
+
+        // A due fixture the API did not return either: not before the next check.
+        const returned = new Set(detailed.map((f) => f.fixture.id));
+        const silent = [...detailIds].filter((id) => !returned.has(id));
+        if (silent.length > 0) {
+            const {error} = await db.from('fixtures').update({last_synced_at: new Date().toISOString()}).in('provider_id', silent);
+            if (error) failSync('fixtures.update', error);
+        }
 
         await finishRun(db, run, 'ok');
         return run;

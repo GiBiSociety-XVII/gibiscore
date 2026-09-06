@@ -92,5 +92,26 @@ export function historySeasonCount(): number {
     return Number.isFinite(n) && n >= 0 ? Math.min(n, 10) : 3;
 }
 
+/**
+ * Competitions whose clubs the fantasy auction follows on the transfer
+ * market, hours after an announcement instead of days: Serie A. Override
+ * with API_FOOTBALL_MARKET_LEAGUE_IDS (comma separated).
+ */
+export function getMarketCompetitionIds(): number[] {
+    return parseIds(process.env.API_FOOTBALL_MARKET_LEAGUE_IDS) ?? [135];
+}
+
+/** The transfer windows of the European season: mid-June to mid-September, January to early February. */
+export function inTransferWindow(at: Date): boolean {
+    const month = at.getUTCMonth();
+    const day = at.getUTCDate();
+    if (month === 0) return true;
+    if (month === 1) return day <= 7;
+    if (month === 5) return day >= 15;
+    if (month === 6 || month === 7) return true;
+    if (month === 8) return day <= 15;
+    return false;
+}
+
 /** Kept for the home page ordering. */
 export const COMPETITIONS = FEATURED_COMPETITIONS;

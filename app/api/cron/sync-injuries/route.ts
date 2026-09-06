@@ -4,5 +4,5 @@ import {syncInjuries} from '@/lib/football/sync/injuries';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/** Every 6 hours: injuries and suspensions for every current season. */
+/** Every 8 hours: injuries and suspensions for every featured season (~13 requests). */
 export const GET = cronRoute(() => syncInjuries());

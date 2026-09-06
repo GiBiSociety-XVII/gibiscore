@@ -3,15 +3,15 @@ import {createPublicClient} from '@/lib/db/server';
 import type {CompetitionSummary, FixtureState, FixtureSummary, StandingRow, StandingZone, TeamSummary} from '../types';
 
 /**
- * Shared pieces of the read layer: the public client bound to the football
- * schema, the fixture select string and row-to-model converters. Every page
- * query module builds on these.
+ * Shared pieces of the read layer: the anonymous client (public schema,
+ * read-only through RLS), the fixture select string and row-to-model
+ * converters. Every page query module builds on these.
  */
 
-export type SchemaClient = ReturnType<ReturnType<typeof createPublicClient>['schema']>;
+export type SchemaClient = ReturnType<typeof createPublicClient>;
 
 export function footballDb(): SchemaClient {
-    return createPublicClient().schema('football');
+    return createPublicClient();
 }
 
 export interface TeamRow {

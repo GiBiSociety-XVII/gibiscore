@@ -6,8 +6,10 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * Every 30 minutes: featured leagues. With `?scope=all` (daily cron): every
- * competition with a match in the last or next 10 days.
+ * Hourly: featured seasons with a result since their table was stored
+ * (~13 requests on a matchday, 0 otherwise). With `?scope=all` (daily
+ * cron): every other competition with a result in the last 24 hours, up
+ * to 300 requests.
  */
 export async function GET(request: NextRequest) {
     const scope = request.nextUrl.searchParams.get('scope') === 'all' ? 'all' : 'featured';

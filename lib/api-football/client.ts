@@ -1,5 +1,7 @@
 import 'server-only';
 import type {AfEnvelope} from './types';
+import {BATCH_PER_MINUTE, PLAN, quotaIsFresh} from './plan';
+import {MINUTE_WINDOW_MS, RateGate} from './rate-gate';
 
 /**
  * Minimal wrapper around API-Football v3 (api-sports.io, direct access).
@@ -7,7 +9,10 @@ import type {AfEnvelope} from './types';
  * Rules (see docs/PLANNING.md, section 3):
  * - only ever called from the server (cron routes, sync workers);
  * - the key comes from the environment and is never sent to the browser;
- * - pages read from our own database, never from this client directly.
+ * - pages read from our own database, never from this client directly;
+ * - the plan's limits (300 a minute, 7,500 a day) are enforced here, once,
+ *   not by each job: every request goes through the minute gate, and every
+ *   response updates the day's count that the jobs read before starting.
  *
  * API-Football answers HTTP 200 even on logical errors (bad key, quota
  * reached, wrong parameter): the `errors` field carries them. We turn those
@@ -38,18 +43,31 @@ export interface RateLimitInfo {
     /** Per-minute burst limit. */
     minuteLimit: number | null;
     minuteRemaining: number | null;
+    /** When these headers were read (ms since epoch); null before the first request. */
+    readAt: number | null;
 }
 
-/** Last rate-limit headers seen; handy for the status route and job logs. */
-export let lastRateLimit: RateLimitInfo = {dayLimit: null, dayRemaining: null, minuteLimit: null, minuteRemaining: null};
+/** Last rate-limit headers seen in this process; the jobs persist them in sync_state for the others. */
+export let lastRateLimit: RateLimitInfo = {dayLimit: PLAN.perDay, dayRemaining: null, minuteLimit: PLAN.perMinute, minuteRemaining: null, readAt: null};
+
+/** Seed the day's count from a reading another process stored (see sync_state). */
+export function seedRateLimit(info: Partial<RateLimitInfo>): void {
+    lastRateLimit = {...lastRateLimit, ...info};
+}
+
+/** Requests started by this process, for the job summaries. */
+export let requestCount = 0;
+
+/** One gate per process: the batch lane waits for its slot, the live lane takes one and goes. */
+const gate = new RateGate({limit: BATCH_PER_MINUTE});
 
 /**
- * Requests left today, from the last answer's headers or, when nothing
- * has been asked yet in this process, from the free /status endpoint.
- * Null when the provider does not say.
+ * Requests left today: from the last headers seen (this process, or seeded
+ * from the store) when recent and of this UTC day, else one call to the
+ * /status endpoint. Null when the provider does not say.
  */
 export async function dailyRemaining(): Promise<number | null> {
-    if (lastRateLimit.dayRemaining === null) {
+    if (lastRateLimit.dayRemaining === null || lastRateLimit.readAt === null || !quotaIsFresh(lastRateLimit.readAt, Date.now())) {
         try {
             await apiFootballGet('status');
         } catch (error) {
@@ -60,8 +78,6 @@ export async function dailyRemaining(): Promise<number | null> {
     }
     return lastRateLimit.dayRemaining;
 }
-
-export {quotaAllows} from './quota';
 
 function apiKey(): string {
     const value = process.env.API_FOOTBALL_KEY;
@@ -88,39 +104,32 @@ function readInt(headers: Headers, name: string): number | null {
 
 export interface GetOptions {
     /**
-     * When the per-minute limit of the plan is hit, wait for the window to
-     * reset and retry (at most twice). Only for batch jobs that can afford a
-     * minute of waiting, never for the live job.
+     * batch (default): wait for a slot in the minute, and when the provider
+     * still answers "too many requests" wait a minute and retry, twice.
+     * live: never wait, the next tick is a minute away anyway.
      */
-    retryOnMinuteLimit?: boolean;
+    lane?: 'batch' | 'live';
 }
-
-const MINUTE_WINDOW_MS = 61_000;
 
 export function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Wait when the plan's per-minute allowance is about to run out, as told by
- * the headers of the previous response. Cheap insurance for batch jobs.
- */
-export async function waitForMinuteWindow(): Promise<void> {
-    if (lastRateLimit.minuteRemaining !== null && lastRateLimit.minuteRemaining <= 1) {
-        await sleep(MINUTE_WINDOW_MS);
-        lastRateLimit = {...lastRateLimit, minuteRemaining: null};
-    }
-}
-
 /** GET one endpoint and return the full envelope (response + paging). */
 export async function apiFootballGet<T>(path: string, params: Params = {}, options: GetOptions = {}): Promise<AfEnvelope<T>> {
+    const live = options.lane === 'live';
     for (let attempt = 0; ; attempt += 1) {
+        if (live) gate.take();
+        else await gate.acquire();
         try {
             return await apiFootballGetOnce<T>(path, params);
         } catch (error) {
-            if (options.retryOnMinuteLimit && error instanceof ApiFootballError && error.kind === 'rate_minute' && attempt < 2) {
-                await sleep(MINUTE_WINDOW_MS);
-                continue;
+            if (error instanceof ApiFootballError && error.kind === 'rate_minute') {
+                gate.backOff();
+                if (!live && attempt < 2) {
+                    await sleep(MINUTE_WINDOW_MS);
+                    continue;
+                }
             }
             throw error;
         }
@@ -133,21 +142,25 @@ async function apiFootballGetOnce<T>(path: string, params: Params): Promise<AfEn
         if (value !== undefined) url.searchParams.set(key, String(value));
     }
 
+    requestCount += 1;
     const response = await fetch(url, {
         headers: {'x-apisports-key': apiKey(), Accept: 'application/json'},
         cache: 'no-store',
     });
 
     lastRateLimit = {
-        dayLimit: readInt(response.headers, 'x-ratelimit-requests-limit'),
+        dayLimit: readInt(response.headers, 'x-ratelimit-requests-limit') ?? lastRateLimit.dayLimit,
         dayRemaining: readInt(response.headers, 'x-ratelimit-requests-remaining'),
-        minuteLimit: readInt(response.headers, 'x-ratelimit-limit'),
+        minuteLimit: readInt(response.headers, 'x-ratelimit-limit') ?? lastRateLimit.minuteLimit,
         minuteRemaining: readInt(response.headers, 'x-ratelimit-remaining'),
+        readAt: Date.now(),
     };
+    gate.observe(lastRateLimit.minuteRemaining);
 
     const body = await response.text().catch(() => '');
     if (!response.ok) {
-        throw new ApiFootballError(`API-Football ${response.status} on ${path}: ${body.slice(0, 300)}`, response.status, path);
+        const kind: ApiFootballErrorKind = response.status === 429 ? 'rate_minute' : 'http';
+        throw new ApiFootballError(`API-Football ${response.status} on ${path}: ${body.slice(0, 300)}`, response.status, path, kind);
     }
 
     let json: AfEnvelope<T>;
@@ -168,6 +181,7 @@ async function apiFootballGetOnce<T>(path: string, params: Params): Promise<AfEn
               : lower.includes('request limit') || lower.includes('rate limit') || lower.includes('reached')
                 ? 'quota'
                 : 'api';
+        if (kind === 'quota') lastRateLimit = {...lastRateLimit, dayRemaining: 0, readAt: Date.now()};
         throw new ApiFootballError(`API-Football error on ${path} (${text})`, response.status, path, kind, json.errors);
     }
 

@@ -1,18 +1,19 @@
 import 'server-only';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {createServiceClient} from '@/lib/db/server';
-import {lastRateLimit} from '@/lib/api-football/client';
+import {dailyRemaining, lastRateLimit, seedRateLimit} from '@/lib/api-football/client';
+import {quotaAllows, quotaIsFresh, RESERVE, type JobClass} from '@/lib/api-football/plan';
 import {fetchAll} from '@/lib/db/paginate';
 import {slugify} from '@/lib/api-football/mappers';
 
 /**
- * Shared plumbing for sync jobs: a service-role client bound to the
- * `football` schema, id maps between provider ids and our ids, and a
- * sync_runs logger.
+ * Shared plumbing for sync jobs: a service-role client (public schema),
+ * id maps between provider ids and our ids, the sync_runs logger and the
+ * day's request count shared between jobs through sync_state.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type FootballClient = SupabaseClient<any, 'football', any>;
+export type FootballClient = SupabaseClient<any, 'public', any>;
 
 export type LeagueTier = 'featured' | 'basic';
 
@@ -49,8 +50,9 @@ export async function startRun(db: FootballClient, job: string): Promise<SyncRun
     const {data, error} = await db.from('sync_runs').insert({job}).select('id').single();
     if (error) fail('sync_runs.insert', error);
     if (!data || typeof data.id !== 'number') {
-        throw new SyncError('sync_runs.insert returned no row: is the `football` schema exposed in Supabase Data API settings?');
+        throw new SyncError('sync_runs.insert returned no row: has the schema migration been applied?');
     }
+    await loadQuota(db);
     const run: SyncRun = {
         id: data.id as number,
         job,
@@ -78,6 +80,61 @@ export async function finishRun(db: FootballClient, run: SyncRun, status: 'ok' |
             details: {counters: run.counters, warnings: run.warnings, error: errorMessage ?? null, quota: lastRateLimit},
         })
         .eq('id', run.id);
+    await saveQuota(db);
+}
+
+// ---------------------------------------------------------------------------
+// sync_state: small shared facts between jobs (the day's quota, above all)
+// ---------------------------------------------------------------------------
+
+const QUOTA_KEY = 'api_football_quota';
+
+export async function getState<T>(db: FootballClient, key: string): Promise<T | null> {
+    const {data, error} = await db.from('sync_state').select('value').eq('key', key).maybeSingle();
+    if (error) fail('sync_state.select', error);
+    return (data?.value as T | undefined) ?? null;
+}
+
+export async function setState(db: FootballClient, key: string, value: unknown): Promise<void> {
+    const {error} = await db.from('sync_state').upsert({key, value, updated_at: new Date().toISOString()}, {onConflict: 'key'});
+    if (error) fail('sync_state.upsert', error);
+}
+
+/**
+ * The last quota headers any job saw, when fresh (same UTC day, recent),
+ * seed this process: a job then knows what is left of the day without
+ * spending a request on /status.
+ */
+async function loadQuota(db: FootballClient): Promise<void> {
+    const stored = await getState<{dayRemaining: number | null; dayLimit: number | null; readAt: number}>(db, QUOTA_KEY);
+    // A warm function keeps its own reading: the newer of the two wins.
+    if (stored && typeof stored.readAt === 'number' && quotaIsFresh(stored.readAt, Date.now()) && (lastRateLimit.readAt === null || stored.readAt > lastRateLimit.readAt)) {
+        seedRateLimit({dayRemaining: stored.dayRemaining, readAt: stored.readAt, ...(stored.dayLimit !== null ? {dayLimit: stored.dayLimit} : {})});
+    }
+}
+
+async function saveQuota(db: FootballClient): Promise<void> {
+    if (lastRateLimit.readAt === null || lastRateLimit.dayRemaining === null) return;
+    try {
+        await setState(db, QUOTA_KEY, {dayRemaining: lastRateLimit.dayRemaining, dayLimit: lastRateLimit.dayLimit, readAt: lastRateLimit.readAt});
+    } catch (error) {
+        console.warn(`[sync] quota not saved: ${(error as Error).message}`);
+    }
+}
+
+/**
+ * Whether a job of this class may start now: what is left of the day
+ * (stored reading, else one /status call) against the class reserve.
+ * A held job logs why and finishes clean; nothing is thrown.
+ */
+export async function allowance(db: FootballClient, run: SyncRun, jobClass: JobClass): Promise<boolean> {
+    const reserve = RESERVE[jobClass];
+    if (reserve === 0) return true;
+    const remaining = await dailyRemaining();
+    if (quotaAllows(remaining, reserve)) return true;
+    run.warn(`daily quota low (${remaining} left, reserve ${reserve}): ${run.job} waits`);
+    run.bump('skipped_quota');
+    return false;
 }
 
 // ---------------------------------------------------------------------------

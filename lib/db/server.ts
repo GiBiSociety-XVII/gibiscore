@@ -52,6 +52,5 @@ export function createServiceClient() {
     }
     return createSupabaseClient(SUPABASE_URL, serviceKey, {
         auth: {persistSession: false, autoRefreshToken: false},
-        db: {schema: 'football'},
     });
 }

@@ -1,10 +1,10 @@
 import 'server-only';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import type {AfInjuryResponse} from '@/lib/api-football/types';
-import {currentSeasons, ensurePlayers, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
+import {allowance, currentSeasons, ensurePlayers, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /**
- * sync-injuries (every 6 hours, featured leagues only)
+ * sync-injuries (every 8 hours, featured leagues only: ~13 requests)
  *
  * One request per featured season. API-Football reports injuries and
  * suspensions per upcoming fixture ("Missing Fixture", "Questionable");
@@ -14,6 +14,10 @@ export async function syncInjuries(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-injuries');
     try {
+        if (!(await allowance(db, run, 'routine'))) {
+            await finishRun(db, run, 'ok');
+            return run;
+        }
         for (const season of await currentSeasons(db, 'featured')) {
             let response: AfInjuryResponse[] = [];
             try {
