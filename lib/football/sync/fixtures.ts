@@ -286,16 +286,20 @@ export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures:
         for (const r of idRows ?? []) fixtureIds.set(r.provider_id as number, r.id as number);
     }
 
-    for (const f of fixtures) {
-        const fixtureId = fixtureIds.get(f.fixture.id);
-        if (!fixtureId) continue;
+    // Details are written a batch of fixtures at a time: one call per table
+    // per batch instead of eight per fixture, or a thousand fixtures take
+    // longer to store than the function is allowed to run.
+    for (const batch of chunk(fixtures.filter((f) => fixtureIds.has(f.fixture.id)), DETAIL_BATCH)) {
         try {
-            await upsertDetails(db, run, f, fixtureId, teams, options.eventsOnly === true, leagues.get(f.league.id));
+            await upsertDetails(db, run, batch, fixtureIds, teams, options.eventsOnly === true, leagues);
         } catch (error) {
-            run.warn(`fixture ${f.fixture.id} details: ${(error as Error).message}`);
+            run.warn(`details of ${batch.length} fixture(s) from ${batch[0].fixture.id}: ${(error as Error).message}`);
         }
     }
 }
+
+/** Fixtures whose events, lineups and statistics are stored together. */
+const DETAIL_BATCH = 25;
 
 function uniqueBy<T>(rows: T[], key: (row: T) => string): T[] {
     const map = new Map<string, T>();
@@ -303,91 +307,112 @@ function uniqueBy<T>(rows: T[], key: (row: T) => string): T[] {
     return [...map.values()];
 }
 
-async function upsertDetails(db: FootballClient, run: SyncRun, f: AfFixtureResponse, fixtureId: number, teams: IdMap, eventsOnly: boolean, league?: LeagueRef) {
-    const events = mapEvents(f.events);
-    const lineups = eventsOnly ? [] : mapLineups(f.lineups);
-    const playerStats = eventsOnly ? [] : mapPlayerStats(f.players);
+async function upsertDetails(db: FootballClient, run: SyncRun, batch: AfFixtureResponse[], fixtureIds: IdMap, teams: IdMap, eventsOnly: boolean, leagues: Map<number, LeagueRef>) {
+    const mapped = batch.map((f) => ({
+        f,
+        fixtureId: fixtureIds.get(f.fixture.id)!,
+        events: mapEvents(f.events),
+        lineups: eventsOnly ? [] : mapLineups(f.lineups),
+        playerStats: eventsOnly ? [] : mapPlayerStats(f.players),
+    }));
 
     // Players referenced anywhere must exist first (FK).
     const refs: MinimalPlayer[] = [];
-    for (const e of events) {
-        if (e.providerPlayerId) refs.push({id: e.providerPlayerId, name: e.playerName});
-        if (e.providerRelatedPlayerId) refs.push({id: e.providerRelatedPlayerId, name: e.relatedPlayerName});
+    for (const m of mapped) {
+        for (const e of m.events) {
+            if (e.providerPlayerId) refs.push({id: e.providerPlayerId, name: e.playerName});
+            if (e.providerRelatedPlayerId) refs.push({id: e.providerRelatedPlayerId, name: e.relatedPlayerName});
+        }
+        for (const l of m.lineups) refs.push({id: l.providerPlayerId, name: l.playerName});
+        for (const s of m.playerStats) refs.push({id: s.providerPlayerId, name: s.playerName});
     }
-    for (const l of lineups) refs.push({id: l.providerPlayerId, name: l.playerName});
-    for (const s of playerStats) refs.push({id: s.providerPlayerId, name: s.playerName});
     const players = await ensurePlayers(db, refs);
 
-    // Events: no provider id, so replace the whole timeline of the fixture.
-    if (Array.isArray(f.events)) {
-        const {error: deleteError} = await db.from('fixture_events').delete().eq('fixture_id', fixtureId);
+    // Events: no provider id, so the whole timeline of each fixture is replaced.
+    const withEvents = mapped.filter((m) => Array.isArray(m.f.events));
+    if (withEvents.length > 0) {
+        const {error: deleteError} = await db.from('fixture_events').delete().in('fixture_id', withEvents.map((m) => m.fixtureId));
         if (deleteError) failSync('fixture_events.delete', deleteError);
-        const rows = events.map((e) => ({
-            fixture_id: fixtureId,
-            team_id: e.providerTeamId ? teams.get(e.providerTeamId) ?? null : null,
-            player_id: e.providerPlayerId ? players.get(e.providerPlayerId) ?? null : null,
-            related_player_id: e.providerRelatedPlayerId ? players.get(e.providerRelatedPlayerId) ?? null : null,
-            player_name: e.playerName,
-            related_player_name: e.relatedPlayerName,
-            type: e.type,
-            minute: e.minute,
-            extra_minute: e.extraMinute,
-            info: e.info,
-            sort_order: e.sortOrder,
-        }));
-        if (rows.length > 0) {
-            const {error} = await db.from('fixture_events').insert(rows);
+        const rows = withEvents.flatMap((m) =>
+            m.events.map((e) => ({
+                fixture_id: m.fixtureId,
+                team_id: e.providerTeamId ? teams.get(e.providerTeamId) ?? null : null,
+                player_id: e.providerPlayerId ? players.get(e.providerPlayerId) ?? null : null,
+                related_player_id: e.providerRelatedPlayerId ? players.get(e.providerRelatedPlayerId) ?? null : null,
+                player_name: e.playerName,
+                related_player_name: e.relatedPlayerName,
+                type: e.type,
+                minute: e.minute,
+                extra_minute: e.extraMinute,
+                info: e.info,
+                sort_order: e.sortOrder,
+            })),
+        );
+        for (const group of chunk(rows, 1000)) {
+            const {error} = await db.from('fixture_events').insert(group);
             if (error) failSync('fixture_events.insert', error);
         }
         run.bump('events', rows.length);
     }
 
+    for (const m of mapped) {
+        if (isLiveState(mapFixtureState(m.f.fixture.status?.short))) run.bump(leagues.get(m.f.league.id)?.tier === 'featured' ? 'live_featured' : 'live_basic');
+    }
     if (eventsOnly) return;
 
     // Team statistics
-    const statRows = [...mapTeamStats(f.statistics).entries()]
-        .filter(([teamProviderId]) => teams.has(teamProviderId))
-        .map(([teamProviderId, s]) => ({fixture_id: fixtureId, team_id: teams.get(teamProviderId)!, ...s}));
-    if (statRows.length > 0) {
-        const {error} = await db.from('fixture_team_stats').upsert(statRows, {onConflict: 'fixture_id,team_id'});
+    const statRows = mapped.flatMap((m) =>
+        [...mapTeamStats(m.f.statistics).entries()]
+            .filter(([teamProviderId]) => teams.has(teamProviderId))
+            .map(([teamProviderId, s]) => ({fixture_id: m.fixtureId, team_id: teams.get(teamProviderId)!, ...s})),
+    );
+    for (const group of chunk(statRows, 500)) {
+        const {error} = await db.from('fixture_team_stats').upsert(group, {onConflict: 'fixture_id,team_id'});
         if (error) failSync('fixture_team_stats.upsert', error);
-        run.bump('team_stats', statRows.length);
     }
+    run.bump('team_stats', statRows.length);
 
-    // Lineups
-    // The feed sometimes lists a player twice (bench and pitch, or in both
-    // teams' blocks): one row per key, last one wins, or Postgres rejects
+    // Lineups. The feed sometimes lists a player twice (bench and pitch, or in
+    // both teams' blocks): one row per key, last one wins, or Postgres rejects
     // the whole upsert ("cannot affect row a second time").
-    const lineupRows = uniqueBy(lineups
-        .filter((l) => teams.has(l.providerTeamId) && players.has(l.providerPlayerId))
-        .map((l) => ({
-            fixture_id: fixtureId,
-            team_id: teams.get(l.providerTeamId)!,
-            player_id: players.get(l.providerPlayerId)!,
-            is_expected: false,
-            is_starter: l.isStarter,
-            formation: l.formation,
-            formation_position: l.formationPosition,
-            jersey_number: l.jerseyNumber,
-        })), (r) => `${r.team_id}:${r.player_id}`);
-    if (lineupRows.length > 0) {
-        const {error} = await db.from('lineups').upsert(lineupRows, {onConflict: 'fixture_id,team_id,player_id,is_expected'});
+    const lineupRows = uniqueBy(
+        mapped.flatMap((m) =>
+            m.lineups
+                .filter((l) => teams.has(l.providerTeamId) && players.has(l.providerPlayerId))
+                .map((l) => ({
+                    fixture_id: m.fixtureId,
+                    team_id: teams.get(l.providerTeamId)!,
+                    player_id: players.get(l.providerPlayerId)!,
+                    is_expected: false,
+                    is_starter: l.isStarter,
+                    formation: l.formation,
+                    formation_position: l.formationPosition,
+                    jersey_number: l.jerseyNumber,
+                })),
+        ),
+        (r) => `${r.fixture_id}:${r.team_id}:${r.player_id}`,
+    );
+    for (const group of chunk(lineupRows, 1000)) {
+        const {error} = await db.from('lineups').upsert(group, {onConflict: 'fixture_id,team_id,player_id,is_expected'});
         if (error) failSync('lineups.upsert', error);
-        run.bump('lineups', lineupRows.length);
     }
+    run.bump('lineups', lineupRows.length);
 
     // Player statistics
-    const playerStatRows = uniqueBy(playerStats
-        .filter((s) => teams.has(s.providerTeamId) && players.has(s.providerPlayerId))
-        .map(({providerPlayerId, providerTeamId, playerName: _name, ...s}) => {
-            void _name;
-            return {fixture_id: fixtureId, player_id: players.get(providerPlayerId)!, team_id: teams.get(providerTeamId)!, ...s};
-        }), (r) => String(r.player_id));
-    if (playerStatRows.length > 0) {
-        const {error} = await db.from('fixture_player_stats').upsert(playerStatRows, {onConflict: 'fixture_id,player_id'});
+    const playerStatRows = uniqueBy(
+        mapped.flatMap((m) =>
+            m.playerStats
+                .filter((s) => teams.has(s.providerTeamId) && players.has(s.providerPlayerId))
+                .map(({providerPlayerId, providerTeamId, playerName: _name, ...s}) => {
+                    void _name;
+                    return {fixture_id: m.fixtureId, player_id: players.get(providerPlayerId)!, team_id: teams.get(providerTeamId)!, ...s};
+                }),
+        ),
+        (r) => `${r.fixture_id}:${r.player_id}`,
+    );
+    for (const group of chunk(playerStatRows, 1000)) {
+        const {error} = await db.from('fixture_player_stats').upsert(group, {onConflict: 'fixture_id,player_id'});
         if (error) failSync('fixture_player_stats.upsert', error);
-        run.bump('player_stats', playerStatRows.length);
     }
-
-    if (isLiveState(mapFixtureState(f.fixture.status?.short))) run.bump(league?.tier === 'featured' ? 'live_featured' : 'live_basic');
+    run.bump('player_stats', playerStatRows.length);
 }

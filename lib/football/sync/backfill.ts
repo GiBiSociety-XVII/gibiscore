@@ -73,21 +73,28 @@ export async function syncBackfill(limit = 1000): Promise<SyncRun> {
         const ids = data.map((r) => r.provider_id as number);
         run.bump('pending', ids.length);
 
-        const fixtures: AfFixtureResponse[] = [];
-        const requested: number[] = [];
-        for (const group of chunk(ids, 20)) {
-            if (outOfTime()) break;
-            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')});
-            run.requests += 1;
-            requested.push(...group);
-            fixtures.push(...response);
+        // Fetched and stored a hundred at a time, so the deadline counts the
+        // writing too and a run cut short has stored everything it fetched.
+        const missing: number[] = [];
+        for (const slice of chunk(ids, 100)) {
+            if (outOfTime()) {
+                run.bump('fixtures_deferred', ids.length - (run.counters.detailed_requested ?? 0));
+                break;
+            }
+            const fixtures: AfFixtureResponse[] = [];
+            for (const group of chunk(slice, 20)) {
+                const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')});
+                run.requests += 1;
+                fixtures.push(...response);
+            }
+            run.bump('detailed_requested', slice.length);
+            run.bump('detailed', fixtures.length);
+            await upsertFixtures(db, run, fixtures, {withDetails: true});
+            const returned = new Set(fixtures.map((f) => f.fixture.id));
+            missing.push(...slice.filter((id) => !returned.has(id)));
         }
-        run.bump('detailed', fixtures.length);
-        await upsertFixtures(db, run, fixtures, {withDetails: true});
 
         // Fixtures the API no longer returns would be retried forever: mark them.
-        const returned = new Set(fixtures.map((f) => f.fixture.id));
-        const missing = requested.filter((id) => !returned.has(id));
         if (missing.length > 0) {
             await db.from('fixtures').update({details_synced_at: new Date().toISOString()}).in('provider_id', missing);
             run.warn(`${missing.length} fixture(s) not returned by the API, marked as synced: ${missing.slice(0, 10).join(',')}`);
