@@ -74,7 +74,7 @@ export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?:
 }
 
 /** Featured fixtures in play get their lineups, statistics and ratings refreshed this often. */
-const DETAIL_EVERY_MS = 3 * 60_000;
+const DETAIL_EVERY_MS = 60_000;
 /** A featured fixture that should have kicked off but is not in the live feed is asked this often. */
 const DUE_EVERY_MS = 10 * 60_000;
 
@@ -86,14 +86,14 @@ const DUE_EVERY_MS = 10 * 60_000;
  * 1. GET /fixtures?live=all: every match in play worldwide, with events.
  *    Scores, minute and events are stored for all of them. One request.
  * 2. Featured fixtures only, by id (20 per request), for lineups,
- *    statistics and player ratings: those in play whose detail is older
- *    than three minutes, those the feed no longer lists (they just ended:
- *    the final detail), and those that should have kicked off in the last
- *    three hours but are not in the feed, asked every ten minutes.
+ *    statistics and player ratings: those in play, those the feed no
+ *    longer lists (they just ended: the final detail), and those that
+ *    should have kicked off in the last three hours but are not in the
+ *    feed, asked every ten minutes.
  *
  * Basic-tier fixtures never cost a request beyond the live feed.
  * Budget: 1 request a minute while matches are on, plus one per 20
- * featured fixtures every three minutes.
+ * featured fixtures in play.
  */
 export async function syncLive(): Promise<SyncRun> {
     const db = footballClient();

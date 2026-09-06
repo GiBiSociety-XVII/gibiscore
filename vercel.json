@@ -38,7 +38,7 @@
     },
     {
       "path": "/api/cron/sync-squads",
-      "schedule": "30 4 * * 1,4"
+      "schedule": "30 4 * * *"
     }
   ]
 }

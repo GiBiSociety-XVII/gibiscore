@@ -15,10 +15,14 @@ import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncE
  * 2. Mark the current season of each league; featured leagues also get
  *    their past seasons (history archive), not current.
  * 3. Featured leagues only: the teams of the current season (one request
- *    per league), stored in season_teams for the squads job.
+ *    per league), stored in season_teams for the squads job; asked again
+ *    only when the list is a week old, it changes once a season.
  *
  * Squads and transfers are not here any more: see squads.ts.
  */
+/** The teams of a season change once a season: the list is asked again after this. */
+const TEAMS_REFRESH_MS = 7 * 24 * 3_600_000;
+
 export async function syncCompetitions(): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-competitions');
@@ -123,7 +127,20 @@ export async function syncCompetitions(): Promise<SyncRun> {
             .eq('leagues.tier', 'featured');
         if (fsError) failSync('seasons.select', fsError);
 
+        const {data: listed, error: listedError} = await db
+            .from('season_teams')
+            .select('season_id,updated_at')
+            .in('season_id', (featuredSeasons ?? []).map((s) => s.id as number))
+            .gt('updated_at', new Date(Date.now() - TEAMS_REFRESH_MS).toISOString())
+            .limit(5000);
+        if (listedError) failSync('season_teams.select', listedError);
+        const fresh = new Set((listed ?? []).map((r) => r.season_id as number));
+
         for (const s of featuredSeasons ?? []) {
+            if (fresh.has(s.id as number)) {
+                run.bump('teams_fresh');
+                continue;
+            }
             const league = s.league as unknown as {id: number; provider_id: number; name: string};
             let teamEntries: AfTeamResponse[] = [];
             try {
@@ -149,7 +166,7 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 })),
             );
             run.bump('teams', teamEntries.length);
-            const rows = [...new Set([...teamIds.values()])].map((teamId) => ({season_id: s.id as number, team_id: teamId}));
+            const rows = [...new Set([...teamIds.values()])].map((teamId) => ({season_id: s.id as number, team_id: teamId, updated_at: new Date().toISOString()}));
             if (rows.length > 0) {
                 const {error} = await db.from('season_teams').upsert(rows, {onConflict: 'season_id,team_id'});
                 if (error) failSync('season_teams.upsert', error);

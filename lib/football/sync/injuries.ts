@@ -3,12 +3,16 @@ import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import type {AfInjuryResponse} from '@/lib/api-football/types';
 import {allowance, currentSeasons, ensurePlayers, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
+/** A season with no match this far ahead has no one to report as missing. */
+const LOOKAHEAD_MS = 7 * 24 * 3_600_000;
+
 /**
- * sync-injuries (every 8 hours, featured leagues only: ~13 requests)
+ * sync-injuries (every 8 hours, featured leagues only: up to ~13 requests)
  *
- * One request per featured season. API-Football reports injuries and
- * suspensions per upcoming fixture ("Missing Fixture", "Questionable");
- * rows have no id, so the season's list is replaced on every run.
+ * One request per featured season with a match in the next seven days.
+ * API-Football reports injuries and suspensions per upcoming fixture
+ * ("Missing Fixture", "Questionable"); rows have no id, so the season's
+ * list is replaced on every run. A season on a break costs nothing.
  */
 export async function syncInjuries(): Promise<SyncRun> {
     const db = footballClient();
@@ -18,7 +22,19 @@ export async function syncInjuries(): Promise<SyncRun> {
             await finishRun(db, run, 'ok');
             return run;
         }
-        for (const season of await currentSeasons(db, 'featured')) {
+        const seasons = await currentSeasons(db, 'featured');
+        const {data: upcoming, error: upcomingError} = await db
+            .from('fixtures')
+            .select('season_id')
+            .in('season_id', seasons.map((s) => s.id))
+            .eq('state', 'scheduled')
+            .gte('starting_at', new Date().toISOString())
+            .lte('starting_at', new Date(Date.now() + LOOKAHEAD_MS).toISOString())
+            .limit(5000);
+        if (upcomingError) failSync('fixtures.select', upcomingError);
+        const active = new Set((upcoming ?? []).map((r) => r.season_id as number));
+        run.bump('seasons_on_break', seasons.length - seasons.filter((s) => active.has(s.id)).length);
+        for (const season of seasons.filter((s) => active.has(s.id))) {
             let response: AfInjuryResponse[] = [];
             try {
                 ({response} = await apiFootballGet<AfInjuryResponse[]>('injuries', {league: season.leagueProviderId, season: season.year}));

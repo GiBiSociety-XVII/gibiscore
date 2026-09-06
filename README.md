@@ -66,36 +66,42 @@ La lista in evidenza è in `lib/football/competitions.ts`
 
 I job stanno in `lib/football/sync/` e sono esposti come route cron protette
 da `CRON_SECRET` (`vercel.json` definisce gli orari). Il piano API-Football è
-**Pro: 300 richieste al minuto, 7.500 al giorno**, e i limiti li fa
+**Mega: 900 richieste al minuto, 150.000 al giorno**, e i limiti li fa
 rispettare il client (`lib/api-football/client.ts`), non i singoli job:
 
-- ogni richiesta passa da un freno al minuto condiviso (180 al minuto per i
+- ogni richiesta passa da un freno al minuto condiviso (600 al minuto per i
   job batch, il resto resta al job live e a un eventuale job lanciato a mano);
   se il provider risponde comunque "troppe richieste" il job batch aspetta un
   minuto e riprova, il job live lascia perdere fino al minuto dopo;
 - ogni risposta aggiorna il conteggio giornaliero, salvato in `sync_state` e
   letto da tutti i job prima di partire. Tre classi di job: **essenziali**
   (live, calendario, competizioni) girano sempre; **ordinari** (classifiche,
-  infortuni) tengono 800 richieste di riserva; **archivio** (rose,
-  statistiche stagionali, partite passate) partono solo con più di 2.500
+  infortuni) tengono 5.000 richieste di riserva; **archivio** (rose,
+  statistiche stagionali, partite passate) partono solo con più di 20.000
   richieste ancora disponibili.
+
+Il piano è largo, ma nessun job gira a vuoto: una richiesta parte solo
+quando qualcosa può essere cambiato. Una lega che non gioca non viene
+interrogata (classifiche solo dopo un risultato, infortuni solo con una
+partita in arrivo, statistiche solo dopo una giornata), e a mercato chiuso
+rose e cessioni restano ferme.
 
 | Job | Frequenza | Richieste | Cosa fa |
 |---|---|---|---|
-| `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso; altrimenti 1, più 1 ogni 20 partite in evidenza ogni 3 minuti | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) solo per le partite in evidenza, ogni 3 minuti e a fine gara |
+| `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso; altrimenti 1, più 1 ogni 20 partite in evidenza in corso | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) solo per le partite in evidenza, a ogni giro e a fine gara |
 | `sync-fixtures` | ogni ora | 3 | tutte le partite di ieri, oggi e domani (una richiesta per giorno) |
 | `sync-fixtures?window=month` | ogni giorno | 32 | finestra estesa a +30 giorni |
 | `sync-standings` | ogni ora | 0-13 | classifiche delle leghe in evidenza, solo se una loro partita è finita da quando la tabella è stata salvata |
 | `sync-standings?scope=all` | ogni giorno | fino a 300 | classifiche delle altre competizioni con un risultato nelle ultime 24 ore |
-| `sync-injuries` | ogni 8 ore | ~13 | infortuni e squalifiche, leghe in evidenza (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
-| `sync-competitions` | ogni giorno | ~15 | tutte le leghe e stagioni correnti, stagioni passate delle leghe in evidenza, squadre di ogni stagione in evidenza (`season_teams`) |
-| `sync-squads` | lunedì e giovedì | ~2 per club (~520) | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, tutti allo stesso modo, i più vecchi prima; quel che non entra nei 4 minuti passa al giro dopo |
-| `sync-backfill` | ogni ora | fino a ~15 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti, 200 partite per giro |
-| `sync-player-seasons` | ogni ora | ~35 per lega-stagione, solo dopo una giornata giocata, max 300 per giro | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
+| `sync-injuries` | ogni 8 ore | 0-13 | infortuni e squalifiche delle leghe in evidenza con una partita nei prossimi 7 giorni (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
+| `sync-competitions` | ogni giorno | 1-14 | tutte le leghe e stagioni correnti, stagioni passate delle leghe in evidenza; squadre di ogni stagione in evidenza (`season_teams`) una volta a settimana |
+| `sync-squads` | ogni giorno | 0 a mercato chiuso, ~2 per club (~520) a mercato aperto | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, tutti allo stesso modo, i più vecchi prima; a mercato chiuso solo le rose vecchie di una settimana; quel che non entra nei 4 minuti passa al giro dopo |
+| `sync-backfill` | ogni ora | 0 se niente manca, fino a ~50 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti, 1.000 partite per giro |
+| `sync-player-seasons` | ogni ora | 0 senza giornate giocate, ~35 per lega-stagione dopo | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
 
-Consumo tipico a regime: 1.500-2.500 richieste al giorno nei weekend di
-campionato (di cui ~900 del live), meno di 1.000 nei giorni senza partite.
-Il resto del piano lo usano, entro la riserva, l'archivio storico e le rose.
+Consumo tipico a regime: 1.500-3.000 richieste al giorno nei weekend di
+campionato (di cui ~1.000 del live), qualche centinaio nei giorni senza
+partite. L'archivio storico si completa in un giorno.
 
 ### Archivio storico
 
@@ -108,9 +114,7 @@ di API-Football (`player_season_stats`). Tutto finisce nel database
 una volta sola, poi le pagine e i calcoli leggono solo da lì. Costo una tantum:
 ~20 richieste per lega-stagione di dettaglio partite + ~35 di statistiche
 giocatori, cioè circa 2.000-2.500 richieste per 13 leghe × 3 stagioni,
-spalmate dai cron orari in tre o quattro giorni entro la riserva giornaliera
-(o prima, lanciando i job a mano con `limit`/`budget` più alti nei giorni
-senza partite).
+che i cron orari smaltiscono in un giorno (o subito, lanciando i job a mano).
 
 Primo avvio su un database vuoto, nell'ordine:
 

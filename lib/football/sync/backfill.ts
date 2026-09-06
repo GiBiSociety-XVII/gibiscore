@@ -25,7 +25,7 @@ const DEADLINE_MS = 230_000;
  *    and player ratings were never stored, newest first, 20 per request,
  *    `limit` fixtures per run.
  */
-export async function syncBackfill(limit = 200): Promise<SyncRun> {
+export async function syncBackfill(limit = 1000): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-backfill');
     const startedAt = Date.now();
