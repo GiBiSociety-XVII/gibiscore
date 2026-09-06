@@ -92,5 +92,22 @@ export function historySeasonCount(): number {
     return Number.isFinite(n) && n >= 0 ? Math.min(n, 10) : 3;
 }
 
+/**
+ * The transfer windows of the European season: mid-June to mid-September
+ * and January to early February (the exact dates differ per country, the
+ * span covers them all). Outside them nobody buys or sells: the squads
+ * and transfer feed are not asked.
+ */
+export function inTransferWindow(at: Date): boolean {
+    const month = at.getUTCMonth();
+    const day = at.getUTCDate();
+    if (month === 0) return true;
+    if (month === 1) return day <= 7;
+    if (month === 5) return day >= 15;
+    if (month === 6 || month === 7) return true;
+    if (month === 8) return day <= 15;
+    return false;
+}
+
 /** Kept for the home page ordering. */
 export const COMPETITIONS = FEATURED_COMPETITIONS;

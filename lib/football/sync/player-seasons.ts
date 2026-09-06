@@ -22,8 +22,8 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** No new season is started after this, well inside the route's maxDuration. */
 const DEADLINE_MS = 200_000;
-/** Requests per run unless asked otherwise: about eight league-seasons an hour. */
-const DEFAULT_BUDGET = 300;
+/** Requests per run unless asked otherwise: dozens of league-seasons an hour, if any is due. */
+const DEFAULT_BUDGET = 1500;
 
 export type PlayerSeasonsScope = 'auto' | 'current' | 'history' | 'all';
 

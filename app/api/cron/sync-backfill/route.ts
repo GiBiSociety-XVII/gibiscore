@@ -7,9 +7,9 @@ export const maxDuration = 300;
 
 /**
  * Hourly: detail of finished featured fixtures never fetched in full.
- * `?limit=2000` to process more per run (20 fixtures per API request).
+ * `?limit=5000` to process more per run (20 fixtures per API request).
  */
 export async function GET(request: NextRequest) {
-    const limit = Math.min(Number(request.nextUrl.searchParams.get('limit')) || 200, 2000);
+    const limit = Math.min(Number(request.nextUrl.searchParams.get('limit')) || 1000, 5000);
     return cronRoute(() => syncBackfill(limit))(request);
 }

@@ -1,5 +1,5 @@
 import 'server-only';
-import {getFeaturedCompetitions} from '@/lib/football/competitions';
+import {getFeaturedCompetitions, inTransferWindow} from '@/lib/football/competitions';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {positionName, slugify} from '@/lib/api-football/mappers';
 import type {AfPlayerProfileResponse, AfSquadResponse, AfTransferResponse} from '@/lib/api-football/types';
@@ -53,16 +53,22 @@ async function featuredClubs(db: FootballClient): Promise<Club[]> {
     return [...clubs.values()].sort((a, b) => (a.squadSyncedAt ?? '').localeCompare(b.squadSyncedAt ?? '') || best(a) - best(b));
 }
 
+/** Outside the transfer windows a squad is refreshed this often: nobody moves, only a free agent now and then. */
+const QUIET_REFRESH_MS = 7 * 24 * 3_600_000;
+
 /**
- * sync-squads (Monday and Thursday; archive class, ~2 requests per club)
+ * sync-squads (daily; archive class, ~2 requests per club)
  *
  * Every featured club: the provider's squad (players and shirt numbers,
  * departures removed) and its transfer feed since the season started
- * (arrivals join at once, departures leave). Clubs are taken in order of
- * the oldest squad first, so a run cut by the deadline is completed by
- * the next one. `limit` caps the clubs per run.
+ * (arrivals join at once, departures leave). While a transfer window is
+ * open every club is asked every day; outside the windows nobody buys or
+ * sells, so a club is asked only when its squad is a week old, and the
+ * transfer feed not at all. `force` asks everyone now; `limit` caps the
+ * clubs per run. Clubs are taken oldest squad first, so a run cut by the
+ * deadline is completed by the next one.
  */
-export async function syncSquads(options: {limit?: number} = {}): Promise<SyncRun> {
+export async function syncSquads(options: {limit?: number; force?: boolean} = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-squads');
     const startedAt = Date.now();
@@ -71,8 +77,11 @@ export async function syncSquads(options: {limit?: number} = {}): Promise<SyncRu
             await finishRun(db, run, 'ok');
             return run;
         }
-        const clubs = (await featuredClubs(db)).slice(0, options.limit ?? Number.POSITIVE_INFINITY);
+        const windowOpen = options.force || inTransferWindow(new Date());
+        const stale = (c: Club) => c.squadSyncedAt === null || Date.now() - Date.parse(c.squadSyncedAt) > QUIET_REFRESH_MS;
+        const clubs = (await featuredClubs(db)).filter((c) => windowOpen || stale(c)).slice(0, options.limit ?? Number.POSITIVE_INFINITY);
         run.bump('clubs', clubs.length);
+        if (!windowOpen) run.bump('window_closed');
         let done = 0;
         for (const group of chunk(clubs, CONCURRENCY)) {
             if (Date.now() - startedAt > DEADLINE_MS) {
@@ -84,7 +93,7 @@ export async function syncSquads(options: {limit?: number} = {}): Promise<SyncRu
                 group.map(async (club) => {
                     try {
                         await syncSquad(db, run, club);
-                        await syncTransfers(db, run, club);
+                        if (windowOpen) await syncTransfers(db, run, club);
                     } catch (error) {
                         run.warn(`${club.name} (#${club.providerId}): ${(error as Error).message}`);
                         if (error instanceof ApiFootballError && error.kind === 'quota') throw error;

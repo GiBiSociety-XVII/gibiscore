@@ -23,8 +23,9 @@ Tempo stimato: 20-30 minuti, di cui la maggior parte in attesa dei job.
 
 1. Registrati su **dashboard.api-football.com** (accesso diretto, non RapidAPI).
 2. Il piano **Free** (100 richieste al giorno, tutti gli endpoint e tutte le
-   leghe) basta per la prima validazione. Per la produzione serve **Pro**
-   (7.500 richieste al giorno) o **Ultra** (75.000).
+   leghe) basta per la prima validazione. La produzione gira sul piano
+   **Mega** (900 richieste al minuto, 150.000 al giorno): i limiti sono in
+   `lib/api-football/plan.ts`.
 3. Nella dashboard, sezione **My Access**, copia la **API Key**.
 4. Facoltativo ma consigliato: dal tuo computer, con il repo clonato,
    ```bash
@@ -96,7 +97,7 @@ export CRON_SECRET=ilsegreto
 export BASE_URL=https://<deploy>
 
 pnpm cron sync-competitions                 # tutte le leghe e stagioni; squadre delle leghe in evidenza (~15 richieste)
-pnpm cron sync-squads                       # rose e feed cessioni dei club in evidenza (~520 richieste; ripeti se `clubs_deferred` > 0)
+pnpm cron "sync-squads?force=1"             # rose e feed cessioni dei club in evidenza (~520 richieste; ripeti se `clubs_deferred` > 0)
 pnpm cron "sync-fixtures?window=month"      # tutte le partite da ieri a +30 giorni (32 richieste)
 pnpm cron sync-standings                    # classifiche delle leghe in evidenza (~13)
 pnpm cron "sync-standings?scope=all"        # classifiche delle altre competizioni con un risultato ieri (fino a 300)
@@ -107,16 +108,15 @@ pnpm cron sync-live                         # partite in corso, se ce ne sono ad
 ```
 
 I job di archivio (`sync-squads`, `sync-backfill`, `sync-player-seasons`)
-partono solo con piu' di 2.500 richieste ancora disponibili nella giornata:
+partono solo con piu' di 20.000 richieste ancora disponibili nella giornata:
 se rispondono `skipped_quota` si riprende il giorno dopo. Le stagioni passate
 (default 3, `API_FOOTBALL_HISTORY_SEASONS`) arrivano da sole con i cron orari
-nel giro di tre o quattro giorni. Per averle prima, nei giorni senza partite,
-ripeti finche' `pending` e `seasons_due` nella risposta non sono 0 (ogni
-chiamata dura al massimo 5 minuti):
+in un giorno. Per averle subito, ripeti finche' `pending` e `seasons_due`
+nella risposta non sono 0 (ogni chiamata dura al massimo 5 minuti):
 
 ```bash
-pnpm cron "sync-backfill?limit=2000"                 # ~100 richieste a chiamata
-pnpm cron "sync-player-seasons?scope=history&budget=1000"   # ~35 richieste per lega-stagione
+pnpm cron "sync-backfill?limit=5000"                 # ~250 richieste a chiamata
+pnpm cron "sync-player-seasons?scope=history&budget=5000"   # ~35 richieste per lega-stagione
 ```
 
 Con il piano **Free** (100 richieste al giorno) imposta prima
@@ -170,10 +170,10 @@ Su Vercel, **Settings → Cron Jobs** deve elencare i nove job di `vercel.json`:
 | `sync-live` | ogni minuto |
 
 I cron girano **solo sul deploy di produzione** (branch `master`), non sulle
-preview. Consumo tipico: 3.500-4.500 richieste al giorno, dentro il piano Pro.
-Con il piano Free i cron automatici esauriscono la quota in poche ore:
-attivali solo dopo il passaggio a Pro, oppure lascia i cron e accetta che i
-job falliscano con `quota` finche' non aggiorni il piano.
+preview. Consumo tipico: 1.500-3.000 richieste al giorno, una frazione del
+piano Mega. Con il piano Free i cron automatici esauriscono la quota in poche
+ore: attivali solo su un piano a pagamento, oppure lascia i cron e accetta
+che i job falliscano con `quota` finche' non aggiorni il piano.
 
 ## 8. Dominio
 
