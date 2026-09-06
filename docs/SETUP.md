@@ -11,7 +11,10 @@ Tempo stimato: 20-30 minuti, di cui la maggior parte in attesa dei job.
 ## 1. Supabase (5 minuti)
 
 1. Apri il progetto **GiBiScore** su supabase.com.
-2. Le tabelle sono nello schema `public`, gia' esposto: niente da configurare.
+2. **Project Settings → Data API → Exposed schemas** deve elencare solo
+   `public` (e `graphql_public`): uno schema elencato ma inesistente blocca
+   l'intera Data API (`PGRST002`, "Could not query the database for the
+   schema cache").
 3. **Project Settings → API Keys**:
    - copia la **Publishable key** (`sb_publishable_...`);
    - crea o mostra la **Secret key** (`sb_secret_...`). E' la chiave che i job
