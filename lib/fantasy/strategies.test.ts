@@ -52,6 +52,24 @@ describe('planStrategy', () => {
         expect(mid.picks.C.reduce((s, p) => s + p.price, 0)).toBeGreaterThan(attack.picks.C.reduce((s, p) => s + p.price, 0));
     });
 
+    it('never suggests an ignored player, and plans a wanted one in whatever the marks say', () => {
+        const players = pool();
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        const plain = planStrategy(STRATEGIES[0], players, prices, config);
+        const topA = plain.picks.A[0];
+        const without = planStrategy(STRATEGIES[0], players, prices, config, new Set(), [], {avoid: new Set([topA.id])});
+        expect(without.picks.A.some((p) => p.id === topA.id)).toBe(false);
+        expect(without.picks.A).toHaveLength(6);
+        // A modest attacker nobody would plan: wanted, he is in, pinned, and the roster still complete.
+        const modest = players.filter((p) => p.role === 'A' && !plain.picks.A.some((x) => x.id === p.id)).sort((a, b) => a.scores.overall - b.scores.overall)[Math.floor(players.filter((p) => p.role === 'A').length / 2)];
+        const withHim = planStrategy(STRATEGIES[0], players, prices, config, new Set(), [], {want: new Set([modest.id])});
+        const pick = withHim.picks.A.find((p) => p.id === modest.id);
+        expect(pick).toBeDefined();
+        expect(pick!.pinned).toBe(true);
+        expect(withHim.picks.A).toHaveLength(6);
+        expect(withHim.spent).toBeLessThanOrEqual(500);
+    });
+
     it('skips players already taken', () => {
         const players = pool();
         const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});

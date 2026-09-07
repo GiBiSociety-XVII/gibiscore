@@ -64,6 +64,10 @@ export interface AuctionConfig {
     cupsCount: boolean;
     /** Roles corrected by hand, by player id. */
     roleOverrides: Record<string, FantaRole>;
+    /** Players the strategies must plan for (ids), whatever the marks say. */
+    want: number[];
+    /** Players the strategies must never suggest (ids). */
+    avoid: number[];
     /**
      * Level of the prices, percent. 100 = the list prices add up exactly to the credits at the
      * table; higher = the list of a contested auction, where the money piles up on the players
@@ -93,6 +97,8 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     formation: null,
     cupsCount: true,
     roleOverrides: {},
+    want: [],
+    avoid: [],
     priceLevel: 100,
 };
 
@@ -122,6 +128,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
     const mode: AuctionMode = r.mode === 'mantra' ? 'mantra' : 'classic';
     const num = (v: unknown, fallback: number, min: number, max: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback);
     const slots = {...DEFAULT_SLOTS[mode], ...(r.slots ?? {})};
+    const ids = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((id): id is number => typeof id === 'number' && Number.isInteger(id)))].slice(0, 60) : []);
     return {
         name: typeof r.name === 'string' ? r.name : '',
         league: r.league,
@@ -136,6 +143,8 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : true,
         roleOverrides: Object.fromEntries(Object.entries(r.roleOverrides ?? {}).filter(([, v]) => v === 'P' || v === 'D' || v === 'C' || v === 'A')) as Record<string, FantaRole>,
+        want: ids(r.want),
+        avoid: ids(r.avoid),
         // 135 was the default before the value model was retuned: it reads as the new default.
         priceLevel: r.priceLevel === 135 ? DEFAULT_CONFIG.priceLevel : num(r.priceLevel, DEFAULT_CONFIG.priceLevel, 50, 300),
     };

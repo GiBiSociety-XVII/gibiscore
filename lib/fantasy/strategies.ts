@@ -116,6 +116,8 @@ export interface StrategyPick {
     overall: number;
     /** The most the strategy would pay for this slot. */
     maxBid: number;
+    /** Planned because the user asked for him, not because the marks chose him. */
+    pinned?: boolean;
 }
 
 /** What the user has already bought: reduces the role budgets and uses up the biggest slots first. */
@@ -123,6 +125,12 @@ export interface OwnPurchase {
     playerId: number;
     role: FantaRole;
     price: number;
+}
+
+/** What the user told the planner: players to build around, players to leave alone. */
+export interface PlanPrefs {
+    want?: Set<number>;
+    avoid?: Set<number>;
 }
 
 export interface StrategyPlan {
@@ -257,7 +265,9 @@ export function bestLineup(players: LineupPlayer[], options: LineupOptions = {})
 }
 
 /** Simulates one strategy on the pool: fills every slot with the best player (by mark plus what the strategy prefers) affordable for that slot's budget. */
-export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers' | 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan {
+export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers' | 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan {
+    const want = prefs.want ?? new Set<number>();
+    const avoid = prefs.avoid ?? new Set<number>();
     // A fixed formation bends the split towards the roles it fields more of and pays its starters first.
     const forced = FORMATIONS.find((f) => f.key === config.formation) ?? null;
     const share = shareFor(strategy.share, forced);
@@ -298,7 +308,7 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             const p = byId.get(m.playerId);
             if (p) picks[role].push({id: p.id, name: p.name, team: p.team.name, role, price: m.price, overall: p.scores.overall, maxBid: m.price});
         }
-        const candidates = players.filter((p) => p.role === role && !taken.has(p.id) && !owned.some((m) => m.playerId === p.id));
+        const candidates = players.filter((p) => p.role === role && !taken.has(p.id) && !avoid.has(p.id) && !owned.some((m) => m.playerId === p.id));
         const used = new Set<number>();
         let left = budget[role] - owned.reduce((s, m) => s + m.price, 0);
         const custom = strategy.fractions?.[role];
@@ -320,7 +330,10 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             // A slot too small for anyone still on the market takes the cheapest player left, when the budget allows it.
             const cheapest = pool.reduce((m, p) => Math.min(m, prices.get(p.id) ?? 1), Infinity);
             if (cheapest > cap && cheapest <= room) cap = cheapest;
-            const pick = pool.find((p) => (prices.get(p.id) ?? 1) <= cap);
+            // The players the user wants come first, dearest first, in the biggest slots: the slot's
+            // cap does not stop them, only what must be left to finish the roster does.
+            const pinned = pool.filter((p) => want.has(p.id)).sort((a, b) => (prices.get(b.id) ?? 1) - (prices.get(a.id) ?? 1)).find((p) => (prices.get(p.id) ?? 1) <= room) ?? null;
+            const pick = pinned ?? pool.find((p) => (prices.get(p.id) ?? 1) <= cap);
             if (!pick) return;
             const price = prices.get(pick.id) ?? 1;
             used.add(pick.id);
@@ -328,7 +341,7 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             left -= price;
             spent += price;
             depth += pick.scores.overall;
-            picks[role].push({id: pick.id, name: pick.name, team: pick.team.name, role, price, overall: pick.scores.overall, maxBid: Math.max(price, cap)});
+            picks[role].push({id: pick.id, name: pick.name, team: pick.team.name, role, price, overall: pick.scores.overall, maxBid: Math.max(price, cap), pinned: pinned !== null});
         });
     }
     const roster = ROLES.flatMap((role) => picks[role].map((p) => byId.get(p.id))).filter((p): p is PoolPlayer => !!p);
@@ -342,8 +355,8 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
 }
 
 /** Every strategy planned on the pool, best lineup first; strategies that need a modifier the league lacks are marked unavailable. */
-export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'> & Partial<Pick<AuctionConfig, 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = []): StrategyPlan[] {
-    return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken, mine), available: !s.needsDefenceModifier || config.modifiers.defence})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
+export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'> & Partial<Pick<AuctionConfig, 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan[] {
+    return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken, mine, prefs), available: !s.needsDefenceModifier || config.modifiers.defence})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
 }
 
 export type HealthStatus = 'ok' | 'warn' | 'switch';
