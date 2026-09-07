@@ -144,6 +144,31 @@ describe('translation to this league and club', () => {
     });
 });
 
+describe('this season at the club', () => {
+    it('a keeper on the bench since the season started is the backup, whatever he was elsewhere', () => {
+        const abroad = line(2025, {level: 1, teamId: 9, teamName: 'Abroad', appearances: 36, lineups: 36, bench: 0, minutes: 3240, goals: 0, assists: 0, rating: 7.2, goalsConceded: 40});
+        const base = {role: 'P' as const, age: 26, currentYear: 2026, currentTeamId: 1, seasons: [abroad], injury: null, teamAttack: null, teamDefence: null};
+        const unknown = scorePlayer(base);
+        const benched = scorePlayer({...base, thisSeason: {starts: 0, benches: 2}});
+        const starting = scorePlayer({...base, thisSeason: {starts: 3, benches: 0}});
+        expect(unknown.starter).toBeGreaterThan(70);
+        expect(benched.starter).toBeLessThan(15);
+        expect(starting.starter).toBeGreaterThan(95);
+        // Not named yet (injured, just arrived): nothing to learn.
+        expect(scorePlayer({...base, thisSeason: {starts: 0, benches: 0}}).starter).toBe(unknown.starter);
+    });
+
+    it('an outfield player takes longer to settle: two benches are half a signal', () => {
+        const base = {role: 'A' as const, age: 26, currentYear: 2026, currentTeamId: 1, seasons: [line(2025)], injury: null, teamAttack: null, teamDefence: null};
+        const before = scorePlayer(base).starter;
+        const two = scorePlayer({...base, thisSeason: {starts: 0, benches: 2}}).starter;
+        const six = scorePlayer({...base, thisSeason: {starts: 0, benches: 6}}).starter;
+        expect(two).toBeLessThan(before);
+        expect(two).toBeGreaterThan(before * 0.6);
+        expect(six).toBeLessThan(before * 0.15);
+    });
+});
+
 describe('form', () => {
     it('is neutral before the season and rewards a strong start', () => {
         const base = [line(2025)];

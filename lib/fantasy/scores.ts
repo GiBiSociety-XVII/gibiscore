@@ -65,6 +65,13 @@ export interface AuctionInput {
      * to score more or less than his numbers say.
      */
     clubStrength?: number | null;
+    /**
+     * This season at the current club, from the lineups: matches started and
+     * matches on the bench. What the coach actually does outweighs any history
+     * once a few rounds are in: a keeper on the bench for three rounds is the
+     * backup, whatever he was elsewhere.
+     */
+    thisSeason?: {starts: number; benches: number} | null;
 }
 
 export interface FantaScores {
@@ -317,6 +324,17 @@ export function scorePlayer(input: AuctionInput): FantaScores {
         starter = starter * (1 - k) + Math.max(starter, prior) * k;
     }
 
+    // The coach has spoken: this season's lineups at the club move the starter mark towards
+    // what he does, with a weight that grows with the matches he was in the squad for. Keepers
+    // do not rotate, two matches settle it; outfield players get six. Never the whole way,
+    // and never on a player the club has not named yet (injured, just arrived).
+    if (input.thisSeason && input.thisSeason.starts + input.thisSeason.benches > 0) {
+        const named = input.thisSeason.starts + input.thisSeason.benches;
+        const settle = input.role === 'P' ? 2 : 6;
+        const w = 0.9 * Math.min(1, named / settle);
+        starter = starter * (1 - w) + (100 * input.thisSeason.starts) / named * w;
+    }
+
     // Current injury and age weigh on fitness.
     if (input.injury?.active) fitness = input.injury.longTerm ? Math.min(fitness, 20) : fitness - Math.min(35, 15 + input.injury.daysOut / 3);
     if (input.age !== null && input.age >= 33) fitness -= (input.age - 32) * 4;
@@ -432,7 +450,7 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {power: 2, freeGap: 0.35, tail: 1.2};
+export const PRICE_TUNING = {power: 1.8, freeGap: 0.35, tail: 1.2};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -445,7 +463,7 @@ export const PRICE_TUNING = {power: 2, freeGap: 0.35, tail: 1.2};
 /** Fantamedia shrunk towards the role's level when it rests on few matches. */
 function shrunkFanta(p: PriceablePlayer, roleLevel: number): number {
     const sample = p.scores.sample ?? 30;
-    const shrink = sample / (sample + 8);
+    const shrink = sample / (sample + 12);
     const raw = p.scores.fantaAvg ?? roleLevel + (p.scores.overall - 50) / 30;
     return raw * shrink + roleLevel * (1 - shrink);
 }
@@ -458,7 +476,9 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     const thin = p.scores.confidence !== undefined && p.scores.confidence !== 'high';
     const upside = Math.min(0.45, 0.1 + (young ? 0.2 : 0) + (hot ? 0.1 : 0) + (thin ? 0.1 : 0));
     const avail = 0.4 + (0.6 * (p.scores.fitness ?? 70)) / 100;
-    return Math.max(0, fm - replacement) * (play + (1 - play) * upside) * avail;
+    // A fantamedia built on a dozen matches is a guess: what it promises over the free player counts in proportion, in full from twenty matches.
+    const evidence = Math.min(1, (p.scores.sample ?? 30) / 20);
+    return Math.max(0, fm - replacement) * evidence * (play + (1 - play) * upside) * avail;
 }
 
 /**
@@ -469,7 +489,10 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
  */
 export function valueWeights<T extends PriceablePlayer>(players: T[], role: FantaRole, count: number): Map<number, number> {
     const pool = players.filter((p) => p.role === role);
-    const level = ROLE_FANTA[role];
+    // The level a thin fantamedia is shrunk towards: what the role's regulars actually average in this
+    // pool (keepers' fantamedia has its own scale), the typical figure only when the pool cannot say.
+    const regulars = pool.filter((p) => (p.scores.sample ?? 0) >= 15 && p.scores.fantaAvg !== null && p.scores.fantaAvg !== undefined).map((p) => p.scores.fantaAvg!).sort((a, b) => a - b);
+    const level = regulars.length >= 8 ? regulars[Math.floor(regulars.length / 2)] : ROLE_FANTA[role];
     // A first pass with the role's typical level finds the order, the replacement is read off it.
     const first = pool.map((p) => [p, expectedValue(p, 0, level)] as const).sort((a, b) => b[1] - a[1]);
     // The free alternative: the players just outside what the league buys, at their (shrunk)

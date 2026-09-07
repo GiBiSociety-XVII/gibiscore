@@ -318,6 +318,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         const currentSet = new Set(currentIds);
         // Availability at the current club: matches started and matches on the bench.
         const availabilityOf = new Map<number, Availability>();
+        // This season only, unweighted: what the coach has done so far, for the starter mark.
+        const thisSeasonOf = new Map<number, Availability>();
         for (const r of benchRes.data ?? []) {
             if (members.get(r.player_id)?.team.id !== r.team_id) continue;
             const weight = currentSet.has(r.season_id) ? 3 : 1;
@@ -325,6 +327,12 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             a.starts += r.starts * weight;
             a.benches += r.benches * weight;
             availabilityOf.set(r.player_id, a);
+            if (currentSet.has(r.season_id)) {
+                const c = thisSeasonOf.get(r.player_id) ?? {starts: 0, benches: 0};
+                c.starts += r.starts;
+                c.benches += r.benches;
+                thisSeasonOf.set(r.player_id, c);
+            }
         }
         // Who started in his slots while he sat: the concrete rivals.
         const replacedBy = new Map<number, Map<number, number>>();
@@ -409,6 +417,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 teamAttack: shape?.attack ?? null,
                 teamDefence: shape?.defence ?? null,
                 teamRounds: shape?.rounds ?? 0,
+                thisSeason: thisSeasonOf.get(player.id) ?? null,
                 clubConcededPer90: clubConcededOf(team.id),
                 clubStrength: clubStrengthOf(team.id),
             };
