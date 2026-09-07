@@ -58,7 +58,9 @@ export function HealthBox({health, onSelect}: {health: StrategyHealth; onSelect:
 }
 
 /** Ranked strategies for this pool and league: split of the credits, the lineup they buy, "use it" to drive my role budgets. */
-export function StrategyPanel({plans, selected, onSelect, credits, health = null, formation = null, onFormation}: {plans: StrategyPlan[]; selected: StrategyKey | null; onSelect: (key: StrategyKey | null) => void; credits: number; health?: StrategyHealth | null; formation?: string | null; onFormation?: (key: string | null) => void}) {
+type Named = {id: number; name: string};
+
+export function StrategyPanel({plans, selected, onSelect, credits, health = null, formation = null, onFormation, wanted = [], avoided = [], onWant, onAvoid}: {plans: StrategyPlan[]; selected: StrategyKey | null; onSelect: (key: StrategyKey | null) => void; credits: number; health?: StrategyHealth | null; formation?: string | null; onFormation?: (key: string | null) => void; wanted?: Named[]; avoided?: Named[]; onWant?: (id: number) => void; onAvoid?: (id: number) => void}) {
     const t = useTranslations('Fantasy.strategies');
     const [open, setOpen] = useState<StrategyKey | null>(selected ?? plans[0]?.key ?? null);
     const best = plans[0];
@@ -74,6 +76,30 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
                         <button key={f.key} type="button" onClick={() => onFormation(f.key)} className={chip(formation === f.key)}>{f.key}</button>
                     ))}
                     <span className="basis-full text-[11px] font-semibold text-muted-foreground">{formation ? t('formationFixed', {formation}) : t('formationAutoHint')}</span>
+                </div>
+            )}
+            {(onWant || onAvoid) && (
+                <div className="px-3 py-2 border-b border-muted flex flex-col gap-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('prefs.title')}</span>
+                    {wanted.length === 0 && avoided.length === 0 ? (
+                        <span className="text-[11px] font-semibold text-muted-foreground">{t('prefs.empty')}</span>
+                    ) : (
+                        <div className="flex flex-wrap items-center gap-1">
+                            {wanted.map((p) => (
+                                <span key={`w${p.id}`} className="inline-flex items-center gap-1 pl-1.5 h-6 rounded border border-foreground bg-foreground text-background text-[11px] font-bold">
+                                    ★ {p.name}
+                                    {onWant && <button type="button" onClick={() => onWant(p.id)} aria-label={t('prefs.remove', {name: p.name})} className="inline-flex w-5 h-6 items-center justify-center hover:text-accent">×</button>}
+                                </span>
+                            ))}
+                            {avoided.map((p) => (
+                                <span key={`a${p.id}`} className="inline-flex items-center gap-1 pl-1.5 h-6 rounded border border-foreground/60 bg-card text-[11px] font-bold text-muted-foreground line-through">
+                                    {p.name}
+                                    {onAvoid && <button type="button" onClick={() => onAvoid(p.id)} aria-label={t('prefs.remove', {name: p.name})} className="inline-flex w-5 h-6 items-center justify-center no-underline hover:text-foreground">×</button>}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                    <span className="text-[10px] font-semibold text-muted-foreground">{t('prefs.hint')}</span>
                 </div>
             )}
             {health && <HealthBox health={health} onSelect={(key) => onSelect(key)} />}
@@ -132,9 +158,11 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
                                                     <span className="text-[11px] font-semibold text-muted-foreground">–</span>
                                                 ) : (
                                                     plan.picks[r].map((p, i) => (
-                                                        <span key={p.id} className={cn("inline-flex items-center gap-1 px-1.5 h-6 rounded border border-foreground/60 text-[11px] font-bold whitespace-nowrap", i === 0 ? "bg-accent/40" : "bg-card")} title={`${p.team} · ${t('overallShort')} ${p.overall}`}>
-                                                            {p.name}
-                                                            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{p.price}</span>
+                                                        <span key={p.id} className={cn("inline-flex items-center gap-1 pl-1.5 h-6 rounded border text-[11px] font-bold whitespace-nowrap", p.pinned ? "border-foreground bg-foreground text-background" : i === 0 ? "border-foreground/60 bg-accent/40" : "border-foreground/60 bg-card", !onAvoid && "pr-1.5")} title={`${p.team} · ${t('overallShort')} ${p.overall}${p.pinned ? ` · ${t('pinned')}` : ''}`}>
+                                                            {p.pinned && '★ '}{p.name}
+                                                            <span className={cn("font-mono text-[10px] tabular-nums", p.pinned ? "text-background/80" : "text-muted-foreground")}>{p.price}</span>
+                                                            {onAvoid && !p.pinned && <button type="button" onClick={() => onAvoid(p.id)} aria-label={t('prefs.ignore', {name: p.name})} title={t('prefs.ignore', {name: p.name})} className="inline-flex w-5 h-6 items-center justify-center text-muted-foreground hover:text-foreground">×</button>}
+                                                            {onWant && p.pinned && <button type="button" onClick={() => onWant(p.id)} aria-label={t('prefs.remove', {name: p.name})} className="inline-flex w-5 h-6 items-center justify-center hover:text-accent">×</button>}
                                                         </span>
                                                     ))
                                                 )}

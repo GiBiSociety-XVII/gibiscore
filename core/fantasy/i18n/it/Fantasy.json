@@ -50,7 +50,7 @@
     "participants": "Partecipanti",
     "credits": "Crediti a testa",
     "priceLevel": "Livello prezzi (%)",
-    "priceLevelHint": "100 = i prezzi del listino sommano esattamente ai crediti del tavolo. Più alto = listino da asta combattuta: i soldi si concentrano sui giocatori che valgono e i riempitivi restano a 1 credito. Vale anche per i prezzi live.",
+    "priceLevelHint": "100 = i prezzi del listino sommano esattamente ai crediti del tavolo (consigliato). Più alto = listino da asta combattuta: i soldi si concentrano sui giocatori che valgono e i riempitivi restano a 1 credito. Vale anche per i prezzi live.",
     "slots": "Giocatori in rosa",
     "slotsTotal": "{count} giocatori per squadra",
     "roles": {
@@ -210,7 +210,11 @@
       "roleManual": "Ruolo {role} impostato da te",
       "fixRole": "Correggi ruolo",
       "fixRoleReset": "Torna al listone",
-      "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
+      "plan": "Strategie",
+    "want": "Voglio",
+    "avoid": "Ignora",
+    "planHint": "\"Voglio\": le strategie lo pianificano comunque e riadattano il resto. \"Ignora\": non lo propongono mai.",
+    "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
       "fvm": "FVM {fvm}",
       "mantra": "Mantra: {roles}"
     }
@@ -223,6 +227,9 @@
     "slots": "{filled}/{total}",
     "empty": "Nessun acquisto ancora. Usa \"Compra\" sul listone.",
     "others": "Altre squadre",
+    "othersHint": "Tocca una squadra per vedere la rosa",
+    "othersSpent": "Spesi {spent} su {credits} cr. · {teams} squadre del listone",
+    "othersEmpty": "Nessun acquisto ancora.",
     "perSlot": "Media per slot libero: {credits} cr.",
     "roleBudget": "Budget consigliato per ruolo",
     "strategy": "Strategia: {name}",
@@ -253,6 +260,15 @@
     "needsDefence": "Serve il modificatore difesa nelle impostazioni",
     "spent": "Spesa simulata {spent} su {credits} crediti",
     "target": "Obiettivo",
+    "pinned": "Obiettivo fissato da te",
+    "ignored": "Ignorato: le strategie non lo propongono",
+    "prefs": {
+      "title": "I tuoi vincoli",
+      "empty": "Nessun vincolo: gli obiettivi li scelgono le strategie. Puoi fissare un giocatore o ignorarlo dalla sua riga nel listone, o con la × qui sotto.",
+      "hint": "Un giocatore fissato entra nel piano di ogni strategia al prezzo attuale, nello slot più grande del suo ruolo; uno ignorato non viene mai proposto. Il resto del piano si riadatta.",
+      "remove": "Togli il vincolo su {name}",
+      "ignore": "Ignora {name}"
+    },
     "balanced": {
       "name": "Equilibrata",
       "tagline": "Nessun buco, un buon titolare in ogni ruolo",

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {scorePlayer, seasonWeights, suggestPrices, type SeasonLine} from './scores';
+import {bonusFactor, clubRatio, scorePlayer, seasonWeights, suggestPrices, type SeasonLine} from './scores';
 
 const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
     year, leagueId: 1, leagueName: 'Serie A', teamId: 1, teamName: 'Inter', games: 38, level: 1,
@@ -42,7 +42,8 @@ describe('scorePlayer', () => {
         const s = scorePlayer({role: 'D', age: 24, currentYear: 2026, seasons: [line(2025, {appearances: 8, lineups: 3, bench: 25, minutes: 400, goals: 0, assists: 0, rating: 6.1})], injury: null, teamAttack: null, teamDefence: null});
         expect(s.starter).toBeLessThan(25);
         expect(s.bonus).toBeLessThan(10);
-        expect(s.fitness).toBeGreaterThan(80);
+        // In the squad 28 times of 38: three starts and 25 benches.
+        expect(s.fitness).toBeGreaterThan(70);
         expect(s.team).toBe(50);
         expect(s.overall).toBeLessThan(45);
     });
@@ -106,6 +107,65 @@ describe('scorePlayer with a transfer', () => {
         expect(lower.rating).toBeLessThan(top.rating);
         expect(lower.bonus).toBeLessThan(top.bonus);
         expect(lower.overall).toBeLessThan(top.overall - 5);
+    });
+});
+
+describe('translation to this league and club', () => {
+    it('a Serie B season is worth about half its goals here, and the price follows', () => {
+        const serieB = line(2025, {level: 0.7, teamId: 5, teamName: 'Promoted', goals: 15, assists: 3, rating: 7.3});
+        const serieA = line(2025, {goals: 15, assists: 3, rating: 7.3});
+        const fromB = scorePlayer({role: 'A', age: 24, currentYear: 2026, currentTeamId: 5, seasons: [serieB], injury: null, teamAttack: null, teamDefence: null, clubStrength: 0.3});
+        const fromA = scorePlayer({role: 'A', age: 24, currentYear: 2026, currentTeamId: 1, seasons: [serieA], injury: null, teamAttack: null, teamDefence: null, clubStrength: 0.8});
+        expect(fromB.fantaAvg!).toBeLessThan(fromA.fantaAvg! - 0.7);
+        expect(fromB.bonus).toBeLessThan(fromA.bonus - 15);
+        expect(fromB.rating).toBeLessThan(fromA.rating);
+    });
+
+    it('a striker moving from the bottom to the top of the table is expected to score more, and the other way round', () => {
+        const atBottom = line(2025, {teamId: 5, teamName: 'Small', clubStrength: 0.15, goals: 10, assists: 2, rating: 6.9});
+        const up = scorePlayer({role: 'A', age: 26, currentYear: 2026, currentTeamId: 1, seasons: [atBottom], injury: null, teamAttack: null, teamDefence: null, clubStrength: 0.9});
+        const same = scorePlayer({role: 'A', age: 26, currentYear: 2026, currentTeamId: 1, seasons: [atBottom], injury: null, teamAttack: null, teamDefence: null, clubStrength: 0.15});
+        const stayed = scorePlayer({role: 'A', age: 26, currentYear: 2026, currentTeamId: 5, seasons: [atBottom], injury: null, teamAttack: null, teamDefence: null, clubStrength: 0.15});
+        expect(up.fantaAvg!).toBeGreaterThan(same.fantaAvg! + 0.3);
+        // At his own club his numbers are his: no translation.
+        expect(stayed.bonus).toBe(same.bonus);
+        expect(clubRatio(0.9, 0.15, 1)).toBe(1.5);
+        expect(clubRatio(0.7, 0.4, 1)).toBeCloseTo(1.12 / 0.94, 2);
+        expect(clubRatio(0.9, null, 1)).toBeLessThanOrEqual(1.15);
+        expect(clubRatio(null, 0.15, 1)).toBe(1);
+        expect(bonusFactor(0.7)).toBeCloseTo(0.565, 2);
+    });
+
+    it('an appearance from the bench is not counted twice among the matches in the squad', () => {
+        // Starts 26 of 38, on the bench 11 times (nine as a substitute): in the squad 37 times.
+        const s = scorePlayer({role: 'C', age: 28, currentYear: 2026, currentTeamId: 1, seasons: [line(2025, {appearances: 35, lineups: 26, bench: 11, minutes: 2131, goals: 10, assists: 1})], injury: null, teamAttack: null, teamDefence: null});
+        expect(s.starter).toBeGreaterThan(60);
+        expect(s.fitness).toBeGreaterThan(95);
+    });
+});
+
+describe('this season at the club', () => {
+    it('a keeper on the bench since the season started is the backup, whatever he was elsewhere', () => {
+        const abroad = line(2025, {level: 1, teamId: 9, teamName: 'Abroad', appearances: 36, lineups: 36, bench: 0, minutes: 3240, goals: 0, assists: 0, rating: 7.2, goalsConceded: 40});
+        const base = {role: 'P' as const, age: 26, currentYear: 2026, currentTeamId: 1, seasons: [abroad], injury: null, teamAttack: null, teamDefence: null};
+        const unknown = scorePlayer(base);
+        const benched = scorePlayer({...base, thisSeason: {starts: 0, benches: 2}});
+        const starting = scorePlayer({...base, thisSeason: {starts: 3, benches: 0}});
+        expect(unknown.starter).toBeGreaterThan(70);
+        expect(benched.starter).toBeLessThan(15);
+        expect(starting.starter).toBeGreaterThan(95);
+        // Not named yet (injured, just arrived): nothing to learn.
+        expect(scorePlayer({...base, thisSeason: {starts: 0, benches: 0}}).starter).toBe(unknown.starter);
+    });
+
+    it('an outfield player takes longer to settle: two benches are half a signal', () => {
+        const base = {role: 'A' as const, age: 26, currentYear: 2026, currentTeamId: 1, seasons: [line(2025)], injury: null, teamAttack: null, teamDefence: null};
+        const before = scorePlayer(base).starter;
+        const two = scorePlayer({...base, thisSeason: {starts: 0, benches: 2}}).starter;
+        const six = scorePlayer({...base, thisSeason: {starts: 0, benches: 6}}).starter;
+        expect(two).toBeLessThan(before);
+        expect(two).toBeGreaterThan(before * 0.6);
+        expect(six).toBeLessThan(before * 0.15);
     });
 });
 
