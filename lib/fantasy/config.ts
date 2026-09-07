@@ -93,7 +93,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     formation: null,
     cupsCount: true,
     roleOverrides: {},
-    priceLevel: 135,
+    priceLevel: 100,
 };
 
 /** Share of the market that usually goes to each role (Serie A leagues, classic). */
@@ -136,6 +136,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : true,
         roleOverrides: Object.fromEntries(Object.entries(r.roleOverrides ?? {}).filter(([, v]) => v === 'P' || v === 'D' || v === 'C' || v === 'A')) as Record<string, FantaRole>,
-        priceLevel: num(r.priceLevel, DEFAULT_CONFIG.priceLevel, 50, 300),
+        // 135 was the default before the value model was retuned: it reads as the new default.
+        priceLevel: r.priceLevel === 135 ? DEFAULT_CONFIG.priceLevel : num(r.priceLevel, DEFAULT_CONFIG.priceLevel, 50, 300),
     };
 }

@@ -20,6 +20,8 @@ export interface SeasonLine {
     level: number;
     /** A cup: rotation there says half as much about his place in the league side. */
     cup?: boolean;
+    /** Strength of the club he played this line for, 0..1 on the top league's scale (see AuctionInput.clubStrength); null when unknown. */
+    clubStrength?: number | null;
     appearances: number;
     lineups: number;
     bench: number;
@@ -56,6 +58,13 @@ export interface AuctionInput {
      * belong to the club, not the keeper: what he let in elsewhere is replaced by this rate.
      */
     clubConcededPer90?: number | null;
+    /**
+     * Strength of the current club, 0..1 on the top league's scale: 0.9 a title
+     * contender, 0.5 mid-table, 0.1 a relegation side, ~0.3 a promoted club. Goals
+     * and assists follow the club: a striker moving up or down the table is expected
+     * to score more or less than his numbers say.
+     */
+    clubStrength?: number | null;
 }
 
 export interface FantaScores {
@@ -105,6 +114,36 @@ export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<n
     return raw;
 }
 
+/**
+ * What a line earned elsewhere, translated to the top league and to the
+ * current club. Goals and assists in a weaker league come at a discount
+ * that grows with the gap (Serie B: about 55%, a minor league 45%); the
+ * excess of a rating over 6 is scaled by the level of the league. A club
+ * near the top creates more chances than one near the bottom: the bonus
+ * follows the ratio of the two clubs' strengths, within reason.
+ */
+export function bonusFactor(level: number): number {
+    return Math.max(0.2, Math.min(1, level)) ** 1.6;
+}
+
+/** Strength assumed for a club when nobody told us: the middle of its league, on the top league's scale. */
+export function defaultClubStrength(level: number): number {
+    return 0.5 * Math.max(0.2, Math.min(1, level));
+}
+
+/** Chances a club creates, relative to an average top-league side. */
+function clubBonus(strength: number): number {
+    return 0.7 + 0.6 * Math.max(0, Math.min(1, strength));
+}
+
+/** How the current club changes what a line's club allowed: 0.6..1.5. */
+export function clubRatio(current: number | null | undefined, line: number | null | undefined, level: number): number {
+    if (current === null || current === undefined) return 1;
+    // A club we know nothing about (abroad) is taken as average, and the ratio kept modest.
+    if (line === null || line === undefined) return Math.max(0.7, Math.min(1.15, clubBonus(current) / clubBonus(defaultClubStrength(level))));
+    return Math.max(0.6, Math.min(1.5, clubBonus(current) / clubBonus(line)));
+}
+
 interface YearAgg {
     /** Longest competition of the season (the league): the availability baseline. */
     games: number;
@@ -121,6 +160,9 @@ interface YearAgg {
     ratingApps: number;
     goals: number;
     assists: number;
+    /** Goals and assists translated to the top league and the current club: what they would be worth here. */
+    tGoals: number;
+    tAssists: number;
     penMissed: number;
     penSaved: number;
     yellow: number;
@@ -132,14 +174,18 @@ interface YearAgg {
 }
 
 /** One season across its competitions. Lines at the current club weigh double for the starter rates. */
-function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined, clubConcededPer90: number | null = null): YearAgg {
-    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0, atClub: 0};
+function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined, clubConcededPer90: number | null = null, clubStrength: number | null = null): YearAgg {
+    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, tGoals: 0, tAssists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0, atClub: 0};
     let levelW = 0;
     for (const l of lines) {
         const atClub = currentTeamId !== null && currentTeamId !== undefined && l.teamId === currentTeamId;
         // The current club counts double, a cup half: rotation in Europe is not rotation in the league.
         const w = (atClub ? 2 : 1) * (l.cup ? 0.5 : 1);
-        const level = 0.5 + 0.5 * l.level;
+        const level = Math.max(0.2, Math.min(1, l.level));
+        // Translation of what he did there to here: the league's gap and the two clubs' strengths.
+        const ratio = atClub ? 1 : clubRatio(clubStrength, l.clubStrength, l.level);
+        const transfer = bonusFactor(l.level) * ratio;
+        const ratingShift = !atClub && clubStrength !== null && clubStrength !== undefined ? Math.max(-0.15, Math.min(0.15, 0.3 * (clubStrength - (l.clubStrength ?? defaultClubStrength(l.level))))) : 0;
         if (atClub) a.atClub += l.appearances + l.bench;
         a.games = Math.max(a.games, l.games);
         a.apps += l.appearances;
@@ -151,12 +197,14 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         a.wBench += w * l.bench;
         a.wMinutes += w * l.minutes;
         if (l.rating !== null && l.appearances > 0) {
-            // Ratings in weaker leagues are worth less: the excess over 6 is discounted.
-            a.ratingSum += (6 + (l.rating - 6) * level) * l.appearances;
+            // Ratings in weaker leagues are worth less: the excess over 6 is scaled by the league's level.
+            a.ratingSum += (6 + (l.rating - 6) * level + ratingShift) * l.appearances;
             a.ratingApps += l.appearances;
         }
         a.goals += l.goals;
         a.assists += l.assists;
+        a.tGoals += l.goals * transfer;
+        a.tAssists += l.assists * transfer;
         a.penMissed += l.penaltiesMissed;
         a.penSaved += l.penaltiesSaved;
         a.yellow += l.yellow;
@@ -199,14 +247,15 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
     for (const y of years) {
         const w = weights.get(y)!;
-        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId, input.clubConcededPer90 ?? null);
+        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId, input.clubConcededPer90 ?? null, input.clubStrength ?? null);
         const per90 = a.minutes > 0 ? 90 / a.minutes : 0;
         const levelFactor = 0.7 + 0.3 * a.level;
 
-        // Starter: of the matches he was in the squad for, how many he started
-        // and how much of them he played. A January transfer is judged on
-        // both clubs, the current one counting double.
-        const inSquad = Math.max(1, a.wApps + a.wBench);
+        // Starter: of the matches he was in the squad for (started, or on the
+        // bench: an appearance from the bench is counted there too), how many
+        // he started and how much of them he played. A January transfer is
+        // judged on both clubs, the current one counting double.
+        const inSquad = Math.max(1, a.wLineups + a.wBench);
         const startRate = Math.min(1, a.wLineups / inSquad);
         const minuteRate = Math.min(1, a.wMinutes / (inSquad * 90));
         starter += w * 100 * (0.6 * startRate + 0.4 * minuteRate) * levelFactor;
@@ -221,8 +270,8 @@ export function scorePlayer(input: AuctionInput): FantaScores {
             const penSaved90 = a.minutes > 0 ? a.penSaved * per90 : 0;
             bonus += w * 100 * Math.min(1, Math.max(0, (cleanSheet - 0.1) / 0.35) + Math.min(0.15, penSaved90 * 3));
         } else {
-            // Bonus per 90 against the role's elite rate, saturating.
-            const bonus90 = (3 * a.goals + a.assists) * per90 * a.level;
+            // Bonus per 90 (translated to this league and club) against the role's elite rate, saturating.
+            const bonus90 = (3 * a.tGoals + a.tAssists) * per90;
             bonus += w * 100 * (1 - Math.exp(-bonus90 / BONUS_SCALE[input.role]));
         }
 
@@ -242,15 +291,15 @@ export function scorePlayer(input: AuctionInput): FantaScores {
             discipline += w * 100 * Math.exp(-malus90 / 0.25);
         }
 
-        // Fitness: matches in the squad (played or on the bench) over the league's season.
-        fitness += w * 100 * Math.min(1, (a.apps + a.bench) / Math.max(1, a.games));
+        // Fitness: matches in the squad (started or on the bench) over the league's season.
+        fitness += w * 100 * Math.min(1, (a.lineups + a.bench) / Math.max(1, a.games));
 
         sample += w * a.apps;
 
         if (a.ratingApps > 0 && a.apps > 0) {
             // Keepers: a goal conceded costs one, a clean sheet earns one, a penalty saved three.
             const keeper = input.role === 'P' ? -a.conceded / a.apps + Math.exp(-(a.minutes > 0 ? a.conceded * per90 : 1.4)) + (3 * a.penSaved) / a.apps : 0;
-            const perMatch = (3 * a.goals + a.assists - 0.5 * a.yellow - a.red - 3 * a.penMissed) / a.apps + keeper;
+            const perMatch = (3 * a.tGoals + a.tAssists - 0.5 * a.yellow - a.red - 3 * a.penMissed) / a.apps + keeper;
             fantaAvg += w * (a.ratingSum / a.ratingApps + perMatch);
             fantaW += w;
         }
@@ -328,7 +377,7 @@ function formScore(input: AuctionInput): number {
 
     // Playing? Starts over the club's rounds, against last season's starting rate.
     const startNow = Math.min(1, now.lineups / rounds);
-    const startBefore = before.apps + before.bench > 0 ? before.lineups / (before.apps + before.bench) : 0.5;
+    const startBefore = before.lineups + before.bench > 0 ? before.lineups / (before.lineups + before.bench) : 0.5;
     delta += Math.max(-15, Math.min(15, (startNow - startBefore) * 40));
     // Not seen at all while the club has played: bad sign unless injured.
     if (now.apps === 0 && rounds >= 2 && !input.injury?.active) delta -= 12;

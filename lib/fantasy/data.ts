@@ -126,6 +126,24 @@ interface ReplacementRow {
 type Rpc = {rpc: <T>(fn: string, args: Record<string, unknown>) => PromiseLike<{data: T[] | null; error: {message: string} | null}>};
 
 /** How much a season in this competition says about the next one in a top league. */
+/** The second tier under each auction league: last season's table there is the prior for the promoted clubs. */
+const SECOND_TIER: Record<string, string> = {'serie-a': 'serie-b'};
+/** The top of a second tier is worth about this much of the top league's scale. */
+const SECOND_TIER_SCALE = 0.4;
+/** A promoted club nobody has a table for. */
+const PROMOTED_STRENGTH = 0.2;
+
+/**
+ * Strength of each club of a table, by points per match: 0.9 for the top,
+ * 0.1 for the bottom, times the scale of the league. Empty when the study
+ * is missing or the season has not started.
+ */
+function rankStrength(study: {teams: Array<{team: {id: number}; played: number; points: number}>} | null, scale: number): Map<number, number> {
+    const rows = (study?.teams ?? []).filter((t) => t.played > 0);
+    const sorted = [...rows].sort((a, b) => b.points / b.played - a.points / a.played);
+    return new Map(sorted.map((t, i) => [t.team.id, scale * (0.1 + 0.8 * (1 - i / Math.max(1, sorted.length - 1)))]));
+}
+
 function leagueLevel(slug: string, tier: string | null, type: string | null): number {
     if (['serie-a', 'premier-league', 'la-liga', 'bundesliga', 'ligue-1', 'champions-league', 'europa-league'].includes(slug)) return 1;
     if (['eredivisie', 'primeira-liga', 'conference-league'].includes(slug)) return 0.85;
@@ -155,6 +173,10 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         const year = Math.max(...seasons.map((s) => s.season.year));
         const currentIds = seasons.map((s) => s.season.id);
         const previousIds = leagues.flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => s.id));
+        // Last season of the leagues' second tiers: where the promoted clubs come from, for their strength prior.
+        const feederSlugs = slugs.map((slug) => SECOND_TIER[slug]).filter((slug): slug is string => !!slug);
+        const {data: feederRows} = feederSlugs.length > 0 ? await db.from('leagues').select('id,slug,seasons(id,year)').in('slug', feederSlugs) : {data: []};
+        const feederIds = ((feederRows ?? []) as unknown as Array<{id: number; slug: string; seasons: Array<{id: number; year: number}>}>).flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => ({id: s.id, slug: l.slug})));
 
         // Current squads, plus anyone with statistics for a club of these
         // leagues this season: the provider's squads lag behind transfers,
@@ -211,11 +233,35 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         }
 
         // Team shape this season and current absences.
-        const [studies, previousStudies, sidelined] = await Promise.all([
+        const [studies, previousStudies, feederStudies, sidelined] = await Promise.all([
             Promise.all(seasons.map(async (s) => [s.season.id, await getSeasonStudy(s.season.id)] as const)),
             Promise.all(previousIds.map(async (id) => [id, await getSeasonStudy(id)] as const)),
+            Promise.all(feederIds.map(async (f) => [f.slug, await getSeasonStudy(f.id)] as const)),
             loadTeamSidelined(db, [...teams.keys()]),
         ]);
+        // Club strength, 0..1 on the top league's scale: last season's table (a promoted club on the
+        // second tier's scale), moved towards this season's table as the rounds come in.
+        const mainSlug = slugs[0];
+        const mainLeagueId = leagues.find((l) => l.slug === mainSlug)?.id ?? null;
+        const mainPreviousId = leagues.find((l) => l.slug === mainSlug)?.seasons.find((s) => s.year === year - 1)?.id ?? null;
+        const mainCurrentId = seasons.find((s) => s.league.slug === mainSlug)?.season.id ?? null;
+        const prevStrength = rankStrength(previousStudies.find(([id]) => id === mainPreviousId)?.[1] ?? null, 1);
+        const feederStrength = rankStrength(feederStudies.find(([slug]) => slug === SECOND_TIER[mainSlug])?.[1] ?? null, SECOND_TIER_SCALE);
+        const mainCurrent = studies.find(([id]) => id === mainCurrentId)?.[1] ?? null;
+        const curStrength = rankStrength(mainCurrent, 1);
+        const clubStrengthOf = (teamId: number): number => {
+            const prev = prevStrength.get(teamId) ?? feederStrength.get(teamId) ?? PROMOTED_STRENGTH;
+            const rounds = mainCurrent?.teams.find((t) => t.team.id === teamId)?.played ?? 0;
+            const w = Math.min(1, rounds / 8);
+            return prev * (1 - w) + (curStrength.get(teamId) ?? prev) * w;
+        };
+        const feederLeagueSlug = SECOND_TIER[mainSlug];
+        const lineStrengthOf = (teamId: number, leagueId: number, leagueSlug: string, seasonYear: number): number | null => {
+            if (leagueId === mainLeagueId && seasonYear === year - 1) return prevStrength.get(teamId) ?? null;
+            if (leagueId === mainLeagueId && seasonYear === year) return clubStrengthOf(teamId);
+            if (feederLeagueSlug && leagueSlug === feederLeagueSlug && seasonYear === year - 1) return feederStrength.get(teamId) ?? null;
+            return null;
+        };
         // What each club concedes per match: last season and this one (counting double).
         const conceded = new Map<number, {goals: number; played: number}>();
         for (const [list, weight] of [[previousStudies, 1], [studies, 2]] as const) {
@@ -332,6 +378,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 games: Math.max(games.get(`${r.league_id}:${r.season_year}`) ?? 0, r.appearances ?? 0, 1),
                 level: leagueLevel(r.league?.slug ?? '', r.league?.tier ?? null, r.league?.type ?? null),
                 cup: r.league?.type === 'cup',
+                clubStrength: lineStrengthOf(r.team_id, r.league_id, r.league?.slug ?? '', r.season_year),
                 appearances: r.appearances ?? 0,
                 lineups: r.lineups ?? 0,
                 bench: r.bench ?? 0,
@@ -363,6 +410,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 teamDefence: shape?.defence ?? null,
                 teamRounds: shape?.rounds ?? 0,
                 clubConcededPer90: clubConcededOf(team.id),
+                clubStrength: clubStrengthOf(team.id),
             };
             const scores = scorePlayer(inputBase);
             const scoresLeagueOnly = scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)});
