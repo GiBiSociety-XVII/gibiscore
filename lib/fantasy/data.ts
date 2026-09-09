@@ -161,6 +161,14 @@ function chunk<T>(items: T[], size: number): T[][] {
     return out;
 }
 
+/** "P. Pereira Gonçalves" and "Pedro António Pereira Gonçalves" from the profile's first and last name, when both are there. */
+function nameForms(first: string | null, last: string | null): string[] {
+    const f = first?.trim() ?? '';
+    const l = last?.trim() ?? '';
+    if (!l) return [];
+    return f ? [`${f[0]}. ${l}`, `${f} ${l}`] : [l];
+}
+
 /** Builds the pool, or throws: a failure must never be cached as an empty list. */
 async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
     {
@@ -408,7 +416,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         for (const slug of new Set([...members.values()].map((m) => m.leagueSlug))) {
             const rows = LISTONE[slug];
             if (!rows) continue;
-            const pool = [...members.values()].filter((m) => m.leagueSlug === slug).map((m) => ({id: m.player.id, name: m.player.name, team: m.team.name}));
+            const pool = [...members.values()].filter((m) => m.leagueSlug === slug).map((m) => ({id: m.player.id, name: m.player.name, team: m.team.name, aliases: nameForms(m.player.first_name, m.player.last_name)}));
             for (const [id, match] of matchListone(parseListone(rows), pool).byPlayer) listoneOf.set(id, match);
         }
 

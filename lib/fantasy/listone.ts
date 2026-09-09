@@ -35,6 +35,8 @@ export interface MatchablePlayer {
     id: number;
     name: string;
     team: string;
+    /** Other ways to write him: the full name behind a nickname ("Pote" is Pedro Pereira Gonçalves). */
+    aliases?: string[];
 }
 
 export interface ListoneMatch {
@@ -118,20 +120,22 @@ function surnameMatches(entry: ListoneEntry, db: {surname: string; tokens: strin
 export function matchListone(entries: ListoneEntry[], players: MatchablePlayer[]): {byPlayer: Map<number, ListoneMatch>; unmatched: ListoneEntry[]} {
     const byPlayer = new Map<number, ListoneMatch>();
     const unmatched: ListoneEntry[] = [];
-    const parsed = players.map((p) => ({p, full: normalizeName(p.name), ...splitDbName(p.name)}));
+    // Every way a player is written, the provider's short name first: a list entry matches the best of them.
+    const parsed = players.map((p) => ({p, full: normalizeName(p.name), forms: [p.name, ...(p.aliases ?? [])].map((n) => splitDbName(n))}));
     const used = new Set<number>();
+    const bestForm = (entry: ListoneEntry, c: (typeof parsed)[number]) => c.forms.map((f) => ({score: surnameMatches(entry, f), initial: f.initial})).sort((a, b) => b.score - a.score)[0];
     /** The candidates of a pool, best surname score first, the initial deciding between namesakes; the same person twice in the database counts once. */
     const pick = (entry: ListoneEntry, pool: typeof parsed, strict: boolean): number[] | null => {
-        let candidates = pool.map((c) => ({c, score: surnameMatches(entry, c)})).filter((x) => x.score > (strict ? 1 : 0) && !used.has(x.c.p.id));
+        let candidates = pool.map((c) => ({c, ...bestForm(entry, c)})).filter((x) => x.score > (strict ? 1 : 0) && !used.has(x.c.p.id));
         if (candidates.length === 0) return null;
         const best = Math.max(...candidates.map((x) => x.score));
         candidates = candidates.filter((x) => x.score === best);
         if (candidates.length > 1 && entry.initial) {
-            const byInitial = candidates.filter((x) => x.c.initial !== null && entry.initial!.startsWith(x.c.initial));
+            const byInitial = candidates.filter((x) => x.initial !== null && entry.initial!.startsWith(x.initial));
             if (byInitial.length >= 1) candidates = byInitial;
         } else if (strict && entry.initial) {
             // Away from the club the initial must agree, or a namesake elsewhere would take the role.
-            candidates = candidates.filter((x) => x.c.initial === null || entry.initial!.startsWith(x.c.initial));
+            candidates = candidates.filter((x) => x.initial === null || entry.initial!.startsWith(x.initial));
         }
         const names = new Set(candidates.map((x) => x.c.full));
         if (names.size !== 1) return null;
