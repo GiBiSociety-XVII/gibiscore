@@ -1,4 +1,4 @@
-import type {Purchase} from './config';
+import type {DefenceBonus, Purchase} from './config';
 import type {FantaRole, FantaScores} from './scores';
 import {bestLineup, FORMATIONS, playerValue, type FormationKey, type Lineup} from './strategies';
 
@@ -78,7 +78,7 @@ function eleven(players: ReportPlayer[], formation: FormationKey): ReportPlayer[
     );
 }
 
-export function teamReport(players: ReportPlayer[], purchases: Purchase[], slots: Record<FantaRole, number>, options: {defenceModifier?: boolean} = {}): TeamReport {
+export function teamReport(players: ReportPlayer[], purchases: Purchase[], slots: Record<FantaRole, number>, options: {defenceModifier?: boolean | DefenceBonus} = {}): TeamReport {
     const priceOf = new Map(purchases.map((p) => [p.playerId, p.price]));
     const lineup = players.length >= 11 ? bestLineup(players, {defenceModifier: options.defenceModifier}) : null;
     // Short of eleven, the formation that fields most of what is there, best first.

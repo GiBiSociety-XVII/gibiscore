@@ -21,7 +21,7 @@ import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/sco
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
-import {bestLineup, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
+import {bestLineup, defenceOption, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
@@ -269,9 +269,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const ownPurchases = mine.filter((p) => byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
     const health = strategy ? strategyHealth(plans, strategy.key, baseline, config, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
-    const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: config.modifiers.defence}) : null;
+    const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: defenceOption(config)}) : null;
     /** The report card of a manager's roster: the team's mark, the eleven, a line per role. */
-    const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: config.modifiers.defence});
+    const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: defenceOption(config)});
     const myReport = reportOf(0);
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
@@ -521,7 +521,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     {mine.length === 0 ? (
                         <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{tr('empty')}</p>
                     ) : (
-                        <ul className="flex flex-col max-h-[50vh] overflow-y-auto">
+                        <ul className="flex flex-col">
                             {ROLES.flatMap((r) => mineByRole(r).map((pu) => {
                                 const p = byId.get(pu.playerId);
                                 if (!p) return null;

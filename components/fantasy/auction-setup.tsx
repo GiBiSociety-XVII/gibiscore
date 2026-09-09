@@ -4,7 +4,7 @@ import {useState} from "react";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
-import {AUCTION_LEAGUES, DEFAULT_CONFIG, DEFAULT_SLOTS, totalSlots, type AuctionConfig, type AuctionMode} from "@/lib/fantasy/config";
+import {AUCTION_LEAGUES, DEFAULT_CONFIG, DEFAULT_SLOTS, DEFENCE_THRESHOLDS, totalSlots, type AuctionConfig, type AuctionMode} from "@/lib/fantasy/config";
 import type {FantaRole} from "@/lib/fantasy/scores";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -129,6 +129,21 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                             </label>
                         ))}
                     </div>
+                    {config.modifiers.defence && (
+                        <div className="px-3 py-2 border-t border-muted flex flex-col gap-2">
+                            <p className="text-[11px] font-semibold text-muted-foreground">{t('defenceBonusHint')}</p>
+                            <div className="grid grid-cols-6 gap-2">
+                                <Field label={t('defenceMin')}>
+                                    <NumberField value={config.defenceBonus.minDefenders} min={3} max={5} onCommit={(n) => set('defenceBonus', {...config.defenceBonus, minDefenders: n})} />
+                                </Field>
+                                {DEFENCE_THRESHOLDS.map((from, i) => (
+                                    <Field key={from} label={`≥ ${from}`}>
+                                        <NumberField value={config.defenceBonus.points[i] ?? 0} min={0} max={20} decimals onCommit={(n) => set('defenceBonus', {...config.defenceBonus, points: config.defenceBonus.points.map((v, j) => (j === i ? n : v))})} />
+                                    </Field>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
                         <input type="checkbox" checked={config.cupsCount} onChange={(e) => set('cupsCount', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
                         <span className="flex flex-col"><span className="text-[13px] font-bold">{t('cupsCount')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('cupsCountHint')}</span></span>

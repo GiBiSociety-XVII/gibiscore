@@ -89,7 +89,9 @@
     "save": "Salva e apri il listone",
     "cancel": "Annulla",
     "cupsCount": "Conta le coppe nel calcolo",
-    "cupsCountHint": "Acceso: voti, titolarità e bonus tengono conto anche di Coppa Italia, Supercoppa e coppe europee (le coppe pesano la metà nella titolarità). Spento: conta solo il campionato principale di ogni paese."
+    "cupsCountHint": "Acceso: voti, titolarità e bonus tengono conto anche di Coppa Italia, Supercoppa e coppe europee (le coppe pesano la metà nella titolarità). Spento: conta solo il campionato principale di ogni paese.",
+    "defenceBonusHint": "Punti del modificatore difesa nella tua lega: media dei voti di portiere e tre migliori difensori schierati, con almeno i difensori indicati in campo. Metti 0 sulle soglie che la lega non usa.",
+    "defenceMin": "Dif. minimi"
   },
   "board": {
     "search": "Cerca giocatore o squadra (Invio = compra il primo)",

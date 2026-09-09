@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {suggestPrices, type FantaRole} from './scores';
-import {bestLineup, FORMATIONS, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
+import {bestLineup, defenceOption, FORMATIONS, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
 
 function pool(): PoolPlayer[] {
     const out: PoolPlayer[] = [];
@@ -169,6 +169,20 @@ describe('bestLineup', () => {
         ];
         expect(bestLineup(roster).formation).toBe('3-4-3');
         expect(bestLineup(roster, {defenceModifier: true}).formation).toBe('4-3-3');
+    });
+
+    it("plays the league's own table: nothing when it pays nothing, more defenders when it pays a lot", () => {
+        const roster = [
+            player('P', 5.6),
+            ...[6.7, 6.6, 6.6, 6.2, 6.0].map((v) => player('D', v)),
+            ...[6.6, 6.5, 6.4, 6.4].map((v) => player('C', v)),
+            ...[8.0, 7.5, 6.6].map((v) => player('A', v)),
+        ];
+        expect(bestLineup(roster, {defenceModifier: {minDefenders: 4, points: [0, 0, 0, 0, 0]}})).toEqual(bestLineup(roster));
+        expect(bestLineup(roster, {defenceModifier: {minDefenders: 5, points: [4, 6, 8, 10, 12]}}).formation).toBe('5-3-2');
+        expect(defenceOption({modifiers: {defence: true, captain: false, fairPlay: false, midfield: false}, defenceBonus: {minDefenders: 4, points: [0, 0, 0, 0, 0]}})).toBe(false);
+        expect(defenceOption({modifiers: {defence: false, captain: false, fairPlay: false, midfield: false}})).toBe(false);
+        expect(defenceOption({modifiers: {defence: true, captain: false, fairPlay: false, midfield: false}})).toEqual({minDefenders: 4, points: [1, 2, 3, 4, 6]});
     });
 });
 

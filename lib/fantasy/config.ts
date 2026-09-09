@@ -45,6 +45,19 @@ export interface Modifiers {
     midfield: boolean;
 }
 
+/**
+ * What the defence modifier pays: the average vote of the keeper and the
+ * three best-voted defenders, with at least `minDefenders` fielded, earns
+ * `points[i]` from the i-th threshold (6, 6.25, 6.5, 6.75, 7).
+ */
+export interface DefenceBonus {
+    minDefenders: number;
+    points: number[];
+}
+export const DEFENCE_THRESHOLDS = [6, 6.25, 6.5, 6.75, 7] as const;
+/** Fantacalcio.it classic table. */
+export const DEFAULT_DEFENCE_BONUS: DefenceBonus = {minDefenders: 4, points: [1, 2, 3, 4, 6]};
+
 export interface AuctionConfig {
     name: string;
     league: AuctionLeague;
@@ -54,6 +67,8 @@ export interface AuctionConfig {
     slots: Record<FantaRole, number>;
     rules: ScoringRules;
     modifiers: Modifiers;
+    /** The league's defence modifier table, when the modifier is on. */
+    defenceBonus: DefenceBonus;
     /** Who is at the auction (names), first one is the user. */
     managers: string[];
     /** Chosen auction strategy (lib/fantasy/strategies.ts), drives my role budgets. */
@@ -92,6 +107,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     slots: DEFAULT_SLOTS.classic,
     rules: DEFAULT_RULES,
     modifiers: {defence: true, captain: false, fairPlay: false, midfield: false},
+    defenceBonus: DEFAULT_DEFENCE_BONUS,
     managers: [],
     strategy: null,
     formation: null,
@@ -139,6 +155,13 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         slots: {P: num(slots.P, 3, 1, 5), D: num(slots.D, 8, 3, 12), C: num(slots.C, 8, 3, 12), A: num(slots.A, 6, 2, 10)},
         rules: {...DEFAULT_RULES, ...(r.rules ?? {})},
         modifiers: {...DEFAULT_CONFIG.modifiers, ...(r.modifiers ?? {})},
+        defenceBonus: {
+            minDefenders: num(r.defenceBonus?.minDefenders, DEFAULT_DEFENCE_BONUS.minDefenders, 3, 5),
+            points: DEFENCE_THRESHOLDS.map((_, i) => {
+                const v = r.defenceBonus?.points?.[i];
+                return typeof v === 'number' && Number.isFinite(v) ? Math.min(20, Math.max(0, Math.round(v * 2) / 2)) : DEFAULT_DEFENCE_BONUS.points[i];
+            }),
+        },
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
