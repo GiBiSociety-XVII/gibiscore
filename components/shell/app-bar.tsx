@@ -149,10 +149,10 @@ export default function AppBar() {
                         href="/account"
                         aria-label={t('login')}
                         title={t('login')}
-                        aria-current={path.startsWith('/account') ? 'page' : undefined}
+                        aria-current={path.startsWith('/account') || path.startsWith('/sign') ? 'page' : undefined}
                         className={cn(
                             "inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg border-2 transition-colors",
-                            path.startsWith('/account') ? "border-foreground bg-accent/40" : "border-transparent text-foreground/70 hover:text-foreground hover:bg-muted",
+                            path.startsWith('/account') || path.startsWith('/sign') ? "border-foreground bg-accent/40" : "border-transparent text-foreground/70 hover:text-foreground hover:bg-muted",
                         )}
                     >
                         <UserRound className="w-5 h-5" aria-hidden="true" />

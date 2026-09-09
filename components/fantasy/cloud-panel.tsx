@@ -2,7 +2,7 @@
 
 import {Cloud, CloudOff, Trash2} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
-import {useFormatter, useLocale, useTranslations} from "next-intl";
+import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
@@ -22,7 +22,6 @@ const AUTOSAVE_MS = 2_500;
 export function CloudPanel({config, purchases}: {config: AuctionConfig | null; purchases: Purchase[]}) {
     const t = useTranslations('Fantasy.cloud');
     const format = useFormatter();
-    const locale = useLocale();
     const link = cloudStore.useValue();
     const [user, setUser] = useState<CloudUser | null | undefined>(undefined);
     const [saved, setSaved] = useState<CloudAuction[]>([]);
@@ -126,7 +125,7 @@ export function CloudPanel({config, purchases}: {config: AuctionConfig | null; p
         }
     };
 
-    const next = `/${locale}/fantacalcio/asta`;
+    const next = '/fantacalcio/asta';
     const btn = "bb-btn h-8 px-2.5 text-[12px] font-extrabold inline-flex items-center gap-1 disabled:opacity-50";
 
     if (user === undefined) return null;
@@ -136,7 +135,7 @@ export function CloudPanel({config, purchases}: {config: AuctionConfig | null; p
             <Panel title={t('title')}>
                 <div className="px-3 py-3 flex flex-col gap-2">
                     <p className="text-[12px] font-semibold text-muted-foreground">{t('signedOut')}</p>
-                    <Link href={{pathname: '/account', query: {next}}} className={cn(btn, "bg-accent self-start")}>
+                    <Link href={{pathname: '/signin', query: {next}}} className={cn(btn, "bg-accent self-start")}>
                         <Cloud className="w-3.5 h-3.5" /> {t('signIn')}
                     </Link>
                 </div>
