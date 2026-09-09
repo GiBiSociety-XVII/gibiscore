@@ -10,11 +10,14 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {CloudPanel} from "./cloud-panel";
+import {ROLE_CLASS, RoleBadge} from "./role-badge";
+import {TeamReportCard} from "./team-report";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
+import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
 import {bestLineup, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
@@ -26,11 +29,6 @@ const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team
 type SortKey = 'overall' | 'price' | 'fantaAvg' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
 
-const ROLE_CLASS: Record<FantaRole, string> = {P: 'bg-amber-200', D: 'bg-emerald-200', C: 'bg-sky-200', A: 'bg-rose-200'};
-
-function RoleBadge({role}: {role: FantaRole}) {
-    return <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded border border-foreground font-mono text-[11px] font-extrabold", ROLE_CLASS[role])}>{role}</span>;
-}
 
 function ScoreCell({value}: {value: number}) {
     return (
@@ -282,6 +280,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         })
         .sort((a, b) => b.total - a.total || a.team.name.localeCompare(b.team.name));
     const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: config.modifiers.defence}) : null;
+    /** The report card of a manager's roster: the team's mark, the eleven, a line per role. */
+    const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: config.modifiers.defence});
+    const myReport = reportOf(0);
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
     // never more than what leaves me enough to finish the roster with the cheapest players left.
@@ -523,6 +524,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             {market.inflation !== 1 && <span className={cn(market.inflation > 1 ? "text-red-700" : "text-emerald-700")}>{tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}</span>}
                         </div>
                     )}
+                    {mine.length > 0 && (
+                        <div className="border-b border-muted">
+                            <p className="px-3 pt-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('report.title')}</p>
+                            <TeamReportCard report={myReport} />
+                        </div>
+                    )}
                     {mine.length === 0 ? (
                         <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{tr('empty')}</p>
                     ) : (
@@ -571,23 +578,19 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 const theirPlayers = theirs.map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p);
                                 const theirLineup = theirPlayers.length >= 11 ? bestLineup(theirPlayers, {defenceModifier: config.modifiers.defence}) : null;
                                 const theirTeams = new Set(theirPlayers.map((p) => p.team.id));
+                                const theirReport = reportOf(manager);
                                 return (
                                     <li key={m} className="border-t border-muted first:border-t-0">
                                         <button type="button" onClick={() => setOpenManager(isOpen ? null : manager)} aria-expanded={isOpen} className="w-full flex items-center gap-2 px-3 h-9 text-left text-[12px] font-bold hover:bg-muted/50">
                                             <span className="truncate">{m}</span>
                                             <span className="ml-auto font-mono tabular-nums text-muted-foreground whitespace-nowrap">{theirs.length}/{slotsTotal} · {theirLeft} cr.</span>
+                                            <span className={cn("inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-md border-2 border-foreground font-mono text-[12px] font-extrabold tabular-nums shrink-0", theirs.length === 0 ? "bg-card text-muted-foreground" : theirReport.overall >= 70 ? "bg-accent" : "bg-card")} title={tr('report.overallHint')}>{theirs.length === 0 ? '–' : theirReport.overall}</span>
                                             {isOpen ? <ChevronUp className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
                                         </button>
                                         {isOpen && (
                                             <div className="flex flex-col border-t border-muted bg-muted/20">
-                                                <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
-                                                    {ROLES.map((r) => (
-                                                        <div key={r} className="px-2 py-1 flex flex-col items-center gap-0.5">
-                                                            <RoleBadge role={r} />
-                                                            <span className={cn("font-mono text-[11px] font-extrabold tabular-nums", roleFull(manager, r) && "text-emerald-700")}>{tr('slots', {filled: roleCount(manager, r), total: config.slots[r]})}</span>
-                                                            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{theirs.filter((pu) => byId.get(pu.playerId)?.role === r).reduce((sum, pu) => sum + pu.price, 0)} cr.</span>
-                                                        </div>
-                                                    ))}
+                                                <div className="border-b border-muted">
+                                                    <TeamReportCard report={theirReport} compact />
                                                 </div>
                                                 <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
                                                     {tr('othersSpent', {spent: config.credits - theirLeft, credits: config.credits, teams: theirTeams.size})}
