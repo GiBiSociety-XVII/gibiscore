@@ -11,7 +11,8 @@ import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {CloudPanel} from "./cloud-panel";
 import {ROLE_CLASS, RoleBadge} from "./role-badge";
-import {TeamReportCard} from "./team-report";
+import {TeamRecap} from "./team-report";
+import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
@@ -135,6 +136,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const purchases = purchasesStore.useValue();
     const [editing, setEditing] = useState(false);
     const [showStrategies, setShowStrategies] = useState(false);
+    const [teamsTab, setTeamsTab] = useState<TeamsTab | null>(null);
 
     const [q, setQ] = useState('');
     const [role, setRole] = useState<FantaRole | 'all'>('all');
@@ -524,12 +526,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             {market.inflation !== 1 && <span className={cn(market.inflation > 1 ? "text-red-700" : "text-emerald-700")}>{tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}</span>}
                         </div>
                     )}
-                    {mine.length > 0 && (
-                        <div className="border-b border-muted">
-                            <p className="px-3 pt-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('report.title')}</p>
-                            <TeamReportCard report={myReport} />
-                        </div>
-                    )}
+                    <div className="border-b border-muted">
+                        <TeamRecap report={myReport} onOpen={() => setTeamsTab(0)} />
+                    </div>
                     {mine.length === 0 ? (
                         <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{tr('empty')}</p>
                     ) : (
@@ -568,7 +567,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     </ul>
                 </Panel>
                 {managers.length > 1 && (
-                    <Panel title={tr('others')} action={<span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{tr('othersHint')}</span>}>
+                    <Panel title={tr('others')} action={<button type="button" onClick={() => setTeamsTab('compare')} className="text-[11px] font-extrabold underline decoration-accent decoration-[2px] underline-offset-2 whitespace-nowrap">{tr('report.compareAll')}</button>}>
                         <ul className="flex flex-col">
                             {managers.slice(1).map((m, i) => {
                                 const manager = i + 1;
@@ -584,13 +583,19 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         <button type="button" onClick={() => setOpenManager(isOpen ? null : manager)} aria-expanded={isOpen} className="w-full flex items-center gap-2 px-3 h-9 text-left text-[12px] font-bold hover:bg-muted/50">
                                             <span className="truncate">{m}</span>
                                             <span className="ml-auto font-mono tabular-nums text-muted-foreground whitespace-nowrap">{theirs.length}/{slotsTotal} · {theirLeft} cr.</span>
-                                            <span className={cn("inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-md border-2 border-foreground font-mono text-[12px] font-extrabold tabular-nums shrink-0", theirs.length === 0 ? "bg-card text-muted-foreground" : theirReport.overall >= 70 ? "bg-accent" : "bg-card")} title={tr('report.overallHint')}>{theirs.length === 0 ? '–' : theirReport.overall}</span>
+                                            <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setTeamsTab(manager); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setTeamsTab(manager); } }} className={cn("inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-md border-2 border-foreground font-mono text-[12px] font-extrabold tabular-nums shrink-0 hover:bg-accent", theirs.length === 0 ? "bg-card text-muted-foreground" : "bg-card")} title={tr('report.openTeam')}>{theirs.length === 0 ? '–' : theirReport.overall}</span>
                                             {isOpen ? <ChevronUp className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
                                         </button>
                                         {isOpen && (
                                             <div className="flex flex-col border-t border-muted bg-muted/20">
-                                                <div className="border-b border-muted">
-                                                    <TeamReportCard report={theirReport} compact />
+                                                <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
+                                                    {ROLES.map((r) => (
+                                                        <div key={r} className="px-2 py-1 flex flex-col items-center gap-0.5">
+                                                            <RoleBadge role={r} />
+                                                            <span className={cn("font-mono text-[11px] font-extrabold tabular-nums", roleFull(manager, r) && "text-emerald-700")}>{tr('slots', {filled: roleCount(manager, r), total: config.slots[r]})}</span>
+                                                            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{theirs.filter((pu) => byId.get(pu.playerId)?.role === r).reduce((sum, pu) => sum + pu.price, 0)} cr.</span>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                                 <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
                                                     {tr('othersSpent', {spent: config.credits - theirLeft, credits: config.credits, teams: theirTeams.size})}
@@ -623,6 +628,18 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     </Panel>
                 )}
             </div>
+
+            {/* Every roster, in full */}
+            {teamsTab !== null && (
+                <TeamsDialog
+                    teams={managers.map((name, manager) => ({manager, name: manager === 0 ? `${name} (${t('mine')})` : name, report: reportOf(manager), players: rosterOf(manager).map((pu) => ({player: byId.get(pu.playerId)!, price: pu.price})), spent: config.credits - creditsLeftOf(manager), left: creditsLeftOf(manager)}))}
+                    credits={config.credits}
+                    tiers={tiers}
+                    initial={teamsTab}
+                    onClose={() => setTeamsTab(null)}
+                    onRelease={release}
+                />
+            )}
 
             {/* Strategies */}
             {showStrategies && (

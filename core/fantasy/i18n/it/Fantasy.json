@@ -217,7 +217,8 @@
       "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
       "fvm": "FVM {fvm}",
       "mantra": "Mantra: {roles}"
-    }
+    },
+    "close": "Chiudi"
   },
   "roster": {
     "title": "La mia rosa",
@@ -269,7 +270,28 @@
       "colStarter": "Titolarità",
       "colStarterShort": "Tit.",
       "colOverall": "Voto",
-      "colSpent": "Spesi"
+      "colSpent": "Spesi",
+      "open": "Scheda squadre",
+      "openTeam": "Apri la scheda di questa squadra",
+      "compareAll": "Confronta",
+      "dialogTitle": "Squadre",
+      "dialogHint": "Voti, titolarità e rosa di ogni presidente",
+      "compare": "Confronto",
+      "compareHint": "Ordine per voto della squadra. Crediti: spesi / rimasti su {credits}.",
+      "colTeam": "Squadra",
+      "colLineup": "Modulo",
+      "colRoster": "Rosa",
+      "colStarters": "Titolari",
+      "colSpentLeft": "Spesi / rimasti",
+      "spentLeft": "{spent} spesi · {left} rimasti su {credits}",
+      "noPlayers": "Nessun acquisto ancora.",
+      "colPlayer": "Giocatore",
+      "colClub": "Club",
+      "colTier": "Fascia",
+      "colFm": "FM",
+      "colPrice": "Pagato",
+      "playerInjured": "Infortunato a lungo",
+      "playerContested": "Posto conteso"
     }
   },
   "strategies": {

@@ -8,11 +8,41 @@ import {RoleBadge} from "./role-badge";
 /** Mark tone: sure from 70, so-so from 45, weak below. */
 const tone = (value: number) => (value >= 70 ? "bg-accent" : value >= 45 ? "bg-accent/45" : "bg-foreground/15");
 
-function Meter({value, className}: {value: number; className?: string}) {
+export function Meter({value, className}: {value: number; className?: string}) {
     return (
         <span className={cn("relative block h-1.5 rounded-full overflow-hidden bg-muted border border-foreground/20", className)} aria-hidden="true">
             <span className={cn("absolute inset-y-0 left-0 rounded-full", tone(value))} style={{width: `${Math.max(0, Math.min(100, value))}%`}} />
         </span>
+    );
+}
+
+/** One strip for the sidebar: the team's mark, how sure the eleven are, their fantasy average, the shape. The rest is behind a button. */
+export function TeamRecap({report, onOpen}: {report: Report; onOpen: () => void}) {
+    const t = useTranslations('Fantasy.roster.report');
+    const empty = report.filled === 0;
+    return (
+        <div className="flex items-stretch gap-3 px-3 py-2 text-[12px]">
+            <button type="button" onClick={onOpen} className="flex flex-col items-center justify-center shrink-0 w-14 rounded-lg border-2 border-foreground bg-card hover:bg-accent transition-colors" title={t('overallHint')}>
+                <span className={cn("font-mono text-2xl font-extrabold tabular-nums leading-none", empty && "text-muted-foreground")}>{empty ? '–' : report.overall}</span>
+                <span className="text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground mt-1">{t('overall')}</span>
+            </button>
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                <div className="flex items-center gap-2" title={t('starterHint')}>
+                    <span className="w-16 shrink-0 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('starter')}</span>
+                    <Meter value={empty ? 0 : report.starter} className="flex-1" />
+                    <span className="w-7 text-right font-mono font-extrabold tabular-nums">{empty ? '–' : report.starter}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                    <span>{t('fantaAvg')} <span className="font-mono font-extrabold tabular-nums text-foreground">{report.fantaAvg === null ? '–' : report.fantaAvg.toFixed(1)}</span></span>
+                    <span className="ml-auto whitespace-nowrap" title={t('lineupHint')}>{report.lineup ? <>{report.lineup.formation} <span className="font-mono tabular-nums text-foreground">{report.lineup.value.toFixed(1)}</span></> : t('short', {missing: Math.max(0, 11 - report.filled)})}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-semibold text-muted-foreground">
+                    <span>{t('starters', {count: report.starters})}</span>
+                    {report.injured > 0 && <span className="text-red-700">{t('injuredShort', {count: report.injured})}</span>}
+                    <button type="button" onClick={onOpen} className="ml-auto text-[11px] font-extrabold text-foreground underline decoration-accent decoration-[2px] underline-offset-2 whitespace-nowrap">{t('open')}</button>
+                </div>
+            </div>
+        </div>
     );
 }
 
