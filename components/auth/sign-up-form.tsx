@@ -14,10 +14,8 @@ const USERNAME_MIN = 3;
 const PASSWORD_MIN = 8;
 
 /**
- * Name, email, password twice. The account is created from the browser;
- * with e-mail confirmation on, the link in the e-mail lands on
- * /api/auth/callback and continues to `next`, and the confirmation page
- * says so; with it off the session is already there and `next` loads.
+ * Name, email, password twice. The account is created from the browser
+ * and is signed in at once (no e-mail confirmation): the home loads.
  */
 export function SignUpForm({next, callback, locale}: {next: string; /** Absolute URL of the auth callback, with `next` already in it. */ callback: string; locale: string}) {
     const t = useTranslations('Account.signUp');
@@ -38,14 +36,13 @@ export function SignUpForm({next, callback, locale}: {next: string; /** Absolute
         if (password.length < PASSWORD_MIN) return setError(t('errorPasswordMin', {min: PASSWORD_MIN}));
         setLoading(true);
         try {
-            const {data, error} = await createClient().auth.signUp({
+            const {error} = await createClient().auth.signUp({
                 email: email.trim(),
                 password,
                 options: {emailRedirectTo: callback, data: {username: name, full_name: name}},
             });
             if (error) throw error;
-            // Confirmation off: signed in already. On: the e-mail completes it.
-            window.location.assign(data.session ? next : localePath(locale, `/signup-success?next=${encodeURIComponent(next)}`));
+            window.location.assign(localePath(locale, '/'));
         } catch (err) {
             setError(te(authErrorKey(err instanceof Error ? err.message : '')));
             setLoading(false);

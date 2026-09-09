@@ -4,7 +4,6 @@ import {authErrorKey} from './errors';
 describe('authErrorKey', () => {
     it('recognises the messages Supabase Auth sends', () => {
         expect(authErrorKey('Invalid login credentials')).toBe('credentials');
-        expect(authErrorKey('Email not confirmed')).toBe('unconfirmed');
         expect(authErrorKey('User already registered')).toBe('exists');
         expect(authErrorKey('Password should be at least 8 characters')).toBe('weak');
         expect(authErrorKey('Email rate limit exceeded')).toBe('rate');

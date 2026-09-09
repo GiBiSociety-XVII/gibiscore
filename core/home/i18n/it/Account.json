@@ -39,16 +39,8 @@
     "errorPasswordMismatch": "Le password non corrispondono",
     "errorPasswordMin": "La password deve avere almeno {min} caratteri"
   },
-  "success": {
-    "title": "Registrazione riuscita!",
-    "subtitle": "Ti abbiamo mandato un'email: apri il link per confermare l'account, poi accedi.",
-    "redirecting": "Tra pochi secondi torni all'asta. Puoi aprire il link dell'email anche più tardi.",
-    "go": "Vai all'asta",
-    "help": "Clicca il bottone sopra se non vieni reindirizzato automaticamente. Non trovi l'email? Controlla lo spam."
-  },
   "errors": {
     "credentials": "Email o password non corretti",
-    "unconfirmed": "Devi prima confermare l'email: controlla la posta",
     "exists": "Esiste già un account con questa email: accedi",
     "weak": "La password è troppo debole",
     "rate": "Troppi tentativi: riprova tra qualche minuto",
