@@ -121,7 +121,7 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                     </div>
                 </Panel>
                 <Panel title={t('modifiers')}>
-                    <div className="grid grid-cols-2 gap-2 px-3 py-3">
+                    <div className="flex flex-col gap-2 px-3 py-3">
                         {(Object.keys(config.modifiers) as Array<keyof AuctionConfig['modifiers']>).map((k) => (
                             <label key={k} className="flex items-center gap-2 text-[13px] font-bold">
                                 <input type="checkbox" checked={config.modifiers[k]} onChange={(e) => set('modifiers', {...config.modifiers, [k]: e.target.checked})} className="w-4 h-4 accent-[rgb(var(--accent))]" />

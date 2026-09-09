@@ -79,10 +79,7 @@
     },
     "modifiers": "Modificatori",
     "modifier": {
-      "defence": "Modificatore difesa",
-      "captain": "Capitano",
-      "fairPlay": "Fair play",
-      "midfield": "Modificatore centrocampo"
+      "defence": "Modificatore difesa"
     },
     "managers": "Squadre al tavolo",
     "managersHint": "Un nome per riga, il primo sei tu. Facoltativo: serve per segnare a chi va ogni giocatore.",

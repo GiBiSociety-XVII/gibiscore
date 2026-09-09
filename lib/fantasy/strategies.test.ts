@@ -19,7 +19,7 @@ function pool(): PoolPlayer[] {
     return out;
 }
 
-const config = {credits: 500, participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}, modifiers: {defence: false, captain: false, fairPlay: false, midfield: false}};
+const config = {credits: 500, participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}, modifiers: {defence: false}};
 
 describe('slotFractions', () => {
     it('sums to one and gets steeper with focus', () => {
@@ -180,9 +180,9 @@ describe('bestLineup', () => {
         ];
         expect(bestLineup(roster, {defenceModifier: {minDefenders: 4, points: [0, 0, 0, 0, 0]}})).toEqual(bestLineup(roster));
         expect(bestLineup(roster, {defenceModifier: {minDefenders: 5, points: [4, 6, 8, 10, 12]}}).formation).toBe('5-3-2');
-        expect(defenceOption({modifiers: {defence: true, captain: false, fairPlay: false, midfield: false}, defenceBonus: {minDefenders: 4, points: [0, 0, 0, 0, 0]}})).toBe(false);
-        expect(defenceOption({modifiers: {defence: false, captain: false, fairPlay: false, midfield: false}})).toBe(false);
-        expect(defenceOption({modifiers: {defence: true, captain: false, fairPlay: false, midfield: false}})).toEqual({minDefenders: 4, points: [1, 2, 3, 4, 6]});
+        expect(defenceOption({modifiers: {defence: true}, defenceBonus: {minDefenders: 4, points: [0, 0, 0, 0, 0]}})).toBe(false);
+        expect(defenceOption({modifiers: {defence: false}})).toBe(false);
+        expect(defenceOption({modifiers: {defence: true}})).toEqual({minDefenders: 4, points: [1, 2, 3, 4, 6]});
     });
 });
 

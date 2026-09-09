@@ -40,9 +40,6 @@ export interface ScoringRules {
 
 export interface Modifiers {
     defence: boolean;
-    captain: boolean;
-    fairPlay: boolean;
-    midfield: boolean;
 }
 
 /**
@@ -106,7 +103,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     credits: 500,
     slots: DEFAULT_SLOTS.classic,
     rules: DEFAULT_RULES,
-    modifiers: {defence: true, captain: false, fairPlay: false, midfield: false},
+    modifiers: {defence: true},
     defenceBonus: DEFAULT_DEFENCE_BONUS,
     managers: [],
     strategy: null,
@@ -154,7 +151,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         credits: num(r.credits, DEFAULT_CONFIG.credits, 50, 5000),
         slots: {P: num(slots.P, 3, 1, 5), D: num(slots.D, 8, 3, 12), C: num(slots.C, 8, 3, 12), A: num(slots.A, 6, 2, 10)},
         rules: {...DEFAULT_RULES, ...(r.rules ?? {})},
-        modifiers: {...DEFAULT_CONFIG.modifiers, ...(r.modifiers ?? {})},
+        modifiers: {defence: typeof r.modifiers?.defence === 'boolean' ? r.modifiers.defence : DEFAULT_CONFIG.modifiers.defence},
         defenceBonus: {
             minDefenders: num(r.defenceBonus?.minDefenders, DEFAULT_DEFENCE_BONUS.minDefenders, 3, 5),
             points: DEFENCE_THRESHOLDS.map((_, i) => {
