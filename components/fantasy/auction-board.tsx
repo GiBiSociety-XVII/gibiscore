@@ -9,13 +9,19 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
+import {CloudMenu, CloudPanel} from "./cloud-panel";
+import {RoleBadge} from "./role-badge";
+import {TeamRecap} from "./team-report";
+import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
-import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
-import {bestLineup, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
+import {teamReport} from "@/lib/fantasy/report";
+import {playerMatches} from "@/lib/fantasy/search";
+import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
+import {bestLineup, defenceOption, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
@@ -24,11 +30,6 @@ const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team
 type SortKey = 'overall' | 'price' | 'fantaAvg' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
 
-const ROLE_CLASS: Record<FantaRole, string> = {P: 'bg-amber-200', D: 'bg-emerald-200', C: 'bg-sky-200', A: 'bg-rose-200'};
-
-function RoleBadge({role}: {role: FantaRole}) {
-    return <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded border border-foreground font-mono text-[11px] font-extrabold", ROLE_CLASS[role])}>{role}</span>;
-}
 
 function ScoreCell({value}: {value: number}) {
     return (
@@ -135,12 +136,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const purchases = purchasesStore.useValue();
     const [editing, setEditing] = useState(false);
     const [showStrategies, setShowStrategies] = useState(false);
+    const [teamsTab, setTeamsTab] = useState<TeamsTab | null>(null);
 
     const [q, setQ] = useState('');
     const [role, setRole] = useState<FantaRole | 'all'>('all');
     const [tier, setTier] = useState<Tier | 'all'>('all');
     const [view, setView] = useState<'list' | 'tiers'>('list');
-    const [openManager, setOpenManager] = useState<number | null>(null);
     const [teamId, setTeamId] = useState<number | 'all'>('all');
     const [hideBought, setHideBought] = useState(false);
     const [sort, setSort] = useState<SortKey>('overall');
@@ -182,7 +183,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
-        const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (tier === 'all' || tiers.get(p.id) === tier) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || p.name.toLowerCase().includes(needle) || p.team.name.toLowerCase().includes(needle)));
+        const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (tier === 'all' || tiers.get(p.id) === tier) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || playerMatches(p, needle)));
         const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'name' ? p.name : p.scores[sort]);
         return list.sort((a, b) => {
             const va = value(a);
@@ -199,7 +200,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         setEditing(false);
         if (!pool || next.league !== pool.league) router.push(`/fantacalcio/asta?league=${next.league}`);
     };
-    if (!config || editing) return <AuctionSetup initial={config} onSave={save} onCancel={config ? () => setEditing(false) : undefined} />;
+    if (!config) {
+        return (
+            <div className="flex flex-col gap-3">
+                <CloudPanel purchases={purchases} />
+                <AuctionSetup initial={null} onSave={save} />
+            </div>
+        );
+    }
+    if (editing) return <AuctionSetup initial={config} onSave={save} onCancel={() => setEditing(false)} />;
     if (pool && pool.league !== config.league) {
         router.replace(`/fantacalcio/asta?league=${config.league}`);
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
@@ -218,6 +227,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (window.confirm(ta('resetConfirm'))) {
             purchasesStore.write([]);
             configStore.write(null);
+            cloudStore.write(null);
         }
     };
     // Roster limits per manager: slots of the role, and credits that must leave 1 per open slot.
@@ -259,18 +269,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const ownPurchases = mine.filter((p) => byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
     const health = strategy ? strategyHealth(plans, strategy.key, baseline, config, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
-    // My players club by club: every club of the list, the ones I bought from first.
-    const teamsMine = pool.teams
-        .map((team) => {
-            const roles = {P: 0, D: 0, C: 0, A: 0} as Record<FantaRole, number>;
-            for (const pu of mine) {
-                const p = byId.get(pu.playerId);
-                if (p && p.team.id === team.id) roles[p.role] += 1;
-            }
-            return {team, roles, total: roles.P + roles.D + roles.C + roles.A};
-        })
-        .sort((a, b) => b.total - a.total || a.team.name.localeCompare(b.team.name));
-    const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: config.modifiers.defence}) : null;
+    const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: defenceOption(config)}) : null;
+    /** The report card of a manager's roster: the team's mark, the eleven, a line per role. */
+    const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: defenceOption(config)});
+    const myReport = reportOf(0);
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
     // never more than what leaves me enough to finish the roster with the cheapest players left.
@@ -315,6 +317,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: tst(`${health.best.key}.name`)})}</span>}
                             </button>
                         )}
+                        <CloudMenu config={config} purchases={purchases} />
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
                         <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
@@ -406,7 +409,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                     <TeamCrest team={p.team} size={16} />
                                                     <span className="flex flex-col leading-tight min-w-0">
                                                         <span className="inline-flex items-center gap-1 min-w-0">
-                                                            <Link href={`/players/${p.slug}`} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
+                                                            <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" title={p.fullName ?? undefined} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
                                                             {targets.has(p.id) && !purchase && <span className={cn("bb-badge text-[9px] h-4 px-1 shrink-0", wanted.has(p.id) ? "bg-foreground text-background" : "bg-accent")} title={wanted.has(p.id) ? tst('pinned') : tst('target')}>★</span>}
                                                             {avoided.has(p.id) && !purchase && <span className="bb-badge bg-card text-[9px] h-4 px-1 shrink-0 text-muted-foreground" title={tst('ignored')}>✕</span>}
                                                         </span>
@@ -512,17 +515,20 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             {market.inflation !== 1 && <span className={cn(market.inflation > 1 ? "text-red-700" : "text-emerald-700")}>{tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}</span>}
                         </div>
                     )}
+                    <div className="border-b border-muted">
+                        <TeamRecap report={myReport} onOpen={() => setTeamsTab(0)} />
+                    </div>
                     {mine.length === 0 ? (
                         <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{tr('empty')}</p>
                     ) : (
-                        <ul className="flex flex-col max-h-[50vh] overflow-y-auto">
+                        <ul className="flex flex-col">
                             {ROLES.flatMap((r) => mineByRole(r).map((pu) => {
                                 const p = byId.get(pu.playerId);
                                 if (!p) return null;
                                 return (
                                     <li key={pu.playerId} className="flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0">
                                         <RoleBadge role={p.role} />
-                                        <Link href={`/players/${p.slug}`} className="text-[12px] font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
+                                        <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
                                         <span className="ml-auto font-mono text-[12px] font-extrabold tabular-nums">{pu.price}</span>
                                         <button type="button" onClick={() => release(pu.playerId)} aria-label={t('release')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
                                     </li>
@@ -531,83 +537,19 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </ul>
                     )}
                 </Panel>
-                {/* My players by club: every club of the list, count and roles */}
-                <Panel title={tr('byTeam')} action={<span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{tr('byTeamTotal', {count: mine.length, teams: teamsMine.filter((tm) => tm.total > 0).length})}</span>}>
-                    <ul className="flex flex-col max-h-[60vh] overflow-y-auto" title={tr('byTeamHint')}>
-                        {teamsMine.map((tm) => (
-                            <li key={tm.team.id} className={cn("flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0 text-[12px] font-bold", tm.total === 0 && "text-muted-foreground")}>
-                                <TeamCrest team={tm.team} size={16} />
-                                <span className="truncate">{tm.team.name}</span>
-                                <span className="ml-auto flex items-center gap-1 shrink-0">
-                                    {ROLES.map((r) => tm.roles[r] > 0 && (
-                                        <span key={r} className={cn("inline-flex items-center justify-center h-5 min-w-5 px-1 rounded border border-foreground font-mono text-[10px] font-extrabold tabular-nums", ROLE_CLASS[r])}>{r}{tm.roles[r]}</span>
-                                    ))}
-                                    <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded-md border-2 font-mono text-[12px] font-extrabold tabular-nums", tm.total > 0 ? "border-foreground bg-accent" : "border-foreground/30 bg-card")}>{tm.total}</span>
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </Panel>
-                {managers.length > 1 && (
-                    <Panel title={tr('others')} action={<span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{tr('othersHint')}</span>}>
-                        <ul className="flex flex-col">
-                            {managers.slice(1).map((m, i) => {
-                                const manager = i + 1;
-                                const theirs = rosterOf(manager);
-                                const theirLeft = creditsLeftOf(manager);
-                                const isOpen = openManager === manager;
-                                const theirPlayers = theirs.map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p);
-                                const theirLineup = theirPlayers.length >= 11 ? bestLineup(theirPlayers, {defenceModifier: config.modifiers.defence}) : null;
-                                const theirTeams = new Set(theirPlayers.map((p) => p.team.id));
-                                return (
-                                    <li key={m} className="border-t border-muted first:border-t-0">
-                                        <button type="button" onClick={() => setOpenManager(isOpen ? null : manager)} aria-expanded={isOpen} className="w-full flex items-center gap-2 px-3 h-9 text-left text-[12px] font-bold hover:bg-muted/50">
-                                            <span className="truncate">{m}</span>
-                                            <span className="ml-auto font-mono tabular-nums text-muted-foreground whitespace-nowrap">{theirs.length}/{slotsTotal} · {theirLeft} cr.</span>
-                                            {isOpen ? <ChevronUp className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-                                        </button>
-                                        {isOpen && (
-                                            <div className="flex flex-col border-t border-muted bg-muted/20">
-                                                <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
-                                                    {ROLES.map((r) => (
-                                                        <div key={r} className="px-2 py-1 flex flex-col items-center gap-0.5">
-                                                            <RoleBadge role={r} />
-                                                            <span className={cn("font-mono text-[11px] font-extrabold tabular-nums", roleFull(manager, r) && "text-emerald-700")}>{tr('slots', {filled: roleCount(manager, r), total: config.slots[r]})}</span>
-                                                            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{theirs.filter((pu) => byId.get(pu.playerId)?.role === r).reduce((sum, pu) => sum + pu.price, 0)} cr.</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                                                    {tr('othersSpent', {spent: config.credits - theirLeft, credits: config.credits, teams: theirTeams.size})}
-                                                    {theirLineup && <span className="block">{tr('formationNow', {formation: theirLineup.formation})} <span className="font-mono text-[10px] tabular-nums">{theirLineup.value.toFixed(1)}</span></span>}
-                                                </p>
-                                                {theirs.length === 0 ? (
-                                                    <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground">{tr('othersEmpty')}</p>
-                                                ) : (
-                                                    <ul className="flex flex-col max-h-[40vh] overflow-y-auto">
-                                                        {ROLES.flatMap((r) => theirs.filter((pu) => byId.get(pu.playerId)?.role === r).sort((a, b) => b.price - a.price).map((pu) => {
-                                                            const p = byId.get(pu.playerId)!;
-                                                            return (
-                                                                <li key={pu.playerId} className="flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0">
-                                                                    <RoleBadge role={p.role} />
-                                                                    <Link href={`/players/${p.slug}`} className="text-[12px] font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
-                                                                    <span className="text-[10px] font-semibold text-muted-foreground truncate">{p.team.name}</span>
-                                                                    <span className="ml-auto font-mono text-[12px] font-extrabold tabular-nums">{pu.price}</span>
-                                                                    <button type="button" onClick={() => release(pu.playerId)} aria-label={t('release')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
-                                                                </li>
-                                                            );
-                                                        }))}
-                                                    </ul>
-                                                )}
-                                            </div>
-                                        )}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </Panel>
-                )}
             </div>
+
+            {/* Every roster, in full */}
+            {teamsTab !== null && (
+                <TeamsDialog
+                    teams={managers.map((name, manager) => ({manager, name: manager === 0 ? `${name} (${t('mine')})` : name, report: reportOf(manager), players: rosterOf(manager).map((pu) => ({player: byId.get(pu.playerId)!, price: pu.price})), spent: config.credits - creditsLeftOf(manager), left: creditsLeftOf(manager)}))}
+                    credits={config.credits}
+                    tiers={tiers}
+                    initial={teamsTab}
+                    onClose={() => setTeamsTab(null)}
+                    onRelease={release}
+                />
+            )}
 
             {/* Strategies */}
             {showStrategies && (

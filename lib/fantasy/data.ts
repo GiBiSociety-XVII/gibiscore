@@ -11,6 +11,7 @@ import type {SidelinedEntry, TeamSummary} from '@/lib/football/types';
 import serieAListone from '@/core/fantasy/listone/serie-a.json';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
 import {matchListone, parseListone, type ListoneMatch, type ListoneRow} from './listone';
+import {lastWindowClose, resolveClub, type ClubEvidence} from './membership';
 import {deriveRole, findRivals, isContested, type Availability, type SlotStart, type SlotUse} from './roles';
 import {scorePlayer, type FantaRole, type FantaScores, type SeasonLine} from './scores';
 
@@ -23,6 +24,8 @@ import {scorePlayer, type FantaRole, type FantaScores, type SeasonLine} from './
 export interface AuctionPlayer {
     id: number;
     name: string;
+    /** First and last name, when the provider gives them: "Pote" is Pedro Gonçalves. */
+    fullName: string | null;
     slug: string;
     role: FantaRole;
     age: number | null;
@@ -158,6 +161,14 @@ function chunk<T>(items: T[], size: number): T[][] {
     return out;
 }
 
+/** "P. Pereira Gonçalves" and "Pedro António Pereira Gonçalves" from the profile's first and last name, when both are there. */
+function nameForms(first: string | null, last: string | null): string[] {
+    const f = first?.trim() ?? '';
+    const l = last?.trim() ?? '';
+    if (!l) return [];
+    return f ? [`${f[0]}. ${l}`, `${f} ${l}`] : [l];
+}
+
 /** Builds the pool, or throws: a failure must never be cached as an empty list. */
 async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
     {
@@ -178,32 +189,74 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         const {data: feederRows} = feederSlugs.length > 0 ? await db.from('leagues').select('id,slug,seasons(id,year)').in('slug', feederSlugs) : {data: []};
         const feederIds = ((feederRows ?? []) as unknown as Array<{id: number; slug: string; seasons: Array<{id: number; year: number}>}>).flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => ({id: s.id, slug: l.slug})));
 
-        // Current squads, plus anyone with statistics for a club of these
-        // leagues this season: the provider's squads lag behind transfers,
-        // the season statistics list a player under his new club as soon as
-        // he plays. Whichever source was written last decides the club.
-        type Member = {player: {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null}; team: TeamRow; league: string; leagueSlug: string; at: string};
-        const [squad, played] = await Promise.all([
+        // Who plays for these clubs now: the provider's squad lists, the season statistics
+        // (a line under a club as soon as he plays there), the injury lists. None is enough
+        // alone (see membership.ts): every player's evidence is weighed, dated matches and
+        // injury reports first.
+        type PoolPlayer = {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null; first_name: string | null; last_name: string | null};
+        type Member = {player: PoolPlayer; team: TeamRow; league: string; leagueSlug: string};
+        const PLAYER_SELECT = 'id,name,slug,position,age,image_url,first_name,last_name';
+        const seasonStart = `${year}-07-01`;
+        const [squad, played, listedOut] = await Promise.all([
             fetchAll(
-                (a, b) => db.from('squad_members').select(`season_id,team_id,updated_at,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('season_id', seasons.map((s) => s.season.id)).order('player_id').range(a, b),
+                (a, b) => db.from('squad_members').select(`season_id,player:players(${PLAYER_SELECT}),team:teams(${TEAM_SELECT})`).in('season_id', currentIds).order('player_id').range(a, b),
                 {max: 6000},
-            ) as unknown as Promise<Array<{season_id: number; updated_at: string; player: Member['player'] | null; team: TeamRow | null}>>,
+            ) as unknown as Promise<Array<{season_id: number; player: PoolPlayer | null; team: TeamRow | null}>>,
             fetchAll(
-                (a, b) => db.from('player_season_stats').select(`league_id,synced_at,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('league_id', seasons.map((s) => s.league.id)).eq('season_year', year).order('id').range(a, b),
+                (a, b) => db.from('player_season_stats').select(`league_id,appearances,player:players(${PLAYER_SELECT}),team:teams(${TEAM_SELECT})`).in('league_id', seasons.map((s) => s.league.id)).eq('season_year', year).order('id').range(a, b),
                 {max: 6000},
-            ) as unknown as Promise<Array<{league_id: number; synced_at: string; player: Member['player'] | null; team: TeamRow | null}>>,
+            ) as unknown as Promise<Array<{league_id: number; appearances: number | null; player: PoolPlayer | null; team: TeamRow | null}>>,
+            fetchAll(
+                (a, b) => db.from('sidelined').select(`season_id,start_date,player:players(${PLAYER_SELECT}),team:teams(${TEAM_SELECT})`).in('season_id', currentIds).order('player_id').range(a, b),
+                {max: 4000},
+            ) as unknown as Promise<Array<{season_id: number; start_date: string | null; player: PoolPlayer | null; team: TeamRow | null}>>,
         ]);
         const leagueOfSeason = new Map(seasons.map((s) => [s.season.id, s.league]));
         const leagueById = new Map(seasons.map((s) => [s.league.id, s.league]));
-        const members = new Map<number, Member>();
         const teams = new Map<number, TeamRow>();
-        const consider = (m: Member) => {
-            teams.set(m.team.id, m.team);
-            const known = members.get(m.player.id);
-            if (!known || m.at > known.at) members.set(m.player.id, m);
+        const leagueOfTeam = new Map<number, {name: string; slug: string}>();
+        const playersById = new Map<number, PoolPlayer>();
+        const evidenceOf = new Map<number, ClubEvidence[]>();
+        const note = (player: PoolPlayer | null, team: TeamRow | null, league: {name: string; slug: string} | undefined, evidence: (teamId: number) => ClubEvidence) => {
+            if (!player || !team) return;
+            teams.set(team.id, team);
+            if (league) leagueOfTeam.set(team.id, league);
+            playersById.set(player.id, player);
+            evidenceOf.set(player.id, [...(evidenceOf.get(player.id) ?? []), evidence(team.id)]);
         };
-        for (const m of squad) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueOfSeason.get(m.season_id)?.name ?? '', leagueSlug: leagueOfSeason.get(m.season_id)?.slug ?? '', at: m.updated_at});
-        for (const m of played) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueById.get(m.league_id)?.name ?? '', leagueSlug: leagueById.get(m.league_id)?.slug ?? '', at: m.synced_at});
+        for (const m of squad) note(m.player, m.team, leagueOfSeason.get(m.season_id), (teamId) => ({kind: 'squad', teamId}));
+        for (const m of played) note(m.player, m.team, leagueById.get(m.league_id), (teamId) => ({kind: 'line', teamId, appearances: m.appearances ?? 0}));
+        for (const m of listedOut) if (m.start_date) note(m.player, m.team, leagueOfSeason.get(m.season_id), (teamId) => ({kind: 'sidelined', teamId, date: m.start_date!}));
+        // The squad lists of every other club we follow: whoever sits in one may have left.
+        const candidateIds = [...evidenceOf.keys()];
+        for (const ids of chunk(candidateIds, 300)) {
+            const rows = (await fetchAll(
+                (a, b) => db.from('squad_members').select('player_id,team_id,season:seasons!inner(is_current)').in('player_id', ids).eq('seasons.is_current', true).order('player_id').range(a, b),
+                {max: 4000},
+            )) as unknown as Array<{player_id: number; team_id: number}>;
+            for (const r of rows) if (!teams.has(r.team_id)) evidenceOf.get(r.player_id)?.push({kind: 'squad', teamId: r.team_id});
+        }
+        // Whoever the sources disagree about, or nobody lists: his matchday squads this season, dated.
+        const uncertain = candidateIds.filter((id) => {
+            const evidence = evidenceOf.get(id)!;
+            return new Set(evidence.map((e) => e.teamId)).size > 1 || !evidence.some((e) => e.kind === 'squad');
+        });
+        for (const ids of chunk(uncertain, 150)) {
+            const rows = (await fetchAll(
+                (a, b) => db.from('lineups').select('player_id,team_id,fixture:fixtures!inner(starting_at)').in('player_id', ids).eq('is_expected', false).gte('fixtures.starting_at', seasonStart).order('player_id').range(a, b),
+                {max: 6000},
+            )) as unknown as Array<{player_id: number; team_id: number; fixture: {starting_at: string} | null}>;
+            for (const r of rows) if (r.fixture) evidenceOf.get(r.player_id)?.push({kind: 'played', teamId: r.team_id, date: r.fixture.starting_at.slice(0, 10)});
+        }
+        const windowClosedAt = lastWindowClose(romeDate(new Date()));
+        const members = new Map<number, Member>();
+        for (const [id, evidence] of evidenceOf) {
+            const teamId = resolveClub(evidence, windowClosedAt);
+            const team = teamId === null ? undefined : teams.get(teamId);
+            if (!team) continue;
+            const league = leagueOfTeam.get(team.id);
+            members.set(id, {player: playersById.get(id)!, team, league: league?.name ?? '', leagueSlug: league?.slug ?? ''});
+        }
         const playerIds = [...members.keys()];
         if (playerIds.length === 0) throw new Error(`no squad members for ${league}`);
 
@@ -363,7 +416,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         for (const slug of new Set([...members.values()].map((m) => m.leagueSlug))) {
             const rows = LISTONE[slug];
             if (!rows) continue;
-            const pool = [...members.values()].filter((m) => m.leagueSlug === slug).map((m) => ({id: m.player.id, name: m.player.name, team: m.team.name}));
+            const pool = [...members.values()].filter((m) => m.leagueSlug === slug).map((m) => ({id: m.player.id, name: m.player.name, team: m.team.name, aliases: nameForms(m.player.first_name, m.player.last_name)}));
             for (const [id, match] of matchListone(parseListone(rows), pool).byPlayer) listoneOf.set(id, match);
         }
 
@@ -426,6 +479,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             players.push({
                 id: player.id,
                 name: player.name,
+                fullName: [player.first_name, player.last_name].filter((n): n is string => !!n && n.trim() !== '').join(' ') || null,
                 slug: player.slug,
                 role,
                 age: player.age,

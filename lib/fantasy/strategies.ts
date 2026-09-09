@@ -1,4 +1,4 @@
-import type {AuctionConfig} from './config';
+import {DEFAULT_DEFENCE_BONUS, DEFENCE_THRESHOLDS, type AuctionConfig, type DefenceBonus} from './config';
 import type {FantaRole, FantaScores} from './scores';
 
 /**
@@ -209,8 +209,8 @@ export interface Lineup {
 }
 
 export interface LineupOptions {
-    /** The league plays the defence modifier: formations with four or more defenders earn it. */
-    defenceModifier?: boolean;
+    /** The league plays the defence modifier: formations with enough defenders earn it (`true` = the classic table). */
+    defenceModifier?: boolean | DefenceBonus;
     /** Formations to prefer when the values are within a hair of the best (a strategy's natural shape). */
     prefer?: FormationKey[];
 }
@@ -222,16 +222,28 @@ export const playChance = (p: LineupPlayer) => Math.max(0.05, Math.min(1, p.scor
 export const playerValue = (p: LineupPlayer) => (p.scores.fantaAvg ?? 5.5) * playChance(p);
 
 /**
- * Classic defence modifier, estimated: the average rating of the keeper and
- * the three best defenders fielded gives +1 from 6, +2 from 6.25, +3 from 6.5,
- * +4 from 6.75, +6 from 7. Fantamedie stand in for ratings: a keeper's
- * fantamedia sits about a goal below his rating, a defender's about level.
+ * Defence modifier, estimated with the league's table: the average vote
+ * of the keeper and the three best defenders fielded, with at least the
+ * table's defenders on the pitch. Fantamedie stand in for votes: a
+ * keeper's fantamedia sits about a goal below his vote, a defender's
+ * about level.
  */
-function defenceModifier(keeper: LineupPlayer | undefined, defenders: LineupPlayer[]): number {
-    if (!keeper || defenders.length < 4) return 0;
+function defenceModifier(keeper: LineupPlayer | undefined, defenders: LineupPlayer[], bonus: DefenceBonus): number {
+    if (!keeper || defenders.length < bonus.minDefenders) return 0;
     const ratings = [(keeper.scores.fantaAvg ?? 5) + 1, ...defenders.slice(0, 3).map((d) => d.scores.fantaAvg ?? 5.8)];
     const avg = ratings.reduce((s, v) => s + v, 0) / ratings.length;
-    return avg >= 7 ? 6 : avg >= 6.75 ? 4 : avg >= 6.5 ? 3 : avg >= 6.25 ? 2 : avg >= 6 ? 1 : 0;
+    let points = 0;
+    DEFENCE_THRESHOLDS.forEach((from, i) => {
+        if (avg >= from) points = bonus.points[i] ?? points;
+    });
+    return points;
+}
+
+/** What to hand `bestLineup` for a league: its table when the modifier is on and pays something, else nothing. */
+export function defenceOption(config: Partial<Pick<AuctionConfig, 'modifiers' | 'defenceBonus'>>): DefenceBonus | false {
+    if (!config.modifiers?.defence) return false;
+    const bonus = config.defenceBonus ?? DEFAULT_DEFENCE_BONUS;
+    return bonus.points.some((p) => p > 0) ? bonus : false;
 }
 
 /**
@@ -244,6 +256,7 @@ function defenceModifier(keeper: LineupPlayer | undefined, defenders: LineupPlay
  * preferred ones win.
  */
 export function bestLineup(players: LineupPlayer[], options: LineupOptions = {}): Lineup {
+    const bonus = options.defenceModifier === true ? DEFAULT_DEFENCE_BONUS : options.defenceModifier || null;
     const sorted = {} as Record<FantaRole, LineupPlayer[]>;
     for (const role of ROLES) sorted[role] = players.filter((p) => p.role === role).sort((a, b) => playerValue(b) - playerValue(a));
     const formations = FORMATIONS.map((f) => {
@@ -255,7 +268,7 @@ export function bestLineup(players: LineupPlayer[], options: LineupOptions = {})
             const cover = bench ? playerValue(bench) : 0;
             for (const p of fielded) value += playerValue(p) + (1 - playChance(p)) * cover;
         }
-        if (options.defenceModifier && f.need.D >= 4) value += defenceModifier(sorted.P[0], sorted.D.slice(0, f.need.D));
+        if (bonus && f.need.D >= bonus.minDefenders) value += defenceModifier(sorted.P[0], sorted.D.slice(0, f.need.D), bonus);
         return {key: f.key, value: Math.round(value * 10) / 10};
     }).sort((a, b) => b.value - a.value || FORMATIONS.findIndex((f) => f.key === a.key) - FORMATIONS.findIndex((f) => f.key === b.key));
     const best = formations[0];
@@ -265,7 +278,7 @@ export function bestLineup(players: LineupPlayer[], options: LineupOptions = {})
 }
 
 /** Simulates one strategy on the pool: fills every slot with the best player (by mark plus what the strategy prefers) affordable for that slot's budget. */
-export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers' | 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan {
+export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers' | 'formation' | 'defenceBonus'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan {
     const want = prefs.want ?? new Set<number>();
     const avoid = prefs.avoid ?? new Set<number>();
     // A fixed formation bends the split towards the roles it fields more of and pays its starters first.
@@ -345,7 +358,7 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
         });
     }
     const roster = ROLES.flatMap((role) => picks[role].map((p) => byId.get(p.id))).filter((p): p is PoolPlayer => !!p);
-    let lineup = bestLineup(roster, {defenceModifier: config.modifiers?.defence, prefer: forced ? [forced.key] : strategy.formations});
+    let lineup = bestLineup(roster, {defenceModifier: defenceOption(config), prefer: forced ? [forced.key] : strategy.formations});
     if (forced) {
         // Valued in the formation asked for, whatever the roster would prefer.
         const chosen = lineup.formations.find((f) => f.key === forced.key)!;
@@ -355,8 +368,8 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
 }
 
 /** Every strategy planned on the pool, best lineup first; strategies that need a modifier the league lacks are marked unavailable. */
-export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'> & Partial<Pick<AuctionConfig, 'formation'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan[] {
-    return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken, mine, prefs), available: !s.needsDefenceModifier || config.modifiers.defence})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
+export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'> & Partial<Pick<AuctionConfig, 'formation' | 'defenceBonus'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan[] {
+    return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken, mine, prefs), available: !s.needsDefenceModifier || defenceOption(config) !== false})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
 }
 
 export type HealthStatus = 'ok' | 'warn' | 'switch';

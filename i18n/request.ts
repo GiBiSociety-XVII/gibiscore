@@ -12,6 +12,7 @@ export default getRequestConfig(async ({requestLocale}) => {
 
     const Common = (await import(`../core/home/i18n/${locale}/Common.json`)).default;
     const AppBar = (await import(`../core/home/i18n/${locale}/AppBar.json`)).default;
+    const Account = (await import(`../core/home/i18n/${locale}/Account.json`)).default;
     const HomePage = (await import(`../core/home/i18n/${locale}/HomePage.json`)).default;
     const Football = (await import(`../core/football/i18n/${locale}/Football.json`)).default;
     const Pages = (await import(`../core/football/i18n/${locale}/Pages.json`)).default;
@@ -24,6 +25,7 @@ export default getRequestConfig(async ({requestLocale}) => {
         messages: {
             Common,
             AppBar,
+            Account,
             HomePage,
             Football,
             Pages,

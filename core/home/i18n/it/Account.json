@@ -1,0 +1,49 @@
+{
+  "title": "Il tuo account",
+  "metaDescription": "Accedi a GiBiScore per salvare le tue aste del fantacalcio e riaprirle da qualsiasi dispositivo.",
+  "intro": "Con l'account salvi le aste del fantacalcio nel cloud e le riapri da qualsiasi dispositivo. Il resto del sito non ha bisogno di accesso.",
+  "back": "Indietro",
+  "signOut": "Esci",
+  "toAuction": "Vai all'asta",
+  "signIn": {
+    "title": "Accedi",
+    "subtitle": "Entra nel tuo account GiBiScore",
+    "email": "Email",
+    "emailPlaceholder": "tuo@email.com",
+    "password": "Password",
+    "signingIn": "Accesso in corso...",
+    "signIn": "Accedi",
+    "noAccount": "Non hai un account?",
+    "createAccount": "Crea un account",
+    "footer": "Proteggi il tuo account con una password sicura",
+    "linkError": "Il link non è più valido: accedi o registrati di nuovo"
+  },
+  "signUp": {
+    "title": "Crea un account",
+    "subtitle": "Unisciti a GiBiScore oggi",
+    "username": "Nome utente",
+    "usernamePlaceholder": "presidente92",
+    "usernameHint": "Almeno {min} caratteri",
+    "email": "Email",
+    "emailPlaceholder": "tuo@email.com",
+    "password": "Password",
+    "passwordHint": "Almeno {min} caratteri",
+    "repeatPassword": "Ripeti password",
+    "passwordStrong": "Usa una password forte e unica",
+    "registering": "Registrazione in corso...",
+    "createAccount": "Crea account",
+    "haveAccount": "Hai già un account?",
+    "signIn": "Accedi",
+    "footer": "Registrandoti accetti i nostri termini di servizio",
+    "errorUsernameMin": "Il nome utente deve avere almeno {min} caratteri",
+    "errorPasswordMismatch": "Le password non corrispondono",
+    "errorPasswordMin": "La password deve avere almeno {min} caratteri"
+  },
+  "errors": {
+    "credentials": "Email o password non corretti",
+    "exists": "Esiste già un account con questa email: accedi",
+    "weak": "La password è troppo debole",
+    "rate": "Troppi tentativi: riprova tra qualche minuto",
+    "generic": "Si è verificato un errore, riprova"
+  }
+}

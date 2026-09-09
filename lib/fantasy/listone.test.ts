@@ -79,3 +79,17 @@ describe('matchListone', () => {
         expect(unmatched.map((e) => e.name)).toEqual(['Bordon', 'Suzuki']);
     });
 });
+
+describe('matchListone with aliases', () => {
+    it('a nickname matches through the full name behind it (Pote = Goncalves P.)', () => {
+        const players = [
+            {id: 1, name: 'Pote', team: 'Fiorentina', aliases: ['P. Pereira Gonçalves', 'Pedro António Pereira Gonçalves']},
+            {id: 2, name: 'N. Fagioli', team: 'Fiorentina', aliases: ['N. Fagioli', 'Nicolò Fagioli']},
+        ];
+        const rows: Array<[string, string, string, number]> = [['C', 'Goncalves P.', 'Fiorentina', 12], ['C', 'Fagioli', 'Fiorentina', 7]];
+        const {byPlayer, unmatched} = matchListone(parseListone(rows), players);
+        expect(byPlayer.get(1)).toMatchObject({role: 'C', quote: 12});
+        expect(byPlayer.get(2)).toMatchObject({role: 'C', quote: 7});
+        expect(unmatched).toHaveLength(0);
+    });
+});

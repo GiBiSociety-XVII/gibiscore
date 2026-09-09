@@ -1,7 +1,6 @@
 import type {Metadata} from "next";
 import {getTranslations, setRequestLocale} from "next-intl/server";
 import {SiteShell} from "@/components/shell/site-shell";
-import {PageHeader} from "@/components/football/page-header";
 import {AuctionBoard} from "@/components/fantasy/auction-board";
 import {isAuctionLeague} from "@/lib/fantasy/config";
 import {getAuctionPool} from "@/lib/fantasy/data";
@@ -18,12 +17,10 @@ export default async function AuctionPage({params, searchParams}: PageProps<"/[l
     const {locale} = await params;
     const sp = await searchParams;
     setRequestLocale(locale);
-    const t = await getTranslations('Fantasy.auction');
     const league = isAuctionLeague(typeof sp.league === 'string' ? sp.league : null) ? (sp.league as Parameters<typeof getAuctionPool>[0]) : 'serie-a';
     const pool = await getAuctionPool(league);
     return (
         <SiteShell wide sidebar={false}>
-            <PageHeader title={t('title')} meta={t('intro')} />
             <AuctionBoard pool={pool} />
         </SiteShell>
     );
