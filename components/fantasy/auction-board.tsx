@@ -10,7 +10,7 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {CloudPanel} from "./cloud-panel";
-import {ROLE_CLASS, RoleBadge} from "./role-badge";
+import {RoleBadge} from "./role-badge";
 import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
@@ -142,7 +142,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const [role, setRole] = useState<FantaRole | 'all'>('all');
     const [tier, setTier] = useState<Tier | 'all'>('all');
     const [view, setView] = useState<'list' | 'tiers'>('list');
-    const [openManager, setOpenManager] = useState<number | null>(null);
     const [teamId, setTeamId] = useState<number | 'all'>('all');
     const [hideBought, setHideBought] = useState(false);
     const [sort, setSort] = useState<SortKey>('overall');
@@ -270,17 +269,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const ownPurchases = mine.filter((p) => byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
     const health = strategy ? strategyHealth(plans, strategy.key, baseline, config, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
-    // My players club by club: every club of the list, the ones I bought from first.
-    const teamsMine = pool.teams
-        .map((team) => {
-            const roles = {P: 0, D: 0, C: 0, A: 0} as Record<FantaRole, number>;
-            for (const pu of mine) {
-                const p = byId.get(pu.playerId);
-                if (p && p.team.id === team.id) roles[p.role] += 1;
-            }
-            return {team, roles, total: roles.P + roles.D + roles.C + roles.A};
-        })
-        .sort((a, b) => b.total - a.total || a.team.name.localeCompare(b.team.name));
     const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: config.modifiers.defence}) : null;
     /** The report card of a manager's roster: the team's mark, the eleven, a line per role. */
     const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: config.modifiers.defence});
@@ -548,85 +536,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </ul>
                     )}
                 </Panel>
-                {/* My players by club: every club of the list, count and roles */}
                 <CloudPanel config={config} purchases={purchases} />
-                <Panel title={tr('byTeam')} action={<span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{tr('byTeamTotal', {count: mine.length, teams: teamsMine.filter((tm) => tm.total > 0).length})}</span>}>
-                    <ul className="flex flex-col max-h-[60vh] overflow-y-auto" title={tr('byTeamHint')}>
-                        {teamsMine.map((tm) => (
-                            <li key={tm.team.id} className={cn("flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0 text-[12px] font-bold", tm.total === 0 && "text-muted-foreground")}>
-                                <TeamCrest team={tm.team} size={16} />
-                                <span className="truncate">{tm.team.name}</span>
-                                <span className="ml-auto flex items-center gap-1 shrink-0">
-                                    {ROLES.map((r) => tm.roles[r] > 0 && (
-                                        <span key={r} className={cn("inline-flex items-center justify-center h-5 min-w-5 px-1 rounded border border-foreground font-mono text-[10px] font-extrabold tabular-nums", ROLE_CLASS[r])}>{r}{tm.roles[r]}</span>
-                                    ))}
-                                    <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded-md border-2 font-mono text-[12px] font-extrabold tabular-nums", tm.total > 0 ? "border-foreground bg-accent" : "border-foreground/30 bg-card")}>{tm.total}</span>
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </Panel>
-                {managers.length > 1 && (
-                    <Panel title={tr('others')} action={<button type="button" onClick={() => setTeamsTab('compare')} className="text-[11px] font-extrabold underline decoration-accent decoration-[2px] underline-offset-2 whitespace-nowrap">{tr('report.compareAll')}</button>}>
-                        <ul className="flex flex-col">
-                            {managers.slice(1).map((m, i) => {
-                                const manager = i + 1;
-                                const theirs = rosterOf(manager);
-                                const theirLeft = creditsLeftOf(manager);
-                                const isOpen = openManager === manager;
-                                const theirPlayers = theirs.map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p);
-                                const theirLineup = theirPlayers.length >= 11 ? bestLineup(theirPlayers, {defenceModifier: config.modifiers.defence}) : null;
-                                const theirTeams = new Set(theirPlayers.map((p) => p.team.id));
-                                const theirReport = reportOf(manager);
-                                return (
-                                    <li key={m} className="border-t border-muted first:border-t-0">
-                                        <button type="button" onClick={() => setOpenManager(isOpen ? null : manager)} aria-expanded={isOpen} className="w-full flex items-center gap-2 px-3 h-9 text-left text-[12px] font-bold hover:bg-muted/50">
-                                            <span className="truncate">{m}</span>
-                                            <span className="ml-auto font-mono tabular-nums text-muted-foreground whitespace-nowrap">{theirs.length}/{slotsTotal} · {theirLeft} cr.</span>
-                                            <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setTeamsTab(manager); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setTeamsTab(manager); } }} className={cn("inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-md border-2 border-foreground font-mono text-[12px] font-extrabold tabular-nums shrink-0 hover:bg-accent", theirs.length === 0 ? "bg-card text-muted-foreground" : "bg-card")} title={tr('report.openTeam')}>{theirs.length === 0 ? '–' : theirReport.overall}</span>
-                                            {isOpen ? <ChevronUp className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-                                        </button>
-                                        {isOpen && (
-                                            <div className="flex flex-col border-t border-muted bg-muted/20">
-                                                <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
-                                                    {ROLES.map((r) => (
-                                                        <div key={r} className="px-2 py-1 flex flex-col items-center gap-0.5">
-                                                            <RoleBadge role={r} />
-                                                            <span className={cn("font-mono text-[11px] font-extrabold tabular-nums", roleFull(manager, r) && "text-emerald-700")}>{tr('slots', {filled: roleCount(manager, r), total: config.slots[r]})}</span>
-                                                            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{theirs.filter((pu) => byId.get(pu.playerId)?.role === r).reduce((sum, pu) => sum + pu.price, 0)} cr.</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                                                    {tr('othersSpent', {spent: config.credits - theirLeft, credits: config.credits, teams: theirTeams.size})}
-                                                    {theirLineup && <span className="block">{tr('formationNow', {formation: theirLineup.formation})} <span className="font-mono text-[10px] tabular-nums">{theirLineup.value.toFixed(1)}</span></span>}
-                                                </p>
-                                                {theirs.length === 0 ? (
-                                                    <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground">{tr('othersEmpty')}</p>
-                                                ) : (
-                                                    <ul className="flex flex-col max-h-[40vh] overflow-y-auto">
-                                                        {ROLES.flatMap((r) => theirs.filter((pu) => byId.get(pu.playerId)?.role === r).sort((a, b) => b.price - a.price).map((pu) => {
-                                                            const p = byId.get(pu.playerId)!;
-                                                            return (
-                                                                <li key={pu.playerId} className="flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0">
-                                                                    <RoleBadge role={p.role} />
-                                                                    <Link href={`/players/${p.slug}`} className="text-[12px] font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
-                                                                    <span className="text-[10px] font-semibold text-muted-foreground truncate">{p.team.name}</span>
-                                                                    <span className="ml-auto font-mono text-[12px] font-extrabold tabular-nums">{pu.price}</span>
-                                                                    <button type="button" onClick={() => release(pu.playerId)} aria-label={t('release')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
-                                                                </li>
-                                                            );
-                                                        }))}
-                                                    </ul>
-                                                )}
-                                            </div>
-                                        )}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </Panel>
-                )}
             </div>
 
             {/* Every roster, in full */}
