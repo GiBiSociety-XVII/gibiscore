@@ -505,6 +505,9 @@
     "delete": "Elimina",
     "loadConfirm": "Caricando un'asta salvata sostituisci quella su questo dispositivo, che non è salvata nel cloud. Continuare?",
     "deleteConfirm": "Eliminare \"{name}\" dal cloud? Non si può annullare.",
-    "gone": "Questa asta non c'è più nel cloud."
+    "gone": "Questa asta non c'è più nel cloud.",
+    "menuSignedOut": "Cloud: accedi",
+    "menuNotSaved": "Salva nel cloud",
+    "menuSaved": "Nel cloud"
   }
 }

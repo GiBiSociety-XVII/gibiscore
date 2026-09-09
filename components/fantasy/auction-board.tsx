@@ -9,7 +9,7 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
-import {CloudPanel} from "./cloud-panel";
+import {CloudMenu, CloudPanel} from "./cloud-panel";
 import {RoleBadge} from "./role-badge";
 import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
@@ -203,7 +203,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     if (!config) {
         return (
             <div className="flex flex-col gap-3">
-                <CloudPanel config={null} purchases={purchases} />
+                <CloudPanel purchases={purchases} />
                 <AuctionSetup initial={null} onSave={save} />
             </div>
         );
@@ -317,6 +317,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: tst(`${health.best.key}.name`)})}</span>}
                             </button>
                         )}
+                        <CloudMenu config={config} purchases={purchases} />
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
                         <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
@@ -536,7 +537,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </ul>
                     )}
                 </Panel>
-                <CloudPanel config={config} purchases={purchases} />
             </div>
 
             {/* Every roster, in full */}
