@@ -133,7 +133,7 @@ export function TierList({players, infos, prices, bought, targets, onBuy}: {play
                                         const purchase = bought.get(p.id);
                                         return (
                                             <li key={p.id} className={cn("flex items-center gap-2 px-3 h-8 border-t border-muted/60 text-[12px]", purchase && "opacity-50")}>
-                                                <Link href={`/players/${p.slug}`} className={cn("font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2", purchase && "line-through")}>{p.name}</Link>
+                                                <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" className={cn("font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2", purchase && "line-through")}>{p.name}</Link>
                                                 {targets.has(p.id) && !purchase && <span className="bb-badge bg-accent text-[9px] h-4 px-1 shrink-0">★</span>}
                                                 <span className="text-[10px] font-semibold text-muted-foreground truncate">{p.team.shortCode ?? p.team.name}</span>
                                                 {infos.get(p.id) && <TierWhy player={p} info={infos.get(p.id)!} />}

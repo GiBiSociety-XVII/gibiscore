@@ -154,7 +154,7 @@ export function TeamsDialog({teams, credits, tiers, initial, onClose, onRelease}
                                                         <td className="pl-3 pr-1 py-1 w-7"><RoleBadge role={p.role} /></td>
                                                         <td className="px-1 py-1 min-w-0">
                                                             <span className="flex flex-col">
-                                                                <Link href={`/players/${p.slug}`} title={p.fullName ?? undefined} className="font-extrabold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
+                                                                <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" title={p.fullName ?? undefined} className="font-extrabold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
                                                                 {(p.injury?.longTerm || p.contested) && (
                                                                     <span className={cn("text-[10px] font-bold", p.injury?.longTerm ? "text-red-700" : "text-amber-700")}>{p.injury?.longTerm ? t('playerInjured') : t('playerContested')}</span>
                                                                 )}

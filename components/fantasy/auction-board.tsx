@@ -408,7 +408,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                     <TeamCrest team={p.team} size={16} />
                                                     <span className="flex flex-col leading-tight min-w-0">
                                                         <span className="inline-flex items-center gap-1 min-w-0">
-                                                            <Link href={`/players/${p.slug}`} title={p.fullName ?? undefined} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
+                                                            <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" title={p.fullName ?? undefined} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
                                                             {targets.has(p.id) && !purchase && <span className={cn("bb-badge text-[9px] h-4 px-1 shrink-0", wanted.has(p.id) ? "bg-foreground text-background" : "bg-accent")} title={wanted.has(p.id) ? tst('pinned') : tst('target')}>★</span>}
                                                             {avoided.has(p.id) && !purchase && <span className="bb-badge bg-card text-[9px] h-4 px-1 shrink-0 text-muted-foreground" title={tst('ignored')}>✕</span>}
                                                         </span>
@@ -527,7 +527,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 return (
                                     <li key={pu.playerId} className="flex items-center gap-2 px-3 h-8 border-t border-muted first:border-t-0">
                                         <RoleBadge role={p.role} />
-                                        <Link href={`/players/${p.slug}`} className="text-[12px] font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
+                                        <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
                                         <span className="ml-auto font-mono text-[12px] font-extrabold tabular-nums">{pu.price}</span>
                                         <button type="button" onClick={() => release(pu.playerId)} aria-label={t('release')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
                                     </li>
