@@ -1,7 +1,7 @@
 'use client';
 
 import {useSyncExternalStore} from 'react';
-import {ROSTER_KEY, STORAGE_KEY, normalizeConfig, type AuctionConfig, type Purchase} from './config';
+import {CLOUD_KEY, ROSTER_KEY, STORAGE_KEY, normalizeConfig, type AuctionConfig, type Purchase} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -61,6 +61,17 @@ function parsePurchases(raw: unknown): Purchase[] {
         .map((p) => ({playerId: p.playerId, price: Math.max(0, Math.round(p.price)), manager: typeof p.manager === 'number' ? p.manager : 0}));
 }
 export const purchasesStore = createJsonStore<Purchase[]>(ROSTER_KEY, parsePurchases, []);
+
+/** The cloud row this device's auction is linked to, and when it was last saved there. */
+export interface CloudLink {
+    id: string;
+    savedAt: string;
+}
+function parseCloudLink(raw: unknown): CloudLink | null {
+    const r = raw as Partial<CloudLink> | null;
+    return r && typeof r.id === 'string' && typeof r.savedAt === 'string' ? {id: r.id, savedAt: r.savedAt} : null;
+}
+export const cloudStore = createJsonStore<CloudLink | null>(CLOUD_KEY, parseCloudLink, null);
 
 const noop = () => () => {};
 /** False during server render and hydration, true afterwards: lets the page wait for localStorage before choosing what to show. */

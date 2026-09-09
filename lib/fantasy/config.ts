@@ -107,6 +107,7 @@ export const ROLE_SHARE: Record<FantaRole, number> = {P: 0.08, D: 0.18, C: 0.27,
 
 export const STORAGE_KEY = 'gibiscore:fanta:auction';
 export const ROSTER_KEY = 'gibiscore:fanta:roster';
+export const CLOUD_KEY = 'gibiscore:fanta:cloud';
 
 /** Bought player as stored on the client. */
 export interface Purchase {

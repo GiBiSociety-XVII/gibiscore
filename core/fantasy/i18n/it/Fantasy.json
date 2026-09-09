@@ -211,10 +211,10 @@
       "fixRole": "Correggi ruolo",
       "fixRoleReset": "Torna al listone",
       "plan": "Strategie",
-    "want": "Voglio",
-    "avoid": "Ignora",
-    "planHint": "\"Voglio\": le strategie lo pianificano comunque e riadattano il resto. \"Ignora\": non lo propongono mai.",
-    "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
+      "want": "Voglio",
+      "avoid": "Ignora",
+      "planHint": "\"Voglio\": le strategie lo pianificano comunque e riadattano il resto. \"Ignora\": non lo propongono mai.",
+      "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
       "fvm": "FVM {fvm}",
       "mantra": "Mantra: {roles}"
     }
@@ -434,5 +434,29 @@
       "C": "centrocampisti",
       "A": "attaccanti"
     }
+  },
+  "cloud": {
+    "title": "Salva nel cloud",
+    "signedOut": "Accedi per salvare l'asta sul tuo account e ricaricarla da qualsiasi dispositivo.",
+    "signIn": "Accedi o registrati",
+    "notSaved": "Questa asta è solo su questo dispositivo.",
+    "saving": "Salvataggio…",
+    "savedAt": "Salvata nel cloud {when}. Ogni modifica viene salvata da sola.",
+    "save": "Salva nel cloud",
+    "saveNow": "Salva ora",
+    "saveAsNew": "Salva come nuova",
+    "unlink": "Scollega",
+    "unlinkHint": "Smette di salvare le modifiche nel cloud; la copia salvata resta.",
+    "unnamed": "Asta senza nome",
+    "saved": "Aste salvate ({count})",
+    "noneYet": "Nessuna asta salvata ancora.",
+    "noneToLoad": "Nessuna asta salvata: configurane una qui sotto.",
+    "current": "attuale",
+    "rowMeta": "{league} · {purchases} acquisti · {when}",
+    "load": "Carica",
+    "delete": "Elimina",
+    "loadConfirm": "Caricando un'asta salvata sostituisci quella su questo dispositivo, che non è salvata nel cloud. Continuare?",
+    "deleteConfirm": "Eliminare \"{name}\" dal cloud? Non si può annullare.",
+    "gone": "Questa asta non c'è più nel cloud."
   }
 }

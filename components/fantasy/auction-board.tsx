@@ -9,12 +9,13 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
+import {CloudPanel} from "./cloud-panel";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
-import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
+import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
 import {bestLineup, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
@@ -199,7 +200,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         setEditing(false);
         if (!pool || next.league !== pool.league) router.push(`/fantacalcio/asta?league=${next.league}`);
     };
-    if (!config || editing) return <AuctionSetup initial={config} onSave={save} onCancel={config ? () => setEditing(false) : undefined} />;
+    if (!config) {
+        return (
+            <div className="flex flex-col gap-3">
+                <CloudPanel config={null} purchases={purchases} />
+                <AuctionSetup initial={null} onSave={save} />
+            </div>
+        );
+    }
+    if (editing) return <AuctionSetup initial={config} onSave={save} onCancel={() => setEditing(false)} />;
     if (pool && pool.league !== config.league) {
         router.replace(`/fantacalcio/asta?league=${config.league}`);
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
@@ -218,6 +227,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (window.confirm(ta('resetConfirm'))) {
             purchasesStore.write([]);
             configStore.write(null);
+            cloudStore.write(null);
         }
     };
     // Roster limits per manager: slots of the role, and credits that must leave 1 per open slot.
@@ -532,6 +542,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     )}
                 </Panel>
                 {/* My players by club: every club of the list, count and roles */}
+                <CloudPanel config={config} purchases={purchases} />
                 <Panel title={tr('byTeam')} action={<span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{tr('byTeamTotal', {count: mine.length, teams: teamsMine.filter((tm) => tm.total > 0).length})}</span>}>
                     <ul className="flex flex-col max-h-[60vh] overflow-y-auto" title={tr('byTeamHint')}>
                         {teamsMine.map((tm) => (

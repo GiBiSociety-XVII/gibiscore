@@ -1,0 +1,31 @@
+{
+  "title": "Account",
+  "metaTitle": "Account",
+  "metaDescription": "Accedi a GiBiScore per salvare le tue aste del fantacalcio e riaprirle da qualsiasi dispositivo.",
+  "intro": "Con un account salvi le aste del fantacalcio nel cloud e le riapri da qualsiasi dispositivo. Il resto del sito non ha bisogno di accesso.",
+  "tabs": {
+    "login": "Accedi",
+    "register": "Registrati"
+  },
+  "email": "E-mail",
+  "password": "Password",
+  "passwordHint": "Almeno 8 caratteri.",
+  "login": "Accedi",
+  "register": "Crea l'account",
+  "signedInAs": "Sei dentro come",
+  "signOut": "Esci",
+  "toAuction": "Vai all'asta",
+  "errors": {
+    "missing": "Inserisci e-mail e password.",
+    "credentials": "E-mail o password non corretti.",
+    "unconfirmed": "Devi prima confermare l'e-mail: controlla la posta.",
+    "weak": "Serve un'e-mail valida e una password di almeno 8 caratteri.",
+    "exists": "Esiste già un account con questa e-mail: accedi.",
+    "signup": "Registrazione non riuscita, riprova tra un momento.",
+    "link": "Il link non è più valido: accedi o richiedi una nuova registrazione."
+  },
+  "notices": {
+    "confirm": "Ti abbiamo mandato un'e-mail: apri il link per confermare l'account, poi torna qui.",
+    "out": "Sei uscito."
+  }
+}
