@@ -189,10 +189,22 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 {max: 6000},
             ) as unknown as Promise<Array<{season_id: number; updated_at: string; player: Member['player'] | null; team: TeamRow | null}>>,
             fetchAll(
-                (a, b) => db.from('player_season_stats').select(`league_id,synced_at,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('league_id', seasons.map((s) => s.league.id)).eq('season_year', year).order('id').range(a, b),
+                (a, b) => db.from('player_season_stats').select(`league_id,synced_at,appearances,player:players(id,name,slug,position,age,image_url),team:teams(${TEAM_SELECT})`).in('league_id', seasons.map((s) => s.league.id)).eq('season_year', year).order('id').range(a, b),
                 {max: 6000},
-            ) as unknown as Promise<Array<{league_id: number; synced_at: string; player: Member['player'] | null; team: TeamRow | null}>>,
+            ) as unknown as Promise<Array<{league_id: number; synced_at: string; appearances: number | null; player: Member['player'] | null; team: TeamRow | null}>>,
         ]);
+        // A statistics line says where he played, not where he is: whoever sits in the current
+        // squad of another club (any league we follow) has left, and whoever is in no squad at
+        // all and never played here was only passing through.
+        const playedIds = [...new Set(played.map((m) => m.player?.id).filter((id): id is number => typeof id === 'number'))];
+        const squadTeamsOf = new Map<number, Set<number>>();
+        for (const ids of chunk(playedIds, 300)) {
+            const rows = (await fetchAll(
+                (a, b) => db.from('squad_members').select('player_id,team_id,season:seasons!inner(is_current)').in('player_id', ids).eq('seasons.is_current', true).order('player_id').range(a, b),
+                {max: 4000},
+            )) as unknown as Array<{player_id: number; team_id: number}>;
+            for (const r of rows) squadTeamsOf.set(r.player_id, (squadTeamsOf.get(r.player_id) ?? new Set<number>()).add(r.team_id));
+        }
         const leagueOfSeason = new Map(seasons.map((s) => [s.season.id, s.league]));
         const leagueById = new Map(seasons.map((s) => [s.league.id, s.league]));
         const members = new Map<number, Member>();
@@ -203,7 +215,13 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             if (!known || m.at > known.at) members.set(m.player.id, m);
         };
         for (const m of squad) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueOfSeason.get(m.season_id)?.name ?? '', leagueSlug: leagueOfSeason.get(m.season_id)?.slug ?? '', at: m.updated_at});
-        for (const m of played) if (m.player && m.team) consider({player: m.player, team: m.team, league: leagueById.get(m.league_id)?.name ?? '', leagueSlug: leagueById.get(m.league_id)?.slug ?? '', at: m.synced_at});
+        for (const m of played) {
+            if (!m.player || !m.team) continue;
+            const squads = squadTeamsOf.get(m.player.id);
+            if (squads && !squads.has(m.team.id)) continue;
+            if (!squads && (m.appearances ?? 0) === 0) continue;
+            consider({player: m.player, team: m.team, league: leagueById.get(m.league_id)?.name ?? '', leagueSlug: leagueById.get(m.league_id)?.slug ?? '', at: m.synced_at});
+        }
         const playerIds = [...members.keys()];
         if (playerIds.length === 0) throw new Error(`no squad members for ${league}`);
 
