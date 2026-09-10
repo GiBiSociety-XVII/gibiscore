@@ -215,6 +215,8 @@
     "compareHint": "Scegli due giocatori da confrontare (tasto C sulla riga evidenziata)",
     "comparePicked": "Confronto: {name} contro…",
     "shortcuts": "Tasti: ↑ ↓ scorri la lista · Invio compra (o corregge) l'evidenziato · C confronta · Ctrl+Z annulla l'ultimo acquisto · Esc chiude",
+    "rivalTakenBadge": "Rivale preso",
+    "rivalTakenHint": "Chi si gioca il posto con lui è già stato comprato: {names}",
     "undoLast": "Annulla ultimo",
     "undoLastHint": "Annulla l'ultimo acquisto registrato: {name} a {manager} per {price} cr. (Ctrl+Z)",
     "edit": "Correggi acquisto",
@@ -230,6 +232,19 @@
       "planWorse": "Strategia {name}: {value} pt. ({delta}), il piano perde qualcosa",
       "over": "Sopra il massimo consigliato di {over} cr."
     }
+  },
+  "targets": {
+    "title": "Obiettivi e piani B",
+    "buy": "Compra",
+    "priceHint": "Prezzo vivo / il massimo che la strategia pagherebbe per questo slot",
+    "planB": "Piano B",
+    "planBNone": "nessuno simile ancora libero",
+    "planBHint": "{name}: totale {overall}, fantamedia {fantaAvg}. Clicca per comprarlo.",
+    "contested": "Ballottaggi",
+    "with": "con",
+    "rivalTaken": "{name} è già stato preso da {manager} per {price} cr.",
+    "rivalFree": "{name} è ancora libero a {price} cr.",
+    "contestedHint": "I tuoi giocatori sono sottolineati. In rosso chi si gioca il posto con loro ed è già stato comprato da un altro."
   },
   "compare": {
     "title": "Confronto",

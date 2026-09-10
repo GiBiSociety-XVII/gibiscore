@@ -16,6 +16,7 @@ import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TableBar} from "./table-bar";
+import {TargetsPanel} from "./targets-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {DEFAULT_RULES, ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
@@ -45,10 +46,11 @@ function ScoreCell({value}: {value: number}) {
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 /** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
-function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']}) {
+function Status({p, rivals, rivalsTaken = []}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]}) {
     const t = useTranslations('Fantasy.board');
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
+            {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
             {p.injury && (() => {
                 const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
                 return (
@@ -533,7 +535,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={p.rivals} />
+                                                    <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? 0)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                                     <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">
@@ -655,6 +657,16 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </ul>
                     )}
                 </Panel>
+                <TargetsPanel
+                    players={pool.players}
+                    targets={strategy ? ROLES.flatMap((r) => strategy.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id)) : []}
+                    prices={prices}
+                    bought={bought}
+                    avoided={avoided}
+                    managers={managers.map((m, i) => (i === 0 ? t('me') : m))}
+                    myIds={new Set(mine.map((p) => p.playerId))}
+                    onBuy={openBuy}
+                />
             </div>
 
             {/* Every roster, in full */}
