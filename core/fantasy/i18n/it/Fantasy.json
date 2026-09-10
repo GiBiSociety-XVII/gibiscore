@@ -15,7 +15,7 @@
     "title": "Asta",
     "metaTitle": "Asta fantacalcio",
     "metaDescription": "Asta del fantacalcio con voti da 1 a 100 per ogni giocatore: titolarità, bonus, rendimento, malus, affidabilità e squadra, con crediti consigliati.",
-    "intro": "Voti da 1 a 100: la stagione scorsa è la base (55%), quella prima il 15%, quella in corso cresce con le giornate. La partenza di giocatore e club è un voto a parte. I crediti sono vivi: registra gli acquisti (tuoi e degli altri) e i prezzi si adattano ai soldi rimasti, ai top rimasti e a quanto il tavolo sta pagando; con una strategia attiva vedi anche la tua offerta massima.",
+    "intro": "Voti da 1 a 100: la stagione scorsa è la base, quella in corso pesa un quarto dopo tre giornate e supera la metà a gennaio, quella di due anni fa pesa poco. Conta anche il club: quanto crea e concede (expected goal) e dove è atteso in classifica. La partenza di giocatore e club è un voto a parte. I crediti sono vivi: registra gli acquisti (tuoi e degli altri) e i prezzi si adattano ai soldi rimasti, ai top rimasti e a quanto il tavolo sta pagando; con una strategia attiva vedi anche la tua offerta massima.",
     "empty": "Listone non disponibile in questo momento: il database sta rispondendo lentamente o le rose non sono ancora state importate. Riprova tra qualche minuto.",
     "settings": "Impostazioni",
     "changeSettings": "Modifica impostazioni",
@@ -549,6 +549,28 @@
     "gone": "Questa asta non c'è più nel cloud.",
     "menuSignedOut": "Cloud: accedi",
     "menuNotSaved": "Salva nel cloud",
-    "menuSaved": "Nel cloud"
+    "menuSaved": "Nel cloud",
+    "share": "Condividi con il gruppo",
+    "shareHint": "Un link di sola lettura con rose, crediti e ultimi acquisti, aggiornato da solo. Non mostra la tua strategia né i tuoi obiettivi.",
+    "shareCopy": "Copia link",
+    "shareCopied": "Link copiato",
+    "shareOpen": "Apri",
+    "shareStop": "Smetti di condividere",
+    "shareNeedsSave": "Salva l'asta nel cloud per condividerla."
+  },
+  "shared": {
+    "metaTitle": "Asta condivisa",
+    "manager": "Squadra {n}",
+    "updated": "Aggiornata {when}",
+    "refreshHint": "La pagina si aggiorna da sola ogni 20 secondi",
+    "gone": "Il link non è più attivo.",
+    "spent": "Spesi {spent} su {credits} cr.",
+    "done": "rosa completa",
+    "empty": "Nessun acquisto ancora.",
+    "table": "Il tavolo",
+    "tableMoney": "{left} crediti ancora da spendere su {total}",
+    "tablePurchases": "{count} acquisti su {total} slot",
+    "last": "Ultimi acquisti",
+    "footer": "Pagina condivisa dal manager che tiene i conti su GiBiScore: sola lettura."
   }
 }
