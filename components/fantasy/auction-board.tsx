@@ -355,10 +355,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button key={r} type="button" role="radio" aria-checked={role === r} onClick={() => { setRole(r); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", role === r ? "bg-foreground text-background" : "bg-card")}>{r === 'all' ? t('allRoles') : r}</button>
                         ))}
                     </div>
-                    <select className={selectClass} value={teamId} onChange={(e) => { setTeamId(e.target.value === 'all' ? 'all' : Number(e.target.value)); setLimit(PAGE); }} aria-label={t('allTeams')}>
-                        <option value="all">{t('allTeams')}</option>
-                        {pool.teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
-                    </select>
                     <select className={selectClass} value={tier} onChange={(e) => { setTier(e.target.value as Tier | 'all'); setLimit(PAGE); }} aria-label={t('columns.tier')}>
                         <option value="all">{tt('all')}</option>
                         {TIERS.map((k) => <option key={k} value={k}>{tt(`${k}.name`)}</option>)}
@@ -375,6 +371,20 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", view === v ? "bg-foreground text-background" : "bg-card")}>{v === 'list' ? t('viewList') : t('viewTiers')}</button>
                         ))}
                     </div>
+                </div>
+
+                {/* Teams: one at a time, the active one again to clear it */}
+                <div role="radiogroup" aria-label={t('allTeams')} className="flex flex-wrap gap-1">
+                    <button type="button" role="radio" aria-checked={teamId === 'all'} onClick={() => { setTeamId('all'); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", teamId === 'all' ? "bg-foreground text-background" : "bg-card")}>{t('allTeams')}</button>
+                    {pool.teams.map((tm) => {
+                        const active = teamId === tm.id;
+                        return (
+                            <button key={tm.id} type="button" role="radio" aria-checked={active} title={tm.name} onClick={() => { setTeamId(active ? 'all' : tm.id); setLimit(PAGE); }} className={cn("bb-btn h-8 pl-1.5 pr-2 text-[12px] font-extrabold inline-flex items-center gap-1.5", active ? "bg-foreground text-background" : "bg-card")}>
+                                <TeamCrest team={tm} size={18} />
+                                <span>{tm.shortCode ?? tm.name}</span>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {view === 'tiers' && (
