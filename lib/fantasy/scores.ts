@@ -509,12 +509,18 @@ export interface PriceablePlayer {
 /** Typical fantamedia of a starter in the role: the fallback when a player has no estimate. */
 const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
 /**
- * Tuning of the value model. `power`: scarcity, a player worth twice as
- * much over the replacement costs 2^power times more. `freeGap`: what a
+ * Tuning of the value model. `freeGap`: what a
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {power: 1.8, freeGap: 0.35, tail: 1.2};
+export const PRICE_TUNING = {freeGap: 0.35, tail: 1.2};
+/**
+ * Scarcity per role: the fantasy averages of keepers and defenders sit
+ * close together (a top keeper is a goal a match better than a spare,
+ * not three), so a gentler curve keeps their prices on a human scale;
+ * attack is where the table fights.
+ */
+export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.5, C: 1.7, A: 1.8};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -542,7 +548,7 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     const avail = 0.4 + (0.6 * (p.scores.fitness ?? 70)) / 100;
     // A fantamedia built on a dozen matches is a guess: it is already shrunk towards the role's level,
     // so what it still promises over the free player counts at least for half, in full from twenty matches.
-    const evidence = 0.5 + 0.5 * Math.min(1, (p.scores.sample ?? 30) / 20);
+    const evidence = 0.4 + 0.6 * Math.min(1, (p.scores.sample ?? 30) / 20);
     return Math.max(0, fm - replacement) * evidence * (play + (1 - play) * upside) * avail;
 }
 
@@ -565,7 +571,7 @@ export function valueWeights<T extends PriceablePlayer>(players: T[], role: Fant
     const free = first.slice(Math.min(first.length - 1, Math.max(0, count)), Math.max(1, Math.round(count * 1.5))).map(([p]) => shrunkFanta(p, level));
     const replacement = free.length > 0 ? free.reduce((s, v) => s + v, 0) / free.length - PRICE_TUNING.freeGap : level - PRICE_TUNING.freeGap;
     const out = new Map<number, number>();
-    for (const p of pool) out.set(p.id, expectedValue(p, replacement, level) ** PRICE_TUNING.power);
+    for (const p of pool) out.set(p.id, expectedValue(p, replacement, level) ** PRICE_POWER[role]);
     return out;
 }
 

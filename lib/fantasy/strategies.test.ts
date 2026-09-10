@@ -193,7 +193,7 @@ describe('formations in plans', () => {
         const plan = planStrategy(STRATEGIES[0], players, prices, config);
         expect(FORMATIONS.map((f) => f.key)).toContain(plan.formation);
         expect(plan.formations[0].key).toBe(plan.formation);
-        expect(plan.formations[0].value).toBe(plan.lineupValue);
+        expect(Math.max(...plan.formations.map((f) => f.value))).toBe(plan.lineupValue);
     });
 });
 
@@ -256,8 +256,50 @@ describe('re-budgeting after my purchases', () => {
         const plan = planStrategy(STRATEGIES.find((s) => s.key === 'topAttack')!, players, prices(), config, new Set(), mine);
         expect(plan.spent).toBeLessThanOrEqual(500);
         expect(plan.budget.C + plan.budget.D).toBeLessThan(150);
-        expect(plan.budget.P).toBe(25);
+        // The keeper's share grows to what I paid plus the cheapest keepers for the two slots still open.
+        expect(plan.budget.P).toBeGreaterThanOrEqual(72);
+        expect(plan.budget.P).toBeLessThan(80);
+        expect(plan.picks.P).toHaveLength(3);
         expect(plan.picks.A).toHaveLength(6);
+        expect(Object.values(plan.budget).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(500);
+    });
+
+    it('fills every slot of a role I overpaid in, instead of leaving them empty', () => {
+        const players = pool();
+        // Strong midfield: P budget 30. I paid exactly 30 for one keeper: two keepers at a credit still come.
+        const mine = [{playerId: 1, role: 'P' as const, price: 30}];
+        const plan = planStrategy(STRATEGIES.find((s) => s.key === 'strongMidfield')!, players, prices(), config, new Set(), mine);
+        expect(plan.picks.P).toHaveLength(3);
+        expect(plan.spent).toBeLessThanOrEqual(500);
+    });
+
+    it('moves the money a role cannot spend to the roles that used their share', () => {
+        const players = pool();
+        const list = prices();
+        // Strong midfield, but every midfielder worth more than a few credits is gone: its C share cannot be spent there.
+        const taken = new Set(players.filter((p) => p.role === 'C' && (list.get(p.id) ?? 1) > 3).map((p) => p.id));
+        const strategy = STRATEGIES.find((s) => s.key === 'strongMidfield')!;
+        const plan = planStrategy(strategy, players, list, config, taken);
+        const start = planStrategy(strategy, players, list, config);
+        expect(plan.budget.C).toBeLessThan(start.budget.C);
+        expect(plan.budget.A + plan.budget.D).toBeGreaterThan(start.budget.A + start.budget.D);
+        expect(Object.values(plan.budget).reduce((a, b) => a + b, 0)).toBe(500);
+        expect(plan.spent).toBeGreaterThan(start.spent - 15);
+        expect(plan.spent).toBeLessThanOrEqual(500);
+        expect(plan.picks.C).toHaveLength(8);
+    });
+
+    it('raises a role share for a wanted star above it, taking the money off the other roles', () => {
+        const players = pool();
+        const list = prices();
+        const stars = players.filter((p) => p.role === 'D').sort((a, b) => (list.get(b.id) ?? 0) - (list.get(a.id) ?? 0)).slice(0, 2);
+        // Three stars: D budget 45, the two best defenders together cost more than that.
+        const strategy = STRATEGIES.find((s) => s.key === 'threeStars')!;
+        expect(stars.reduce((s, p) => s + list.get(p.id)!, 0)).toBeGreaterThan(45);
+        const plan = planStrategy(strategy, players, list, config, new Set(), [], {want: new Set(stars.map((p) => p.id))});
+        for (const star of stars) expect(plan.picks.D.some((p) => p.id === star.id && p.pinned)).toBe(true);
+        expect(plan.picks.D).toHaveLength(8);
+        expect(plan.spent).toBeLessThanOrEqual(500);
     });
 
     it('gives what I saved in a finished role to the others', () => {
