@@ -270,6 +270,11 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
     return a;
 }
 
+/** Minutes a rate per 90 is measured over at least (six full matches); a rating average is filled up to them too. */
+const RATE_MINUTES = 540;
+/** Goals conceded per 90 by an average side, for a keeper's missing minutes when his club's rate is unknown. */
+const TYPICAL_CONCEDED = 1.4;
+
 /** Bonus points per 90 (3 x goals + assists) of the role's scale: the saturating curve marks 63 there, ~90 at twice that (an elite season). */
 const BONUS_SCALE: Record<FantaRole, number> = {P: 0.1, D: 0.25, C: 0.55, A: 1.0};
 
@@ -302,7 +307,10 @@ export function scorePlayer(input: AuctionInput): FantaScores {
     for (const y of years) {
         const w = weights.get(y)!;
         const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId, input.clubConcededPer90 ?? null, input.clubStrength ?? null);
-        const per90 = a.minutes > 0 ? 90 / a.minutes : 0;
+        // Rates per 90 are measured over at least six full matches: a goal in the twenty minutes of
+        // a substitute is not a goal a match. A keeper's missing minutes concede at his club's rate.
+        const per90 = a.minutes > 0 ? 90 / Math.max(a.minutes, RATE_MINUTES) : 0;
+        const missing = a.minutes > 0 ? Math.max(0, RATE_MINUTES - a.minutes) : 0;
         const levelFactor = 0.7 + 0.3 * a.level;
 
         // Starter: of the matches he was in the squad for (started, or on the
@@ -316,7 +324,7 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
         // A year without a minute on the pitch says nothing about bonus and malus: it is left out
         // of those two marks (as of the rating), and shows in starter, fitness and the sample.
-        const conceded90 = a.conceded * per90;
+        const conceded90 = (a.conceded + ((input.clubConcededPer90 ?? TYPICAL_CONCEDED) * missing) / 90) * per90;
         const cleanSheet = Math.exp(-conceded90);
         if (a.minutes > 0) {
             if (input.role === 'P') {
@@ -336,7 +344,9 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
         // Rating: 5.6 -> 0, 7.3 -> 100.
         if (a.ratingApps > 0) {
-            const avg = a.ratingSum / a.ratingApps;
+            // Filled up to six full matches with sixes: two good ratings in a few minutes are not a season.
+            const filler = missing / 90;
+            const avg = (a.ratingSum + 6 * filler) / (a.ratingApps + filler);
             rating += w * 100 * Math.max(0, Math.min(1, (avg - 5.6) / 1.7));
             ratingW += w;
         }
@@ -361,7 +371,7 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
         if (a.ratingApps > 0 && a.apps > 0) {
             // Per match played, for the fantasy average under the league's rules.
-            events.rating += w * (a.ratingSum / a.ratingApps);
+            events.rating += w * ((a.ratingSum + 6 * (missing / 90)) / (a.ratingApps + missing / 90));
             events.goals += (w * a.tGoals) / a.apps;
             events.assists += (w * a.tAssists) / a.apps;
             events.yellow += (w * a.yellow) / a.apps;

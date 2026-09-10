@@ -169,6 +169,28 @@ describe('this season at the club', () => {
     });
 });
 
+describe('little playing time', () => {
+    it('a goal in the minutes of a substitute is not a goal a match: bonus, malus and rating are diluted', () => {
+        const base = {age: 22, currentYear: 2026, injury: null, teamAttack: null, teamDefence: null};
+        const sub = scorePlayer({...base, role: 'A', seasons: [line(2025, {appearances: 8, lineups: 0, bench: 20, minutes: 60, goals: 1, assists: 0, rating: 7.2, yellow: 0})]});
+        const regular = scorePlayer({...base, role: 'A', seasons: [line(2025, {appearances: 30, lineups: 28, bench: 2, minutes: 2400, goals: 12, assists: 4, rating: 6.9, yellow: 3})]});
+        expect(sub.bonus).toBeLessThan(regular.bonus);
+        expect(sub.bonus).toBeLessThan(50);
+        expect(sub.rating).toBeLessThan(regular.rating);
+        expect(sub.fantaAvg!).toBeLessThan(regular.fantaAvg!);
+        // Nothing happened in the minutes he did not play: the malus mark stays high, not perfect.
+        expect(sub.discipline).toBeGreaterThanOrEqual(regular.discipline);
+    });
+
+    it('a keeper with one clean sheet in ninety minutes is not a wall', () => {
+        const base = {age: 30, currentYear: 2026, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 1.5};
+        const one = scorePlayer({...base, role: 'P', seasons: [line(2025, {appearances: 1, lineups: 1, bench: 30, minutes: 90, goals: 0, assists: 0, rating: 6.5, goalsConceded: 0, saves: 3})]});
+        const wall = scorePlayer({...base, role: 'P', seasons: [line(2025, {appearances: 34, lineups: 34, bench: 0, minutes: 3060, goals: 0, assists: 0, rating: 6.5, goalsConceded: 24, saves: 100})]});
+        expect(one.bonus).toBeLessThan(wall.bonus);
+        expect(one.bonus).toBeLessThan(60);
+    });
+});
+
 describe('team mark', () => {
     it('reads the club\'s expected place from the start, the season\'s shape only from the fifth round', () => {
         const base = {role: 'A' as const, age: 27, currentYear: 2026, seasons: [line(2025)], injury: null};
