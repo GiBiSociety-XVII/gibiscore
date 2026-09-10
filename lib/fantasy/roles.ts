@@ -3,10 +3,10 @@ import type {FantaRole} from './scores';
 /**
  * Fantasy roles from the formations actually fielded. The provider's
  * position (goalkeeper, defender, midfielder, attacker) is generic and
- * often disagrees with the fantasy list: a wing-back is a defender, a
- * winger an attacker, a wide playmaker in a 4-2-3-1 an attacker while
- * the central one is a midfielder. The lineup grid (row and column in
- * the formation) says where the coach really plays him. Pure.
+ * often disagrees with the fantasy list; the lineup grid (row and column
+ * in the formation) says where the coach really plays him. Classic
+ * rules, nothing finer: the back line is defenders, the front line
+ * attackers, everyone in between a midfielder. Pure.
  */
 
 /** One formation slot a player started in: the grid row and column (row 1 = keeper). */
@@ -21,48 +21,33 @@ export interface SlotStart {
 
 export interface FormationShape {
     rows: number[];
-    /** Three at the back: the outer players of the widest middle row are wing-backs (a back five has them already). */
-    backThree: boolean;
 }
 
 export function parseFormation(formation: string | null): FormationShape | null {
     if (!formation) return null;
     const rows = formation.split('-').map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
     if (rows.length < 2 || rows.reduce((s, v) => s + v, 0) !== 10) return null;
-    return {rows, backThree: rows[0] === 3};
+    return {rows};
 }
 
 /**
- * Fantasy role of a formation slot. `apiRole` breaks the ties the grid
- * cannot settle (a two-man line behind the striker: a midfielder by
- * trade stays a midfielder, a forward is an attacker).
+ * Fantasy role of a formation slot: the first row defends, the last one
+ * attacks, the rows between are midfield. `apiRole` is only a fallback
+ * when the formation is unknown.
  */
 export function slotRole(formation: string | null, position: number, apiRole: FantaRole | null): FantaRole | null {
     const row = Math.floor(position / 10);
-    const col = position % 10;
     if (row === 1) return 'P';
     const shape = parseFormation(formation);
-    if (!shape) return row === 2 ? 'D' : null;
-    const lines = shape.rows.length;
+    if (!shape) return row === 2 ? 'D' : apiRole;
     const index = row - 2;
-    if (index < 0 || index >= lines) return null;
-    const size = shape.rows[index];
-    const last = index === lines - 1;
-    const outer = col === 1 || col === size;
+    if (index < 0 || index >= shape.rows.length) return null;
     if (index === 0) return 'D';
-    if (last) return 'A';
-    // The widest middle row of a back-three side: its outer men are wing-backs.
-    if (shape.backThree && size >= 4 && outer && index === 1) return 'D';
-    if (index === lines - 2) {
-        // The line behind the strikers: a lone man there is the trequartista, an attacker when that is his trade.
-        if (size === 1) return apiRole === 'A' ? 'A' : 'C';
-        if (size === 2) return apiRole === 'C' || apiRole === 'D' ? 'C' : 'A';
-        if (size >= 3 && lines >= 4) return outer ? 'A' : 'C';
-    }
+    if (index === shape.rows.length - 1) return 'A';
     return 'C';
 }
 
-/** Starting slots per fantasy role of a formation (a 3-5-2 has five defenders, three midfielders, two attackers). */
+/** Starting slots per fantasy role of a formation (a 3-5-2 has three defenders, five midfielders, two attackers). */
 export function formationSpots(formation: string | null): Record<FantaRole, number> | null {
     const shape = parseFormation(formation);
     if (!shape) return null;
