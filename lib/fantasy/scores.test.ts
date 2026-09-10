@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {bonusFactor, clubRatio, fantaAvgFor, scorePlayer, seasonWeights, suggestPrices, type SeasonLine} from './scores';
+import {bonusFactor, clubRatio, fantaAvgFor, PRICE_TUNING, scorePlayer, seasonWeights, suggestPrices, type SeasonLine} from './scores';
 
 const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
     year, leagueId: 1, leagueName: 'Serie A', teamId: 1, teamName: 'Inter', games: 38, level: 1,
@@ -254,7 +254,7 @@ describe('suggestPrices', () => {
         // One outlier far above everyone: without a ceiling he would take most of the attack money.
         const players = Array.from({length: 40}, (_, i) => ({id: i + 1, role: 'A' as const, scores: {overall: i === 0 ? 100 : 70 - i, fantaAvg: i === 0 ? 12 : 7 - i / 20, starter: 95, sample: 30}}));
         const prices = suggestPrices(players, {credits: 1000, participants: 12, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.18, C: 0.27, A: 0.47}});
-        expect(prices.get(1)!).toBe(400);
+        expect(prices.get(1)!).toBe(Math.round(1000 * PRICE_TUNING.ceiling));
         expect(prices.get(2)!).toBeGreaterThan(100);
         const spent = [...prices.values()].reduce((s, v) => s + v, 0);
         expect(Math.abs(spent - 1000 * 12 * 0.47)).toBeLessThan(100);

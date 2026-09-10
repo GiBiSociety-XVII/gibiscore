@@ -547,7 +547,7 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {tail: 1.2, ceiling: 0.4};
+export const PRICE_TUNING = {tail: 1.2, ceiling: 0.47};
 /**
  * The free alternative per role: which starters (as a share of what the
  * league buys, from..to) stand for the player nobody pays for, and what
@@ -561,7 +561,7 @@ export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: numb
     P: {from: 0.7, to: 1, gap: 0.1},
     D: {from: 0.7, to: 1, gap: 0.1},
     C: {from: 0.7, to: 1, gap: 0.1},
-    A: {from: 1, to: 1.5, gap: 0.35},
+    A: {from: 0.75, to: 1, gap: 0.25},
 };
 /**
  * Scarcity per role: the fantasy averages of keepers and defenders sit
@@ -569,7 +569,7 @@ export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: numb
  * not three), so a gentler curve keeps their prices on a human scale;
  * attack is where the table fights.
  */
-export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.25, C: 1.4, A: 1.3};
+export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.25, C: 1.4, A: 1.2};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -582,6 +582,8 @@ export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.25, C: 1.4, 
 /** Fantamedia shrunk towards the role's level when it rests on few matches. */
 /** How much the club moves a price: the factor runs from 1 - pull/2 (a club at 0) to 1 + pull/2 (at 100). */
 export const CLUB_PULL = 1.0;
+/** The chance of playing enters the price with this exponent: below 1 a rotation player keeps more of his value. */
+export const PLAY_CURVE = 0.7;
 /** What a starter of the role at a top club averages above one at a bottom club: where a thin fantamedia is shrunk towards. */
 const CLUB_SHIFT: Record<FantaRole, number> = {P: 0.6, D: 0.4, C: 0.6, A: 1.0};
 
@@ -607,7 +609,9 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     // The club: a side near the top creates more (and concedes less) than one near the bottom,
     // beyond what his own numbers say. About ±30% between the ends of the table.
     const club = 1 + CLUB_PULL * ((p.scores.team ?? 50) / 100 - 0.5);
-    return Math.max(0, fm - replacement) * evidence * (play + (1 - play) * upside) * avail * club;
+    // The table pays a sure starter in full and a rotation player more than his minutes say: a name is bought for the weeks he plays.
+    const onPitch = play ** PLAY_CURVE;
+    return Math.max(0, fm - replacement) * evidence * (onPitch + (1 - onPitch) * upside) * avail * club;
 }
 
 /**
