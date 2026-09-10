@@ -8,16 +8,26 @@ const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
 });
 
 describe('seasonWeights', () => {
-    it('weights the current season by how far it has gone', () => {
-        const w = seasonWeights([line(2026, {games: 2}), line(2025), line(2024)], 2026);
-        const cur = 0.6 * (2 / 19) ** 1.2;
-        expect(w.get(2026)!).toBeCloseTo(cur / (cur + 0.7), 5);
-        expect(w.get(2026)!).toBeLessThan(0.08);
-        expect(w.get(2025)!).toBeCloseTo(0.55 / (cur + 0.7), 5);
-        // January: the current season is the biggest weight.
-        const jan = seasonWeights([line(2026, {games: 19}), line(2025), line(2024)], 2026);
-        expect(jan.get(2026)!).toBeGreaterThan(jan.get(2025)!);
+    it('September: last season first, the current one a little, the one before last third', () => {
+        const w = seasonWeights([line(2026, {games: 3}), line(2025), line(2024)], 2026);
+        expect(w.get(2025)!).toBeGreaterThan(w.get(2026)!);
+        expect(w.get(2026)!).toBeGreaterThan(w.get(2024)!);
+        expect(w.get(2025)!).toBeCloseTo(0.61, 1);
+        expect(w.get(2026)!).toBeCloseTo(0.25, 1);
         expect([...w.values()].reduce((s, v) => s + v, 0)).toBeCloseTo(1, 5);
+    });
+
+    it('January: the current season is the biggest weight by a clear margin', () => {
+        const jan = seasonWeights([line(2026, {games: 19}), line(2025), line(2024)], 2026);
+        expect(jan.get(2026)!).toBeGreaterThan(jan.get(2025)! * 1.5);
+        expect(jan.get(2026)!).toBeCloseTo(0.56, 1);
+        expect(jan.get(2024)!).toBeLessThan(0.15);
+    });
+
+    it('before the first round the current season weighs nothing', () => {
+        const w = seasonWeights([line(2026, {games: 0}), line(2025), line(2024)], 2026);
+        expect(w.has(2026)).toBe(false);
+        expect(w.get(2025)!).toBeCloseTo(0.55 / 0.67, 5);
     });
 
     it('ignores seasons outside the window', () => {

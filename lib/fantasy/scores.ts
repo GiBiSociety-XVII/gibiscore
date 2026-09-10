@@ -136,19 +136,26 @@ export interface FantaScores {
 const clamp = (v: number, min = 1, max = 100) => Math.max(min, Math.min(max, Math.round(v)));
 
 /**
- * Season weights. Auctions happen in early September and early January,
- * so the previous season is the backbone (55%) and the one before it
- * counts 15%; the current season starts small and grows with the
- * matches played: 5% after two rounds, 20% after eight, 45% by January
- * (nineteen rounds). How the player and his club have started is a
- * separate mark ("form"), not a bigger weight.
+ * Season weights. Auctions happen in early September and late January.
+ * In September the previous season is the backbone, the current one
+ * counts a little (it has just begun) and the one before last comes
+ * third: about 61 / 25 / 14 after three rounds. As the rounds come in
+ * the current season grows and the previous one fades, and by January
+ * (nineteen rounds) the current season is the biggest weight by a clear
+ * margin: about 56 / 33 / 11. With nothing played yet, 80 / 20. How
+ * the player and his club have started is also a separate mark ("form").
  */
+/** Raw weight of the current season after `rounds` matches: nothing before the first, 0.21 after three, 0.6 from January on. */
+const currentWeight = (rounds: number) => (rounds <= 0 ? 0 : 0.12 + 0.48 * Math.min(1, rounds / 19) ** 0.9);
+/** Raw weight of the previous season: 0.55 before the first round, fading to 0.36 by January as the current one takes over. */
+const previousWeight = (rounds: number) => 0.55 * (1 - 0.35 * Math.min(1, Math.max(0, rounds) / 19));
+
 export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<number, number> {
     const years = [...new Set(seasons.map((s) => s.year))].filter((y) => y <= currentYear && y >= currentYear - 2);
     const gamesOf = (y: number) => Math.max(0, ...seasons.filter((s) => s.year === y).map((s) => s.games));
     const raw = new Map<number, number>();
     for (const y of years) {
-        const base = y === currentYear ? 0.6 * Math.min(1, gamesOf(y) / 19) ** 1.2 : y === currentYear - 1 ? 0.55 : 0.15;
+        const base = y === currentYear ? currentWeight(gamesOf(y)) : y === currentYear - 1 ? previousWeight(gamesOf(currentYear)) : 0.12;
         if (base > 0) raw.set(y, base);
     }
     const total = [...raw.values()].reduce((s, v) => s + v, 0);
