@@ -45,7 +45,7 @@ export interface RoleReport {
 }
 
 export interface TeamReport {
-    /** The team's mark: the average auction mark of the eleven it would field (fewer, while the roster is short). */
+    /** The team's mark: the auction marks of the eleven it would field, over eleven places (a short roster scores for what it has). */
     overall: number;
     /** Average starter mark of those eleven. */
     starter: number;
@@ -104,9 +104,11 @@ export function teamReport(players: ReportPlayer[], purchases: Purchase[], slots
             best: best ? {id: best.id, name: best.name, overall: best.scores.overall} : null,
         };
     });
+    // Over eleven places, whoever is there: a short roster is not yet a team.
+    const overEleven = (values: number[]) => values.reduce((s, v) => s + v, 0) / 11;
     return {
-        overall: round(mean(xi.map((p) => p.scores.overall))),
-        starter: round(mean(xi.map((p) => p.scores.starter))),
+        overall: round(overEleven(xi.map((p) => p.scores.overall))),
+        starter: round(overEleven(xi.map((p) => p.scores.starter))),
         fantaAvg: withAvg.length > 0 ? round1(mean(withAvg.map((p) => p.scores.fantaAvg!))) : null,
         lineup: lineup ? {formation: lineup.formation, value: lineup.value} : null,
         formation,

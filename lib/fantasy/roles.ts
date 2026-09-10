@@ -21,7 +21,7 @@ export interface SlotStart {
 
 export interface FormationShape {
     rows: number[];
-    /** Three or five at the back: the outer players of the widest middle row are wing-backs. */
+    /** Three at the back: the outer players of the widest middle row are wing-backs (a back five has them already). */
     backThree: boolean;
 }
 
@@ -29,7 +29,7 @@ export function parseFormation(formation: string | null): FormationShape | null 
     if (!formation) return null;
     const rows = formation.split('-').map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
     if (rows.length < 2 || rows.reduce((s, v) => s + v, 0) !== 10) return null;
-    return {rows, backThree: rows[0] === 3 || rows[0] === 5};
+    return {rows, backThree: rows[0] === 3};
 }
 
 /**
@@ -54,8 +54,8 @@ export function slotRole(formation: string | null, position: number, apiRole: Fa
     // The widest middle row of a back-three side: its outer men are wing-backs.
     if (shape.backThree && size >= 4 && outer && index === 1) return 'D';
     if (index === lines - 2) {
-        // The line behind the strikers.
-        if (size === 1) return 'C';
+        // The line behind the strikers: a lone man there is the trequartista, an attacker when that is his trade.
+        if (size === 1) return apiRole === 'A' ? 'A' : 'C';
         if (size === 2) return apiRole === 'C' || apiRole === 'D' ? 'C' : 'A';
         if (size >= 3 && lines >= 4) return outer ? 'A' : 'C';
     }

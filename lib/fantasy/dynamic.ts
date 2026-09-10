@@ -54,6 +54,15 @@ export function marketState(players: PricedPlayer[], listPrices: Map<number, num
     const paid = purchases.reduce((s, p) => s + p.price, 0);
     const listed = purchases.reduce((s, p) => s + (listPrices.get(p.playerId) ?? 1), 0);
     const inflation = purchases.length >= 5 && listed > 0 ? clamp(paid / listed, 0.6, 1.8) : 1;
+    // The share of the money each role takes: what the list itself gives it (the usual split when the list cannot say).
+    const listTotal = players.reduce((s, p) => s + (listPrices.get(p.id) ?? 1), 0);
+    const roleShare = {} as Record<FantaRole, number>;
+    for (const role of ROLES) {
+        const roleList = players.filter((p) => p.role === role).reduce((s, p) => s + (listPrices.get(p.id) ?? 1), 0);
+        roleShare[role] = listTotal > 0 && roleList > 0 ? roleList / listTotal : ROLE_SHARE[role];
+    }
+    /** Whether a manager has every slot of the role already: he buys no more of it. */
+    const roleFull = (manager: number, role: FantaRole) => purchases.filter((p) => p.manager === manager && byId.get(p.playerId)?.role === role).length >= config.slots[role];
 
     // The money left goes to the roles two ways, averaged: what each role should still receive
     // (its usual share of the market minus what has already been spent on it) and the slots still
@@ -67,14 +76,14 @@ export function marketState(players: PricedPlayer[], listPrices: Map<number, num
         const rolePurchases = purchases.filter((p) => byId.get(p.playerId)?.role === role);
         boughtBy[role] = rolePurchases.length;
         slotsLeft[role] = Math.max(0, config.participants * config.slots[role] - boughtBy[role]);
-        demand += (slotsLeft[role] * ROLE_SHARE[role]) / Math.max(1, config.slots[role]);
+        demand += (slotsLeft[role] * roleShare[role]) / Math.max(1, config.slots[role]);
         const spentOn = rolePurchases.reduce((s, p) => s + p.price, 0);
-        owed[role] = slotsLeft[role] > 0 ? Math.max(slotsLeft[role], market * ROLE_SHARE[role] - spentOn) : 0;
+        owed[role] = slotsLeft[role] > 0 ? Math.max(slotsLeft[role], market * roleShare[role] - spentOn) : 0;
         owedTotal += owed[role];
     }
     const byRole = {} as Record<FantaRole, RoleMarket>;
     for (const role of ROLES) {
-        const bySlots = demand > 0 ? (slotsLeft[role] * ROLE_SHARE[role]) / Math.max(1, config.slots[role]) / demand : 0;
+        const bySlots = demand > 0 ? (slotsLeft[role] * roleShare[role]) / Math.max(1, config.slots[role]) / demand : 0;
         const byOwed = owedTotal > 0 ? owed[role] / owedTotal : 0;
         const share = (bySlots + byOwed) / 2;
         const rolePurchases = purchases.filter((p) => byId.get(p.playerId)?.role === role);
@@ -86,13 +95,15 @@ export function marketState(players: PricedPlayer[], listPrices: Map<number, num
         const tops = ranked.slice(0, topTotal);
         const topLeft = tops.filter((p) => !bought.has(p.id)).length;
         const holders = new Set(purchases.filter((p) => tops.some((t) => t.id === p.playerId)).map((p) => p.manager));
-        // Managers still without a top of the role who can still pay for one (unnamed managers are assumed untouched).
+        // Managers still without a top of the role, with a slot for him and the money for one after
+        // what finishing the roster costs (unnamed managers are assumed untouched).
         const cheapestTop = Math.min(...tops.filter((p) => !bought.has(p.id)).map((p) => listPrices.get(p.id) ?? 1), Infinity);
         let hungry = 0;
         for (let m = 0; m < config.participants; m += 1) {
-            if (holders.has(m)) continue;
+            if (holders.has(m) || roleFull(m, role)) continue;
             const left = config.credits - purchases.filter((p) => p.manager === m).reduce((s, p) => s + p.price, 0);
-            if (!Number.isFinite(cheapestTop) || left >= cheapestTop * 0.8) hungry += 1;
+            const spare = left - completionReserve(players, listPrices, config, purchases, m, role);
+            if (!Number.isFinite(cheapestTop) || spare >= cheapestTop * 0.8) hungry += 1;
         }
         byRole[role] = {
             slotsLeft: slotsLeft[role],
@@ -149,9 +160,12 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
     // No fixed ceiling: the only bound is what the richest manager at the table can still pay
     // for one player while keeping enough to finish his roster with the cheapest players left
     // (unnamed managers: untouched budget). One ceiling per role, since the reserve depends on it.
+    const byId = new Map(players.map((p) => [p.id, p]));
     const capFor = (role: FantaRole) => {
         let cap = 1;
         for (let m = 0; m < config.participants; m += 1) {
+            // A manager with the role complete is out of this market.
+            if (purchases.filter((p) => p.manager === m && byId.get(p.playerId)?.role === role).length >= config.slots[role]) continue;
             const left = config.credits - purchases.filter((p) => p.manager === m).reduce((s, p) => s + p.price, 0);
             cap = Math.max(cap, left - completionReserve(players, listPrices, config, purchases, m, role));
         }
@@ -167,8 +181,9 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         const toBuy = available.slice(0, Math.max(1, Math.round(state.slotsLeft * PRICE_TUNING.tail)));
         const weight = (p: PricedPlayer) => weights.get(p.id) ?? 0;
         const total = toBuy.reduce((s, p) => s + weight(p), 0);
-        // A table that pays over list keeps doing it, softly: at most a tenth either way.
-        const mood = Math.sqrt(clamp(state.inflation, 0.8, 1.2));
+        // A table that pays over list keeps doing it, softly: at most a tenth either way, and only
+        // once every manager has bought something (a handful of purchases say nothing yet).
+        const mood = purchases.length >= config.participants ? Math.sqrt(clamp(state.inflation, 0.8, 1.2)) : 1;
         // The same level as the list: the money left on the table, seen through a contested auction.
         const rest = Math.max(0, (state.money * (config.priceLevel ?? 100)) / 100 - toBuy.length);
         // Scarcity against the start: tops gone while managers still want one make the tops left
@@ -183,12 +198,18 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         // few, most of it once a good part of the role is gone.
         const progress = Math.min(1, state.bought / Math.max(1, config.participants * config.slots[role]));
         const marketWeight = Math.min(0.9, 0.35 + 0.55 * Math.sqrt(progress) + Math.min(0.15, purchases.length / 100));
-        toBuy.forEach((p) => {
+        // The scarcity premium moves money, it does not create it: what the tops gain comes off the rest.
+        const base = toBuy.map((p) => {
             const raw = total > 0 ? 1 + (rest * weight(p)) / total : 1;
             const list = listPrices.get(p.id) ?? 1;
-            const premium = topIds.has(p.id) ? scarcity : semiIds.has(p.id) ? Math.sqrt(scarcity) : 1;
-            const price = Math.round((raw * mood * marketWeight + list * (1 - marketWeight)) * premium);
-            prices.set(p.id, clamp(Math.max(1, price), 1, cap));
+            return raw * mood * marketWeight + list * (1 - marketWeight);
+        });
+        const withPremium = toBuy.map((p, i) => base[i] * (topIds.has(p.id) ? scarcity : semiIds.has(p.id) ? Math.sqrt(scarcity) : 1));
+        const baseSum = base.reduce((s, v) => s + v, 0);
+        const premiumSum = withPremium.reduce((s, v) => s + v, 0);
+        const level = premiumSum > 0 ? baseSum / premiumSum : 1;
+        toBuy.forEach((p, i) => {
+            prices.set(p.id, clamp(Math.max(1, Math.round(withPremium[i] * level)), 1, cap));
         });
     }
     for (const [id, price] of paidFor) prices.set(id, price);

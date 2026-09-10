@@ -15,9 +15,9 @@ import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
-import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
+import {DEFAULT_RULES, ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
-import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
+import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
@@ -149,8 +149,11 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!rawPool || !config) return rawPool;
         const overrides = config.roleOverrides;
         const fixed = Object.keys(overrides).length > 0 ? rawPool.players.map((p) => (overrides[String(p.id)] && overrides[String(p.id)] !== p.role ? {...p, role: overrides[String(p.id)], roleSource: 'manual' as const} : p)) : rawPool.players;
-        if (config.cupsCount) return fixed === rawPool.players ? rawPool : {...rawPool, players: fixed};
-        return {...rawPool, players: fixed.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}))};
+        const chosen = config.cupsCount ? fixed : fixed.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}));
+        // The league's own bonus and malus: the fantasy average follows them.
+        const classic = (Object.keys(DEFAULT_RULES) as Array<keyof typeof DEFAULT_RULES>).every((k) => config.rules[k] === DEFAULT_RULES[k]);
+        const players = classic ? chosen : chosen.map((p) => (p.scores.events ? {...p, scores: {...p.scores, fantaAvg: fantaAvgFor(p.scores.events, p.role, config.rules)}} : p));
+        return players === rawPool.players ? rawPool : {...rawPool, players};
     }, [rawPool, config]);
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {

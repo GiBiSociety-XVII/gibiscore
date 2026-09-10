@@ -303,3 +303,35 @@ describe('a fixed formation', () => {
         expect(three.picks.A.filter((p) => p.price >= 20).length).toBeGreaterThanOrEqual(3);
     });
 });
+
+describe('what the review fixed', () => {
+    const players = pool();
+    const prices = suggestPrices(players.map((p) => ({...p, age: 26, scores: {...p.scores, sample: 30, confidence: 'high' as const}})), {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.06, D: 0.16, C: 0.28, A: 0.5}, level: 1});
+    const player = (role: FantaRole, fantaAvg: number, starter = 90) => ({role, scores: {fantaAvg, starter}});
+
+    it('the role budgets add up to the credits, formation or not', () => {
+        for (const credits of [500, 503, 1000]) {
+            for (const formation of [null, '3-4-3', '5-3-2', '4-4-2']) {
+                for (const s of STRATEGIES) {
+                    const plan = planStrategy(s, players, prices, {...config, credits, formation});
+                    expect(Object.values(plan.budget).reduce((a, b) => a + b, 0)).toBe(credits);
+                    expect(plan.spent).toBeLessThanOrEqual(credits);
+                }
+            }
+        }
+    });
+
+    it('one substitute covers a role once, whoever is missing', () => {
+        const roster = [
+            player('P', 5.5, 100),
+            ...[6.2, 6.2, 6.2, 6.2].map((v) => player('D', v, 100)),
+            ...[6.4, 6.4, 6.4].map((v) => player('C', v, 100)),
+            ...[7.0, 7.0, 7.0].map((v) => player('A', v, 50)),
+            player('A', 6.0, 100),
+        ];
+        const value = bestLineup(roster).formations.find((f) => f.key === '4-3-3')!.value;
+        // Three attackers at 50%: 3 × 3.5 fielded, and the substitute plays when at least one is out (1 − 0.5³ = 0.875).
+        const attack = 3 * 3.5 + 0.875 * 6.0;
+        expect(value).toBeCloseTo(5.5 + 4 * 6.2 + 3 * 6.4 + attack, 0);
+    });
+});

@@ -9,7 +9,7 @@ describe('assignTiers', () => {
     it('sizes the seven ranked tiers on how many players the league buys', () => {
         const players = [...pool('A', 70, 0), ...pool('P', 30, 100)];
         const tiers = assignTiers(players, config);
-        // Attackers: 48 bought -> 4 top, 6 semi-top, 8 first, 9 second, 9 third, 7 fourth, 6 fifth, the rest by profile.
+        // Attackers: 48 bought -> 4 top, 6 semi-top, 7 first, 9 second, 9 third, 7 fourth, 6 fifth (48 in all), the rest by profile.
         expect(tiers.get(1)).toBe('top');
         expect(tiers.get(4)).toBe('top');
         expect(tiers.get(5)).toBe('semiTop');
@@ -18,7 +18,8 @@ describe('assignTiers', () => {
         expect(tiers.get(28)).toBe('third');
         expect(tiers.get(37)).toBe('fourth');
         expect(tiers.get(44)).toBe('fifth');
-        expect(tiers.get(49)).toBe('fifth');
+        expect(tiers.get(48)).toBe('fifth');
+        expect(tiers.get(49)).toBe('filler');
         expect(tiers.get(60)).toBe('filler');
         // Keepers: 24 bought -> 2 top, 3 semi-top, 4 first, 4 second, 4 third, 4 fourth, 3 fifth.
         expect(tiers.get(101)).toBe('top');

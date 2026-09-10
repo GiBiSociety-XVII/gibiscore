@@ -74,6 +74,40 @@ export interface AuctionInput {
     thisSeason?: {starts: number; benches: number} | null;
 }
 
+/** Per match played: the rating and the events a league pays or fines. Keepers: goals conceded and the chance of a clean sheet. */
+export interface FantaEvents {
+    rating: number;
+    goals: number;
+    assists: number;
+    yellow: number;
+    red: number;
+    penaltyMissed: number;
+    penaltySaved: number;
+    conceded: number;
+    cleanSheet: number;
+}
+
+/** What a league pays per event (config.ts ScoringRules has the same shape). */
+export interface FantaRules {
+    goal: number;
+    assist: number;
+    goalConceded: number;
+    yellow: number;
+    red: number;
+    penaltyMissed: number;
+    penaltySaved: number;
+    cleanSheet: number;
+}
+
+export const CLASSIC_RULES: FantaRules = {goal: 3, assist: 1, goalConceded: -1, yellow: -0.5, red: -1, penaltyMissed: -3, penaltySaved: 3, cleanSheet: 1};
+
+/** The fantasy average per match under a league's rules, from the events. */
+export function fantaAvgFor(events: FantaEvents, role: FantaRole, rules: FantaRules): number {
+    const keeper = role === 'P' ? events.conceded * rules.goalConceded + events.cleanSheet * rules.cleanSheet + events.penaltySaved * rules.penaltySaved : 0;
+    const value = events.rating + events.goals * rules.goal + events.assists * rules.assist + events.yellow * rules.yellow + events.red * rules.red + events.penaltyMissed * rules.penaltyMissed + keeper;
+    return Math.round(value * 100) / 100;
+}
+
 export interface FantaScores {
     /** How often the player starts (and finishes) the matches he is available for. */
     starter: number;
@@ -90,8 +124,10 @@ export interface FantaScores {
     /** How the season has started for him and his club, against his own past: 50 = as expected. */
     form: number;
     overall: number;
-    /** Estimated fantasy average per match played (rating + bonus - malus). */
+    /** Estimated fantasy average per match played (rating + bonus - malus), with the classic rules. */
     fantaAvg: number | null;
+    /** What he does per match played, translated to this league and club: the fantasy average under any rules (`fantaAvgFor`). */
+    events: FantaEvents | null;
     /** Weighted matches behind the marks. */
     sample: number;
     confidence: 'low' | 'medium' | 'high';
@@ -154,6 +190,9 @@ export function clubRatio(current: number | null | undefined, line: number | nul
 interface YearAgg {
     /** Longest competition of the season (the league): the availability baseline. */
     games: number;
+    /** League lines of the year, and the matches he was in the squad for in them (cups rotate). */
+    leagueLines: number;
+    inSquadLeague: number;
     apps: number;
     lineups: number;
     bench: number;
@@ -182,7 +221,7 @@ interface YearAgg {
 
 /** One season across its competitions. Lines at the current club weigh double for the starter rates. */
 function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined, clubConcededPer90: number | null = null, clubStrength: number | null = null): YearAgg {
-    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, tGoals: 0, tAssists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0, atClub: 0};
+    const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, tGoals: 0, tAssists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0, atClub: 0, leagueLines: 0, inSquadLeague: 0};
     let levelW = 0;
     for (const l of lines) {
         const atClub = currentTeamId !== null && currentTeamId !== undefined && l.teamId === currentTeamId;
@@ -193,7 +232,11 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         const ratio = atClub ? 1 : clubRatio(clubStrength, l.clubStrength, l.level);
         const transfer = bonusFactor(l.level) * ratio;
         const ratingShift = !atClub && clubStrength !== null && clubStrength !== undefined ? Math.max(-0.15, Math.min(0.15, 0.3 * (clubStrength - (l.clubStrength ?? defaultClubStrength(l.level))))) : 0;
-        if (atClub) a.atClub += l.appearances + l.bench;
+        if (atClub) a.atClub += l.lineups + l.bench;
+        if (!l.cup) {
+            a.leagueLines += 1;
+            a.inSquadLeague += l.lineups + l.bench;
+        }
         a.games = Math.max(a.games, l.games);
         a.apps += l.appearances;
         a.lineups += l.lineups;
@@ -216,19 +259,21 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         a.penSaved += l.penaltiesSaved;
         a.yellow += l.yellow;
         a.red += l.red + l.yellowRed;
-        // Goals conceded belong to the club: elsewhere they are replaced by what the current club concedes.
-        a.conceded += !atClub && clubConcededPer90 !== null ? (clubConcededPer90 * l.minutes) / 90 : l.goalsConceded;
-        a.level += l.level * Math.max(1, l.appearances);
+        // Goals conceded belong to the club: elsewhere they are replaced by what the current club
+        // concedes; his own, in a weaker league, would be more here.
+        a.conceded += !atClub && clubConcededPer90 !== null ? (clubConcededPer90 * l.minutes) / 90 : l.goalsConceded / Math.max(0.6, level);
+        // How sure his place is: a starter in a weaker league may not start here, unless it is his club.
+        a.level += (atClub ? 1 : l.level) * Math.max(1, l.appearances);
         levelW += Math.max(1, l.appearances);
     }
     a.level = levelW > 0 ? a.level / levelW : 1;
     return a;
 }
 
-/** Bonus points per 90 (3 x goals + assists) that mark 100 for the role: an elite season. */
+/** Bonus points per 90 (3 x goals + assists) of the role's scale: the saturating curve marks 63 there, ~90 at twice that (an elite season). */
 const BONUS_SCALE: Record<FantaRole, number> = {P: 0.1, D: 0.25, C: 0.55, A: 1.0};
 
-const WEIGHTS: Record<FantaRole, Record<Exclude<keyof FantaScores, 'overall' | 'fantaAvg' | 'sample' | 'confidence'>, number>> = {
+const WEIGHTS: Record<FantaRole, Record<Exclude<keyof FantaScores, 'overall' | 'fantaAvg' | 'events' | 'sample' | 'confidence'>, number>> = {
     P: {starter: 30, bonus: 14, rating: 20, discipline: 10, fitness: 8, team: 9, form: 9},
     D: {starter: 27, bonus: 18, rating: 18, discipline: 9, fitness: 8, team: 9, form: 11},
     C: {starter: 22, bonus: 32, rating: 14, discipline: 4, fitness: 8, team: 9, form: 11},
@@ -239,18 +284,20 @@ export function scorePlayer(input: AuctionInput): FantaScores {
     const weights = seasonWeights(input.seasons, input.currentYear);
     const years = [...weights.keys()];
     if (years.length === 0) {
-        return {starter: 1, bonus: 1, rating: 1, discipline: 50, fitness: input.injury?.active ? 20 : 50, team: teamScore(input), form: 50, overall: 1, fantaAvg: null, sample: 0, confidence: 'low'};
+        return {starter: 1, bonus: 1, rating: 1, discipline: 50, fitness: input.injury?.active ? 20 : 50, team: teamScore(input), form: 50, overall: 1, fantaAvg: null, events: null, sample: 0, confidence: 'low'};
     }
 
     let starter = 0;
     let bonus = 0;
+    let bonusW = 0;
     let rating = 0;
     let ratingW = 0;
     let discipline = 0;
+    let disciplineW = 0;
     let fitness = 0;
     let sample = 0;
-    let fantaAvg = 0;
     let fantaW = 0;
+    const events: FantaEvents = {rating: 0, goals: 0, assists: 0, yellow: 0, red: 0, penaltyMissed: 0, penaltySaved: 0, conceded: 0, cleanSheet: 0};
 
     for (const y of years) {
         const w = weights.get(y)!;
@@ -267,19 +314,24 @@ export function scorePlayer(input: AuctionInput): FantaScores {
         const minuteRate = Math.min(1, a.wMinutes / (inSquad * 90));
         starter += w * 100 * (0.6 * startRate + 0.4 * minuteRate) * levelFactor;
 
-        if (input.role === 'P') {
-            // Keepers do not score: their bonus is the clean sheet and the penalty saved. With goals
-            // conceded per 90 as a Poisson rate, the chance of a clean sheet is exp(-rate): 0.9 a match
-            // (an elite season) gives 41%, 1.4 (average) 25%, 1.9 (a sieve) 15%. A penalty saved every
-            // twenty matches adds a few points.
-            const conceded90 = a.minutes > 0 ? a.conceded * per90 / Math.max(0.6, a.level) : 1.4;
-            const cleanSheet = Math.exp(-conceded90);
-            const penSaved90 = a.minutes > 0 ? a.penSaved * per90 : 0;
-            bonus += w * 100 * Math.min(1, Math.max(0, (cleanSheet - 0.1) / 0.35) + Math.min(0.15, penSaved90 * 3));
-        } else {
-            // Bonus per 90 (translated to this league and club) against the role's elite rate, saturating.
-            const bonus90 = (3 * a.tGoals + a.tAssists) * per90;
-            bonus += w * 100 * (1 - Math.exp(-bonus90 / BONUS_SCALE[input.role]));
+        // A year without a minute on the pitch says nothing about bonus and malus: it is left out
+        // of those two marks (as of the rating), and shows in starter, fitness and the sample.
+        const conceded90 = a.conceded * per90;
+        const cleanSheet = Math.exp(-conceded90);
+        if (a.minutes > 0) {
+            if (input.role === 'P') {
+                // Keepers do not score: their bonus is the clean sheet and the penalty saved. With goals
+                // conceded per 90 as a Poisson rate, the chance of a clean sheet is exp(-rate): 0.9 a match
+                // (an elite season) gives 41%, 1.4 (average) 25%, 1.9 (a sieve) 15%. A penalty saved every
+                // twenty matches adds a few points.
+                const penSaved90 = a.penSaved * per90;
+                bonus += w * 100 * Math.min(1, Math.max(0, (cleanSheet - 0.1) / 0.35) + Math.min(0.15, penSaved90 * 3));
+            } else {
+                // Bonus per 90 (translated to this league and club) against the role's elite rate, saturating.
+                const bonus90 = (3 * a.tGoals + a.tAssists) * per90;
+                bonus += w * 100 * (1 - Math.exp(-bonus90 / BONUS_SCALE[input.role]));
+            }
+            bonusW += w;
         }
 
         // Rating: 5.6 -> 0, 7.3 -> 100.
@@ -290,27 +342,38 @@ export function scorePlayer(input: AuctionInput): FantaScores {
         }
 
         // Malus: cards (and goals conceded for keepers) per 90.
-        if (input.role === 'P') {
-            const conceded90 = a.minutes > 0 ? a.conceded * per90 : 1.4;
-            discipline += w * 100 * Math.max(0, Math.min(1, (2.2 - conceded90) / 1.4));
-        } else {
-            const malus90 = a.minutes > 0 ? (0.5 * a.yellow + a.red + 3 * a.penMissed) * per90 : 0.15;
-            discipline += w * 100 * Math.exp(-malus90 / 0.25);
+        if (a.minutes > 0) {
+            if (input.role === 'P') {
+                discipline += w * 100 * Math.max(0, Math.min(1, (2.2 - conceded90) / 1.4));
+            } else {
+                const malus90 = (0.5 * a.yellow + a.red + 3 * a.penMissed) * per90;
+                discipline += w * 100 * Math.exp(-malus90 / 0.25);
+            }
+            disciplineW += w;
         }
 
-        // Fitness: matches in the squad (started or on the bench) over the league's season.
-        fitness += w * 100 * Math.min(1, (a.lineups + a.bench) / Math.max(1, a.games));
+        // Fitness: matches in the league squad (started or on the bench) over the league's season;
+        // cup nights are rotation, not availability.
+        const inSquadSeason = a.leagueLines > 0 ? a.inSquadLeague : a.lineups + a.bench;
+        fitness += w * 100 * Math.min(1, inSquadSeason / Math.max(1, a.games));
 
         sample += w * a.apps;
 
         if (a.ratingApps > 0 && a.apps > 0) {
-            // Keepers: a goal conceded costs one, a clean sheet earns one, a penalty saved three.
-            const keeper = input.role === 'P' ? -a.conceded / a.apps + Math.exp(-(a.minutes > 0 ? a.conceded * per90 : 1.4)) + (3 * a.penSaved) / a.apps : 0;
-            const perMatch = (3 * a.tGoals + a.tAssists - 0.5 * a.yellow - a.red - 3 * a.penMissed) / a.apps + keeper;
-            fantaAvg += w * (a.ratingSum / a.ratingApps + perMatch);
+            // Per match played, for the fantasy average under the league's rules.
+            events.rating += w * (a.ratingSum / a.ratingApps);
+            events.goals += (w * a.tGoals) / a.apps;
+            events.assists += (w * a.tAssists) / a.apps;
+            events.yellow += (w * a.yellow) / a.apps;
+            events.red += (w * a.red) / a.apps;
+            events.penaltyMissed += (w * a.penMissed) / a.apps;
+            events.penaltySaved += (w * a.penSaved) / a.apps;
+            events.conceded += (w * a.conceded) / a.apps;
+            events.cleanSheet += w * cleanSheet;
             fantaW += w;
         }
     }
+    if (fantaW > 0) for (const k of Object.keys(events) as Array<keyof FantaEvents>) events[k] /= fantaW;
 
     // A new signing is bought to play: with little history at the current club, what he did
     // elsewhere counts for half and the other half is what a player of his quality is expected
@@ -341,22 +404,23 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
     const scores = {
         starter: clamp(starter),
-        bonus: clamp(bonus),
+        bonus: bonusW > 0 ? clamp(bonus / bonusW) : 1,
         rating: ratingW > 0 ? clamp(rating / ratingW) : 1,
-        discipline: clamp(discipline),
+        discipline: disciplineW > 0 ? clamp(discipline / disciplineW) : 50,
         fitness: clamp(fitness),
         team: teamScore(input),
         form: formScore(input),
     };
     const w = WEIGHTS[input.role];
     const overall = (Object.keys(w) as Array<keyof typeof w>).reduce((s, k) => s + (scores[k] * w[k]) / 100, 0);
-    // Thin evidence pulls the overall towards the middle-low range.
+    // Thin evidence pulls the overall towards the low range: a man barely seen must not rank above a known reserve.
     const evidence = Math.min(1, sample / 15);
     const games = Math.round(sample);
     return {
         ...scores,
-        overall: clamp(overall * evidence + 30 * (1 - evidence)),
-        fantaAvg: fantaW > 0 ? Math.round((fantaAvg / fantaW) * 100) / 100 : null,
+        overall: clamp(overall * evidence + 20 * (1 - evidence)),
+        fantaAvg: fantaW > 0 ? fantaAvgFor(events, input.role, CLASSIC_RULES) : null,
+        events: fantaW > 0 ? events : null,
         sample: games,
         confidence: games >= 20 ? 'high' : games >= 8 ? 'medium' : 'low',
     };
@@ -476,8 +540,9 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     const thin = p.scores.confidence !== undefined && p.scores.confidence !== 'high';
     const upside = Math.min(0.45, 0.1 + (young ? 0.2 : 0) + (hot ? 0.1 : 0) + (thin ? 0.1 : 0));
     const avail = 0.4 + (0.6 * (p.scores.fitness ?? 70)) / 100;
-    // A fantamedia built on a dozen matches is a guess: what it promises over the free player counts in proportion, in full from twenty matches.
-    const evidence = Math.min(1, (p.scores.sample ?? 30) / 20);
+    // A fantamedia built on a dozen matches is a guess: it is already shrunk towards the role's level,
+    // so what it still promises over the free player counts at least for half, in full from twenty matches.
+    const evidence = 0.5 + 0.5 * Math.min(1, (p.scores.sample ?? 30) / 20);
     return Math.max(0, fm - replacement) * evidence * (play + (1 - play) * upside) * avail;
 }
 

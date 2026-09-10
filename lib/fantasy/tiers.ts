@@ -26,7 +26,6 @@ const TIER_SHARE: Array<[Tier, number]> = [
     ['fifth', 0.13],
 ];
 
-const NEXT: Record<Tier, Tier> = {top: 'semiTop', semiTop: 'first', first: 'second', second: 'third', third: 'fourth', fourth: 'fifth', fifth: 'jolly', jolly: 'jolly', filler: 'filler', avoid: 'avoid'};
 
 export interface TierPlayer {
     id: number;
@@ -98,34 +97,41 @@ export function explainTiers<T extends TierPlayer>(players: T[], config: {partic
     for (const role of ['P', 'D', 'C', 'A'] as const) {
         const pool = players.filter((p) => p.role === role).sort((a, b) => b.scores.overall - a.scores.overall);
         const bought = Math.max(1, config.participants * config.slots[role]);
-        // Thin evidence is not enough for top or semi-top: those players are ranked after the first tier's worth of solid ones.
-        const solid = pool.filter((p) => p.scores.confidence !== 'low');
-        const thin = pool.filter((p) => p.scores.confidence === 'low');
-        const firstTwo = Math.max(1, Math.round(bought * TIER_SHARE[0][1])) + Math.max(1, Math.round(bought * TIER_SHARE[1][1]));
-        const ordered = [...solid.slice(0, firstTwo), ...[...solid.slice(firstTwo), ...thin].sort((a, b) => b.scores.overall - a.scores.overall)];
+        // Tier boundaries: cumulative, so the sizes add up to what the league buys.
+        const bounds: Array<{tier: Tier; from: number; to: number}> = [];
+        let acc = 0;
+        let start = 0;
+        TIER_SHARE.forEach(([tier, share], i) => {
+            acc += share;
+            const to = i === TIER_SHARE.length - 1 ? bought : Math.min(bought, Math.max(start + 1, Math.round(bought * acc)));
+            bounds.push({tier, from: start, to});
+            start = to;
+        });
+        // The tier a position gets by mark alone.
+        const tierAt = (position: number): Tier | null => bounds.find((b) => position >= b.from && position < b.to)?.tier ?? null;
+        // Thin evidence is not enough for top or semi-top: such a player is ranked at the first tier's
+        // door at best, everyone else keeps his mark's place (the solid ones are placed first).
+        const startOf = (tier: Tier) => bounds.find((b) => b.tier === tier)?.from ?? bought;
+        const ordered: T[] = pool.filter((p) => p.scores.confidence !== 'low');
+        pool.forEach((p, position) => {
+            if (p.scores.confidence !== 'low') return;
+            const byMark = tierAt(position);
+            const floor = byMark === 'top' || byMark === 'semiTop' ? startOf('first') : position;
+            ordered.splice(Math.min(ordered.length, Math.max(position, floor)), 0, p);
+        });
         const info = (p: T, index: number, tier: Tier, why: TierWhy[]) => out.set(p.id, {tier, rank: index + 1, ofRole: pool.length, bought, why});
-        // The tier a position would get by mark alone: where a thin-evidence player would have been.
-        const tierAt = (position: number): Tier | null => {
-            let from = 0;
-            for (const [tier, share] of TIER_SHARE) {
-                const size = Math.max(1, Math.round(bought * share));
-                if (position < from + size) return tier;
-                from += size;
-            }
-            return null;
-        };
         let index = 0;
-        for (const [tier, share] of TIER_SHARE) {
-            const size = Math.max(1, Math.round(bought * share));
-            ordered.slice(index, index + size).forEach((p, i) => {
-                const ranked: TierWhy = {kind: 'ranked', tier, from: index + 1, to: index + size};
+        for (const {tier, from, to} of bounds) {
+            ordered.slice(from, to).forEach((p, i) => {
+                const ranked: TierWhy = {kind: 'ranked', tier, from: from + 1, to};
                 const byMark = p.scores.confidence === 'low' ? tierAt(pool.indexOf(p)) : null;
                 const thin: TierWhy[] = byMark && byMark !== tier ? [{kind: 'thinDropped', from: byMark, sample: p.scores.sample ?? 0}] : [];
-                if (p.injury?.longTerm && tier !== 'top' && tier !== 'semiTop') info(p, index + i, 'avoid', [ranked, {kind: 'longInjury', daysOut: p.injury.daysOut ?? null}]);
-                else if (p.scores.confidence === 'low' && (tier === 'top' || tier === 'semiTop')) info(p, index + i, NEXT[tier], [ranked, {kind: 'thinDropped', from: tier, sample: p.scores.sample ?? 0}]);
-                else info(p, index + i, tier, [ranked, ...thin]);
+                // The numbers say not to buy him, unless his mark makes him one of the very best anyway.
+                const avoid = tier === 'top' || tier === 'semiTop' ? null : avoidReason(p);
+                if (avoid) info(p, from + i, 'avoid', [ranked, avoid]);
+                else info(p, from + i, tier, [ranked, ...thin]);
             });
-            index += size;
+            index = to;
         }
         // Below the bought: the mark of the last player a league buys is the bar for a bet.
         const floor = ordered[Math.min(index, ordered.length) - 1]?.scores.overall ?? 0;
