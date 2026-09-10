@@ -1,7 +1,7 @@
 'use client';
 
-import {Activity, ChevronDown, ChevronUp, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
-import {useMemo, useState} from "react";
+import {Activity, ArrowLeftRight, ChevronDown, ChevronUp, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
 import {Badge} from "@/components/shared/ui/badge";
@@ -10,6 +10,7 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {CloudMenu, CloudPanel} from "./cloud-panel";
+import {CompareDialog} from "./compare-dialog";
 import {RoleBadge} from "./role-badge";
 import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
@@ -143,6 +144,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const [open, setOpen] = useState<number | null>(null);
     const [buying, setBuying] = useState<{player: AuctionPlayer; price: string; manager: number; editing: boolean} | null>(null);
     const [lastManager, setLastManager] = useState(0);
+    /** Players picked for the comparison (up to two) and the row the keyboard is on. */
+    const [compare, setCompare] = useState<number[]>([]);
+    const [cursor, setCursor] = useState<number | null>(null);
     const openBuy = (player: AuctionPlayer) => setBuying({player, price: String(prices.get(player.id) ?? 1), manager: lastManager, editing: false});
     /** A registered purchase, opened again to correct the price or the manager. */
     const openEdit = (player: AuctionPlayer) => {
@@ -264,6 +268,46 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const lastPurchase = purchases.length > 0 ? purchases[purchases.length - 1] : null;
     const undoLast = () => {
         if (lastPurchase) purchasesStore.write(purchases.slice(0, -1));
+    };
+    const toggleCompare = (id: number) => setCompare((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c.slice(-1), id]));
+    const comparing = compare.length === 2 ? compare.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p) : [];
+    /** The keyboard on the list: arrows move, Enter buys or corrects, C compares, Ctrl+Z undoes, Esc closes. */
+    const onKey = (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement | null;
+        const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        if (e.key === 'Escape') {
+            if (buying) setBuying(null);
+            else if (comparing.length === 2) setCompare([]);
+            else if (showStrategies) setShowStrategies(false);
+            else if (teamsTab !== null) setTeamsTab(null);
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) {
+            e.preventDefault();
+            undoLast();
+            return;
+        }
+        if (typing || buying || showStrategies || teamsTab !== null || e.ctrlKey || e.metaKey || e.altKey) return;
+        const list = players.slice(0, limit);
+        if (list.length === 0) return;
+        const at = cursor === null ? -1 : list.findIndex((p) => p.id === cursor);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const next = list[Math.max(0, Math.min(list.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))];
+            setCursor(next.id);
+            document.getElementById(`auction-row-${next.id}`)?.scrollIntoView({block: 'nearest'});
+            return;
+        }
+        const current = at >= 0 ? list[at] : null;
+        if (!current) return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (bought.has(current.id)) openEdit(current);
+            else openBuy(current);
+        } else if (e.key.toLowerCase() === 'c') {
+            e.preventDefault();
+            toggleCompare(current.id);
+        }
     };
     const strategy = plans.find((p) => p.key === config.strategy) ?? null;
     const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
@@ -463,7 +507,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 const expanded = open === p.id;
                                 return (
                                     <FragmentRow key={p.id}>
-                                        <tr className={cn("border-t border-muted", purchase && (purchase.manager === 0 ? "bg-accent/15" : "opacity-60"))}>
+                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", purchase && (purchase.manager === 0 ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
                                             <td className="px-2 py-1 min-w-0">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/40 bg-card shrink-0">
@@ -490,6 +534,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
                                                     <Status p={p} rivals={p.rivals} />
+                                                    <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">
                                                             <span className="text-[11px] font-bold">{t('boughtBy', {manager: managers[purchase.manager] ?? t('me'), price: purchase.price})}</span>
@@ -540,7 +585,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     )}
                 </Panel>
                 <p className="text-[11px] font-semibold text-muted-foreground">{ta('intro')}</p>
+                <p className="hidden md:block text-[11px] font-semibold text-muted-foreground">{t('shortcuts')}</p>
                 </>)}
+                {compare.length === 1 && byId.has(compare[0]) && (
+                    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bb-surface bg-background px-3 h-9 flex items-center gap-2 text-[12px] font-extrabold shadow-[4px_4px_0_rgb(var(--foreground))]">
+                        <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
+                        {t('comparePicked', {name: byId.get(compare[0])!.name})}
+                        <button type="button" onClick={() => setCompare([])} aria-label={t('close')} className="inline-flex w-6 h-6 items-center justify-center rounded border border-foreground bg-card"><X className="w-3 h-3" /></button>
+                    </div>
+                )}
             </div>
 
             {/* My roster and the strategies */}
@@ -630,6 +683,18 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 </div>
             )}
 
+            <Hotkeys onKey={onKey} />
+
+            {/* Two players side by side */}
+            {comparing.length === 2 && (
+                <CompareDialog
+                    a={{player: comparing[0], list: listPrices.get(comparing[0].id) ?? 1, live: prices.get(comparing[0].id) ?? 1, maxBid: maxBidOf(comparing[0].id), tier: tiers.get(comparing[0].id) ?? 'filler', bought: bought.has(comparing[0].id) ? {manager: managers[bought.get(comparing[0].id)!.manager] ?? t('me'), price: bought.get(comparing[0].id)!.price} : null}}
+                    b={{player: comparing[1], list: listPrices.get(comparing[1].id) ?? 1, live: prices.get(comparing[1].id) ?? 1, maxBid: maxBidOf(comparing[1].id), tier: tiers.get(comparing[1].id) ?? 'filler', bought: bought.has(comparing[1].id) ? {manager: managers[bought.get(comparing[1].id)!.manager] ?? t('me'), price: bought.get(comparing[1].id)!.price} : null}}
+                    onClose={() => setCompare([])}
+                    onBuy={(player) => { setCompare([]); openBuy(player); }}
+                />
+            )}
+
             {/* Buy sheet */}
             {buying && (
                 <div role="dialog" aria-modal="true" aria-label={buying.editing ? t('editTitle') : t('buyTitle')} className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-foreground/40 p-3" onClick={() => setBuying(null)}>
@@ -697,6 +762,20 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
             )}
         </div>
     );
+}
+
+/** One window listener for the board's keys; the handler is the latest render's, through a ref. */
+function Hotkeys({onKey}: {onKey: (e: KeyboardEvent) => void}) {
+    const latest = useRef(onKey);
+    useEffect(() => {
+        latest.current = onKey;
+    });
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => latest.current(e);
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+    return null;
 }
 
 function FragmentRow({children}: {children: React.ReactNode}) {

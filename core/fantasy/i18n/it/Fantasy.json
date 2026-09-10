@@ -211,6 +211,10 @@
     },
     "close": "Chiudi",
     "paidVsList": "Listino {list} · pagato {paid} ({gap})",
+    "compare": "Confronta",
+    "compareHint": "Scegli due giocatori da confrontare (tasto C sulla riga evidenziata)",
+    "comparePicked": "Confronto: {name} contro…",
+    "shortcuts": "Tasti: ↑ ↓ scorri la lista · Invio compra (o corregge) l'evidenziato · C confronta · Ctrl+Z annulla l'ultimo acquisto · Esc chiude",
     "undoLast": "Annulla ultimo",
     "undoLastHint": "Annulla l'ultimo acquisto registrato: {name} a {manager} per {price} cr. (Ctrl+Z)",
     "edit": "Correggi acquisto",
@@ -226,6 +230,13 @@
       "planWorse": "Strategia {name}: {value} pt. ({delta}), il piano perde qualcosa",
       "over": "Sopra il massimo consigliato di {over} cr."
     }
+  },
+  "compare": {
+    "title": "Confronto",
+    "hint": "Il valore migliore di ogni riga è evidenziato",
+    "list": "Listino",
+    "lastSeason": "Ultima stagione",
+    "seasonLine": "{year} {team}: {apps} PG, {goals} gol, {assists} assist, voto {rating}"
   },
   "table": {
     "title": "Il tavolo",
