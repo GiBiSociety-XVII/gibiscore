@@ -531,14 +531,29 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {freeGap: 0.35, tail: 1.2, ceiling: 0.4};
+export const PRICE_TUNING = {tail: 1.2, ceiling: 0.4};
+/**
+ * The free alternative per role: which starters (as a share of what the
+ * league buys, from..to) stand for the player nobody pays for, and what
+ * a free player brings below his fantamedia (`gap`), since he does not
+ * play every week. Keepers, defenders and midfielders are paid for the
+ * first two thirds and filled at a credit after: the bar is the last
+ * starter still paid for. Attackers are paid down the list: the bar is
+ * the first left unbought.
+ */
+export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: number}> = {
+    P: {from: 0.7, to: 1, gap: 0.1},
+    D: {from: 0.7, to: 1, gap: 0.1},
+    C: {from: 0.7, to: 1, gap: 0.1},
+    A: {from: 1, to: 1.5, gap: 0.35},
+};
 /**
  * Scarcity per role: the fantasy averages of keepers and defenders sit
  * close together (a top keeper is a goal a match better than a spare,
  * not three), so a gentler curve keeps their prices on a human scale;
  * attack is where the table fights.
  */
-export const PRICE_POWER: Record<FantaRole, number> = {P: 1.1, D: 1.25, C: 1.3, A: 1.3};
+export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.25, C: 1.4, A: 1.3};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -589,8 +604,13 @@ export function valueWeights<T extends PriceablePlayer>(players: T[], role: Fant
     const first = pool.map((p) => [p, expectedValue(p, 0, level)] as const).sort((a, b) => b[1] - a[1]);
     // The free alternative: the players just outside what the league buys, at their (shrunk)
     // fantamedia less what a bench player loses by not playing every week.
-    const free = first.slice(Math.min(first.length - 1, Math.max(0, count)), Math.max(1, Math.round(count * 1.5))).map(([p]) => shrunkFanta(p, level));
-    const replacement = free.length > 0 ? free.reduce((s, v) => s + v, 0) / free.length - PRICE_TUNING.freeGap : level - PRICE_TUNING.freeGap;
+    // ...among the players who actually play: a role whose slots outnumber its starters (keepers,
+    // three a roster for one on the pitch) is measured against its last starters, not the benches.
+    const tuning = FREE_PLAYER[role];
+    const starters = first.filter(([p]) => (p.scores.starter ?? Math.min(100, p.scores.overall + 5)) >= 50);
+    const n = Math.min(count, Math.max(1, starters.length));
+    const free = starters.slice(Math.min(n - 1, Math.round(n * tuning.from)), Math.max(n, Math.round(n * tuning.to))).map(([p]) => shrunkFanta(p, level));
+    const replacement = free.length > 0 ? free.reduce((s, v) => s + v, 0) / free.length - tuning.gap : level - tuning.gap;
     const out = new Map<number, number>();
     for (const p of pool) out.set(p.id, expectedValue(p, replacement, level) ** PRICE_POWER[role]);
     return out;
