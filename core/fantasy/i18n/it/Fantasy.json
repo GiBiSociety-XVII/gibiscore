@@ -210,7 +210,30 @@
       "mantra": "Mantra: {roles}"
     },
     "close": "Chiudi",
-    "paidVsList": "Listino {list} · pagato {paid} ({gap})"
+    "paidVsList": "Listino {list} · pagato {paid} ({gap})",
+    "undoLast": "Annulla ultimo",
+    "undoLastHint": "Annulla l'ultimo acquisto registrato: {name} a {manager} per {price} cr. (Ctrl+Z)",
+    "edit": "Correggi acquisto",
+    "editTitle": "Correggi acquisto",
+    "preview": {
+      "title": "Se lo paghi {price}",
+      "left": "{left} cr. per {slots} slot ({perSlot} a slot)",
+      "leftNone": "{left} cr., rosa completa",
+      "role": "{role}: {spent} su ~{budget} cr. previsti",
+      "lineup": "Undici: {formation} · {value} pt.",
+      "lineupShort": "Undici: mancano {missing} giocatori",
+      "plan": "Strategia {name}: {value} pt. ({delta})",
+      "planWorse": "Strategia {name}: {value} pt. ({delta}), il piano perde qualcosa",
+      "over": "Sopra il massimo consigliato di {over} cr."
+    }
+  },
+  "table": {
+    "title": "Il tavolo",
+    "hint": "{name}: {left} crediti per {open} slot liberi ({perSlot} a slot)",
+    "done": "{name}: rosa completa",
+    "broke": "{name}: {left} crediti per {open} slot, può solo pagare 1",
+    "richest": "Ha più crediti di tutti",
+    "brokeBadge": "Solo riempitivi"
   },
   "roster": {
     "title": "La mia rosa",
