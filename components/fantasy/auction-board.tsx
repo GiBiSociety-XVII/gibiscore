@@ -42,21 +42,16 @@ function ScoreCell({value}: {value: number}) {
 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
-/** Absence badge with the return in short, plus the small flags that matter at the auction. */
+/** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
 function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']}) {
     const t = useTranslations('Fantasy.board');
-    const format = useFormatter();
-    const short = (iso: string) => format.dateTime(day(iso), {day: 'numeric', month: 'short'});
-    const back = (e: NonNullable<AuctionPlayer['injury']>['estimate']): string | null =>
-        e.kind === 'range' && e.date ? t('info.backShort', {date: short(e.date)}) : e.kind === 'soon' ? t('info.backSoonShort') : e.kind === 'nextMatch' ? t('info.backNextShort') : null;
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
             {p.injury && (() => {
                 const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
-                const when = back(p.injury.estimate);
                 return (
                     <span className="inline-flex items-center gap-1" title={`${p.injury.description ?? label} · ${t('daysOut', {count: p.injury.daysOut})}`}>
-                        <Badge variant={p.injury.category === 'suspension' ? 'ink' : 'outline'} className="text-[9px] h-4 px-1">{label}{when ? ` · ${when}` : ''}</Badge>
+                        <Badge variant={p.injury.category === 'suspension' ? 'ink' : 'outline'} className="text-[9px] h-4 px-1">{label}</Badge>
                         {p.injury.longTerm && <Badge variant="ink" className="text-[9px] h-4 px-1">{t('longTerm')}</Badge>}
                     </span>
                 );
@@ -81,10 +76,8 @@ function Notes({p, onRole, wanted, avoided, onWant, onAvoid}: {p: AuctionPlayer;
     else if (p.roleSource === 'lineups') lines.push({key: 'role', text: t('info.roleLineups', {role: p.role, breakdown})});
     else lines.push({key: 'role', text: t('info.roleProfile', {role: p.role})});
     if (p.injury) {
-        const e = p.injury.estimate;
         const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
-        const back = e.kind === 'range' && e.from && e.to ? t('info.backWindow', {from: short(e.from), to: short(e.to)}) : e.kind === 'range' && e.date ? t('info.backDate', {date: short(e.date)}) : e.kind === 'soon' ? t('info.backSoon') : e.kind === 'nextMatch' ? t('info.backNext') : t('info.backUnknown');
-        lines.push({key: 'injury', text: t('info.injury', {label, description: p.injury.description ? ` (${p.injury.description})` : '', since: short(p.injury.since), days: t('info.injuryDays', {count: p.injury.daysOut}), back}) + (p.injury.longTerm ? ` · ${t('longTerm')}` : ''), tone: 'text-red-800'});
+        lines.push({key: 'injury', text: t('info.injury', {label, description: p.injury.description ? ` (${p.injury.description})` : '', since: short(p.injury.since), days: t('info.injuryDays', {count: p.injury.daysOut})}) + (p.injury.longTerm ? ` · ${t('longTerm')}` : ''), tone: 'text-red-800'});
     }
     const avail = p.availability.starts + p.availability.benches;
     if (p.contested && p.rivals.length > 0) lines.push({key: 'rivals', text: t('info.contested', {benches: Math.round(p.availability.benches), total: Math.round(avail), names: p.rivals.map((r) => t('info.rivalOne', {name: r.name, shared: r.shared})).join(', ')}), tone: 'text-amber-800'});

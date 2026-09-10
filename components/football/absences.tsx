@@ -12,33 +12,11 @@ export function reasonKey(description: string): string {
     return description.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
-/** "Rientro stimato: 20 set" / "a breve" / "prossima partita", from the estimate. */
-export function ReturnLabel({entry, className}: {entry: SidelinedEntry; className?: string}) {
-    const t = useTranslations('Football.absences');
-    const format = useFormatter();
-    const e = entry.estimate;
-    const short = (iso: string) => format.dateTime(day(iso), {day: 'numeric', month: 'short'});
-    let text: string;
-    let title: string | undefined;
-    if (e.kind === 'range' && e.date) {
-        text = t('returnRange', {date: short(e.date)});
-        title = e.from && e.to ? t('returnWindow', {from: short(e.from), to: short(e.to)}) : undefined;
-    } else if (e.kind === 'soon') text = t('returnSoon');
-    else if (e.kind === 'nextMatch') text = t('returnNextMatch');
-    else text = t('returnUnknown');
-    return (
-        <span className={cn("inline-flex items-center gap-1.5", className)} title={title}>
-            {text}
-            {e.longTerm && <Badge variant="ink" className="text-[9px] h-4 px-1">{t('longTerm')}</Badge>}
-        </span>
-    );
-}
-
 export function categoryVariant(category: string): 'ink' | 'outline' | 'accent' {
     return category === 'suspension' ? 'ink' : category === 'doubtful' ? 'accent' : 'outline';
 }
 
-/** Rows of absent players: reason, out since (days), indicative return. */
+/** Rows of absent players: reason, out since (days), matches missed. No return date: nobody can tell one. */
 export function AbsenceList({entries, compact = false, hint = false}: {entries: SidelinedEntry[]; compact?: boolean; hint?: boolean}) {
     const t = useTranslations('Football.absences');
     const format = useFormatter();
@@ -67,10 +45,12 @@ export function AbsenceList({entries, compact = false, hint = false}: {entries: 
                                 <span className="text-foreground">{t('daysOut', {count: p.daysOut})}</span>
                                 {' · '}{t('since', {date: format.dateTime(day(p.since), {day: 'numeric', month: 'short'})})}
                                 {' · '}{t('missed', {count: p.missed})}
-                                {' · '}<ReturnLabel entry={p} className="text-foreground" />
                             </span>
                         </span>
-                        <Badge variant={categoryVariant(p.category)} className="ml-auto whitespace-nowrap shrink-0">{t(`category.${p.category}`)}</Badge>
+                        <span className="ml-auto inline-flex items-center gap-1 shrink-0">
+                            {p.longTerm && <Badge variant="ink" className="text-[9px] h-4 px-1 whitespace-nowrap">{t('longTerm')}</Badge>}
+                            <Badge variant={categoryVariant(p.category)} className="whitespace-nowrap">{t(`category.${p.category}`)}</Badge>
+                        </span>
                     </li>
                 ))}
             </ul>

@@ -6,7 +6,6 @@ import {romeDate} from '@/lib/football/data/scores';
 import {TEAM_SELECT, footballDb, logReadError, toTeam, type TeamRow} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getSeasonStudy} from '@/lib/football/data/study';
-import type {ReturnEstimate} from '@/lib/football/spells';
 import type {SidelinedEntry, TeamSummary} from '@/lib/football/types';
 import serieAListone from '@/core/fantasy/listone/serie-a.json';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
@@ -32,7 +31,7 @@ export interface AuctionPlayer {
     imageUrl: string | null;
     team: TeamSummary;
     league: string;
-    injury: {category: string; description: string | null; since: string; daysOut: number; longTerm: boolean; estimate: ReturnEstimate} | null;
+    injury: {category: string; description: string | null; since: string; daysOut: number; longTerm: boolean} | null;
     /** Club he played for last season, when it is not the current one. */
     newSigning: string | null;
     /** European cup the club plays this season, when someone in the squad already has a line in it. */
@@ -466,7 +465,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 currentYear: year,
                 currentTeamId: team.id,
                 seasons: lines,
-                injury: injury ? {active: true, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm} : null,
+                injury: injury ? {active: true, daysOut: injury.daysOut, longTerm: injury.longTerm} : null,
                 teamAttack: shape?.attack ?? null,
                 teamDefence: shape?.defence ?? null,
                 teamRounds: shape?.rounds ?? 0,
@@ -486,7 +485,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 imageUrl: player.image_url,
                 team: toTeam(team),
                 league: leagueName,
-                injury: injury ? {category: injury.category, description: injury.description, since: injury.since, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm, estimate: injury.estimate} : null,
+                injury: injury ? {category: injury.category, description: injury.description, since: injury.since, daysOut: injury.daysOut, longTerm: injury.longTerm} : null,
                 newSigning: (() => {
                     const prev = lines.filter((l) => l.year === year - 1 && l.appearances > 0).sort((a, b) => b.minutes - a.minutes);
                     return prev.length > 0 && !prev.some((l) => l.teamId === team.id) ? prev[0].teamName : null;

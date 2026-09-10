@@ -1,4 +1,3 @@
-import type {ReturnEstimate} from './spells';
 /**
  * Read models used by the UI. They mirror the football.* tables in
  * supabase/migrations but stay independent of the provider payloads.
@@ -348,7 +347,8 @@ export interface SidelinedEntry {
     since: string;
     daysOut: number;
     missed: number;
-    estimate: ReturnEstimate;
+    /** Out for months by the kind of problem: a long spell, not a date. */
+    longTerm: boolean;
 }
 
 // ---------------------------------------------------------------------------

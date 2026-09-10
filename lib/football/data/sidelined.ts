@@ -63,7 +63,7 @@ export function toEntry(spell: Spell, player: SidelinedPlayerRow, today: string)
         since: spell.since,
         daysOut: Math.max(0, daysBetween(spell.since, today)),
         missed: spell.missed,
-        estimate: estimateReturn(spell, today),
+        longTerm: estimateReturn(spell, today).longTerm,
     };
 }
 
