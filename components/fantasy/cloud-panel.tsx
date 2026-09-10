@@ -1,13 +1,13 @@
 'use client';
 
-import {ChevronDown, Cloud, CloudOff, Trash2} from "lucide-react";
+import {ChevronDown, Cloud, CloudOff, Copy, ExternalLink, Share2, Trash2} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {AuctionConfig, Purchase} from "@/lib/fantasy/config";
-import {cloudUser, deleteAuction, listAuctions, loadAuction, saveAuction, type CloudAuction, type CloudUser} from "@/lib/fantasy/cloud";
+import {cloudUser, deleteAuction, listAuctions, loadAuction, saveAuction, shareAuction, unshareAuction, type CloudAuction, type CloudUser} from "@/lib/fantasy/cloud";
 import {cloudStore, configStore, purchasesStore} from "@/lib/fantasy/store";
 
 /** A change is written to the cloud this long after the last one. */
@@ -130,7 +130,73 @@ function useCloud(config: AuctionConfig | null, purchases: Purchase[]) {
     };
 
     const unlink = () => cloudStore.write(null);
-    return {link, user, saved, busy, error, pending, save, load, remove, unlink};
+
+    // The group's link for the linked auction: opened here, closed here.
+    const shareToken = link ? (saved.find((r) => r.id === link.id)?.shareToken ?? null) : null;
+    const share = async () => {
+        if (!link) return;
+        setBusy('save');
+        setError(null);
+        try {
+            const token = await shareAuction(link.id);
+            setSaved((rows) => rows.map((r) => (r.id === link.id ? {...r, shareToken: token} : r)));
+        } catch (e) {
+            setError((e as Error).message);
+        } finally {
+            setBusy(null);
+        }
+    };
+    const unshare = async () => {
+        if (!link) return;
+        setBusy('save');
+        setError(null);
+        try {
+            await unshareAuction(link.id);
+            setSaved((rows) => rows.map((r) => (r.id === link.id ? {...r, shareToken: null} : r)));
+        } catch (e) {
+            setError((e as Error).message);
+        } finally {
+            setBusy(null);
+        }
+    };
+    return {link, user, saved, busy, error, pending, save, load, remove, unlink, shareToken, share, unshare};
+}
+
+/** The share block of the menu: open the link, copy it, close it. */
+function ShareBlock({cloud}: {cloud: Cloud}) {
+    const t = useTranslations('Fantasy.cloud');
+    const [copied, setCopied] = useState(false);
+    const path = cloud.shareToken ? `/fantacalcio/asta/condivisa/${cloud.shareToken}` : null;
+    const url = path && typeof window !== 'undefined' ? `${window.location.origin}${path}` : null;
+    const copy = async () => {
+        if (!url) return;
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+        } catch {
+            window.prompt(t('shareCopy'), url);
+        }
+    };
+    return (
+        <div className="flex flex-col gap-1.5 border-t border-muted pt-2">
+            <p className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('share')}</p>
+            <p className="text-[11px] font-semibold text-muted-foreground">{cloud.link ? t('shareHint') : t('shareNeedsSave')}</p>
+            {cloud.link && (
+                <div className="flex flex-wrap gap-2">
+                    {cloud.shareToken ? (
+                        <>
+                            <button type="button" onClick={() => void copy()} disabled={cloud.busy !== null} className={cn(btn, "bg-accent")}><Copy className="w-3.5 h-3.5" /> {copied ? t('shareCopied') : t('shareCopy')}</button>
+                            <a href={path!} target="_blank" rel="noopener noreferrer" className={cn(btn, "bg-card")}><ExternalLink className="w-3.5 h-3.5" /> {t('shareOpen')}</a>
+                            <button type="button" onClick={() => void cloud.unshare()} disabled={cloud.busy !== null} className={cn(btn, "bg-card")}>{t('shareStop')}</button>
+                        </>
+                    ) : (
+                        <button type="button" onClick={() => void cloud.share()} disabled={cloud.busy !== null} className={cn(btn, "bg-card")}><Share2 className="w-3.5 h-3.5" /> {t('share')}</button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
 }
 
 type Cloud = ReturnType<typeof useCloud>;
@@ -235,6 +301,7 @@ export function CloudMenu({config, purchases}: {config: AuctionConfig; purchases
                                 )}
                             </div>
                             {cloud.error && <p role="alert" className="text-[12px] font-bold text-red-800">{cloud.error}</p>}
+                            <ShareBlock cloud={cloud} />
                             <SavedList cloud={cloud} config={config} onDone={() => setOpen(false)} />
                         </>
                     )}

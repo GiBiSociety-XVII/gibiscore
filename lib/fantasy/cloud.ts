@@ -2,6 +2,9 @@
 
 import {createClient} from '@/lib/db/client';
 import {normalizeConfig, type AuctionConfig, type Purchase} from './config';
+import {parseShared, type SharedAuction} from './shared';
+
+export type {SharedAuction};
 
 /**
  * Auctions saved in the cloud for the signed-in user (table
@@ -16,6 +19,8 @@ export interface CloudAuction {
     league: string;
     updatedAt: string;
     purchasesCount: number;
+    /** Set when the auction is shared by link. */
+    shareToken: string | null;
 }
 
 export interface CloudUser {
@@ -29,9 +34,9 @@ export async function cloudUser(): Promise<CloudUser | null> {
 }
 
 export async function listAuctions(): Promise<CloudAuction[]> {
-    const {data, error} = await createClient().from('fantasy_auctions').select('id,name,league,updated_at,purchases').order('updated_at', {ascending: false}).limit(50);
+    const {data, error} = await createClient().from('fantasy_auctions').select('id,name,league,updated_at,purchases,share_token').order('updated_at', {ascending: false}).limit(50);
     if (error) throw error;
-    return (data ?? []).map((r) => ({id: r.id as string, name: r.name as string, league: r.league as string, updatedAt: r.updated_at as string, purchasesCount: Array.isArray(r.purchases) ? r.purchases.length : 0}));
+    return (data ?? []).map((r) => ({id: r.id as string, name: r.name as string, league: r.league as string, updatedAt: r.updated_at as string, purchasesCount: Array.isArray(r.purchases) ? r.purchases.length : 0, shareToken: (r.share_token as string | null) ?? null}));
 }
 
 /** Creates the auction (no id) or updates it; returns the id. */
@@ -64,4 +69,30 @@ export async function loadAuction(id: string): Promise<{config: AuctionConfig; p
 export async function deleteAuction(id: string): Promise<void> {
     const {error} = await createClient().from('fantasy_auctions').delete().eq('id', id);
     if (error) throw error;
+}
+
+/** Opens the auction to the group: a new token, or the one it has. Returns the token. */
+export async function shareAuction(id: string): Promise<string> {
+    const db = createClient();
+    const {data: current, error: readError} = await db.from('fantasy_auctions').select('share_token').eq('id', id).maybeSingle();
+    if (readError) throw readError;
+    if (current?.share_token) return current.share_token as string;
+    const token = crypto.randomUUID();
+    const {error} = await db.from('fantasy_auctions').update({share_token: token}).eq('id', id);
+    if (error) throw error;
+    return token;
+}
+
+/** Closes the link: whoever has it sees nothing any more. */
+export async function unshareAuction(id: string): Promise<void> {
+    const {error} = await createClient().from('fantasy_auctions').update({share_token: null}).eq('id', id);
+    if (error) throw error;
+}
+
+/** The shared auction behind a token, from the browser. */
+export async function loadShared(token: string): Promise<SharedAuction | null> {
+    const {data, error} = await createClient().rpc('shared_auction', {token});
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? parseShared(row) : null;
 }

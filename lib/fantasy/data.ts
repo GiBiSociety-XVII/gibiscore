@@ -134,6 +134,8 @@ const SECOND_TIER: Record<string, string> = {'serie-a': 'serie-b'};
 const SECOND_TIER_SCALE = 0.3;
 /** A promoted club nobody has a table for. */
 const PROMOTED_STRENGTH = 0.2;
+/** What a promoted club concedes in the top league, relative to what it conceded in the second tier. */
+const PROMOTED_CONCEDED = 1.25;
 
 /**
  * Strength of each club of a table, by points per match: 0.9 for the top,
@@ -305,7 +307,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         // Club strength, 0..1 on each league's own scale: last season's table (a promoted club on the
         // second tier's scale), moved towards this season's table as the rounds come in. Every league
         // of the pool has its tables (a club sits in one league, so the maps merge).
-        const merge = (maps: Array<Map<number, number>>) => new Map(maps.flatMap((m) => [...m]));
+        const merge = <T,>(maps: Array<Map<number, T>>) => new Map(maps.flatMap((m) => [...m]));
         const poolLeagueIds = new Set(seasons.map((s) => s.league.id));
         const feederSlugSet = new Set(feederSlugs);
         const prevStrength = merge(previousStudies.map(([, study]) => rankStrength(study, 1)));
@@ -323,15 +325,18 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             if (feederSlugSet.has(leagueSlug) && seasonYear === year - 1) return feederStrength.get(teamId) ?? null;
             return null;
         };
-        // What each club concedes per match: last season and this one (counting double).
+        // What each club is expected to concede per match: the expected goals against it (goals when
+        // it has no xG yet), last season and this one counting double; a promoted club's Serie B
+        // figure raised, since it will concede more here. Every keeper of the club is judged on it.
         const conceded = new Map<number, {goals: number; played: number}>();
-        for (const [list, weight] of [[previousStudies, 1], [studies, 2]] as const) {
+        for (const [list, weight, raise] of [[previousStudies, 1, 1], [feederStudies, 1, PROMOTED_CONCEDED], [studies, 2, 1]] as const) {
             for (const [, study] of list) {
                 if (!study) continue;
                 for (const t of study.teams) {
                     if (t.played === 0) continue;
                     const c = conceded.get(t.team.id) ?? {goals: 0, played: 0};
-                    c.goals += t.goalsAgainst * weight;
+                    const perMatch = t.xgAgainst !== null && t.withStats >= 3 ? t.xgAgainst : t.goalsAgainst / t.played;
+                    c.goals += perMatch * raise * t.played * weight;
                     c.played += t.played * weight;
                     conceded.set(t.team.id, c);
                 }
@@ -341,17 +346,38 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             const c = conceded.get(teamId);
             return c && c.played >= 5 ? c.goals / c.played : null;
         };
-        // Club shape from the first round: the scoring uses it softly as
-        // "form" at once and as "team" strength only from the fifth round.
-        const teamShape = new Map<number, {attack: number; defence: number; rounds: number}>();
-        for (const [, study] of studies) {
-            if (!study || study.played === 0) continue;
+        // Club shape for the roles: the chances it creates and allows, from expected goals against
+        // the league's average (goals when a club has no xG yet), 1 = an average side. Last season's
+        // numbers are the prior (a promoted club's on the lower scale), this season's take over as
+        // the rounds come in, so a Juventus reads as a top attack from the first round on.
+        type Shape = {attack: number; defence: number; games: number};
+        const shapeOf = (study: NonNullable<Awaited<ReturnType<typeof getSeasonStudy>>>, scale: number): Map<number, Shape> => {
+            const out = new Map<number, Shape>();
+            if (study.played === 0) return out;
             const perTeam = study.goalsPerMatch / 2;
-            const logistic = (ratio: number) => 1 / (1 + Math.exp(-(ratio - 1) * 3));
+            const leagueXg = study.avgXg ?? perTeam;
             for (const t of study.teams) {
                 if (t.played === 0) continue;
-                teamShape.set(t.team.id, {attack: logistic(t.goalsFor / t.played / perTeam), defence: logistic(perTeam / Math.max(0.2, t.goalsAgainst / t.played)), rounds: t.played});
+                const withXg = t.xgFor !== null && t.xgAgainst !== null && t.withStats >= 3;
+                const attack = withXg ? t.xgFor! / Math.max(0.2, leagueXg) : t.goalsFor / t.played / perTeam;
+                const defence = withXg ? leagueXg / Math.max(0.2, t.xgAgainst!) : perTeam / Math.max(0.2, t.goalsAgainst / t.played);
+                out.set(t.team.id, {attack: attack * scale, defence: defence * scale, games: t.played});
             }
+            return out;
+        };
+        const prevShape = merge(previousStudies.map(([, study]) => (study ? shapeOf(study, 1) : new Map<number, Shape>())));
+        const feederShape = merge(feederStudies.map(([, study]) => (study ? shapeOf(study, SECOND_TIER_SCALE ** 0.4) : new Map<number, Shape>())));
+        const curShape = merge(studies.map(([, study]) => (study ? shapeOf(study, 1) : new Map<number, Shape>())));
+        const logistic = (ratio: number) => 1 / (1 + Math.exp(-(ratio - 1) * 3));
+        const teamShape = new Map<number, {attack: number; defence: number; rounds: number}>();
+        for (const teamId of teams.keys()) {
+            const prior = prevShape.get(teamId) ?? feederShape.get(teamId) ?? {attack: PROMOTED_STRENGTH + 0.5, defence: PROMOTED_STRENGTH + 0.5, games: 0};
+            const cur = curShape.get(teamId) ?? null;
+            const rounds = cur?.games ?? 0;
+            const w = Math.min(1, rounds / 10);
+            const attack = prior.attack * (1 - w) + (cur?.attack ?? prior.attack) * w;
+            const defence = prior.defence * (1 - w) + (cur?.defence ?? prior.defence) * w;
+            teamShape.set(teamId, {attack: logistic(attack), defence: logistic(defence), rounds});
         }
         // Clubs in Europe this season: any squad member with a line in a European cup this year, the biggest cup winning.
         const europeByTeam = new Map<number, string>();

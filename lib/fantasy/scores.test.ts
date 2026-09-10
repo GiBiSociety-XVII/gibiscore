@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {bonusFactor, clubRatio, fantaAvgFor, scorePlayer, seasonWeights, suggestPrices, type SeasonLine} from './scores';
+import {bonusFactor, clubRatio, fantaAvgFor, PRICE_TUNING, scorePlayer, seasonWeights, suggestPrices, type SeasonLine} from './scores';
 
 const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
     year, leagueId: 1, leagueName: 'Serie A', teamId: 1, teamName: 'Inter', games: 38, level: 1,
@@ -8,16 +8,26 @@ const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
 });
 
 describe('seasonWeights', () => {
-    it('weights the current season by how far it has gone', () => {
-        const w = seasonWeights([line(2026, {games: 2}), line(2025), line(2024)], 2026);
-        const cur = 0.6 * (2 / 19) ** 1.2;
-        expect(w.get(2026)!).toBeCloseTo(cur / (cur + 0.7), 5);
-        expect(w.get(2026)!).toBeLessThan(0.08);
-        expect(w.get(2025)!).toBeCloseTo(0.55 / (cur + 0.7), 5);
-        // January: the current season is the biggest weight.
-        const jan = seasonWeights([line(2026, {games: 19}), line(2025), line(2024)], 2026);
-        expect(jan.get(2026)!).toBeGreaterThan(jan.get(2025)!);
+    it('September: last season first, the current one a little, the one before last third', () => {
+        const w = seasonWeights([line(2026, {games: 3}), line(2025), line(2024)], 2026);
+        expect(w.get(2025)!).toBeGreaterThan(w.get(2026)!);
+        expect(w.get(2026)!).toBeGreaterThan(w.get(2024)!);
+        expect(w.get(2025)!).toBeCloseTo(0.61, 1);
+        expect(w.get(2026)!).toBeCloseTo(0.25, 1);
         expect([...w.values()].reduce((s, v) => s + v, 0)).toBeCloseTo(1, 5);
+    });
+
+    it('January: the current season is the biggest weight by a clear margin', () => {
+        const jan = seasonWeights([line(2026, {games: 19}), line(2025), line(2024)], 2026);
+        expect(jan.get(2026)!).toBeGreaterThan(jan.get(2025)! * 1.5);
+        expect(jan.get(2026)!).toBeCloseTo(0.56, 1);
+        expect(jan.get(2024)!).toBeLessThan(0.15);
+    });
+
+    it('before the first round the current season weighs nothing', () => {
+        const w = seasonWeights([line(2026, {games: 0}), line(2025), line(2024)], 2026);
+        expect(w.has(2026)).toBe(false);
+        expect(w.get(2025)!).toBeCloseTo(0.55 / 0.67, 5);
     });
 
     it('ignores seasons outside the window', () => {
@@ -186,13 +196,14 @@ describe('little playing time', () => {
         const base = {age: 30, currentYear: 2026, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 1.5};
         const one = scorePlayer({...base, role: 'P', seasons: [line(2025, {appearances: 1, lineups: 1, bench: 30, minutes: 90, goals: 0, assists: 0, rating: 6.5, goalsConceded: 0, saves: 3})]});
         const wall = scorePlayer({...base, role: 'P', seasons: [line(2025, {appearances: 34, lineups: 34, bench: 0, minutes: 3060, goals: 0, assists: 0, rating: 6.5, goalsConceded: 24, saves: 100})]});
-        expect(one.bonus).toBeLessThan(wall.bonus);
+        // Both are judged on what the club concedes: the one match is no wall, and no worse either.
+        expect(one.bonus).toBeLessThanOrEqual(wall.bonus);
         expect(one.bonus).toBeLessThan(60);
     });
 });
 
 describe('team mark', () => {
-    it('reads the club\'s expected place from the start, the season\'s shape only from the fifth round', () => {
+    it('reads the club\'s expected place and its shape from the start', () => {
         const base = {role: 'A' as const, age: 27, currentYear: 2026, seasons: [line(2025)], injury: null};
         const top = scorePlayer({...base, teamAttack: null, teamDefence: null, teamRounds: 0, clubStrength: 0.9});
         const bottom = scorePlayer({...base, teamAttack: null, teamDefence: null, teamRounds: 0, clubStrength: 0.1});
@@ -202,12 +213,11 @@ describe('team mark', () => {
         expect(bottom.team).toBe(26);
         expect(promoted.team).toBe(38);
         expect(unknown.team).toBe(50);
-        // Three rounds of a poor start do not move a title contender's mark yet; ten do, partly.
-        const early = scorePlayer({...base, teamAttack: 0.2, teamDefence: 0.3, teamRounds: 3, clubStrength: 0.9});
-        const later = scorePlayer({...base, teamAttack: 0.2, teamDefence: 0.3, teamRounds: 10, clubStrength: 0.9});
-        expect(early.team).toBe(74);
-        expect(later.team).toBeLessThan(74);
-        expect(later.team).toBeGreaterThan(40);
+        // The shape (chances created and allowed) weighs more than the table: a contender creating little reads mid-table.
+        const poor = scorePlayer({...base, teamAttack: 0.2, teamDefence: 0.3, teamRounds: 3, clubStrength: 0.9});
+        const strong = scorePlayer({...base, teamAttack: 0.8, teamDefence: 0.7, teamRounds: 3, clubStrength: 0.9});
+        expect(poor.team).toBeLessThan(50);
+        expect(strong.team).toBeGreaterThan(74);
     });
 });
 
@@ -221,8 +231,8 @@ describe('form', () => {
         expect(hot.form).toBeGreaterThan(60);
         expect(cold.form).toBeLessThan(40);
         expect(hot.overall).toBeGreaterThan(cold.overall);
-        // Three rounds do not make the team score: that waits for five.
-        expect(hot.team).toBe(50);
+        // The club's shape counts from the first round: a side creating a lot reads as a strong club.
+        expect(hot.team).toBeGreaterThan(60);
     });
 });
 
@@ -245,7 +255,7 @@ describe('suggestPrices', () => {
         // One outlier far above everyone: without a ceiling he would take most of the attack money.
         const players = Array.from({length: 40}, (_, i) => ({id: i + 1, role: 'A' as const, scores: {overall: i === 0 ? 100 : 70 - i, fantaAvg: i === 0 ? 12 : 7 - i / 20, starter: 95, sample: 30}}));
         const prices = suggestPrices(players, {credits: 1000, participants: 12, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.18, C: 0.27, A: 0.47}});
-        expect(prices.get(1)!).toBe(400);
+        expect(prices.get(1)!).toBe(Math.round(1000 * PRICE_TUNING.ceiling));
         expect(prices.get(2)!).toBeGreaterThan(100);
         const spent = [...prices.values()].reduce((s, v) => s + v, 0);
         expect(Math.abs(spent - 1000 * 12 * 0.47)).toBeLessThan(100);
@@ -255,8 +265,8 @@ describe('suggestPrices', () => {
         const at = (team: number) => ({id: team, role: 'A' as const, scores: {overall: 75, fantaAvg: 7.5, starter: 90, sample: 30, team}});
         const filler = Array.from({length: 40}, (_, i) => ({id: 100 + i, role: 'A' as const, scores: {overall: 60 - i, fantaAvg: 6.8 - i / 20, starter: 80, sample: 30, team: 50}}));
         const prices = suggestPrices([at(75), at(25), ...filler], {credits: 500, participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
-        expect(prices.get(75)!).toBeGreaterThan(prices.get(25)! * 1.1);
-        expect(prices.get(75)!).toBeLessThan(prices.get(25)! * 1.4);
+        expect(prices.get(75)!).toBeGreaterThan(prices.get(25)! * 1.4);
+        expect(prices.get(75)!).toBeLessThan(prices.get(25)! * 2.2);
     });
 
     it('prices attackers above midfielders, defenders and keepers with the same marks', () => {
@@ -277,9 +287,9 @@ describe('a player who changed club', () => {
         expect(moved.bonus).toBeGreaterThan(leaky.bonus + 20);
         expect(moved.discipline).toBeGreaterThan(leaky.discipline);
         expect(moved.fantaAvg!).toBeGreaterThan(leaky.fantaAvg! + 0.4);
-        // At his own club the rate is his: nothing replaced.
+        // At his own club too: the goals belong to the side, and the side is judged on what it is expected to concede.
         const home = scorePlayer({role: 'P', age: 28, currentYear: 2026, currentTeamId: 2, seasons: [line(2025, {goalsConceded: 55, saves: 100, rating: 6.9, teamId: 2})], injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 0.9});
-        expect(home.bonus).toBe(leaky.bonus);
+        expect(home.bonus).toBe(moved.bonus);
     });
 
     it('rotation in a cup weighs half of rotation in the league', () => {
@@ -311,16 +321,16 @@ describe('what the review fixed', () => {
     });
 
     it("a keeper's goals conceded are one number, in the bonus, the malus and the fantasy average", () => {
-        const keeper = (level: number, teamId: number) => scorePlayer({role: 'P', age: 28, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 1.0, seasons: [line(2024, {level, teamId, goals: 0, assists: 0, penaltiesScored: 0, goalsConceded: 40, rating: 6.4})]});
-        // The same keeper: at his club his own goals count, elsewhere the club's rate; the marks move together.
-        const own = keeper(1, 1);
-        const elsewhere = keeper(1, 2);
+        const keeper = (level: number, clubConcededPer90: number | null) => scorePlayer({role: 'P', age: 28, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90, seasons: [line(2024, {level, teamId: 1, goals: 0, assists: 0, penaltiesScored: 0, goalsConceded: 40, rating: 6.4})]});
+        // The same keeper: his own goals when nobody knows the club, the club's expected rate otherwise; the marks move together.
+        const own = keeper(1, null);
+        const club = keeper(1, 1.0);
         expect(own.events!.conceded).toBeCloseTo(40 / 34, 2);
-        expect(elsewhere.events!.conceded).toBeCloseTo(((1.0 * 2900) / 90) / 34, 2);
-        expect(own.bonus).toBeLessThan(elsewhere.bonus);
-        expect(own.discipline).toBeLessThan(elsewhere.discipline);
+        expect(club.events!.conceded).toBeCloseTo(((1.0 * 2900) / 90) / 34, 2);
+        expect(own.bonus).toBeLessThan(club.bonus);
+        expect(own.discipline).toBeLessThan(club.discipline);
         // His own goals in a weaker league would be more here.
-        expect(keeper(0.7, 1).events!.conceded).toBeGreaterThan(own.events!.conceded);
+        expect(keeper(0.7, null).events!.conceded).toBeGreaterThan(own.events!.conceded);
     });
 
     it("the league's rules change the fantasy average", () => {

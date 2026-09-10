@@ -1,7 +1,7 @@
 'use client';
 
-import {Activity, ChevronDown, ChevronUp, Lightbulb, Search, Settings2, X} from "lucide-react";
-import {useMemo, useState} from "react";
+import {Activity, ArrowLeftRight, ChevronDown, ChevronUp, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
 import {Badge} from "@/components/shared/ui/badge";
@@ -10,10 +10,13 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {CloudMenu, CloudPanel} from "./cloud-panel";
+import {CompareDialog} from "./compare-dialog";
 import {RoleBadge} from "./role-badge";
 import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
+import {TableBar} from "./table-bar";
+import {TargetsPanel} from "./targets-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {DEFAULT_RULES, ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
@@ -21,7 +24,7 @@ import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/li
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
-import {bestLineup, defenceOption, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
+import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, STRATEGIES, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
@@ -43,10 +46,11 @@ function ScoreCell({value}: {value: number}) {
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 /** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
-function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']}) {
+function Status({p, rivals, rivalsTaken = []}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]}) {
     const t = useTranslations('Fantasy.board');
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
+            {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
             {p.injury && (() => {
                 const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
                 return (
@@ -140,9 +144,17 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const [sort, setSort] = useState<SortKey>('overall');
     const [limit, setLimit] = useState(PAGE);
     const [open, setOpen] = useState<number | null>(null);
-    const [buying, setBuying] = useState<{player: AuctionPlayer; price: string; manager: number} | null>(null);
+    const [buying, setBuying] = useState<{player: AuctionPlayer; price: string; manager: number; editing: boolean} | null>(null);
     const [lastManager, setLastManager] = useState(0);
-    const openBuy = (player: AuctionPlayer) => setBuying({player, price: String(prices.get(player.id) ?? 1), manager: lastManager});
+    /** Players picked for the comparison (up to two) and the row the keyboard is on. */
+    const [compare, setCompare] = useState<number[]>([]);
+    const [cursor, setCursor] = useState<number | null>(null);
+    const openBuy = (player: AuctionPlayer) => setBuying({player, price: String(prices.get(player.id) ?? 1), manager: lastManager, editing: false});
+    /** A registered purchase, opened again to correct the price or the manager. */
+    const openEdit = (player: AuctionPlayer) => {
+        const purchase = purchases.find((p) => p.playerId === player.id);
+        if (purchase) setBuying({player, price: String(purchase.price), manager: purchase.manager, editing: true});
+    };
 
     // The marks the league wants: with the cups, or the main leagues only.
     const pool = useMemo(() => {
@@ -247,11 +259,58 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!buying) return;
         const price = Math.max(0, Math.round(Number(buying.price) || 0));
         if (blocker(buying.player, buying.manager, price)) return;
-        purchasesStore.write([...purchases.filter((p) => p.playerId !== buying.player.id), {playerId: buying.player.id, price, manager: buying.manager}]);
+        const next = {playerId: buying.player.id, price, manager: buying.manager};
+        const at = purchases.findIndex((p) => p.playerId === buying.player.id);
+        // A correction keeps its place in the order; a purchase goes at the end (the last one, for undo).
+        purchasesStore.write(at >= 0 && buying.editing ? purchases.map((p, i) => (i === at ? next : p)) : [...purchases.filter((p) => p.playerId !== buying.player.id), next]);
         setLastManager(buying.manager);
         setBuying(null);
     };
     const release = (playerId: number) => purchasesStore.write(purchases.filter((p) => p.playerId !== playerId));
+    const lastPurchase = purchases.length > 0 ? purchases[purchases.length - 1] : null;
+    const undoLast = () => {
+        if (lastPurchase) purchasesStore.write(purchases.slice(0, -1));
+    };
+    const toggleCompare = (id: number) => setCompare((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c.slice(-1), id]));
+    const comparing = compare.length === 2 ? compare.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p) : [];
+    /** The keyboard on the list: arrows move, Enter buys or corrects, C compares, Ctrl+Z undoes, Esc closes. */
+    const onKey = (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement | null;
+        const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        if (e.key === 'Escape') {
+            if (buying) setBuying(null);
+            else if (comparing.length === 2) setCompare([]);
+            else if (showStrategies) setShowStrategies(false);
+            else if (teamsTab !== null) setTeamsTab(null);
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) {
+            e.preventDefault();
+            undoLast();
+            return;
+        }
+        if (typing || buying || showStrategies || teamsTab !== null || e.ctrlKey || e.metaKey || e.altKey) return;
+        const list = players.slice(0, limit);
+        if (list.length === 0) return;
+        const at = cursor === null ? -1 : list.findIndex((p) => p.id === cursor);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const next = list[Math.max(0, Math.min(list.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))];
+            setCursor(next.id);
+            document.getElementById(`auction-row-${next.id}`)?.scrollIntoView({block: 'nearest'});
+            return;
+        }
+        const current = at >= 0 ? list[at] : null;
+        if (!current) return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (bought.has(current.id)) openEdit(current);
+            else openBuy(current);
+        } else if (e.key.toLowerCase() === 'c') {
+            e.preventDefault();
+            toggleCompare(current.id);
+        }
+    };
     const strategy = plans.find((p) => p.key === config.strategy) ?? null;
     const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
     // The user's say on the targets: a wanted player is planned in, an ignored one never suggested. One or the other.
@@ -278,6 +337,24 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!player) return null;
         const pick = ROLES.flatMap((r) => strategy.picks[r]).find((p) => p.id === id);
         return Math.min(myMaxFor(player.role), pick ? pick.maxBid : (prices.get(id) ?? 1));
+    };
+    /** What a purchase at this price does to the manager's roster: credits and slots after, and for me the eleven and the plan. */
+    const previewOf = (player: AuctionPlayer, manager: number, price: number) => {
+        const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
+        const others = purchases.filter((p) => p.manager === manager && p.playerId !== player.id && byId.has(p.playerId));
+        const leftAfter = config.credits - others.reduce((s, p) => s + p.price, 0) - price;
+        const slotsAfter = Math.max(0, slotsTotal - others.length - 1);
+        const roleSpent = others.filter((p) => byId.get(p.playerId)!.role === player.role).reduce((s, p) => s + p.price, 0) + price;
+        const roleBudget = Math.round(config.credits * roleShare[player.role]);
+        if (manager !== 0) return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup: null, plan: null, over: 0, already};
+        const rosterAfter = [...others.map((p) => byId.get(p.playerId)!), player];
+        const lineup = rosterAfter.length >= 11 ? bestLineup(rosterAfter, {defenceModifier: defenceOption(config)}) : null;
+        const def = strategy ? STRATEGIES.find((s) => s.key === strategy.key) : null;
+        const plan = def && strategy
+            ? planStrategy(def, pool.players, prices, config, takenByOthers, [...others.map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price})), {playerId: player.id, role: player.role, price}], {want: wanted, avoid: avoided})
+            : null;
+        const max = maxBidOf(player.id);
+        return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup, plan: plan && strategy ? {value: plan.lineupValue, delta: plan.lineupValue - strategy.lineupValue, name: tst(`${strategy.key}.name`)} : null, over: max !== null ? Math.max(0, price - max) : 0, already, missing: Math.max(0, 11 - rosterAfter.length)};
     };
     const priceCell = (id: number) => {
         const list = listPrices.get(id) ?? 1;
@@ -314,6 +391,13 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)}</span>
                     <span className="text-[11px] font-semibold text-muted-foreground">· {ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr.</span>
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
+                        {lastPurchase && byId.has(lastPurchase.playerId) && (
+                            <button type="button" onClick={undoLast} title={t('undoLastHint', {name: byId.get(lastPurchase.playerId)!.name, manager: managers[lastPurchase.manager] ?? t('me'), price: lastPurchase.price})} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5">
+                                <Undo2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                <span className="hidden md:inline">{t('undoLast')}</span>
+                                <span className="font-mono text-[11px] font-bold text-muted-foreground max-w-[120px] truncate">{byId.get(lastPurchase.playerId)!.name} {lastPurchase.price}</span>
+                            </button>
+                        )}
                         <button type="button" onClick={() => setShowStrategies(true)} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", strategy ? "bg-accent" : "bg-card")}>
                             <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
                             {strategy ? tst(`${strategy.key}.name`) : ta('strategies')}
@@ -330,6 +414,14 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
                 </div>
+
+                {/* The table: every manager, credits and open slots */}
+                {managers.length > 1 && (
+                    <TableBar
+                        managers={managers.map((name, manager) => ({manager, name: manager === 0 ? `${name} (${t('mine')})` : name, left: creditsLeftOf(manager), open: {P: Math.max(0, config.slots.P - roleCount(manager, 'P')), D: Math.max(0, config.slots.D - roleCount(manager, 'D')), C: Math.max(0, config.slots.C - roleCount(manager, 'C')), A: Math.max(0, config.slots.A - roleCount(manager, 'A'))}}))}
+                        onOpen={(manager) => setTeamsTab(manager)}
+                    />
+                )}
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -417,7 +509,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 const expanded = open === p.id;
                                 return (
                                     <FragmentRow key={p.id}>
-                                        <tr className={cn("border-t border-muted", purchase && (purchase.manager === 0 ? "bg-accent/15" : "opacity-60"))}>
+                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", purchase && (purchase.manager === 0 ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
                                             <td className="px-2 py-1 min-w-0">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/40 bg-card shrink-0">
@@ -443,10 +535,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={p.rivals} />
+                                                    <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? 0)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                                    <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">
                                                             <span className="text-[11px] font-bold">{t('boughtBy', {manager: managers[purchase.manager] ?? t('me'), price: purchase.price})}</span>
+                                                            <button type="button" onClick={() => openEdit(p)} aria-label={t('edit')} title={t('edit')} className="inline-flex w-6 h-6 items-center justify-center rounded border border-foreground bg-card hover:bg-accent"><Pencil className="w-3 h-3" /></button>
                                                             <button type="button" onClick={() => release(p.id)} aria-label={t('release')} title={t('release')} className="inline-flex w-6 h-6 items-center justify-center rounded border border-foreground bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
                                                         </span>
                                                     ) : (
@@ -493,7 +587,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     )}
                 </Panel>
                 <p className="text-[11px] font-semibold text-muted-foreground">{ta('intro')}</p>
+                <p className="hidden md:block text-[11px] font-semibold text-muted-foreground">{t('shortcuts')}</p>
                 </>)}
+                {compare.length === 1 && byId.has(compare[0]) && (
+                    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bb-surface bg-background px-3 h-9 flex items-center gap-2 text-[12px] font-extrabold shadow-[4px_4px_0_rgb(var(--foreground))]">
+                        <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
+                        {t('comparePicked', {name: byId.get(compare[0])!.name})}
+                        <button type="button" onClick={() => setCompare([])} aria-label={t('close')} className="inline-flex w-6 h-6 items-center justify-center rounded border border-foreground bg-card"><X className="w-3 h-3" /></button>
+                    </div>
+                )}
             </div>
 
             {/* My roster and the strategies */}
@@ -547,6 +649,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         <RoleBadge role={p.role} />
                                         <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
                                         <span className="ml-auto font-mono text-[12px] font-extrabold tabular-nums">{pu.price}</span>
+                                        <button type="button" onClick={() => openEdit(p)} aria-label={t('edit')} title={t('edit')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-card hover:bg-accent"><Pencil className="w-3 h-3" /></button>
                                         <button type="button" onClick={() => release(pu.playerId)} aria-label={t('release')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
                                     </li>
                                 );
@@ -554,6 +657,16 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </ul>
                     )}
                 </Panel>
+                <TargetsPanel
+                    players={pool.players}
+                    targets={strategy ? ROLES.flatMap((r) => strategy.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id)) : []}
+                    prices={prices}
+                    bought={bought}
+                    avoided={avoided}
+                    managers={managers.map((m, i) => (i === 0 ? t('me') : m))}
+                    myIds={new Set(mine.map((p) => p.playerId))}
+                    onBuy={openBuy}
+                />
             </div>
 
             {/* Every roster, in full */}
@@ -582,11 +695,24 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 </div>
             )}
 
+            <Hotkeys onKey={onKey} />
+
+            {/* Two players side by side */}
+            {comparing.length === 2 && (
+                <CompareDialog
+                    a={{player: comparing[0], list: listPrices.get(comparing[0].id) ?? 1, live: prices.get(comparing[0].id) ?? 1, maxBid: maxBidOf(comparing[0].id), tier: tiers.get(comparing[0].id) ?? 'filler', bought: bought.has(comparing[0].id) ? {manager: managers[bought.get(comparing[0].id)!.manager] ?? t('me'), price: bought.get(comparing[0].id)!.price} : null}}
+                    b={{player: comparing[1], list: listPrices.get(comparing[1].id) ?? 1, live: prices.get(comparing[1].id) ?? 1, maxBid: maxBidOf(comparing[1].id), tier: tiers.get(comparing[1].id) ?? 'filler', bought: bought.has(comparing[1].id) ? {manager: managers[bought.get(comparing[1].id)!.manager] ?? t('me'), price: bought.get(comparing[1].id)!.price} : null}}
+                    onClose={() => setCompare([])}
+                    onBuy={(player) => { setCompare([]); openBuy(player); }}
+                />
+            )}
+
             {/* Buy sheet */}
             {buying && (
-                <div role="dialog" aria-modal="true" aria-label={t('buyTitle')} className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-foreground/40 p-3" onClick={() => setBuying(null)}>
+                <div role="dialog" aria-modal="true" aria-label={buying.editing ? t('editTitle') : t('buyTitle')} className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-foreground/40 p-3" onClick={() => setBuying(null)}>
                     <form onSubmit={(e) => { e.preventDefault(); confirmBuy(); }} onClick={(e) => e.stopPropagation()} className="bb-surface w-full max-w-md p-4 flex flex-col gap-3 bg-background">
                         <div className="flex items-center gap-2">
+                            {buying.editing && <span className="bb-badge bg-accent text-[10px] h-5 px-1.5 shrink-0">{t('editTitle')}</span>}
                             <RoleBadge role={buying.player.role} />
                             <span className="text-[15px] font-extrabold truncate">{buying.player.name}</span>
                             <span className="text-[12px] font-semibold text-muted-foreground truncate">{buying.player.team.name}</span>
@@ -625,9 +751,19 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             {strategy && maxBidOf(buying.player.id) !== null && <span className="block text-foreground">{t('maxBidHint', {max: maxBidOf(buying.player.id)!})}</span>}
                         </p>
                         {(() => {
-                            const why = blocker(buying.player, buying.manager, Math.max(0, Math.round(Number(buying.price) || 0)));
+                            const price = Math.max(0, Math.round(Number(buying.price) || 0));
+                            const why = blocker(buying.player, buying.manager, price);
+                            const pv = previewOf(buying.player, buying.manager, price);
                             return (
                                 <>
+                                    <div className="rounded-lg border-2 border-foreground/30 bg-muted/40 px-3 py-2 flex flex-col gap-0.5 text-[12px] font-semibold">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('preview.title', {price})}</span>
+                                        <span className={cn(pv.leftAfter < pv.slotsAfter && "text-red-700")}>{pv.slotsAfter > 0 ? t('preview.left', {left: pv.leftAfter, slots: pv.slotsAfter, perSlot: Math.max(0, Math.floor(pv.leftAfter / pv.slotsAfter))}) : t('preview.leftNone', {left: pv.leftAfter})}</span>
+                                        <span className={cn(pv.roleSpent > pv.roleBudget * 1.15 && "text-red-700")}>{t('preview.role', {role: ts(`roles.${buying.player.role}`), spent: pv.roleSpent, budget: pv.roleBudget})}</span>
+                                        {buying.manager === 0 && (pv.lineup ? <span>{t('preview.lineup', {formation: pv.lineup.formation, value: pv.lineup.value.toFixed(1)})}</span> : <span className="text-muted-foreground">{t('preview.lineupShort', {missing: pv.missing ?? 0})}</span>)}
+                                        {pv.plan && <span className={cn(pv.plan.delta < -0.5 && "text-red-700")}>{t(pv.plan.delta < -0.5 ? 'preview.planWorse' : 'preview.plan', {name: pv.plan.name, value: pv.plan.value.toFixed(1), delta: `${pv.plan.delta >= 0 ? '+' : ''}${pv.plan.delta.toFixed(1)}`})}</span>}
+                                        {pv.over > 0 && <span className="text-red-700">{t('preview.over', {over: pv.over})}</span>}
+                                    </div>
                                     {why && <p role="alert" className="text-[12px] font-bold text-red-700">{why}</p>}
                                     <button type="submit" disabled={why !== null} className="bb-btn bg-accent h-10 px-4 text-[13px] font-extrabold disabled:opacity-50 disabled:cursor-not-allowed">{t('confirm')}</button>
                                 </>
@@ -638,6 +774,20 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
             )}
         </div>
     );
+}
+
+/** One window listener for the board's keys; the handler is the latest render's, through a ref. */
+function Hotkeys({onKey}: {onKey: (e: KeyboardEvent) => void}) {
+    const latest = useRef(onKey);
+    useEffect(() => {
+        latest.current = onKey;
+    });
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => latest.current(e);
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+    return null;
 }
 
 function FragmentRow({children}: {children: React.ReactNode}) {

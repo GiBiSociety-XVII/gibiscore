@@ -136,19 +136,26 @@ export interface FantaScores {
 const clamp = (v: number, min = 1, max = 100) => Math.max(min, Math.min(max, Math.round(v)));
 
 /**
- * Season weights. Auctions happen in early September and early January,
- * so the previous season is the backbone (55%) and the one before it
- * counts 15%; the current season starts small and grows with the
- * matches played: 5% after two rounds, 20% after eight, 45% by January
- * (nineteen rounds). How the player and his club have started is a
- * separate mark ("form"), not a bigger weight.
+ * Season weights. Auctions happen in early September and late January.
+ * In September the previous season is the backbone, the current one
+ * counts a little (it has just begun) and the one before last comes
+ * third: about 61 / 25 / 14 after three rounds. As the rounds come in
+ * the current season grows and the previous one fades, and by January
+ * (nineteen rounds) the current season is the biggest weight by a clear
+ * margin: about 56 / 33 / 11. With nothing played yet, 80 / 20. How
+ * the player and his club have started is also a separate mark ("form").
  */
+/** Raw weight of the current season after `rounds` matches: nothing before the first, 0.21 after three, 0.6 from January on. */
+const currentWeight = (rounds: number) => (rounds <= 0 ? 0 : 0.12 + 0.48 * Math.min(1, rounds / 19) ** 0.9);
+/** Raw weight of the previous season: 0.55 before the first round, fading to 0.36 by January as the current one takes over. */
+const previousWeight = (rounds: number) => 0.55 * (1 - 0.35 * Math.min(1, Math.max(0, rounds) / 19));
+
 export function seasonWeights(seasons: SeasonLine[], currentYear: number): Map<number, number> {
     const years = [...new Set(seasons.map((s) => s.year))].filter((y) => y <= currentYear && y >= currentYear - 2);
     const gamesOf = (y: number) => Math.max(0, ...seasons.filter((s) => s.year === y).map((s) => s.games));
     const raw = new Map<number, number>();
     for (const y of years) {
-        const base = y === currentYear ? 0.6 * Math.min(1, gamesOf(y) / 19) ** 1.2 : y === currentYear - 1 ? 0.55 : 0.15;
+        const base = y === currentYear ? currentWeight(gamesOf(y)) : y === currentYear - 1 ? previousWeight(gamesOf(currentYear)) : 0.12;
         if (base > 0) raw.set(y, base);
     }
     const total = [...raw.values()].reduce((s, v) => s + v, 0);
@@ -220,7 +227,14 @@ interface YearAgg {
 }
 
 /** One season across its competitions. Lines at the current club weigh double for the starter rates. */
-function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined, clubConcededPer90: number | null = null, clubStrength: number | null = null): YearAgg {
+/** Chances the club creates relative to an average side, 0.6..1.5, read back from its attack shape (a logistic of that ratio). */
+function createsFromShape(attack: number | null | undefined): number | null {
+    if (attack === null || attack === undefined) return null;
+    const a = Math.max(0.02, Math.min(0.98, attack));
+    return Math.max(0.6, Math.min(1.5, 1 + Math.log(a / (1 - a)) / 3));
+}
+
+function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undefined, clubConcededPer90: number | null = null, clubStrength: number | null = null, clubCreates: number | null = null): YearAgg {
     const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, ratingApps: 0, goals: 0, assists: 0, tGoals: 0, tAssists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0, atClub: 0, leagueLines: 0, inSquadLeague: 0};
     let levelW = 0;
     for (const l of lines) {
@@ -229,7 +243,8 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         const w = (atClub ? 2 : 1) * (l.cup ? 0.5 : 1);
         const level = Math.max(0.2, Math.min(1, l.level));
         // Translation of what he did there to here: the league's gap and the two clubs' strengths.
-        const ratio = atClub ? 1 : clubRatio(clubStrength, l.clubStrength, l.level);
+        // What the current club creates (its expected goals, when known) against what the line's club allowed him.
+        const ratio = atClub ? 1 : clubCreates !== null ? Math.max(0.6, Math.min(1.5, clubCreates / clubBonus(l.clubStrength ?? defaultClubStrength(l.level)))) : clubRatio(clubStrength, l.clubStrength, l.level);
         const transfer = bonusFactor(l.level) * ratio;
         const ratingShift = !atClub && clubStrength !== null && clubStrength !== undefined ? Math.max(-0.15, Math.min(0.15, 0.3 * (clubStrength - (l.clubStrength ?? defaultClubStrength(l.level))))) : 0;
         if (atClub) a.atClub += l.lineups + l.bench;
@@ -259,9 +274,11 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         a.penSaved += l.penaltiesSaved;
         a.yellow += l.yellow;
         a.red += l.red + l.yellowRed;
-        // Goals conceded belong to the club: elsewhere they are replaced by what the current club
-        // concedes; his own, in a weaker league, would be more here.
-        a.conceded += !atClub && clubConcededPer90 !== null ? (clubConcededPer90 * l.minutes) / 90 : l.goalsConceded / Math.max(0.6, level);
+        // Goals conceded belong to the club, not to the keeper: every keeper of a side is judged on
+        // what the side is expected to concede (its expected goals against, this season's as they come),
+        // which also spares a keeper of few matches the luck of those matches. His own count only
+        // when nobody knows the club, and then in a weaker league they would be more here.
+        a.conceded += clubConcededPer90 !== null ? (clubConcededPer90 * l.minutes) / 90 : l.goalsConceded / Math.max(0.6, level);
         // How sure his place is: a starter in a weaker league may not start here, unless it is his club.
         a.level += (atClub ? 1 : l.level) * Math.max(1, l.appearances);
         levelW += Math.max(1, l.appearances);
@@ -306,7 +323,7 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
     for (const y of years) {
         const w = weights.get(y)!;
-        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId, input.clubConcededPer90 ?? null, input.clubStrength ?? null);
+        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.currentTeamId, input.clubConcededPer90 ?? null, input.clubStrength ?? null, createsFromShape(input.teamAttack));
         // Rates per 90 are measured over at least six full matches: a goal in the twenty minutes of
         // a substitute is not a goal a match. A keeper's missing minutes concede at his club's rate.
         const per90 = a.minutes > 0 ? 90 / Math.max(a.minutes, RATE_MINUTES) : 0;
@@ -448,16 +465,17 @@ function clubMix(input: AuctionInput): number | null {
 /**
  * The club, 20..80: where it is expected to finish (last season's table, a
  * promoted club low, moved by this season's as the rounds come in), and
- * from the fifth round more and more the shape it shows for the role.
+ * the shape it shows for the role: the chances it creates and allows, by
+ * expected goals, last season's as the prior and this season's taking
+ * over with the rounds.
  */
 function teamScore(input: AuctionInput): number {
     const strength = input.clubStrength;
     const prior = strength === null || strength === undefined ? 50 : clamp(50 + (strength - 0.5) * 60);
     const mix = clubMix(input);
-    const rounds = input.teamRounds ?? 0;
-    if (mix === null || rounds < 5) return prior;
-    const w = Math.min(1, (rounds - 4) / 10);
-    return clamp(prior * (1 - w) + (50 + (mix - 0.5) * 60) * w);
+    if (mix === null) return prior;
+    // The shape (chances created and allowed, last season's as the prior) weighs more than the table.
+    return clamp(0.4 * prior + 0.6 * (50 + (mix - 0.5) * 100));
 }
 
 /**
@@ -531,7 +549,7 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {tail: 1.2, ceiling: 0.4};
+export const PRICE_TUNING = {tail: 1.0, ceiling: 0.42};
 /**
  * The free alternative per role: which starters (as a share of what the
  * league buys, from..to) stand for the player nobody pays for, and what
@@ -542,10 +560,10 @@ export const PRICE_TUNING = {tail: 1.2, ceiling: 0.4};
  * the first left unbought.
  */
 export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: number}> = {
-    P: {from: 0.7, to: 1, gap: 0.1},
-    D: {from: 0.7, to: 1, gap: 0.1},
-    C: {from: 0.7, to: 1, gap: 0.1},
-    A: {from: 1, to: 1.5, gap: 0.35},
+    P: {from: 0.85, to: 1, gap: 0.1},
+    D: {from: 0.85, to: 1, gap: 0.1},
+    C: {from: 0.9, to: 1, gap: 0.1},
+    A: {from: 0.85, to: 1, gap: 0.25},
 };
 /**
  * Scarcity per role: the fantasy averages of keepers and defenders sit
@@ -553,7 +571,7 @@ export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: numb
  * not three), so a gentler curve keeps their prices on a human scale;
  * attack is where the table fights.
  */
-export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.25, C: 1.4, A: 1.3};
+export const PRICE_POWER: Record<FantaRole, number> = {P: 1.3, D: 1.3, C: 1.6, A: 1.3};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -564,11 +582,19 @@ export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.25, C: 1.4, 
  * numbers, no fixed prices anywhere: the money then follows this value.
  */
 /** Fantamedia shrunk towards the role's level when it rests on few matches. */
+/** How much the club moves a price: the factor runs from 1 - pull/2 (a club at 0) to 1 + pull/2 (at 100). */
+export const CLUB_PULL = 1.0;
+/** The chance of playing enters the price with this exponent: below 1 a rotation player keeps more of his value. */
+export const PLAY_CURVE = 0.7;
+/** What a starter of the role at a top club averages above one at a bottom club: where a thin fantamedia is shrunk towards. */
+const CLUB_SHIFT: Record<FantaRole, number> = {P: 0.6, D: 0.4, C: 0.6, A: 1.0};
+
 function shrunkFanta(p: PriceablePlayer, roleLevel: number): number {
     const sample = p.scores.sample ?? 30;
     const shrink = sample / (sample + 12);
-    const raw = p.scores.fantaAvg ?? roleLevel + (p.scores.overall - 50) / 30;
-    return raw * shrink + roleLevel * (1 - shrink);
+    const target = roleLevel + CLUB_SHIFT[p.role] * ((p.scores.team ?? 50) / 100 - 0.5);
+    const raw = p.scores.fantaAvg ?? target + (p.scores.overall - 50) / 30;
+    return raw * shrink + target * (1 - shrink);
 }
 
 export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel: number): number {
@@ -582,10 +608,12 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     // A fantamedia built on a dozen matches is a guess: it is already shrunk towards the role's level,
     // so what it still promises over the free player counts at least for half, in full from twenty matches.
     const evidence = 0.4 + 0.6 * Math.min(1, (p.scores.sample ?? 30) / 20);
-    // The club: a side expected near the top creates more (and concedes less) than one near the
-    // bottom, beyond what his own numbers say. About ±10% between the ends of the table.
-    const club = 1 + 0.35 * ((p.scores.team ?? 50) / 100 - 0.5);
-    return Math.max(0, fm - replacement) * evidence * (play + (1 - play) * upside) * avail * club;
+    // The club: a side near the top creates more (and concedes less) than one near the bottom,
+    // beyond what his own numbers say. About ±30% between the ends of the table.
+    const club = 1 + CLUB_PULL * ((p.scores.team ?? 50) / 100 - 0.5);
+    // The table pays a sure starter in full and a rotation player more than his minutes say: a name is bought for the weeks he plays.
+    const onPitch = play ** PLAY_CURVE;
+    return Math.max(0, fm - replacement) * evidence * (onPitch + (1 - onPitch) * upside) * avail * club;
 }
 
 /**
