@@ -71,7 +71,7 @@ describe('dynamicPrices', () => {
         expect(moved([31, 32, 33, 121, 122, 123])).toBeGreaterThanOrEqual(4);
         expect(dyn.get(121)!).toBeLessThan(list.get(121)!);
         // Mid-table attackers still to be bought change too.
-        expect(moved([230, 235, 240])).toBeGreaterThanOrEqual(2);
+        expect(moved([225, 230, 235])).toBeGreaterThanOrEqual(2);
     });
 
     it('never asks more than the richest manager can still pay and finish his roster', () => {

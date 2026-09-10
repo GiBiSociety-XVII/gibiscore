@@ -549,7 +549,7 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {tail: 1.2, ceiling: 0.47};
+export const PRICE_TUNING = {tail: 1.0, ceiling: 0.42};
 /**
  * The free alternative per role: which starters (as a share of what the
  * league buys, from..to) stand for the player nobody pays for, and what
@@ -560,10 +560,10 @@ export const PRICE_TUNING = {tail: 1.2, ceiling: 0.47};
  * the first left unbought.
  */
 export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: number}> = {
-    P: {from: 0.7, to: 1, gap: 0.1},
-    D: {from: 0.7, to: 1, gap: 0.1},
-    C: {from: 0.7, to: 1, gap: 0.1},
-    A: {from: 0.75, to: 1, gap: 0.25},
+    P: {from: 0.85, to: 1, gap: 0.1},
+    D: {from: 0.85, to: 1, gap: 0.1},
+    C: {from: 0.9, to: 1, gap: 0.1},
+    A: {from: 0.85, to: 1, gap: 0.25},
 };
 /**
  * Scarcity per role: the fantasy averages of keepers and defenders sit
@@ -571,7 +571,7 @@ export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: numb
  * not three), so a gentler curve keeps their prices on a human scale;
  * attack is where the table fights.
  */
-export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.25, C: 1.4, A: 1.2};
+export const PRICE_POWER: Record<FantaRole, number> = {P: 1.3, D: 1.3, C: 1.6, A: 1.3};
 
 /**
  * What a player is expected to bring over the free alternative, per
