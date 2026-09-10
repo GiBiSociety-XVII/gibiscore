@@ -373,15 +373,14 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     </div>
                 </div>
 
-                {/* Teams: one at a time, the active one again to clear it */}
-                <div role="radiogroup" aria-label={t('allTeams')} className="flex flex-wrap gap-1">
-                    <button type="button" role="radio" aria-checked={teamId === 'all'} onClick={() => { setTeamId('all'); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", teamId === 'all' ? "bg-foreground text-background" : "bg-card")}>{t('allTeams')}</button>
+                {/* Teams on one row, crests only: one at a time, the active one again to clear it */}
+                <div role="radiogroup" aria-label={t('allTeams')} className="flex items-center gap-1 overflow-x-auto [scrollbar-width:thin] pb-1 -mb-1">
+                    <button type="button" role="radio" aria-checked={teamId === 'all'} onClick={() => { setTeamId('all'); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold shrink-0", teamId === 'all' ? "bg-foreground text-background" : "bg-card")}>{t('allTeams')}</button>
                     {pool.teams.map((tm) => {
                         const active = teamId === tm.id;
                         return (
-                            <button key={tm.id} type="button" role="radio" aria-checked={active} title={tm.name} onClick={() => { setTeamId(active ? 'all' : tm.id); setLimit(PAGE); }} className={cn("bb-btn h-8 pl-1.5 pr-2 text-[12px] font-extrabold inline-flex items-center gap-1.5", active ? "bg-foreground text-background" : "bg-card")}>
-                                <TeamCrest team={tm} size={18} />
-                                <span>{tm.shortCode ?? tm.name}</span>
+                            <button key={tm.id} type="button" role="radio" aria-checked={active} title={tm.name} aria-label={tm.name} onClick={() => { setTeamId(active ? 'all' : tm.id); setLimit(PAGE); }} className={cn("bb-btn h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center", active ? "bg-foreground" : "bg-card")}>
+                                <TeamCrest team={tm} size={20} />
                             </button>
                         );
                     })}

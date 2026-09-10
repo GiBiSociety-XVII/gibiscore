@@ -169,6 +169,26 @@ describe('this season at the club', () => {
     });
 });
 
+describe('team mark', () => {
+    it('reads the club\'s expected place from the start, the season\'s shape only from the fifth round', () => {
+        const base = {role: 'A' as const, age: 27, currentYear: 2026, seasons: [line(2025)], injury: null};
+        const top = scorePlayer({...base, teamAttack: null, teamDefence: null, teamRounds: 0, clubStrength: 0.9});
+        const bottom = scorePlayer({...base, teamAttack: null, teamDefence: null, teamRounds: 0, clubStrength: 0.1});
+        const promoted = scorePlayer({...base, teamAttack: null, teamDefence: null, teamRounds: 0, clubStrength: 0.3});
+        const unknown = scorePlayer({...base, teamAttack: null, teamDefence: null, teamRounds: 0});
+        expect(top.team).toBe(74);
+        expect(bottom.team).toBe(26);
+        expect(promoted.team).toBe(38);
+        expect(unknown.team).toBe(50);
+        // Three rounds of a poor start do not move a title contender's mark yet; ten do, partly.
+        const early = scorePlayer({...base, teamAttack: 0.2, teamDefence: 0.3, teamRounds: 3, clubStrength: 0.9});
+        const later = scorePlayer({...base, teamAttack: 0.2, teamDefence: 0.3, teamRounds: 10, clubStrength: 0.9});
+        expect(early.team).toBe(74);
+        expect(later.team).toBeLessThan(74);
+        expect(later.team).toBeGreaterThan(40);
+    });
+});
+
 describe('form', () => {
     it('is neutral before the season and rewards a strong start', () => {
         const base = [line(2025)];
@@ -197,6 +217,24 @@ describe('suggestPrices', () => {
         expect(prices.get(24)!).toBeLessThan(prices.get(1)! * 0.4);
         expect(prices.get(40)!).toBeLessThanOrEqual(15);
         expect(Math.abs(spent - 500 * 8 * 0.48)).toBeLessThan(60);
+    });
+
+    it('never asks more than the ceiling of a manager\'s credits for one man, and gives the excess to the others', () => {
+        // One outlier far above everyone: without a ceiling he would take most of the attack money.
+        const players = Array.from({length: 40}, (_, i) => ({id: i + 1, role: 'A' as const, scores: {overall: i === 0 ? 100 : 70 - i, fantaAvg: i === 0 ? 12 : 7 - i / 20, starter: 95, sample: 30}}));
+        const prices = suggestPrices(players, {credits: 1000, participants: 12, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.18, C: 0.27, A: 0.47}});
+        expect(prices.get(1)!).toBe(400);
+        expect(prices.get(2)!).toBeGreaterThan(100);
+        const spent = [...prices.values()].reduce((s, v) => s + v, 0);
+        expect(Math.abs(spent - 1000 * 12 * 0.47)).toBeLessThan(100);
+    });
+
+    it('a stronger club is worth more with the same numbers', () => {
+        const at = (team: number) => ({id: team, role: 'A' as const, scores: {overall: 75, fantaAvg: 7.5, starter: 90, sample: 30, team}});
+        const filler = Array.from({length: 40}, (_, i) => ({id: 100 + i, role: 'A' as const, scores: {overall: 60 - i, fantaAvg: 6.8 - i / 20, starter: 80, sample: 30, team: 50}}));
+        const prices = suggestPrices([at(75), at(25), ...filler], {credits: 500, participants: 8, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        expect(prices.get(75)!).toBeGreaterThan(prices.get(25)! * 1.1);
+        expect(prices.get(75)!).toBeLessThan(prices.get(25)! * 1.4);
     });
 
     it('prices attackers above midfielders, defenders and keepers with the same marks', () => {

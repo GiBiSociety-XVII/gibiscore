@@ -435,11 +435,19 @@ function clubMix(input: AuctionInput): number | null {
     return mix[0] * (attack ?? 0.5) + mix[1] * (defence ?? 0.5);
 }
 
-/** Club strength for the role, compressed to 20..80, only once the club has played five rounds. */
+/**
+ * The club, 20..80: where it is expected to finish (last season's table, a
+ * promoted club low, moved by this season's as the rounds come in), and
+ * from the fifth round more and more the shape it shows for the role.
+ */
 function teamScore(input: AuctionInput): number {
+    const strength = input.clubStrength;
+    const prior = strength === null || strength === undefined ? 50 : clamp(50 + (strength - 0.5) * 60);
     const mix = clubMix(input);
-    if (mix === null || (input.teamRounds ?? 5) < 5) return 50;
-    return clamp(50 + (mix - 0.5) * 60);
+    const rounds = input.teamRounds ?? 0;
+    if (mix === null || rounds < 5) return prior;
+    const w = Math.min(1, (rounds - 4) / 10);
+    return clamp(prior * (1 - w) + (50 + (mix - 0.5) * 60) * w);
 }
 
 /**
@@ -497,7 +505,7 @@ export interface PriceConfig {
 }
 
 /** What the pricing reads of a player: the marks, or just the overall when the rest is unknown. */
-export interface PricedScores extends Pick<FantaScores, 'overall'>, Partial<Pick<FantaScores, 'fantaAvg' | 'starter' | 'fitness' | 'form' | 'sample' | 'confidence'>> {}
+export interface PricedScores extends Pick<FantaScores, 'overall'>, Partial<Pick<FantaScores, 'fantaAvg' | 'starter' | 'fitness' | 'form' | 'team' | 'sample' | 'confidence'>> {}
 
 export interface PriceablePlayer {
     id: number;
@@ -513,14 +521,14 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {freeGap: 0.35, tail: 1.2};
+export const PRICE_TUNING = {freeGap: 0.35, tail: 1.2, ceiling: 0.4};
 /**
  * Scarcity per role: the fantasy averages of keepers and defenders sit
  * close together (a top keeper is a goal a match better than a spare,
  * not three), so a gentler curve keeps their prices on a human scale;
  * attack is where the table fights.
  */
-export const PRICE_POWER: Record<FantaRole, number> = {P: 1.2, D: 1.5, C: 1.7, A: 1.8};
+export const PRICE_POWER: Record<FantaRole, number> = {P: 1.1, D: 1.25, C: 1.3, A: 1.3};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -549,7 +557,10 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     // A fantamedia built on a dozen matches is a guess: it is already shrunk towards the role's level,
     // so what it still promises over the free player counts at least for half, in full from twenty matches.
     const evidence = 0.4 + 0.6 * Math.min(1, (p.scores.sample ?? 30) / 20);
-    return Math.max(0, fm - replacement) * evidence * (play + (1 - play) * upside) * avail;
+    // The club: a side expected near the top creates more (and concedes less) than one near the
+    // bottom, beyond what his own numbers say. About ±10% between the ends of the table.
+    const club = 1 + 0.35 * ((p.scores.team ?? 50) / 100 - 0.5);
+    return Math.max(0, fm - replacement) * evidence * (play + (1 - play) * upside) * avail * club;
 }
 
 /**
@@ -590,7 +601,8 @@ export function suggestPrices<T extends PriceablePlayer>(players: T[], config: P
         // what one manager can physically pay while keeping a credit for every other slot of the
         // roster. What a bounded player leaves on the table goes to the others, a few passes until stable.
         const rosterSlots = config.slots.P + config.slots.D + config.slots.C + config.slots.A;
-        const cap = Math.max(1, config.credits - (rosterSlots - 1));
+        // ...and never more than the ceiling of a manager's credits: nobody spends half his money on one man.
+        const cap = Math.max(1, Math.min(config.credits - (rosterSlots - 1), Math.round(config.credits * PRICE_TUNING.ceiling)));
         const fixed = new Map<number, number>();
         for (let pass = 0; pass < 6; pass += 1) {
             const open = priced.filter((p) => !fixed.has(p.id));

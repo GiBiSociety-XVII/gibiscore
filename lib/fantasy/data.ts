@@ -286,12 +286,13 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             stats.push(...rows);
         }
 
-        // Matches a competition had in a season: the most appearances anyone made in it. A league
-        // has at least thirty, whatever the few lines of a far-away season say; a cup is what it is.
+        // Matches a competition had in a season: the most appearances anyone made in it. A past league
+        // season has at least thirty, whatever the few lines of a far-away season say; the current one
+        // is the rounds played so far (a floor there would make three rounds weigh like a season); a cup is what it is.
         const games = new Map<string, number>();
         for (const r of stats) {
             const key = `${r.league_id}:${r.season_year}`;
-            games.set(key, Math.max(games.get(key) ?? 0, r.appearances ?? 0, r.league?.type === 'cup' ? 0 : 30));
+            games.set(key, Math.max(games.get(key) ?? 0, r.appearances ?? 0, r.league?.type === 'cup' || r.season_year === year ? 0 : 30));
         }
 
         // Team shape this season and current absences.
