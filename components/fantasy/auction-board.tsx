@@ -284,13 +284,25 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         return Math.min(myMaxFor(player.role), pick ? pick.maxBid : (prices.get(id) ?? 1));
     };
     const priceCell = (id: number) => {
-        const live = prices.get(id) ?? 1;
         const list = listPrices.get(id) ?? 1;
+        const purchase = bought.get(id);
+        // Bought: what the list said, then what was actually paid, so the theory meets the table.
+        if (purchase) {
+            const gap = purchase.price - list;
+            const notable = Math.abs(gap) >= Math.max(2, list * 0.05);
+            return (
+                <span className="inline-flex items-center justify-end gap-1.5" title={t('paidVsList', {list, paid: purchase.price, gap: `${gap > 0 ? '+' : ''}${gap}`})}>
+                    <span className="font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">{list}</span>
+                    <span className={cn("font-mono font-extrabold tabular-nums", notable && (gap > 0 ? "text-red-700" : "text-emerald-700"))}>{purchase.price}</span>
+                </span>
+            );
+        }
+        const live = prices.get(id) ?? 1;
         const delta = live - list;
         return (
-            <span className="inline-flex items-center justify-end gap-1" title={bought.has(id) ? t('paid') : t('listPrice', {price: list})}>
+            <span className="inline-flex items-center justify-end gap-1" title={t('listPrice', {price: list})}>
                 <span className="font-mono font-extrabold tabular-nums">{live}</span>
-                {!bought.has(id) && Math.abs(delta) >= Math.max(2, list * 0.05) && <span className={cn("font-mono text-[10px] font-bold tabular-nums", delta > 0 ? "text-red-700" : "text-emerald-700")}>{delta > 0 ? '▲' : '▼'}{Math.abs(delta)}</span>}
+                {Math.abs(delta) >= Math.max(2, list * 0.05) && <span className={cn("font-mono text-[10px] font-bold tabular-nums", delta > 0 ? "text-red-700" : "text-emerald-700")}>{delta > 0 ? '▲' : '▼'}{Math.abs(delta)}</span>}
             </span>
         );
     };

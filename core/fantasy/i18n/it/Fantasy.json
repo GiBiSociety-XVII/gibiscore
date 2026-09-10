@@ -124,7 +124,7 @@
       "team_": "Forza della squadra in questa stagione",
       "overall": "Voto complessivo pesato per ruolo",
       "fantaAvg": "Fantamedia stimata a partita",
-      "price": "Crediti: prezzo vivo, aggiornato con gli acquisti registrati (soldi rimasti al tavolo, top rimasti, quanto si sta pagando). In grigio la differenza dal listino.",
+      "price": "Crediti: prezzo vivo, aggiornato con gli acquisti registrati (soldi rimasti al tavolo, top rimasti, quanto si sta pagando). Per chi è già stato comprato: a sinistra in grigio il listino consigliato, a destra quanto è stato pagato davvero (rosso sopra il listino, verde sotto).",
       "tier": "Fascia nel ruolo: top, semi-top, prima, seconda, terza, riempitivi",
       "form": "Partenza: com'è iniziata la stagione per lui e per il suo club rispetto all'anno scorso (50 = come atteso)",
       "maxBid": "Offerta massima per te secondo la strategia scelta e i crediti che ti restano"
@@ -217,7 +217,8 @@
       "fvm": "FVM {fvm}",
       "mantra": "Mantra: {roles}"
     },
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "paidVsList": "Listino {list} · pagato {paid} ({gap})"
   },
   "roster": {
     "title": "La mia rosa",
