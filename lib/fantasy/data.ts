@@ -562,7 +562,9 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
     }
 }
 
-const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600, tags: ['fantasy-pool']});
+// Keyed by the deployed commit: the marks and prices are the code's, so a new deploy computes its
+// own pool instead of serving, for up to an hour, the one the previous deploy cached.
+const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 3600, tags: ['fantasy-pool']});
 
 /**
  * The auction pool for a league, cached for an hour once built. A build
