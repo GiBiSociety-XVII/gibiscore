@@ -405,6 +405,8 @@ export interface PlayerSeasonStat {
 export interface PlayerPage {
     player: SquadPlayer & {nationality: string | null; height: number | null; weight: number | null; injured: boolean};
     team: TeamSummary | null;
+    /** His current absence at his club (injury, suspension, doubt), from the fixtures missed; null when available. */
+    absence: SidelinedEntry | null;
     /** Season shown in the totals and match list (year the season starts). */
     selectedSeason: number;
     selectedSeasonName: string;

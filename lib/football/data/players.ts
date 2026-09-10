@@ -2,6 +2,7 @@ import 'server-only';
 import type {PlayerMatchRow, PlayerPage, PlayerSeasonStat, PlayerSeasonTotals} from '../types';
 import {normalizePosition} from './matches';
 import {FIXTURE_SELECT, TEAM_SELECT, footballDb, logReadError, toFixture, toTeam, type FixtureRow, type TeamRow} from './shared';
+import {loadTeamSidelined} from './sidelined';
 
 interface PlayerStatRow {
     team_id: number;
@@ -177,6 +178,8 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
                 if (teamRow) team = toTeam(teamRow as unknown as TeamRow);
             }
         }
+        // Out at the moment? The club's absence list, rebuilt from the fixtures he missed.
+        const absence = team ? ((await loadTeamSidelined(db, [team.id])).get(team.id) ?? []).find((e) => e.player.id === p.id) ?? null : null;
 
         return {
             player: {
@@ -190,9 +193,10 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
                 nationality: p.nationality,
                 height: p.height_cm,
                 weight: p.weight_kg,
-                injured: p.injured === true,
+                injured: p.injured === true || absence?.category === 'injury',
             },
             team,
+            absence,
             selectedSeason,
             selectedSeasonName,
             availableSeasons,

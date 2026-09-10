@@ -10,6 +10,7 @@ import {PlayerAnalysis} from "@/components/football/player-analysis";
 import {RatingTrend} from "@/components/football/rating-trend";
 import {getPositionBenchmark} from "@/lib/football/data/study";
 import {Tabs} from "@/components/football/tabs";
+import {AbsenceLine} from "@/components/football/absences";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
 
@@ -197,7 +198,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                 title={
                     <span className="inline-flex items-center gap-2">
                         {player.name}
-                        {player.injured && <span className="bb-badge bg-card text-[10px]">{t('injured')}</span>}
+                        {!page.absence && player.injured && <span className="bb-badge bg-card text-[10px]">{t('injured')}</span>}
                     </span>
                 }
                 meta={
@@ -213,6 +214,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                 .filter(Boolean)
                                 .join(' · ')}
                         </span>
+                        {page.absence && <AbsenceLine entry={page.absence} className="basis-full" />}
                     </>
                 }
                 aside={

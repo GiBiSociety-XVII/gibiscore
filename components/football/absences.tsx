@@ -12,6 +12,23 @@ export function reasonKey(description: string): string {
     return description.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
+/** One line for a page header: "Infortunio · Thigh Injury · da 17 giorni · dal 24 ago · 3 partite saltate", plus the long-spell badge. */
+export function AbsenceLine({entry, className}: {entry: SidelinedEntry; className?: string}) {
+    const t = useTranslations('Football.absences');
+    const format = useFormatter();
+    const key = entry.description ? `reasons.${reasonKey(entry.description)}` : null;
+    const reason = key && t.has(key) ? t(key) : entry.description;
+    return (
+        <span className={cn("inline-flex items-center gap-1.5 flex-wrap", className)}>
+            <Badge variant={categoryVariant(entry.category)} className="whitespace-nowrap">{t(`category.${entry.category}`)}</Badge>
+            {entry.longTerm && <Badge variant="ink" className="text-[9px] h-4 px-1 whitespace-nowrap">{t('longTerm')}</Badge>}
+            <span className="text-[12px] font-semibold text-muted-foreground">
+                {[reason, t('daysOut', {count: entry.daysOut}), t('since', {date: format.dateTime(day(entry.since), {day: 'numeric', month: 'short'})}), t('missed', {count: entry.missed})].filter(Boolean).join(' · ')}
+            </span>
+        </span>
+    );
+}
+
 export function categoryVariant(category: string): 'ink' | 'outline' | 'accent' {
     return category === 'suspension' ? 'ink' : category === 'doubtful' ? 'accent' : 'outline';
 }
