@@ -108,7 +108,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     managers: [],
     strategy: null,
     formation: null,
-    cupsCount: true,
+    cupsCount: false,
     roleOverrides: {},
     want: [],
     avoid: [],
@@ -116,7 +116,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
 };
 
 /** Share of the market that usually goes to each role (Serie A leagues, classic). */
-export const ROLE_SHARE: Record<FantaRole, number> = {P: 0.08, D: 0.18, C: 0.27, A: 0.47};
+export const ROLE_SHARE: Record<FantaRole, number> = {P: 0.09, D: 0.19, C: 0.27, A: 0.45};
 
 export const STORAGE_KEY = 'gibiscore:fanta:auction';
 export const ROSTER_KEY = 'gibiscore:fanta:roster';
@@ -162,7 +162,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
-        cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : true,
+        cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : false,
         roleOverrides: Object.fromEntries(Object.entries(r.roleOverrides ?? {}).filter(([, v]) => v === 'P' || v === 'D' || v === 'C' || v === 'A')) as Record<string, FantaRole>,
         want: ids(r.want),
         avoid: ids(r.avoid),

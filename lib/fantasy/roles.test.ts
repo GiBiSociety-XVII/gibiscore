@@ -9,40 +9,30 @@ describe('slotRole', () => {
         expect(slotRole('5-3-2', 25, null)).toBe('D');
     });
 
-    it('makes wing-backs of a back three defenders, the inner men midfielders', () => {
-        expect(slotRole('3-5-2', 31, 'C')).toBe('D');
-        expect(slotRole('3-5-2', 35, 'D')).toBe('D');
-        expect(slotRole('3-5-2', 33, 'C')).toBe('C');
-        expect(slotRole('3-4-2-1', 31, 'C')).toBe('D');
-        expect(slotRole('3-4-2-1', 32, 'C')).toBe('C');
-        expect(slotRole('3-4-3', 34, 'C')).toBe('D');
-    });
-
-    it('keeps the wide men of a back four midfielders in a 4-4-2 and attackers on the last line', () => {
-        expect(slotRole('4-4-2', 31, 'C')).toBe('C');
+    it('classic rules: the back line defends, the front line attacks, everyone between is midfield', () => {
+        expect(slotRole('3-5-2', 31, 'C')).toBe('C');
+        expect(slotRole('3-5-2', 35, 'D')).toBe('C');
+        expect(slotRole('3-4-3', 34, 'C')).toBe('C');
+        expect(slotRole('5-4-1', 31, 'C')).toBe('C');
         expect(slotRole('4-4-2', 41, 'A')).toBe('A');
         expect(slotRole('4-3-3', 41, 'C')).toBe('A');
-        expect(slotRole('4-3-3', 43, 'A')).toBe('A');
+        expect(slotRole('4-2-3-1', 41, 'A')).toBe('C');
+        expect(slotRole('4-2-3-1', 51, 'A')).toBe('A');
+        expect(slotRole('3-4-2-1', 41, 'A')).toBe('C');
+        expect(slotRole('4-3-1-2', 41, 'C')).toBe('C');
     });
 
-    it('splits the line behind the striker: wide men attackers, the central one a midfielder', () => {
-        expect(slotRole('4-2-3-1', 41, 'A')).toBe('A');
-        expect(slotRole('4-2-3-1', 42, 'A')).toBe('C');
-        expect(slotRole('4-2-3-1', 43, 'C')).toBe('A');
-        expect(slotRole('4-2-3-1', 51, 'A')).toBe('A');
-        expect(slotRole('4-2-3-1', 31, 'C')).toBe('C');
-        expect(slotRole('4-1-4-1', 41, 'A')).toBe('A');
-        expect(slotRole('4-1-4-1', 42, 'C')).toBe('C');
-        expect(slotRole('4-3-1-2', 41, 'C')).toBe('C');
-        // Two behind the striker: the provider's position breaks the tie.
-        expect(slotRole('3-4-2-1', 41, 'A')).toBe('A');
-        expect(slotRole('3-4-2-1', 42, 'C')).toBe('C');
+    it('falls back to the provider only without a formation', () => {
+        expect(slotRole(null, 21, 'C')).toBe('D');
+        expect(slotRole(null, 41, 'A')).toBe('A');
+        expect(slotRole('4-3-3', 61, 'A')).toBeNull();
     });
 
     it('counts the spots of a formation', () => {
-        expect(formationSpots('3-5-2')).toEqual({P: 1, D: 5, C: 3, A: 2});
-        expect(formationSpots('4-2-3-1')).toEqual({P: 1, D: 4, C: 3, A: 3});
+        expect(formationSpots('3-5-2')).toEqual({P: 1, D: 3, C: 5, A: 2});
+        expect(formationSpots('4-2-3-1')).toEqual({P: 1, D: 4, C: 5, A: 1});
         expect(formationSpots('4-3-3')).toEqual({P: 1, D: 4, C: 3, A: 3});
+        expect(formationSpots('5-4-1')).toEqual({P: 1, D: 5, C: 4, A: 1});
         expect(parseFormation('4-4-3')).toBeNull();
     });
 });
@@ -50,7 +40,7 @@ describe('slotRole', () => {
 describe('deriveRole', () => {
     it('takes the role he started most in, the current season counting more', () => {
         const call = deriveRole([
-            {formation: '3-4-2-1', position: 31, starts: 20, weight: 1},
+            {formation: '3-4-2-1', position: 21, starts: 20, weight: 1},
             {formation: '4-3-3', position: 32, starts: 2, weight: 3},
         ], 'C')!;
         expect(call.role).toBe('D');

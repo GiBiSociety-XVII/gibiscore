@@ -6,7 +6,6 @@ import {romeDate} from '@/lib/football/data/scores';
 import {TEAM_SELECT, footballDb, logReadError, toTeam, type TeamRow} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getSeasonStudy} from '@/lib/football/data/study';
-import type {ReturnEstimate} from '@/lib/football/spells';
 import type {SidelinedEntry, TeamSummary} from '@/lib/football/types';
 import serieAListone from '@/core/fantasy/listone/serie-a.json';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
@@ -32,7 +31,7 @@ export interface AuctionPlayer {
     imageUrl: string | null;
     team: TeamSummary;
     league: string;
-    injury: {category: string; description: string | null; since: string; daysOut: number; longTerm: boolean; estimate: ReturnEstimate} | null;
+    injury: {category: string; description: string | null; since: string; daysOut: number; longTerm: boolean} | null;
     /** Club he played for last season, when it is not the current one. */
     newSigning: string | null;
     /** European cup the club plays this season, when someone in the squad already has a line in it. */
@@ -132,7 +131,7 @@ type Rpc = {rpc: <T>(fn: string, args: Record<string, unknown>) => PromiseLike<{
 /** The second tier under each auction league: last season's table there is the prior for the promoted clubs. */
 const SECOND_TIER: Record<string, string> = {'serie-a': 'serie-b'};
 /** The top of a second tier is worth about this much of the top league's scale. */
-const SECOND_TIER_SCALE = 0.4;
+const SECOND_TIER_SCALE = 0.3;
 /** A promoted club nobody has a table for. */
 const PROMOTED_STRENGTH = 0.2;
 
@@ -144,7 +143,16 @@ const PROMOTED_STRENGTH = 0.2;
 function rankStrength(study: {teams: Array<{team: {id: number}; played: number; points: number}>} | null, scale: number): Map<number, number> {
     const rows = (study?.teams ?? []).filter((t) => t.played > 0);
     const sorted = [...rows].sort((a, b) => b.points / b.played - a.points / a.played);
-    return new Map(sorted.map((t, i) => [t.team.id, scale * (0.1 + 0.8 * (1 - i / Math.max(1, sorted.length - 1)))]));
+    const rate = (t: (typeof rows)[number]) => Math.round((1000 * t.points) / t.played);
+    // Clubs level on points share the average of their positions: early in a season nothing tells them apart.
+    const position = new Map<number, number>();
+    for (let i = 0; i < sorted.length; ) {
+        let j = i;
+        while (j + 1 < sorted.length && rate(sorted[j + 1]) === rate(sorted[i])) j += 1;
+        for (let k = i; k <= j; k += 1) position.set(sorted[k].team.id, (i + j) / 2);
+        i = j + 1;
+    }
+    return new Map(sorted.map((t) => [t.team.id, scale * (0.1 + 0.8 * (1 - position.get(t.team.id)! / Math.max(1, sorted.length - 1)))]));
 }
 
 function leagueLevel(slug: string, tier: string | null, type: string | null): number {
@@ -278,11 +286,13 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             stats.push(...rows);
         }
 
-        // Matches a competition had in a season: the most appearances anyone made in it.
+        // Matches a competition had in a season: the most appearances anyone made in it. A past league
+        // season has at least thirty, whatever the few lines of a far-away season say; the current one
+        // is the rounds played so far (a floor there would make three rounds weigh like a season); a cup is what it is.
         const games = new Map<string, number>();
         for (const r of stats) {
             const key = `${r.league_id}:${r.season_year}`;
-            games.set(key, Math.max(games.get(key) ?? 0, r.appearances ?? 0));
+            games.set(key, Math.max(games.get(key) ?? 0, r.appearances ?? 0, r.league?.type === 'cup' || r.season_year === year ? 0 : 30));
         }
 
         // Team shape this season and current absences.
@@ -292,27 +302,25 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             Promise.all(feederIds.map(async (f) => [f.slug, await getSeasonStudy(f.id)] as const)),
             loadTeamSidelined(db, [...teams.keys()]),
         ]);
-        // Club strength, 0..1 on the top league's scale: last season's table (a promoted club on the
-        // second tier's scale), moved towards this season's table as the rounds come in.
-        const mainSlug = slugs[0];
-        const mainLeagueId = leagues.find((l) => l.slug === mainSlug)?.id ?? null;
-        const mainPreviousId = leagues.find((l) => l.slug === mainSlug)?.seasons.find((s) => s.year === year - 1)?.id ?? null;
-        const mainCurrentId = seasons.find((s) => s.league.slug === mainSlug)?.season.id ?? null;
-        const prevStrength = rankStrength(previousStudies.find(([id]) => id === mainPreviousId)?.[1] ?? null, 1);
-        const feederStrength = rankStrength(feederStudies.find(([slug]) => slug === SECOND_TIER[mainSlug])?.[1] ?? null, SECOND_TIER_SCALE);
-        const mainCurrent = studies.find(([id]) => id === mainCurrentId)?.[1] ?? null;
-        const curStrength = rankStrength(mainCurrent, 1);
+        // Club strength, 0..1 on each league's own scale: last season's table (a promoted club on the
+        // second tier's scale), moved towards this season's table as the rounds come in. Every league
+        // of the pool has its tables (a club sits in one league, so the maps merge).
+        const merge = (maps: Array<Map<number, number>>) => new Map(maps.flatMap((m) => [...m]));
+        const poolLeagueIds = new Set(seasons.map((s) => s.league.id));
+        const feederSlugSet = new Set(feederSlugs);
+        const prevStrength = merge(previousStudies.map(([, study]) => rankStrength(study, 1)));
+        const feederStrength = merge(feederStudies.map(([, study]) => rankStrength(study, SECOND_TIER_SCALE)));
+        const curStrength = merge(studies.map(([, study]) => rankStrength(study, 1)));
+        const roundsOf = new Map<number, number>(studies.flatMap(([, study]) => (study?.teams ?? []).map((t) => [t.team.id, t.played] as const)));
         const clubStrengthOf = (teamId: number): number => {
             const prev = prevStrength.get(teamId) ?? feederStrength.get(teamId) ?? PROMOTED_STRENGTH;
-            const rounds = mainCurrent?.teams.find((t) => t.team.id === teamId)?.played ?? 0;
-            const w = Math.min(1, rounds / 8);
+            const w = Math.min(1, (roundsOf.get(teamId) ?? 0) / 8);
             return prev * (1 - w) + (curStrength.get(teamId) ?? prev) * w;
         };
-        const feederLeagueSlug = SECOND_TIER[mainSlug];
         const lineStrengthOf = (teamId: number, leagueId: number, leagueSlug: string, seasonYear: number): number | null => {
-            if (leagueId === mainLeagueId && seasonYear === year - 1) return prevStrength.get(teamId) ?? null;
-            if (leagueId === mainLeagueId && seasonYear === year) return clubStrengthOf(teamId);
-            if (feederLeagueSlug && leagueSlug === feederLeagueSlug && seasonYear === year - 1) return feederStrength.get(teamId) ?? null;
+            if (poolLeagueIds.has(leagueId) && seasonYear === year - 1) return prevStrength.get(teamId) ?? null;
+            if (poolLeagueIds.has(leagueId) && seasonYear === year) return clubStrengthOf(teamId);
+            if (feederSlugSet.has(leagueSlug) && seasonYear === year - 1) return feederStrength.get(teamId) ?? null;
             return null;
         };
         // What each club concedes per match: last season and this one (counting double).
@@ -345,9 +353,17 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 teamShape.set(t.team.id, {attack: logistic(t.goalsFor / t.played / perTeam), defence: logistic(perTeam / Math.max(0.2, t.goalsAgainst / t.played)), rounds: t.played});
             }
         }
-        // Clubs in Europe this season: any squad member with a line in a European cup this year.
+        // Clubs in Europe this season: any squad member with a line in a European cup this year, the biggest cup winning.
         const europeByTeam = new Map<number, string>();
-        for (const r of stats) if (r.season_year === year && /champions|europa|conference/i.test(r.league?.slug ?? '')) europeByTeam.set(r.team_id, r.league?.name ?? '');
+        const cupRank = (slug: string) => (/champions/i.test(slug) ? 3 : /europa/i.test(slug) ? 2 : /conference/i.test(slug) ? 1 : 0);
+        const europeRank = new Map<number, number>();
+        for (const r of stats) {
+            const rank = r.season_year === year ? cupRank(r.league?.slug ?? '') : 0;
+            if (rank > (europeRank.get(r.team_id) ?? 0)) {
+                europeRank.set(r.team_id, rank);
+                europeByTeam.set(r.team_id, r.league?.name ?? '');
+            }
+        }
         const injuryOf = new Map<number, SidelinedEntry>();
         for (const entries of sidelined.values()) for (const e of entries) injuryOf.set(e.player.id, e);
 
@@ -466,7 +482,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 currentYear: year,
                 currentTeamId: team.id,
                 seasons: lines,
-                injury: injury ? {active: true, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm} : null,
+                injury: injury ? {active: true, daysOut: injury.daysOut, longTerm: injury.longTerm} : null,
                 teamAttack: shape?.attack ?? null,
                 teamDefence: shape?.defence ?? null,
                 teamRounds: shape?.rounds ?? 0,
@@ -486,7 +502,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 imageUrl: player.image_url,
                 team: toTeam(team),
                 league: leagueName,
-                injury: injury ? {category: injury.category, description: injury.description, since: injury.since, daysOut: injury.daysOut, longTerm: injury.estimate.longTerm, estimate: injury.estimate} : null,
+                injury: injury ? {category: injury.category, description: injury.description, since: injury.since, daysOut: injury.daysOut, longTerm: injury.longTerm} : null,
                 newSigning: (() => {
                     const prev = lines.filter((l) => l.year === year - 1 && l.appearances > 0).sort((a, b) => b.minutes - a.minutes);
                     return prev.length > 0 && !prev.some((l) => l.teamId === team.id) ? prev[0].teamName : null;
@@ -498,7 +514,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 listFvm: listed && listed.fvm > 0 ? listed.fvm : null,
                 mantraRoles: listed && listed.mantra ? listed.mantra : null,
                 availability: availabilityOf.get(player.id) ?? {starts: 0, benches: 0},
-                contested: isContested(availabilityOf.get(player.id) ?? {starts: 0, benches: 0}),
+                contested: isContested(availabilityOf.get(player.id) ?? {starts: 0, benches: 0}, 9),
                 rivals: [],
                 penaltyTaker: lines.some((l) => l.year >= year - 1 && l.penaltiesScored >= 2),
                 scores,
@@ -546,7 +562,9 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
     }
 }
 
-const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool'], {revalidate: 3600, tags: ['fantasy-pool']});
+// Keyed by the deployed commit: the marks and prices are the code's, so a new deploy computes its
+// own pool instead of serving, for up to an hour, the one the previous deploy cached.
+const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 3600, tags: ['fantasy-pool']});
 
 /**
  * The auction pool for a league, cached for an hour once built. A build

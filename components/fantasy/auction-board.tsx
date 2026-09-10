@@ -15,9 +15,9 @@ import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
-import {ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
+import {DEFAULT_RULES, ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
-import {suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
+import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
@@ -42,21 +42,16 @@ function ScoreCell({value}: {value: number}) {
 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
-/** Absence badge with the return in short, plus the small flags that matter at the auction. */
+/** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
 function Status({p, rivals}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']}) {
     const t = useTranslations('Fantasy.board');
-    const format = useFormatter();
-    const short = (iso: string) => format.dateTime(day(iso), {day: 'numeric', month: 'short'});
-    const back = (e: NonNullable<AuctionPlayer['injury']>['estimate']): string | null =>
-        e.kind === 'range' && e.date ? t('info.backShort', {date: short(e.date)}) : e.kind === 'soon' ? t('info.backSoonShort') : e.kind === 'nextMatch' ? t('info.backNextShort') : null;
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
             {p.injury && (() => {
                 const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
-                const when = back(p.injury.estimate);
                 return (
                     <span className="inline-flex items-center gap-1" title={`${p.injury.description ?? label} · ${t('daysOut', {count: p.injury.daysOut})}`}>
-                        <Badge variant={p.injury.category === 'suspension' ? 'ink' : 'outline'} className="text-[9px] h-4 px-1">{label}{when ? ` · ${when}` : ''}</Badge>
+                        <Badge variant={p.injury.category === 'suspension' ? 'ink' : 'outline'} className="text-[9px] h-4 px-1">{label}</Badge>
                         {p.injury.longTerm && <Badge variant="ink" className="text-[9px] h-4 px-1">{t('longTerm')}</Badge>}
                     </span>
                 );
@@ -81,10 +76,8 @@ function Notes({p, onRole, wanted, avoided, onWant, onAvoid}: {p: AuctionPlayer;
     else if (p.roleSource === 'lineups') lines.push({key: 'role', text: t('info.roleLineups', {role: p.role, breakdown})});
     else lines.push({key: 'role', text: t('info.roleProfile', {role: p.role})});
     if (p.injury) {
-        const e = p.injury.estimate;
         const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
-        const back = e.kind === 'range' && e.from && e.to ? t('info.backWindow', {from: short(e.from), to: short(e.to)}) : e.kind === 'range' && e.date ? t('info.backDate', {date: short(e.date)}) : e.kind === 'soon' ? t('info.backSoon') : e.kind === 'nextMatch' ? t('info.backNext') : t('info.backUnknown');
-        lines.push({key: 'injury', text: t('info.injury', {label, description: p.injury.description ? ` (${p.injury.description})` : '', since: short(p.injury.since), days: t('info.injuryDays', {count: p.injury.daysOut}), back}) + (p.injury.longTerm ? ` · ${t('longTerm')}` : ''), tone: 'text-red-800'});
+        lines.push({key: 'injury', text: t('info.injury', {label, description: p.injury.description ? ` (${p.injury.description})` : '', since: short(p.injury.since), days: t('info.injuryDays', {count: p.injury.daysOut})}) + (p.injury.longTerm ? ` · ${t('longTerm')}` : ''), tone: 'text-red-800'});
     }
     const avail = p.availability.starts + p.availability.benches;
     if (p.contested && p.rivals.length > 0) lines.push({key: 'rivals', text: t('info.contested', {benches: Math.round(p.availability.benches), total: Math.round(avail), names: p.rivals.map((r) => t('info.rivalOne', {name: r.name, shared: r.shared})).join(', ')}), tone: 'text-amber-800'});
@@ -156,8 +149,11 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!rawPool || !config) return rawPool;
         const overrides = config.roleOverrides;
         const fixed = Object.keys(overrides).length > 0 ? rawPool.players.map((p) => (overrides[String(p.id)] && overrides[String(p.id)] !== p.role ? {...p, role: overrides[String(p.id)], roleSource: 'manual' as const} : p)) : rawPool.players;
-        if (config.cupsCount) return fixed === rawPool.players ? rawPool : {...rawPool, players: fixed};
-        return {...rawPool, players: fixed.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}))};
+        const chosen = config.cupsCount ? fixed : fixed.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}));
+        // The league's own bonus and malus: the fantasy average follows them.
+        const classic = (Object.keys(DEFAULT_RULES) as Array<keyof typeof DEFAULT_RULES>).every((k) => config.rules[k] === DEFAULT_RULES[k]);
+        const players = classic ? chosen : chosen.map((p) => (p.scores.events ? {...p, scores: {...p.scores, fantaAvg: fantaAvgFor(p.scores.events, p.role, config.rules)}} : p));
+        return players === rawPool.players ? rawPool : {...rawPool, players};
     }, [rawPool, config]);
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {
@@ -284,13 +280,25 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         return Math.min(myMaxFor(player.role), pick ? pick.maxBid : (prices.get(id) ?? 1));
     };
     const priceCell = (id: number) => {
-        const live = prices.get(id) ?? 1;
         const list = listPrices.get(id) ?? 1;
+        const purchase = bought.get(id);
+        // Bought: what the list said, then what was actually paid, so the theory meets the table.
+        if (purchase) {
+            const gap = purchase.price - list;
+            const notable = Math.abs(gap) >= Math.max(2, list * 0.05);
+            return (
+                <span className="inline-flex items-center justify-end gap-1.5" title={t('paidVsList', {list, paid: purchase.price, gap: `${gap > 0 ? '+' : ''}${gap}`})}>
+                    <span className="font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">{list}</span>
+                    <span className={cn("font-mono font-extrabold tabular-nums", notable && (gap > 0 ? "text-red-700" : "text-emerald-700"))}>{purchase.price}</span>
+                </span>
+            );
+        }
+        const live = prices.get(id) ?? 1;
         const delta = live - list;
         return (
-            <span className="inline-flex items-center justify-end gap-1" title={bought.has(id) ? t('paid') : t('listPrice', {price: list})}>
+            <span className="inline-flex items-center justify-end gap-1" title={t('listPrice', {price: list})}>
                 <span className="font-mono font-extrabold tabular-nums">{live}</span>
-                {!bought.has(id) && Math.abs(delta) >= Math.max(2, list * 0.05) && <span className={cn("font-mono text-[10px] font-bold tabular-nums", delta > 0 ? "text-red-700" : "text-emerald-700")}>{delta > 0 ? '▲' : '▼'}{Math.abs(delta)}</span>}
+                {Math.abs(delta) >= Math.max(2, list * 0.05) && <span className={cn("font-mono text-[10px] font-bold tabular-nums", delta > 0 ? "text-red-700" : "text-emerald-700")}>{delta > 0 ? '▲' : '▼'}{Math.abs(delta)}</span>}
             </span>
         );
     };
@@ -347,10 +355,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button key={r} type="button" role="radio" aria-checked={role === r} onClick={() => { setRole(r); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", role === r ? "bg-foreground text-background" : "bg-card")}>{r === 'all' ? t('allRoles') : r}</button>
                         ))}
                     </div>
-                    <select className={selectClass} value={teamId} onChange={(e) => { setTeamId(e.target.value === 'all' ? 'all' : Number(e.target.value)); setLimit(PAGE); }} aria-label={t('allTeams')}>
-                        <option value="all">{t('allTeams')}</option>
-                        {pool.teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
-                    </select>
                     <select className={selectClass} value={tier} onChange={(e) => { setTier(e.target.value as Tier | 'all'); setLimit(PAGE); }} aria-label={t('columns.tier')}>
                         <option value="all">{tt('all')}</option>
                         {TIERS.map((k) => <option key={k} value={k}>{tt(`${k}.name`)}</option>)}
@@ -367,6 +371,19 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", view === v ? "bg-foreground text-background" : "bg-card")}>{v === 'list' ? t('viewList') : t('viewTiers')}</button>
                         ))}
                     </div>
+                </div>
+
+                {/* Teams on one row, crests only: one at a time, the active one again to clear it */}
+                <div role="radiogroup" aria-label={t('allTeams')} className="flex items-center gap-1 overflow-x-auto [scrollbar-width:thin] pb-1 -mb-1">
+                    <button type="button" role="radio" aria-checked={teamId === 'all'} onClick={() => { setTeamId('all'); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold shrink-0", teamId === 'all' ? "bg-foreground text-background" : "bg-card")}>{t('allTeams')}</button>
+                    {pool.teams.map((tm) => {
+                        const active = teamId === tm.id;
+                        return (
+                            <button key={tm.id} type="button" role="radio" aria-checked={active} title={tm.name} aria-label={tm.name} onClick={() => { setTeamId(active ? 'all' : tm.id); setLimit(PAGE); }} className={cn("bb-btn h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center", active ? "bg-foreground" : "bg-card")}>
+                                <TeamCrest team={tm} size={20} />
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {view === 'tiers' && (

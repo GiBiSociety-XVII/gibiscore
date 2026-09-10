@@ -81,10 +81,10 @@ describe('planStrategy', () => {
 describe('preferences', () => {
     it('penalty takers strategy picks the taker over a slightly better non-taker', () => {
         const players = pool();
-        players[222].penaltyTaker = true; // A13, overall 68, behind A1..A12
+        players[225].penaltyTaker = true; // A16, overall 62: the plan's second slot would take A14 without the flag
         const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
         const plan = planStrategy(STRATEGIES.find((s) => s.key === 'penaltyTakers')!, players, prices, config);
-        expect(plan.picks.A.some((p) => p.id === players[222].id)).toBe(true);
+        expect(plan.picks.A.some((p) => p.id === players[225].id)).toBe(true);
     });
 
     it('young upside prefers the younger of two equal players', () => {
@@ -193,7 +193,7 @@ describe('formations in plans', () => {
         const plan = planStrategy(STRATEGIES[0], players, prices, config);
         expect(FORMATIONS.map((f) => f.key)).toContain(plan.formation);
         expect(plan.formations[0].key).toBe(plan.formation);
-        expect(plan.formations[0].value).toBe(plan.lineupValue);
+        expect(Math.max(...plan.formations.map((f) => f.value))).toBe(plan.lineupValue);
     });
 });
 
@@ -256,8 +256,50 @@ describe('re-budgeting after my purchases', () => {
         const plan = planStrategy(STRATEGIES.find((s) => s.key === 'topAttack')!, players, prices(), config, new Set(), mine);
         expect(plan.spent).toBeLessThanOrEqual(500);
         expect(plan.budget.C + plan.budget.D).toBeLessThan(150);
-        expect(plan.budget.P).toBe(25);
+        // The keeper's share grows to what I paid plus the cheapest keepers for the two slots still open.
+        expect(plan.budget.P).toBeGreaterThanOrEqual(72);
+        expect(plan.budget.P).toBeLessThan(80);
+        expect(plan.picks.P).toHaveLength(3);
         expect(plan.picks.A).toHaveLength(6);
+        expect(Object.values(plan.budget).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(500);
+    });
+
+    it('fills every slot of a role I overpaid in, instead of leaving them empty', () => {
+        const players = pool();
+        // Strong midfield: P budget 30. I paid exactly 30 for one keeper: two keepers at a credit still come.
+        const mine = [{playerId: 1, role: 'P' as const, price: 30}];
+        const plan = planStrategy(STRATEGIES.find((s) => s.key === 'strongMidfield')!, players, prices(), config, new Set(), mine);
+        expect(plan.picks.P).toHaveLength(3);
+        expect(plan.spent).toBeLessThanOrEqual(500);
+    });
+
+    it('moves the money a role cannot spend to the roles that used their share', () => {
+        const players = pool();
+        const list = prices();
+        // Strong midfield, but every midfielder worth more than a few credits is gone: its C share cannot be spent there.
+        const taken = new Set(players.filter((p) => p.role === 'C' && (list.get(p.id) ?? 1) > 3).map((p) => p.id));
+        const strategy = STRATEGIES.find((s) => s.key === 'strongMidfield')!;
+        const plan = planStrategy(strategy, players, list, config, taken);
+        const start = planStrategy(strategy, players, list, config);
+        expect(plan.budget.C).toBeLessThan(start.budget.C);
+        expect(plan.budget.A + plan.budget.D).toBeGreaterThan(start.budget.A + start.budget.D);
+        expect(Object.values(plan.budget).reduce((a, b) => a + b, 0)).toBe(500);
+        expect(plan.spent).toBeGreaterThan(start.spent - 15);
+        expect(plan.spent).toBeLessThanOrEqual(500);
+        expect(plan.picks.C).toHaveLength(8);
+    });
+
+    it('raises a role share for a wanted star above it, taking the money off the other roles', () => {
+        const players = pool();
+        const list = prices();
+        const stars = players.filter((p) => p.role === 'D').sort((a, b) => (list.get(b.id) ?? 0) - (list.get(a.id) ?? 0)).slice(0, 2);
+        // Three stars: D budget 45, the two best defenders together cost more than that.
+        const strategy = STRATEGIES.find((s) => s.key === 'threeStars')!;
+        expect(stars.reduce((s, p) => s + list.get(p.id)!, 0)).toBeGreaterThan(45);
+        const plan = planStrategy(strategy, players, list, config, new Set(), [], {want: new Set(stars.map((p) => p.id))});
+        for (const star of stars) expect(plan.picks.D.some((p) => p.id === star.id && p.pinned)).toBe(true);
+        expect(plan.picks.D).toHaveLength(8);
+        expect(plan.spent).toBeLessThanOrEqual(500);
     });
 
     it('gives what I saved in a finished role to the others', () => {
@@ -301,5 +343,37 @@ describe('a fixed formation', () => {
         const fifth = (plan: typeof five) => [...plan.picks.D].sort((a, b) => b.price - a.price)[4].price;
         expect(fifth(five)).toBeGreaterThan(fifth(three));
         expect(three.picks.A.filter((p) => p.price >= 20).length).toBeGreaterThanOrEqual(3);
+    });
+});
+
+describe('what the review fixed', () => {
+    const players = pool();
+    const prices = suggestPrices(players.map((p) => ({...p, age: 26, scores: {...p.scores, sample: 30, confidence: 'high' as const}})), {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.06, D: 0.16, C: 0.28, A: 0.5}, level: 1});
+    const player = (role: FantaRole, fantaAvg: number, starter = 90) => ({role, scores: {fantaAvg, starter}});
+
+    it('the role budgets add up to the credits, formation or not', () => {
+        for (const credits of [500, 503, 1000]) {
+            for (const formation of [null, '3-4-3', '5-3-2', '4-4-2']) {
+                for (const s of STRATEGIES) {
+                    const plan = planStrategy(s, players, prices, {...config, credits, formation});
+                    expect(Object.values(plan.budget).reduce((a, b) => a + b, 0)).toBe(credits);
+                    expect(plan.spent).toBeLessThanOrEqual(credits);
+                }
+            }
+        }
+    });
+
+    it('one substitute covers a role once, whoever is missing', () => {
+        const roster = [
+            player('P', 5.5, 100),
+            ...[6.2, 6.2, 6.2, 6.2].map((v) => player('D', v, 100)),
+            ...[6.4, 6.4, 6.4].map((v) => player('C', v, 100)),
+            ...[7.0, 7.0, 7.0].map((v) => player('A', v, 50)),
+            player('A', 6.0, 100),
+        ];
+        const value = bestLineup(roster).formations.find((f) => f.key === '4-3-3')!.value;
+        // Three attackers at 50%: 3 × 3.5 fielded, and the substitute plays when at least one is out (1 − 0.5³ = 0.875).
+        const attack = 3 * 3.5 + 0.875 * 6.0;
+        expect(value).toBeCloseTo(5.5 + 4 * 6.2 + 3 * 6.4 + attack, 0);
     });
 });

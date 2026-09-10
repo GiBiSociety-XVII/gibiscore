@@ -266,9 +266,16 @@ export function bestLineup(players: LineupPlayer[], options: LineupOptions = {})
             const fielded = sorted[role].slice(0, need);
             const bench = sorted[role][need];
             const cover = bench ? playerValue(bench) : 0;
-            for (const p of fielded) value += playerValue(p) + (1 - playChance(p)) * cover;
+            // One substitute: he plays when at least one of the fielded is out.
+            const allPlay = fielded.reduce((prod, p) => prod * playChance(p), 1);
+            value += fielded.reduce((s, p) => s + playerValue(p), 0) + (fielded.length > 0 ? (1 - allPlay) * cover : 0);
         }
-        if (bonus && f.need.D >= bonus.minDefenders) value += defenceModifier(sorted.P[0], sorted.D.slice(0, f.need.D), bonus);
+        if (bonus && f.need.D >= bonus.minDefenders) {
+            // The modifier needs the keeper and the defenders on the pitch: paid in proportion to how surely they are.
+            const line = [sorted.P[0], ...sorted.D.slice(0, bonus.minDefenders)].filter((p): p is LineupPlayer => !!p);
+            const onPitch = line.length > 0 ? line.reduce((s, p) => s + playChance(p), 0) / line.length : 0;
+            value += defenceModifier(sorted.P[0], sorted.D.slice(0, f.need.D), bonus) * onPitch;
+        }
         return {key: f.key, value: Math.round(value * 10) / 10};
     }).sort((a, b) => b.value - a.value || FORMATIONS.findIndex((f) => f.key === a.key) - FORMATIONS.findIndex((f) => f.key === b.key));
     const best = formations[0];
@@ -290,7 +297,15 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
     const chosen: PoolPlayer[] = mine.map((m) => byId.get(m.playerId)).filter((p): p is PoolPlayer => !!p);
     let spent = mine.reduce((s, m) => s + m.price, 0);
     let depth = chosen.reduce((s, p) => s + p.scores.overall, 0);
-    for (const role of ROLES) budget[role] = Math.round(config.credits * share[role]);
+    // The split, rounded so it adds up to the credits exactly (largest remainders get the odd credit).
+    const exact = ROLES.map((role) => config.credits * share[role]);
+    ROLES.forEach((role, i) => (budget[role] = Math.floor(exact[i])));
+    let odd = config.credits - ROLES.reduce((s, role) => s + budget[role], 0);
+    for (const i of ROLES.map((_, i) => i).sort((a, b) => exact[b] - Math.floor(exact[b]) - (exact[a] - Math.floor(exact[a])))) {
+        if (odd <= 0) break;
+        budget[ROLES[i]] += 1;
+        odd -= 1;
+    }
     // What I overpaid in a role comes off the roles still to fill (leaving a credit per open
     // slot); what I saved in a role already complete goes to them. The split follows the auction.
     const spentOn = {} as Record<FantaRole, number>;
@@ -301,21 +316,46 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
         const owned = mine.filter((m) => m.role === role);
         spentOn[role] = owned.reduce((s, m) => s + m.price, 0);
         const open = Math.max(0, config.slots[role] - owned.length);
-        room[role] = budget[role] - spentOn[role] - open;
+        // The players the user wants are as good as bought: their price is charged to the role now,
+        // so a wanted star does not vanish from the plan for being above the role's usual share.
+        const wanted = players.filter((p) => p.role === role && want.has(p.id) && !taken.has(p.id) && !owned.some((m) => m.playerId === p.id)).slice(0, open);
+        const wantedCost = wanted.reduce((s, p) => s + (prices.get(p.id) ?? 1), 0);
+        // The other open slots need at least the cheapest players still on the market.
+        const cheapest = players
+            .filter((p) => p.role === role && !taken.has(p.id) && !want.has(p.id) && !owned.some((m) => m.playerId === p.id))
+            .map((p) => prices.get(p.id) ?? 1)
+            .sort((a, b) => a - b)
+            .slice(0, open - wanted.length);
+        const floorCost = cheapest.reduce((s, v) => s + v, 0) + Math.max(0, open - wanted.length - cheapest.length);
+        room[role] = budget[role] - spentOn[role] - wantedCost - floorCost;
         if (room[role] < 0) net -= room[role];
         else if (open === 0) net -= room[role];
         else flexible.push(role);
+        // A role I have filled is worth what I paid for it: its surplus or deficit moves to the others.
+        if (open === 0) budget[role] = spentOn[role];
     }
     const roomTotal = flexible.reduce((s, role) => s + room[role], 0);
     const baseTotal = flexible.reduce((s, role) => s + budget[role], 0);
     if (net > 0 && roomTotal > 0) {
         const cut = Math.min(net, roomTotal);
         for (const role of flexible) budget[role] -= Math.ceil((cut * room[role]) / roomTotal);
+        // A role that needs more than its share with slots still open (overpaid, or a wanted star)
+        // gets what the others gave up, so the plan can still fill it, a credit per slot at least.
+        for (const role of ROLES) {
+            const open = config.slots[role] - mine.filter((m) => m.role === role).length;
+            if (room[role] < 0 && open > 0) budget[role] += Math.floor((-room[role] * cut) / net);
+        }
     } else if (net < 0 && baseTotal > 0) {
         for (const role of flexible) budget[role] += Math.floor((-net * budget[role]) / baseTotal);
     }
-    for (const role of ROLES) {
+    /** Fills the role's open slots from its budget (again, from scratch, when its budget changed). */
+    const fill = (role: FantaRole) => {
         const owned = mine.filter((m) => m.role === role);
+        for (const pick of picks[role]) {
+            const at = chosen.findIndex((p) => p.id === pick.id && !owned.some((m) => m.playerId === p.id));
+            if (at >= 0) chosen.splice(at, 1);
+        }
+        picks[role] = [];
         // What I already have in the role fills the plan first, then the biggest slots are gone.
         for (const m of owned) {
             const p = byId.get(m.playerId);
@@ -329,6 +369,8 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
         const fractions = [...all].sort((a, b) => b - a).slice(owned.length);
         fractions.forEach((fraction, index) => {
             const slotsLeft = fractions.length - index;
+            // Not even a credit per slot left: the plan cannot buy here any more.
+            if (left < slotsLeft) return;
             // The strategy's preferences shift the order (a penalty taker, a starter, a youngster...).
             const rank = (p: PoolPlayer) => p.scores.overall + (strategy.prefer?.(p, {chosen}) ?? 0);
             const pool = candidates.filter((p) => !used.has(p.id)).sort((a, b) => rank(b) - rank(a) || (b.scores.fantaAvg ?? 0) - (a.scores.fantaAvg ?? 0));
@@ -352,10 +394,34 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             used.add(pick.id);
             chosen.push(pick);
             left -= price;
-            spent += price;
-            depth += pick.scores.overall;
             picks[role].push({id: pick.id, name: pick.name, team: pick.team.name, role, price, overall: pick.scores.overall, maxBid: Math.max(price, cap), pinned: pinned !== null});
         });
+    };
+    for (const role of ROLES) fill(role);
+    // What a role could not spend (its targets gone, nobody dear enough left) goes to the roles
+    // that used their share, which are planned again with it: the money is not lost to the plan.
+    const unspent = {} as Record<FantaRole, number>;
+    for (const role of ROLES) unspent[role] = Math.max(0, budget[role] - picks[role].reduce((s, p) => s + p.price, 0));
+    const takers = ROLES.filter((role) => mine.filter((m) => m.role === role).length < config.slots[role] && unspent[role] <= Math.max(2, budget[role] * 0.05));
+    const spare = ROLES.filter((role) => !takers.includes(role)).reduce((s, role) => s + unspent[role], 0);
+    if (spare >= 5 && takers.length > 0) {
+        const base = takers.reduce((s, role) => s + budget[role], 0);
+        let given = 0;
+        for (const role of ROLES) if (!takers.includes(role)) budget[role] -= unspent[role];
+        for (const role of takers) {
+            const part = base > 0 ? Math.floor((spare * budget[role]) / base) : Math.floor(spare / takers.length);
+            budget[role] += part;
+            given += part;
+        }
+        budget[takers[0]] += spare - given;
+        for (const role of takers) fill(role);
+    }
+    for (const role of ROLES) {
+        for (const pick of picks[role]) {
+            if (mine.some((m) => m.playerId === pick.id)) continue;
+            spent += pick.price;
+            depth += pick.overall;
+        }
     }
     const roster = ROLES.flatMap((role) => picks[role].map((p) => byId.get(p.id))).filter((p): p is PoolPlayer => !!p);
     let lineup = bestLineup(roster, {defenceModifier: defenceOption(config), prefer: forced ? [forced.key] : strategy.formations});
@@ -364,7 +430,9 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
         const chosen = lineup.formations.find((f) => f.key === forced.key)!;
         lineup = {formation: chosen.key, value: chosen.value, formations: [chosen, ...lineup.formations.filter((f) => f !== chosen)]};
     }
-    return {key: strategy.key, share, budget, picks, spent, lineupValue: lineup.value, formation: lineup.formation, formations: lineup.formations, depth, available: true};
+    // Ranked on the best the roster can field; the preferred shape is for the display (a forced one is the value asked for).
+    const lineupValue = forced ? lineup.value : Math.max(...lineup.formations.map((f) => f.value));
+    return {key: strategy.key, share, budget, picks, spent, lineupValue, formation: lineup.formation, formations: lineup.formations, depth, available: true};
 }
 
 /** Every strategy planned on the pool, best lineup first; strategies that need a modifier the league lacks are marked unavailable. */
@@ -417,16 +485,18 @@ export function strategyHealth(plans: StrategyPlan[], key: StrategyKey, baseline
     const driftPct = start && start.lineupValue > 0 ? current.lineupValue / start.lineupValue - 1 : 0;
     if (driftPct <= -0.06) reasons.push({kind: 'drift', pct: driftPct});
     let broken = false;
+    // Judged on the strategy's own split from the start: the re-planned one already bends to what I paid.
+    const share = start?.budget ?? current.budget;
     for (const role of ROLES) {
         const owned = mine.filter((m) => m.role === role);
         const spent = owned.reduce((s, m) => s + m.price, 0);
         const open = Math.max(0, config.slots[role] - owned.length);
-        const left = current.budget[role] - spent;
+        const left = share[role] - spent;
         if (open > 0 && left < open) {
             reasons.push({kind: 'starved', role, left: Math.max(0, left), open});
             broken = true;
-        } else if (spent > current.budget[role] * 1.1 && spent > current.budget[role] + 5) {
-            reasons.push({kind: 'overspent', role, spent, budget: current.budget[role]});
+        } else if (spent > share[role] * 1.1 && spent > share[role] + 5) {
+            reasons.push({kind: 'overspent', role, spent, budget: share[role]});
             broken = true;
         }
     }

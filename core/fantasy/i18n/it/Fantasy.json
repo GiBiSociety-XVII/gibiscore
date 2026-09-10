@@ -124,7 +124,7 @@
       "team_": "Forza della squadra in questa stagione",
       "overall": "Voto complessivo pesato per ruolo",
       "fantaAvg": "Fantamedia stimata a partita",
-      "price": "Crediti: prezzo vivo, aggiornato con gli acquisti registrati (soldi rimasti al tavolo, top rimasti, quanto si sta pagando). In grigio la differenza dal listino.",
+      "price": "Crediti: prezzo vivo, aggiornato con gli acquisti registrati (soldi rimasti al tavolo, top rimasti, quanto si sta pagando). Per chi è già stato comprato: a sinistra in grigio il listino consigliato, a destra quanto è stato pagato davvero (rosso sopra il listino, verde sotto).",
       "tier": "Fascia nel ruolo: top, semi-top, prima, seconda, terza, riempitivi",
       "form": "Partenza: com'è iniziata la stagione per lui e per il suo club rispetto all'anno scorso (50 = come atteso)",
       "maxBid": "Offerta massima per te secondo la strategia scelta e i crediti che ti restano"
@@ -178,16 +178,8 @@
     "full": "pieno",
     "info": {
       "title": "Note per l'asta",
-      "injury": "{label}{description}: fuori dal {since} ({days}), {back}",
+      "injury": "{label}{description}: fuori dal {since} ({days})",
       "injuryDays": "{count, plural, =0 {da oggi} =1 {1 giorno} other {# giorni}}",
-      "backDate": "rientro stimato {date}",
-      "backWindow": "rientro stimato tra il {from} e il {to}",
-      "backSoon": "rientro previsto a breve",
-      "backNext": "rientra alla prossima partita",
-      "backUnknown": "rientro non prevedibile",
-      "backShort": "rientro {date}",
-      "backSoonShort": "a breve",
-      "backNextShort": "prossima",
       "rivals": "In ballottaggio con {names}",
       "rivalsBadge": "Ballott.",
       "newSigning": "Nuovo arrivo: l'anno scorso al {club}",
@@ -217,7 +209,8 @@
       "fvm": "FVM {fvm}",
       "mantra": "Mantra: {roles}"
     },
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "paidVsList": "Listino {list} · pagato {paid} ({gap})"
   },
   "roster": {
     "title": "La mia rosa",
@@ -443,8 +436,8 @@
       "lastBought": "Quinta fascia: gli ultimi che la lega compra davvero (posizioni {from}-{to})",
       "belowBought": "Oltre i {bought} {roles} che la tua lega compra: qui contano il profilo e i segnali",
       "thinDropped": "Pochi dati alle spalle ({sample} partite pesate): per voto starebbe in {from}, ma senza numeri solidi non può salire",
-      "longInjury": "Infortunio lungo: rientro stimato tra {days} giorni",
-      "longInjuryUnknown": "Infortunio lungo, rientro senza data",
+      "longInjury": "Infortunio lungo: fuori da {days} giorni, rientro incerto",
+      "longInjuryUnknown": "Infortunio lungo, rientro incerto",
       "neverPlays": "Gioca quasi mai: titolarità {starter} su 100 con dati sufficienti per fidarsi",
       "lowFitness": "Disponibilità al minimo ({fitness} su 100): infortuni, età o poche presenze in rosa",
       "young": "{age} anni e bonus in canna ({bonus} su 100): può crescere in fretta",

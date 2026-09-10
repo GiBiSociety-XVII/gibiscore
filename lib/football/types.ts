@@ -1,4 +1,3 @@
-import type {ReturnEstimate} from './spells';
 /**
  * Read models used by the UI. They mirror the football.* tables in
  * supabase/migrations but stay independent of the provider payloads.
@@ -348,7 +347,8 @@ export interface SidelinedEntry {
     since: string;
     daysOut: number;
     missed: number;
-    estimate: ReturnEstimate;
+    /** Out for months by the kind of problem: a long spell, not a date. */
+    longTerm: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -405,6 +405,8 @@ export interface PlayerSeasonStat {
 export interface PlayerPage {
     player: SquadPlayer & {nationality: string | null; height: number | null; weight: number | null; injured: boolean};
     team: TeamSummary | null;
+    /** His current absence at his club (injury, suspension, doubt), from the fixtures missed; null when available. */
+    absence: SidelinedEntry | null;
     /** Season shown in the totals and match list (year the season starts). */
     selectedSeason: number;
     selectedSeasonName: string;

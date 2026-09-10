@@ -54,6 +54,7 @@ describe('teamReport', () => {
         expect(attack.fantaAvg).toBe(6.5);
         expect(r.injured).toBe(1);
         expect(r.lineup).toBeNull();
-        expect(r.overall).toBe(70);
+        // Two players over eleven places: (80 + 60) / 11.
+        expect(r.overall).toBe(13);
     });
 });
