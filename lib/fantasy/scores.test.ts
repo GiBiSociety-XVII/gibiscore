@@ -243,7 +243,7 @@ describe('a player who changed club', () => {
 
 describe('what the review fixed', () => {
     it("a year without a minute says nothing about bonus and malus", () => {
-        const idle = scorePlayer({role: 'P', age: 24, currentYear: 2025, currentTeamId: 1, seasons: [line(2024, {appearances: 0, lineups: 0, bench: 30, minutes: 0, rating: null, goals: 0, assists: 0, goalsConceded: 0, penaltiesScored: 0, yellow: 0})]});
+        const idle = scorePlayer({role: 'P', age: 24, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, seasons: [line(2024, {appearances: 0, lineups: 0, bench: 30, minutes: 0, rating: null, goals: 0, assists: 0, goalsConceded: 0, penaltiesScored: 0, yellow: 0})]});
         expect(idle.bonus).toBe(1);
         expect(idle.discipline).toBe(50);
         expect(idle.fantaAvg).toBeNull();
@@ -251,7 +251,7 @@ describe('what the review fixed', () => {
     });
 
     it("a keeper's goals conceded are one number, in the bonus, the malus and the fantasy average", () => {
-        const keeper = (level: number, teamId: number) => scorePlayer({role: 'P', age: 28, currentYear: 2025, currentTeamId: 1, clubConcededPer90: 1.0, seasons: [line(2024, {level, teamId, goals: 0, assists: 0, penaltiesScored: 0, goalsConceded: 40, rating: 6.4})]});
+        const keeper = (level: number, teamId: number) => scorePlayer({role: 'P', age: 28, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 1.0, seasons: [line(2024, {level, teamId, goals: 0, assists: 0, penaltiesScored: 0, goalsConceded: 40, rating: 6.4})]});
         // The same keeper: at his club his own goals count, elsewhere the club's rate; the marks move together.
         const own = keeper(1, 1);
         const elsewhere = keeper(1, 2);
@@ -264,7 +264,7 @@ describe('what the review fixed', () => {
     });
 
     it("the league's rules change the fantasy average", () => {
-        const s = scorePlayer({role: 'A', age: 26, currentYear: 2025, currentTeamId: 1, seasons: [line(2024)]});
+        const s = scorePlayer({role: 'A', age: 26, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, seasons: [line(2024)]});
         expect(s.events).not.toBeNull();
         const classic = fantaAvgFor(s.events!, 'A', {goal: 3, assist: 1, goalConceded: -1, yellow: -0.5, red: -1, penaltyMissed: -3, penaltySaved: 3, cleanSheet: 1});
         expect(classic).toBe(s.fantaAvg);
@@ -273,8 +273,8 @@ describe('what the review fixed', () => {
     });
 
     it('a cup run does not make a rotation player available every week', () => {
-        const leagueOnly = scorePlayer({role: 'C', age: 26, currentYear: 2025, currentTeamId: 1, seasons: [line(2024, {appearances: 20, lineups: 16, bench: 4, minutes: 1500, goals: 3, assists: 2, penaltiesScored: 0})]});
-        const withCup = scorePlayer({role: 'C', age: 26, currentYear: 2025, currentTeamId: 1, seasons: [line(2024, {appearances: 20, lineups: 16, bench: 4, minutes: 1500, goals: 3, assists: 2, penaltiesScored: 0}), line(2024, {leagueId: 9, leagueName: 'Europa League', cup: true, games: 12, appearances: 12, lineups: 10, bench: 2, minutes: 900, goals: 1, assists: 1, penaltiesScored: 0})]});
+        const leagueOnly = scorePlayer({role: 'C', age: 26, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, seasons: [line(2024, {appearances: 20, lineups: 16, bench: 4, minutes: 1500, goals: 3, assists: 2, penaltiesScored: 0})]});
+        const withCup = scorePlayer({role: 'C', age: 26, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, seasons: [line(2024, {appearances: 20, lineups: 16, bench: 4, minutes: 1500, goals: 3, assists: 2, penaltiesScored: 0}), line(2024, {leagueId: 9, leagueName: 'Europa League', cup: true, games: 12, appearances: 12, lineups: 10, bench: 2, minutes: 900, goals: 1, assists: 1, penaltiesScored: 0})]});
         expect(withCup.fitness).toBe(leagueOnly.fitness);
     });
 });
