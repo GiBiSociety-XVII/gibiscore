@@ -196,7 +196,8 @@ describe('little playing time', () => {
         const base = {age: 30, currentYear: 2026, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 1.5};
         const one = scorePlayer({...base, role: 'P', seasons: [line(2025, {appearances: 1, lineups: 1, bench: 30, minutes: 90, goals: 0, assists: 0, rating: 6.5, goalsConceded: 0, saves: 3})]});
         const wall = scorePlayer({...base, role: 'P', seasons: [line(2025, {appearances: 34, lineups: 34, bench: 0, minutes: 3060, goals: 0, assists: 0, rating: 6.5, goalsConceded: 24, saves: 100})]});
-        expect(one.bonus).toBeLessThan(wall.bonus);
+        // Both are judged on what the club concedes: the one match is no wall, and no worse either.
+        expect(one.bonus).toBeLessThanOrEqual(wall.bonus);
         expect(one.bonus).toBeLessThan(60);
     });
 });
@@ -286,9 +287,9 @@ describe('a player who changed club', () => {
         expect(moved.bonus).toBeGreaterThan(leaky.bonus + 20);
         expect(moved.discipline).toBeGreaterThan(leaky.discipline);
         expect(moved.fantaAvg!).toBeGreaterThan(leaky.fantaAvg! + 0.4);
-        // At his own club the rate is his: nothing replaced.
+        // At his own club too: the goals belong to the side, and the side is judged on what it is expected to concede.
         const home = scorePlayer({role: 'P', age: 28, currentYear: 2026, currentTeamId: 2, seasons: [line(2025, {goalsConceded: 55, saves: 100, rating: 6.9, teamId: 2})], injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 0.9});
-        expect(home.bonus).toBe(leaky.bonus);
+        expect(home.bonus).toBe(moved.bonus);
     });
 
     it('rotation in a cup weighs half of rotation in the league', () => {
@@ -320,16 +321,16 @@ describe('what the review fixed', () => {
     });
 
     it("a keeper's goals conceded are one number, in the bonus, the malus and the fantasy average", () => {
-        const keeper = (level: number, teamId: number) => scorePlayer({role: 'P', age: 28, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90: 1.0, seasons: [line(2024, {level, teamId, goals: 0, assists: 0, penaltiesScored: 0, goalsConceded: 40, rating: 6.4})]});
-        // The same keeper: at his club his own goals count, elsewhere the club's rate; the marks move together.
-        const own = keeper(1, 1);
-        const elsewhere = keeper(1, 2);
+        const keeper = (level: number, clubConcededPer90: number | null) => scorePlayer({role: 'P', age: 28, currentYear: 2025, currentTeamId: 1, injury: null, teamAttack: null, teamDefence: null, clubConcededPer90, seasons: [line(2024, {level, teamId: 1, goals: 0, assists: 0, penaltiesScored: 0, goalsConceded: 40, rating: 6.4})]});
+        // The same keeper: his own goals when nobody knows the club, the club's expected rate otherwise; the marks move together.
+        const own = keeper(1, null);
+        const club = keeper(1, 1.0);
         expect(own.events!.conceded).toBeCloseTo(40 / 34, 2);
-        expect(elsewhere.events!.conceded).toBeCloseTo(((1.0 * 2900) / 90) / 34, 2);
-        expect(own.bonus).toBeLessThan(elsewhere.bonus);
-        expect(own.discipline).toBeLessThan(elsewhere.discipline);
+        expect(club.events!.conceded).toBeCloseTo(((1.0 * 2900) / 90) / 34, 2);
+        expect(own.bonus).toBeLessThan(club.bonus);
+        expect(own.discipline).toBeLessThan(club.discipline);
         // His own goals in a weaker league would be more here.
-        expect(keeper(0.7, 1).events!.conceded).toBeGreaterThan(own.events!.conceded);
+        expect(keeper(0.7, null).events!.conceded).toBeGreaterThan(own.events!.conceded);
     });
 
     it("the league's rules change the fantasy average", () => {

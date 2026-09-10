@@ -134,6 +134,8 @@ const SECOND_TIER: Record<string, string> = {'serie-a': 'serie-b'};
 const SECOND_TIER_SCALE = 0.3;
 /** A promoted club nobody has a table for. */
 const PROMOTED_STRENGTH = 0.2;
+/** What a promoted club concedes in the top league, relative to what it conceded in the second tier. */
+const PROMOTED_CONCEDED = 1.25;
 
 /**
  * Strength of each club of a table, by points per match: 0.9 for the top,
@@ -323,15 +325,18 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             if (feederSlugSet.has(leagueSlug) && seasonYear === year - 1) return feederStrength.get(teamId) ?? null;
             return null;
         };
-        // What each club concedes per match: last season and this one (counting double).
+        // What each club is expected to concede per match: the expected goals against it (goals when
+        // it has no xG yet), last season and this one counting double; a promoted club's Serie B
+        // figure raised, since it will concede more here. Every keeper of the club is judged on it.
         const conceded = new Map<number, {goals: number; played: number}>();
-        for (const [list, weight] of [[previousStudies, 1], [studies, 2]] as const) {
+        for (const [list, weight, raise] of [[previousStudies, 1, 1], [feederStudies, 1, PROMOTED_CONCEDED], [studies, 2, 1]] as const) {
             for (const [, study] of list) {
                 if (!study) continue;
                 for (const t of study.teams) {
                     if (t.played === 0) continue;
                     const c = conceded.get(t.team.id) ?? {goals: 0, played: 0};
-                    c.goals += t.goalsAgainst * weight;
+                    const perMatch = t.xgAgainst !== null && t.withStats >= 3 ? t.xgAgainst : t.goalsAgainst / t.played;
+                    c.goals += perMatch * raise * t.played * weight;
                     c.played += t.played * weight;
                     conceded.set(t.team.id, c);
                 }

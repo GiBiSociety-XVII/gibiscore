@@ -274,9 +274,11 @@ function aggregateYear(lines: SeasonLine[], currentTeamId: number | null | undef
         a.penSaved += l.penaltiesSaved;
         a.yellow += l.yellow;
         a.red += l.red + l.yellowRed;
-        // Goals conceded belong to the club: elsewhere they are replaced by what the current club
-        // concedes; his own, in a weaker league, would be more here.
-        a.conceded += !atClub && clubConcededPer90 !== null ? (clubConcededPer90 * l.minutes) / 90 : l.goalsConceded / Math.max(0.6, level);
+        // Goals conceded belong to the club, not to the keeper: every keeper of a side is judged on
+        // what the side is expected to concede (its expected goals against, this season's as they come),
+        // which also spares a keeper of few matches the luck of those matches. His own count only
+        // when nobody knows the club, and then in a weaker league they would be more here.
+        a.conceded += clubConcededPer90 !== null ? (clubConcededPer90 * l.minutes) / 90 : l.goalsConceded / Math.max(0.6, level);
         // How sure his place is: a starter in a weaker league may not start here, unless it is his club.
         a.level += (atClub ? 1 : l.level) * Math.max(1, l.appearances);
         levelW += Math.max(1, l.appearances);
