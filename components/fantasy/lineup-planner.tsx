@@ -111,7 +111,7 @@ function FantasyPitch({starters, formation, byId, pinned}: {starters: PlayerFore
     );
 }
 
-function ForecastRow({f, index, byId, reasonText, muted = false, pinned, onPin, out, onOut}: {f: PlayerForecast; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void}) {
+function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const p = byId.get(f.player.id);
@@ -151,10 +151,10 @@ function ForecastRow({f, index, byId, reasonText, muted = false, pinned, onPin, 
                     <span className="text-muted-foreground">{t('noFixture')}</span>
                 )}
             </td>
-            <td className="px-2 py-1.5 text-right"><span className={cn("bb-badge font-mono text-[11px] tabular-nums h-5 px-1.5", chanceClass(f.plays))}>{pct(f.plays)}</span></td>
+            <td className="px-2 py-1.5 text-right"><span className={cn("bb-badge font-mono text-[11px] tabular-nums h-5 px-1.5", chanceClass(f.plays))} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</span></td>
             <td className="px-2 py-1.5 text-right font-mono text-[12px] font-bold tabular-nums">{f.rating.toFixed(2)}</td>
             <td className="px-2 py-1.5 text-right font-mono text-[12px] font-bold tabular-nums">{f.points.toFixed(2)}</td>
-            <td className="px-2 py-1.5 text-right font-mono text-[13px] font-extrabold tabular-nums">{f.value.toFixed(2)}</td>
+            <td className="px-2 py-1.5 text-right font-mono text-[13px] font-extrabold tabular-nums" title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</td>
         </tr>
     );
 }
@@ -326,7 +326,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <table className="w-full text-[12px]">
                                 <Head withIndex={false} />
                                 <tbody>
-                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
+                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -337,7 +337,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <table className="w-full text-[12px]">
                                 <Head withIndex />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
                                 </tbody>
                             </table>
                         </div>

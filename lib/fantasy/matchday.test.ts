@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {CLASSIC_RULES} from './scores';
-import {forecastPlayer, recommendLineup, type MatchdayFixture, type MatchdayPlayer, type PlayerContext, type RecentMatch} from './matchday';
+import {forecastPlayer, recommendLineup, type MatchdayFixture, type MatchdayPlayer, type PlayerContext, type PlayerForecast, type RecentMatch} from './matchday';
 
 const fixture: MatchdayFixture = {id: 1, round: 'R4', startingAt: '2026-09-13T18:45:00Z', state: 'scheduled', home: {id: 10, name: 'Inter'}, away: {id: 20, name: 'Lecce'}, prediction: {lambdaHome: 2.2, lambdaAway: 0.6, home: 72, draw: 18, away: 10}, avgFor: {home: 1.9, away: 0.9}, form: {home: 'WWWDW', away: 'LLDLL'}};
 const player = (id: number, role: MatchdayPlayer['role'], teamId: number, starter: number, over: Partial<MatchdayPlayer['scores']['events']> = {}): MatchdayPlayer => ({
@@ -21,6 +21,12 @@ describe('forecastPlayer', () => {
         const ctx = (official: PlayerContext['official']): PlayerContext => ({teamId: 10, recent: recent(['bench', 'bench']), official, sidelined: null});
         expect(forecastPlayer(player(1, 'A', 10, 30), ctx('starter'), [fixture], CLASSIC_RULES).plays).toBe(0.95);
         expect(forecastPlayer(player(1, 'A', 10, 95), ctx('out'), [fixture], CLASSIC_RULES).plays).toBe(0.02);
+        // On the bench: a small chance of a start, a fair one of a vote as a substitute, worth less.
+        const bench = forecastPlayer(player(1, 'A', 10, 95), ctx('bench'), [fixture], CLASSIC_RULES);
+        expect(bench.plays).toBe(0.25);
+        expect(bench.starts).toBe(0.03);
+        expect(bench.subPoints).toBeLessThan(bench.points);
+        expect(bench.value).toBeCloseTo(0.03 * bench.points + 0.22 * bench.subPoints, 1);
     });
 
     it('an injured or suspended player is out, a doubt halves the chance', () => {
@@ -35,7 +41,13 @@ describe('forecastPlayer', () => {
         const regular = forecastPlayer(player(1, 'C', 10, 40), {teamId: 10, recent: recent(['started', 'started', 'started', 'sub']), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
         const benched = forecastPlayer(player(2, 'C', 10, 90), {teamId: 10, recent: recent(['bench', 'bench', 'out']), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
         expect(regular.plays).toBeGreaterThan(0.7);
+        expect(regular.plays).toBeGreaterThan(regular.starts);
         expect(benched.plays).toBeLessThan(0.45);
+        // A super-sub: a vote off the bench most weeks, at a sub's points.
+        const superSub = forecastPlayer(player(4, 'A', 10, 40), {teamId: 10, recent: recent(['sub', 'sub', 'sub', 'sub']), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        expect(superSub.starts).toBeLessThan(0.25);
+        expect(superSub.plays - superSub.starts).toBeGreaterThan(0.3);
+        expect(superSub.value).toBeGreaterThan(superSub.starts * superSub.points);
         // Nothing seen yet: the mark alone.
         expect(forecastPlayer(player(3, 'C', 10, 80), {teamId: 10, recent: [], official: null, sidelined: null}, [fixture], CLASSIC_RULES).plays).toBe(0.8);
     });
@@ -130,5 +142,26 @@ describe('recommendLineup', () => {
         expect(['3-4-3', '4-3-3']).toContain(three.formation);
         expect(three.formations.filter((f) => f.feasible).map((f) => f.key).sort()).toEqual(['3-4-3', '4-3-3']);
         expect(three.starters.filter((f) => f.player.role === 'A').map((f) => f.player.id).sort()).toEqual([12, 13, 15]);
+    });
+
+    it('a better player with a little more risk starts over a surer, weaker one: a miss is covered by the bench', () => {
+        const sure = (p: MatchdayPlayer): PlayerForecast => ({player: p, fixture, home: true, opponent: fixture.away, plays: 0.92, starts: 0.92, rating: 6.5, points: 7.22, subPoints: 6, value: 6.64, reasons: []});
+        const better = (p: MatchdayPlayer): PlayerForecast => ({player: p, fixture, home: true, opponent: fixture.away, plays: 0.86, starts: 0.86, rating: 7.17, points: 7.53, subPoints: 6, value: 6.48, reasons: []});
+        const filler = (p: MatchdayPlayer, plays: number, points: number): PlayerForecast => ({player: p, fixture, home: true, opponent: fixture.away, plays, starts: plays, points, subPoints: 6, rating: 6, value: Math.round(plays * points * 100) / 100, reasons: []});
+        const forecasts: PlayerForecast[] = [
+            filler(player(1, 'P', 10, 100), 0.95, 6),
+            better(player(2, 'D', 10, 90)), sure(player(3, 'D', 10, 90)),
+            ...[4, 5, 6].map((id) => filler(player(id, 'D', 10, 90), 0.9, 6.3)),
+            filler(player(7, 'D', 10, 50), 0.9, 6.0),
+            ...[8, 9, 10, 11, 12].map((id) => filler(player(id, 'C', 10, 90), 0.9, 6.4)),
+            ...[13, 14, 15, 16].map((id) => filler(player(id, 'A', 10, 90), 0.9, 6.8)),
+        ];
+        const advice = recommendLineup(forecasts, {rules: CLASSIC_RULES, force: '3-4-3'});
+        const defenders = advice.starters.filter((f) => f.player.role === 'D').map((f) => f.player.id);
+        expect(defenders[0]).toBe(2);
+        expect(defenders).toContain(3);
+        // The slot: his points when he plays, the substitute's when not, so the surer one is not ahead by the risk alone.
+        expect(advice.slots.get(2)!).toBeGreaterThan(advice.slots.get(3)!);
+        expect(advice.slots.get(2)!).toBeGreaterThan(6.48);
     });
 });
