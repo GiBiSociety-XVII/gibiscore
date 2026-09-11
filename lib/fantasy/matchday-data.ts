@@ -6,7 +6,7 @@ import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getSeasonStudy} from '@/lib/football/data/study';
 import {attackBaseline, predictMatch} from '@/lib/football/prediction';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
-import type {MatchdayFixture, PlayerContext, RecentMatch} from './matchday';
+import {roundStates, type MatchdayFixture, type PlayerContext, type RecentMatch, type RoundState} from './matchday';
 
 /**
  * What a matchday looks like, for the lineup advice: the rounds of the
@@ -21,7 +21,7 @@ export interface MatchdayRound {
     round: string;
     from: string;
     to: string;
-    state: 'played' | 'live' | 'next' | 'future';
+    state: RoundState;
 }
 
 export interface MatchdayContext {
@@ -33,6 +33,8 @@ export interface MatchdayContext {
     fixtures: MatchdayFixture[];
     /** Per player id: this season's use and absences (players never seen in a lineup are absent). */
     players: Record<number, Omit<PlayerContext, 'official'>>;
+    /** Per team id: its last league matches (fixture ids, most recent first), for the players never seen in a lineup. */
+    teamRecent: Record<number, number[]>;
     /** Official lineups of the round, per player id, and the clubs that have published one. */
     official: Record<number, 'starter' | 'bench'>;
     officialTeams: number[];
@@ -42,7 +44,6 @@ export interface MatchdayContext {
 /** How many of the club's last league matches say how a player is used. */
 const RECENT_MATCHES = 8;
 const FINISHED = new Set(['finished']);
-const LIVE = new Set(['live', 'half_time', 'extra_time', 'penalties']);
 
 interface FixtureRow {
     id: number;
@@ -73,21 +74,10 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     const fixtures = rows.filter((r) => r.round && r.home && r.away);
     if (fixtures.length === 0) return null;
 
-    // Rounds in calendar order; the next one is the first with a match still to play.
+    // Rounds in order; the next one is the first with most of its matches still to play.
     const byRound = new Map<string, FixtureRow[]>();
     for (const f of fixtures) byRound.set(f.round!, [...(byRound.get(f.round!) ?? []), f]);
-    const ordered = [...byRound.entries()].sort((a, b) => a[1][0].starting_at.localeCompare(b[1][0].starting_at));
-    let nextFound = false;
-    const rounds: MatchdayRound[] = ordered.map(([round, list]) => {
-        const live = list.some((f) => LIVE.has(f.state));
-        const open = list.some((f) => !FINISHED.has(f.state) && f.state !== 'cancelled');
-        let state: MatchdayRound['state'] = 'played';
-        if (live) state = 'live';
-        else if (open && !nextFound) state = 'next';
-        else if (open) state = 'future';
-        if (state === 'next' || state === 'live') nextFound = true;
-        return {round, from: list[0].starting_at, to: list[list.length - 1].starting_at, state};
-    });
+    const rounds: MatchdayRound[] = roundStates(fixtures.map((f) => ({round: f.round!, startingAt: f.starting_at, state: f.state})));
     // Only the round to play: a lineup for a later one would pretend to know how clubs and players will be by then.
     const round = rounds.find((r) => r.state === 'live' || r.state === 'next')?.round ?? rounds[rounds.length - 1].round;
     const roundFixtures = byRound.get(round) ?? [];
@@ -171,7 +161,9 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         official[l.player_id] = l.is_starter ? 'starter' : 'bench';
         officialTeams.add(l.team_id);
     }
-    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, official, officialTeams: [...officialTeams], generatedAt: new Date().toISOString()};
+    const teamRecent: MatchdayContext['teamRecent'] = {};
+    for (const [teamId, list] of recentOf) teamRecent[teamId] = list.map((f) => f.id);
+    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], generatedAt: new Date().toISOString()};
 }
 
 const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 600, tags: ['fantasy-matchday']});

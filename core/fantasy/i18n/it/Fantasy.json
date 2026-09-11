@@ -630,7 +630,7 @@
     "officialBadge": "ufficiale",
     "howTitle": "Come funziona",
     "how1": "Gioca: con la formazione ufficiale (pubblicata circa un'ora prima) un titolare vale 95%, un panchinaro 3% di partire e 22% di prendere il voto entrando, chi è fuori 2%. Prima, contano infortuni e squalifiche in corso, poi come il club l'ha usato nelle ultime otto partite (le recenti pesano di più: le partite da titolare e quelle da subentrato separate) e la titolarità dell'asta.",
-    "how2": "Voto: la media reale, spostata dalla partita: un terzo di punto tra una vittoria sicura e una sconfitta sicura (la forza del club contro l'avversario, come la vede la previsione), un quinto per la forma delle ultime cinque contro quella dell'avversario, un po' in più in casa. Portieri e difensori salgono contro un attacco debole e scendono contro uno forte.",
+    "how2": "Voto: la media reale, tirata verso i suoi ultimi voti (fino al 40% con cinque partite), poi spostata dalla partita: un terzo di punto tra una vittoria sicura e una sconfitta sicura (la forza del club contro l'avversario, come la vede la previsione), un quinto per la forma delle ultime cinque contro quella dell'avversario, un po' in più in casa. Portieri e difensori salgono contro un attacco debole e scendono contro uno forte.",
     "how3": "Bonus: i gol e assist a partita del giocatore, scalati su quanto la sua squadra è attesa segnare in questa partita rispetto a una partita normale del club (la forza d'attacco del club da xG e gol, stabilizzata sulle poche partite di inizio stagione), con la leva allargata: una big contro una piccola vale fino a +80%, il contrario fino a -50%. Per i portieri contano i gol attesi dall'avversario e la probabilità di porta inviolata. Coppe dentro o fuori come nelle impostazioni della lega.",
     "how4": "Modulo: per ogni modulo si sommano i valori degli undici, più la copertura della prima riserva quando un titolare rischia di non avere il voto. Un giocatore migliore ma un po' meno sicuro passa davanti a uno più sicuro ma più debole, perché se manca entra la riserva, non zero.",
     "how5": "Modificatore difesa: stimato dai voti attesi di portiere e difensori, pesato su quanto è sicuro che giochino.",
@@ -656,7 +656,8 @@
       "cleanSheet": "porta inviolata {pct}%",
       "penalty": "rigorista",
       "form": "forma {own}/{of} contro {opp}/{of}",
-      "manual": "segnato fuori da te"
+      "manual": "segnato fuori da te",
+      "playerForm": "ultime {matches} con voto: media {avg} (stagionale {base})"
     },
     "colPin": "Titolare fisso",
     "pin": "Titolare fisso: lo schiero comunque e costruisco la formazione intorno a lui",
@@ -705,6 +706,8 @@
       "absent": "assente",
       "doubtful": "in dubbio",
       "noMatch": "non gioca"
-    }
+    },
+    "colRecent": "Ult.",
+    "colRecentHint": "Media dei suoi ultimi voti (fino a cinque partite giocate) e quante sono: verde sopra la sua media stagionale, rosso sotto. Sposta il voto atteso fino a un 40%, di più con più partite."
   }
 }

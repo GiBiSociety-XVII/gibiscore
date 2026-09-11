@@ -36,10 +36,12 @@ function toMatchdayPlayer(p: AuctionPlayer): MatchdayPlayer {
 function contextOf(p: AuctionPlayer, ctx: MatchdayContext, manualOut: boolean): PlayerContext | null {
     const known = ctx.players[p.id];
     const official = ctx.official[p.id] ?? (ctx.officialTeams.includes(p.team.id) ? 'out' : null);
+    // Never in a matchday squad this season: out of every match his club played (the auction's mark still says a little).
+    const recent = known?.recent && known.recent.length > 0 ? known.recent : (ctx.teamRecent[p.team.id] ?? []).map((fixtureId) => ({fixtureId, status: 'out' as const, minutes: 0, rating: null, goals: 0, assists: 0}));
     // Marked out by hand: the news is ahead of the data, and it beats even the official lineup.
-    if (manualOut) return {teamId: known?.teamId ?? p.team.id, recent: known?.recent ?? [], sidelined: {category: 'manual', description: null, longTerm: false}, official: null};
-    if (!known && !official) return null;
-    return {teamId: known?.teamId ?? p.team.id, recent: known?.recent ?? [], sidelined: known?.sidelined ?? null, official};
+    if (manualOut) return {teamId: known?.teamId ?? p.team.id, recent, sidelined: {category: 'manual', description: null, longTerm: false}, official: null};
+    if (!known && !official && recent.length === 0) return null;
+    return {teamId: known?.teamId ?? p.team.id, recent, sidelined: known?.sidelined ?? null, official};
 }
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -59,6 +61,7 @@ function useReasonText() {
             case 'match': return t('match', {where: r.home ? t('home') : t('away'), opponent: r.opponent, win: Math.round(r.win), lambdaFor: r.lambdaFor.toFixed(1), lambdaAgainst: r.lambdaAgainst.toFixed(1)});
             case 'attack': return t(r.factor > 1 ? 'attackUp' : 'attackDown', {pct: Math.round(Math.abs(r.factor - 1) * 100)});
             case 'form': return t('form', {own: r.own, opp: r.opp, of: r.of});
+            case 'playerForm': return t('playerForm', {avg: r.avg.toFixed(2), matches: r.matches, base: r.base.toFixed(2)});
             case 'manual': return t('manual');
             case 'cleanSheet': return t('cleanSheet', {pct: r.pct});
             case 'penalty': return t('penalty');
@@ -131,7 +134,7 @@ function Cell({tone, title, children, strong = false}: {tone: Tone; title?: stri
 /** The forecast's reasons, one field each, for the columns. */
 function facts(f: PlayerForecast) {
     const by = <K extends ForecastReason['kind']>(kind: K) => f.reasons.find((r): r is Extract<ForecastReason, {kind: K}> => r.kind === kind);
-    return {usage: by('usage'), form: by('form'), match: by('match'), attack: by('attack'), cleanSheet: by('cleanSheet'), official: by('official'), sidelined: by('sidelined'), doubtful: by('doubtful'), manual: by('manual'), noMatch: by('noMatch'), noUsage: by('noUsage')};
+    return {usage: by('usage'), form: by('form'), playerForm: by('playerForm'), match: by('match'), attack: by('attack'), cleanSheet: by('cleanSheet'), official: by('official'), sidelined: by('sidelined'), doubtful: by('doubtful'), manual: by('manual'), noMatch: by('noMatch'), noUsage: by('noUsage')};
 }
 
 function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void}) {
@@ -197,6 +200,9 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                 ) : null}
             </td>
             <td className={td}>
+                {x.playerForm && <Cell tone={toneOf(x.playerForm.avg - x.playerForm.base, [-0.5, -0.25, 0.25, 0.5])} title={reasonText(x.playerForm)}>{x.playerForm.avg.toFixed(1)}<span className="opacity-60 text-[9px]">×{x.playerForm.matches}</span></Cell>}
+            </td>
+            <td className={td}>
                 {x.form && <Cell tone={toneOf(x.form.own - x.form.opp, [-5, -3, 3, 5])} title={reasonText(x.form)}>{x.form.own}<span className="opacity-60">·</span>{x.form.opp}</Cell>}
             </td>
             <td className={td}>
@@ -238,6 +244,7 @@ function Head({withIndex}: {withIndex: boolean}) {
                 <th className={cn(th, "text-left px-2")}>{t('colPlayer')}</th>
                 <th className={cn(th, "text-left px-2")}>{t('colMatch')}</th>
                 <th className={th} title={t('colUsageHint')}>{t('colUsage')}</th>
+                <th className={th} title={t('colRecentHint')}>{t('colRecent')}</th>
                 <th className={th} title={t('colFormHint')}>{t('colForm')}</th>
                 <th className={th} title={t('colWinHint')}>{t('colWin')}</th>
                 <th className={th} title={t('colGoalsHint')}>{t('colGoals')}</th>

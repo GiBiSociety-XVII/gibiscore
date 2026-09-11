@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {CLASSIC_RULES} from './scores';
-import {forecastPlayer, recommendLineup, type MatchdayFixture, type MatchdayPlayer, type PlayerContext, type PlayerForecast, type RecentMatch} from './matchday';
+import {forecastPlayer, recommendLineup, roundStates, type MatchdayFixture, type MatchdayPlayer, type PlayerContext, type PlayerForecast, type RecentMatch} from './matchday';
 
 const fixture: MatchdayFixture = {id: 1, round: 'R4', startingAt: '2026-09-13T18:45:00Z', state: 'scheduled', home: {id: 10, name: 'Inter'}, away: {id: 20, name: 'Lecce'}, prediction: {lambdaHome: 2.2, lambdaAway: 0.6, home: 72, draw: 18, away: 10}, avgFor: {home: 1.9, away: 0.9}, form: {home: 'WWWDW', away: 'LLDLL'}};
 const player = (id: number, role: MatchdayPlayer['role'], teamId: number, starter: number, over: Partial<MatchdayPlayer['scores']['events']> = {}): MatchdayPlayer => ({
@@ -163,5 +163,45 @@ describe('recommendLineup', () => {
         // The slot: his points when he plays, the substitute's when not, so the surer one is not ahead by the risk alone.
         expect(advice.slots.get(2)!).toBeGreaterThan(advice.slots.get(3)!);
         expect(advice.slots.get(2)!).toBeGreaterThan(6.48);
+    });
+
+    it('a player never in a squad this season is not a sure starter on his auction mark alone', () => {
+        const ghost = forecastPlayer(player(1, 'D', 10, 95), {teamId: 10, recent: recent(['out', 'out', 'out']), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        expect(ghost.plays).toBeLessThan(0.45);
+        expect(ghost.reasons.some((r) => r.kind === 'usage' && r.started === 0)).toBe(true);
+    });
+
+    it('his own recent votes pull the expected rating', () => {
+        const voted = (ratings: number[]): RecentMatch[] => ratings.map((rating, i) => ({fixtureId: 200 + i, status: 'started', minutes: 90, rating, goals: 0, assists: 0}));
+        const base = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: recent(['started', 'started', 'started']), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        const hot = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: voted([7.4, 7.2, 7.5]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        const cold = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: voted([5.8, 5.9, 6.0]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        expect(hot.rating).toBeGreaterThan(base.rating + 0.1);
+        expect(cold.rating).toBeLessThan(base.rating - 0.1);
+        // Three votes: half of the full pull, a bit less.
+        expect(hot.rating - base.rating).toBeLessThan(0.4 * 0.5 * (7.4 - 6.4) + 0.01);
+        expect(hot.reasons.some((r) => r.kind === 'playerForm' && r.matches === 3)).toBe(true);
+    });
+});
+
+describe('roundStates', () => {
+    const f = (round: number, day: number, state: string) => ({round: `Regular Season - ${round}`, startingAt: `2026-09-${String(day).padStart(2, '0')}T18:00:00Z`, state});
+    it('the next round is the first with most matches to play; a postponed match does not hold its round back', () => {
+        const fixtures = [
+            ...[1, 2, 3, 4].map(() => f(1, 1, 'finished')),
+            ...[1, 2, 3].map(() => f(2, 8, 'finished')), f(2, 30, 'scheduled'),
+            ...[1, 2, 3, 4].map(() => f(3, 15, 'scheduled')),
+            ...[1, 2, 3, 4].map(() => f(4, 22, 'scheduled')),
+        ];
+        const rounds = roundStates(fixtures);
+        expect(rounds.map((r) => r.state)).toEqual(['played', 'played', 'next', 'future']);
+        // The played round's span ignores the match moved to the 30th.
+        expect(rounds[1].to.startsWith('2026-09-08')).toBe(true);
+    });
+    it('a round with a match live is the live one, and rounds sort by number', () => {
+        const fixtures = [f(10, 20, 'scheduled'), f(10, 20, 'scheduled'), f(9, 13, 'live'), f(9, 12, 'finished'), f(2, 1, 'finished'), f(2, 1, 'finished')];
+        const rounds = roundStates(fixtures);
+        expect(rounds.map((r) => r.round)).toEqual(['Regular Season - 2', 'Regular Season - 9', 'Regular Season - 10']);
+        expect(rounds.map((r) => r.state)).toEqual(['played', 'live', 'future']);
     });
 });
