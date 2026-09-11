@@ -588,8 +588,6 @@ export const CLUB_PULL = 1.0;
 export const PLAY_CURVE = 0.8;
 /** How much of the value a place fully contested (chance of playing 0) loses on top of the minutes: the table pays certainty. */
 export const CONTEST_DISCOUNT = 0.3;
-/** The upside of a keeper's bench weeks when the league buys keeper pairs (four slots or more). */
-export const PAIR_UPSIDE = 0.5;
 /** What a starter of the role at a top club averages above one at a bottom club: where a thin fantamedia is shrunk towards. */
 const CLUB_SHIFT: Record<FantaRole, number> = {P: 0.6, D: 0.4, C: 0.6, A: 1.0};
 
@@ -601,21 +599,14 @@ function shrunkFanta(p: PriceablePlayer, roleLevel: number): number {
     return raw * shrink + target * (1 - shrink);
 }
 
-export interface ValueOptions {
-    /** The league buys four or more keepers a roster: a top club's second keeper is bought as the pair of the first. */
-    keeperPairs?: boolean;
-}
-
-export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel: number, options: ValueOptions = {}): number {
+export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel: number): number {
     const fm = shrunkFanta(p, roleLevel);
     const play = Math.max(0, Math.min(1, (p.scores.starter ?? Math.min(100, p.scores.overall + 5)) / 100));
     const young = p.age !== null && p.age !== undefined && p.age <= 23;
     const hot = (p.scores.form ?? 50) >= 60;
     const thin = p.scores.confidence !== undefined && p.scores.confidence !== 'high';
-    // What the weeks he does not play are still worth: a bet on the young, the hot, the unknown;
-    // with four keeper slots, a second keeper covers the first, and the table pays for the pair.
-    const base = options.keeperPairs && p.role === 'P' ? PAIR_UPSIDE : 0.1;
-    const upside = Math.min(0.5, base + (young ? 0.2 : 0) + (hot ? 0.1 : 0) + (thin ? 0.1 : 0));
+    // What the weeks he does not play are still worth: a bet on the young, the hot, the unknown.
+    const upside = Math.min(0.45, 0.1 + (young ? 0.2 : 0) + (hot ? 0.1 : 0) + (thin ? 0.1 : 0));
     const avail = 0.4 + (0.6 * (p.scores.fitness ?? 70)) / 100;
     // A fantamedia built on a dozen matches is a guess: it is already shrunk towards the role's level,
     // so what it still promises over the free player counts at least for half, in full from twenty matches.
@@ -636,14 +627,14 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
  * the level of the last player the league buys (`count` of them), so
  * everyone below is worth nothing on the market. Pure.
  */
-export function valueWeights<T extends PriceablePlayer>(players: T[], role: FantaRole, count: number, options: ValueOptions = {}): Map<number, number> {
+export function valueWeights<T extends PriceablePlayer>(players: T[], role: FantaRole, count: number): Map<number, number> {
     const pool = players.filter((p) => p.role === role);
     // The level a thin fantamedia is shrunk towards: what the role's regulars actually average in this
     // pool (keepers' fantamedia has its own scale), the typical figure only when the pool cannot say.
     const regulars = pool.filter((p) => (p.scores.sample ?? 0) >= 15 && p.scores.fantaAvg !== null && p.scores.fantaAvg !== undefined).map((p) => p.scores.fantaAvg!).sort((a, b) => a - b);
     const level = regulars.length >= 8 ? regulars[Math.floor(regulars.length / 2)] : ROLE_FANTA[role];
     // A first pass with the role's typical level finds the order, the replacement is read off it.
-    const first = pool.map((p) => [p, expectedValue(p, 0, level, options)] as const).sort((a, b) => b[1] - a[1]);
+    const first = pool.map((p) => [p, expectedValue(p, 0, level)] as const).sort((a, b) => b[1] - a[1]);
     // The free alternative: the players just outside what the league buys, at their (shrunk)
     // fantamedia less what a bench player loses by not playing every week.
     // ...among the players who actually play: a role whose slots outnumber its starters (keepers,
@@ -654,7 +645,7 @@ export function valueWeights<T extends PriceablePlayer>(players: T[], role: Fant
     const free = starters.slice(Math.min(n - 1, Math.round(n * tuning.from)), Math.max(n, Math.round(n * tuning.to))).map(([p]) => shrunkFanta(p, level));
     const replacement = free.length > 0 ? free.reduce((s, v) => s + v, 0) / free.length - tuning.gap : level - tuning.gap;
     const out = new Map<number, number>();
-    for (const p of pool) out.set(p.id, expectedValue(p, replacement, level, options) ** PRICE_POWER[role]);
+    for (const p of pool) out.set(p.id, expectedValue(p, replacement, level) ** PRICE_POWER[role]);
     return out;
 }
 
@@ -664,7 +655,7 @@ export function suggestPrices<T extends PriceablePlayer>(players: T[], config: P
     for (const role of ['P', 'D', 'C', 'A'] as const) {
         const pool = players.filter((p) => p.role === role);
         const bought = Math.max(1, config.participants * config.slots[role]);
-        const weights = valueWeights(pool, role, bought, {keeperPairs: config.slots.P >= 4});
+        const weights = valueWeights(pool, role, bought);
         // Priced: what the league buys plus the players just outside, who go for a few credits.
         const priced = [...pool].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0)).slice(0, Math.max(1, Math.round(bought * PRICE_TUNING.tail)));
         const budget = market * config.roleShare[role] * (config.level ?? 1);

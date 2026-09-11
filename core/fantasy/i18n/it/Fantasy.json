@@ -87,6 +87,8 @@
     "cancel": "Annulla",
     "cupsCount": "Conta le coppe nel calcolo",
     "cupsCountHint": "Acceso: voti, titolarità e bonus tengono conto anche di Coppa Italia, Supercoppa e coppe europee (le coppe pesano la metà nella titolarità). Spento: conta solo il campionato principale di ogni paese.",
+    "keeperBlock": "Portieri a blocco",
+    "keeperBlockHint": "Comprando un portiere prendi tutti i portieri della sua squadra a un prezzo unico, che riempie gli slot portiere. Il listino prezza il blocco sul titolare, i secondi risultano \"nel blocco\"; le strategie pianificano un blocco solo.",
     "defenceBonusHint": "Punti del modificatore difesa nella tua lega: media dei voti di portiere e tre migliori difensori schierati, con almeno i difensori indicati in campo. Metti 0 sulle soglie che la lega non usa.",
     "defenceMin": "Dif. minimi"
   },
@@ -215,6 +217,11 @@
     "compareHint": "Scegli due giocatori da confrontare (tasto C sulla riga evidenziata)",
     "comparePicked": "Confronto: {name} contro…",
     "shortcuts": "Tasti: ↑ ↓ scorri la lista · Invio compra (o corregge) l'evidenziato · C confronta · Ctrl+Z annulla l'ultimo acquisto · Esc chiude",
+    "block": {
+      "inBlock": "Nel blocco di {name}",
+      "buy": "Compra il blocco",
+      "note": "Portieri a blocco: con {name} prendi anche {others}, a questo prezzo. Il blocco riempie gli slot portiere."
+    },
     "rivalTakenBadge": "Rivale preso",
     "rivalTakenHint": "Chi si gioca il posto con lui è già stato comprato: {names}",
     "undoLast": "Annulla ultimo",

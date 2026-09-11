@@ -269,18 +269,6 @@ describe('suggestPrices', () => {
         expect(prices.get(75)!).toBeLessThan(prices.get(25)! * 2.2);
     });
 
-    it('with four keeper slots a top club\'s second keeper is bought as the pair of the first', () => {
-        const keepers = [
-            {id: 1, role: 'P' as const, scores: {overall: 85, fantaAvg: 6.6, starter: 100, sample: 30, team: 80}},
-            {id: 2, role: 'P' as const, scores: {overall: 60, fantaAvg: 6.8, starter: 8, sample: 25, team: 80}},
-            ...Array.from({length: 30}, (_, i) => ({id: 10 + i, role: 'P' as const, scores: {overall: 70 - i, fantaAvg: 6.3 - i / 25, starter: i < 15 ? 95 : 8, sample: 30, team: 50}})),
-        ];
-        const three = suggestPrices(keepers, {credits: 500, participants: 10, slots: {P: 3, D: 8, C: 8, A: 6}, roleShare: {P: 0.1, D: 0.13, C: 0.24, A: 0.53}});
-        const four = suggestPrices(keepers, {credits: 500, participants: 10, slots: {P: 4, D: 8, C: 8, A: 6}, roleShare: {P: 0.1, D: 0.13, C: 0.24, A: 0.53}});
-        expect(four.get(2)!).toBeGreaterThan(three.get(2)! * 1.3);
-        expect(four.get(2)!).toBeLessThan(four.get(1)!);
-    });
-
     it('a contested place costs more than the minutes it loses', () => {
         const sure = expectedValue({id: 1, role: 'A', scores: {overall: 70, fantaAvg: 7.5, starter: 100, sample: 30, team: 50}}, 6.5, 6.8);
         const half = expectedValue({id: 2, role: 'A', scores: {overall: 70, fantaAvg: 7.5, starter: 50, sample: 30, team: 50}}, 6.5, 6.8);

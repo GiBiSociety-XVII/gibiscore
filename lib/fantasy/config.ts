@@ -74,6 +74,8 @@ export interface AuctionConfig {
     formation: string | null;
     /** Whether cups (domestic and European) count in the marks; off = only the main league of each country. */
     cupsCount: boolean;
+    /** Keepers go by club: buying one keeper takes every keeper of his club, at one price, as the league's keeper slots. */
+    keeperBlock: boolean;
     /** Roles corrected by hand, by player id. */
     roleOverrides: Record<string, FantaRole>;
     /** Players the strategies must plan for (ids), whatever the marks say. */
@@ -109,6 +111,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     strategy: null,
     formation: null,
     cupsCount: false,
+    keeperBlock: false,
     roleOverrides: {},
     want: [],
     avoid: [],
@@ -163,6 +166,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : false,
+        keeperBlock: typeof r.keeperBlock === 'boolean' ? r.keeperBlock : false,
         roleOverrides: Object.fromEntries(Object.entries(r.roleOverrides ?? {}).filter(([, v]) => v === 'P' || v === 'D' || v === 'C' || v === 'A')) as Record<string, FantaRole>,
         want: ids(r.want),
         avoid: ids(r.avoid),

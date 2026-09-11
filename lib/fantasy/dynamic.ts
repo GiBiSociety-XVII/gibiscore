@@ -176,7 +176,7 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         const state = market.byRole[role];
         // Value of what is left against the replacement level of what the league still buys.
         const left = players.filter((p) => p.role === role && !paidFor.has(p.id));
-        const weights = valueWeights(left, role, Math.max(1, state.slotsLeft), {keeperPairs: config.slots.P >= 4});
+        const weights = valueWeights(left, role, Math.max(1, state.slotsLeft));
         const available = [...left].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0));
         const toBuy = available.slice(0, Math.max(1, Math.round(state.slotsLeft * PRICE_TUNING.tail)));
         const weight = (p: PricedPlayer) => weights.get(p.id) ?? 0;

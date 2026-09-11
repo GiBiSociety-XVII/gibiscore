@@ -18,6 +18,7 @@ import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TableBar} from "./table-bar";
 import {TargetsPanel} from "./targets-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
+import {keeperBlocks} from "@/lib/fantasy/block";
 import {DEFAULT_RULES, ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
@@ -149,12 +150,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     /** Players picked for the comparison (up to two) and the row the keyboard is on. */
     const [compare, setCompare] = useState<number[]>([]);
     const [cursor, setCursor] = useState<number | null>(null);
-    const openBuy = (player: AuctionPlayer) => setBuying({player, price: String(prices.get(player.id) ?? 1), manager: lastManager, editing: false});
-    /** A registered purchase, opened again to correct the price or the manager. */
-    const openEdit = (player: AuctionPlayer) => {
-        const purchase = purchases.find((p) => p.playerId === player.id);
-        if (purchase) setBuying({player, price: String(purchase.price), manager: purchase.manager, editing: true});
-    };
 
     // The marks the league wants: with the cups, or the main leagues only.
     const pool = useMemo(() => {
@@ -167,27 +162,39 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const players = classic ? chosen : chosen.map((p) => (p.scores.events ? {...p, scores: {...p.scores, fantaAvg: fantaAvgFor(p.scores.events, p.role, config.rules)}} : p));
         return players === rawPool.players ? rawPool : {...rawPool, players};
     }, [rawPool, config]);
+    // Keepers by block (a league rule): the club's first keeper carries the block, the others are not on
+    // the market by themselves. Prices, market and strategies then see one keeper slot and no backups.
+    const board = useMemo(() => {
+        if (!pool || !config) return null;
+        const blocks = config.keeperBlock ? keeperBlocks(pool.players) : null;
+        return {
+            blocks,
+            players: blocks ? pool.players.filter((p) => !blocks.backups.has(p.id)) : pool.players,
+            config: blocks ? {...config, slots: {...config.slots, P: 1}} : config,
+            purchases: blocks ? purchases.filter((p) => !blocks.backups.has(p.playerId)) : purchases,
+        };
+    }, [pool, config, purchases]);
     // List prices assume a full market; the live prices follow what has been bought and paid.
     const listPrices = useMemo(() => {
-        if (!pool || !config) return new Map<number, number>();
-        return suggestPrices(pool.players, {credits: config.credits, participants: config.participants, slots: config.slots, roleShare: ROLE_SHARE, level: config.priceLevel / 100});
-    }, [pool, config]);
+        if (!board) return new Map<number, number>();
+        return suggestPrices(board.players, {credits: board.config.credits, participants: board.config.participants, slots: board.config.slots, roleShare: ROLE_SHARE, level: board.config.priceLevel / 100});
+    }, [board]);
     // Cheap enough to redo on every render: a few hundred players, a handful of purchases.
-    const prices = pool && config ? dynamicPrices(pool.players, listPrices, config, purchases) : listPrices;
-    const market = pool && config ? marketState(pool.players, listPrices, config, purchases) : null;
+    const prices = board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices;
+    const market = board ? marketState(board.players, listPrices, board.config, board.purchases) : null;
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
     const tierInfos = useMemo(() => (pool && config ? explainTiers(pool.players, config) : new Map<number, TierInfo>()), [pool, config]);
     const tiers = useMemo(() => new Map<number, Tier>([...tierInfos].map(([id, info]) => [id, info.tier])), [tierInfos]);
     // Strategies simulated on what is still on the market at live prices, starting from what I already own.
     const plans = useMemo(() => {
-        if (!pool || !config) return [];
-        const byId = new Map(pool.players.map((p) => [p.id, p]));
-        const taken = new Set(purchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
-        const mine = purchases.filter((p) => p.manager === 0 && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-        return rankStrategies(pool.players, prices, config, taken, mine, {want: new Set(config.want), avoid: new Set(config.avoid)});
-    }, [pool, config, prices, purchases]);
+        if (!board) return [];
+        const byId = new Map(board.players.map((p) => [p.id, p]));
+        const taken = new Set(board.purchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
+        const mine = board.purchases.filter((p) => p.manager === 0 && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
+        return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)});
+    }, [board, prices]);
     // The same strategies on the full list at list prices: what each was worth when the auction started.
-    const baseline = useMemo(() => (pool && config ? rankStrategies(pool.players, listPrices, config, new Set(), [], {want: new Set(config.want), avoid: new Set(config.avoid)}) : []), [pool, config, listPrices]);
+    const baseline = useMemo(() => (board ? rankStrategies(board.players, listPrices, board.config, new Set(), [], {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}) : []), [board, listPrices]);
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
@@ -221,7 +228,20 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         router.replace(`/fantacalcio/asta?league=${config.league}`);
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     }
-    if (!pool) return <p className="text-sm font-semibold text-muted-foreground">{ta('empty')}</p>;
+    if (!pool || !board) return <p className="text-sm font-semibold text-muted-foreground">{ta('empty')}</p>;
+    // The market as the league sees it (keepers by block or not): what prices, market and strategies use.
+    const {blocks, players: marketPlayers, config: marketConfig, purchases: marketPurchases} = board;
+    const byId = new Map(pool.players.map((p) => [p.id, p]));
+    const openBuy = (player: AuctionPlayer) => {
+        // Keepers by block: a second keeper is bought through the first of his club.
+        const target = blocks?.backups.has(player.id) ? (byId.get(blocks.starterOf.get(player.id)!) ?? player) : player;
+        setBuying({player: target, price: String(prices.get(target.id) ?? 1), manager: lastManager, editing: false});
+    };
+    /** A registered purchase, opened again to correct the price or the manager. */
+    const openEdit = (player: AuctionPlayer) => {
+        const purchase = purchases.find((p) => p.playerId === player.id);
+        if (purchase) setBuying({player, price: String(purchase.price), manager: purchase.manager, editing: true});
+    };
 
     const managers = config.managers.length > 0 ? config.managers : [t('me')];
     const mine = purchases.filter((p) => p.manager === 0);
@@ -229,7 +249,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const left = config.credits - spent;
     const slotsTotal = totalSlots(config.slots);
     const freeSlots = Math.max(0, slotsTotal - mine.length);
-    const byId = new Map(pool.players.map((p) => [p.id, p]));
     const mineByRole = (r: FantaRole) => mine.filter((p) => byId.get(p.playerId)?.role === r);
     const reset = () => {
         if (window.confirm(ta('resetConfirm'))) {
@@ -241,35 +260,50 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     // Roster limits per manager: slots of the role, and credits that must leave 1 per open slot.
     const rosterOf = (manager: number) => purchases.filter((p) => p.manager === manager && byId.has(p.playerId));
     const roleCount = (manager: number, r: FantaRole) => rosterOf(manager).filter((p) => byId.get(p.playerId)!.role === r).length;
-    const roleFull = (manager: number, r: FantaRole) => roleCount(manager, r) >= config.slots[r];
+    // Keepers by block: one block fills the keeper slots.
+    const roleFull = (manager: number, r: FantaRole) => (blocks && r === 'P' ? roleCount(manager, 'P') >= 1 : roleCount(manager, r) >= config.slots[r]);
     const creditsLeftOf = (manager: number) => config.credits - rosterOf(manager).reduce((s, p) => s + p.price, 0);
     /** Why a purchase cannot go through, or null. */
     const blocker = (player: AuctionPlayer, manager: number, price: number): string | null => {
         const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
         if (roleFull(manager, player.role) && !already) return t('blockRole', {manager: managers[manager] ?? t('me'), count: config.slots[player.role], role: ts(`roles.${player.role}`)});
-        const others = already ? purchases.filter((p) => p !== already) : purchases;
+        const others = (already ? purchases.filter((p) => p !== already) : purchases).filter((p) => !blocks?.backups.has(p.playerId));
         const left = creditsLeftOf(manager) + (already?.price ?? 0);
-        const maxPay = left - completionReserve(pool.players, prices, config, others, manager, player.role);
+        const maxPay = left - completionReserve(marketPlayers, prices, marketConfig, others, manager, player.role);
         if (price > maxPay) return t('blockCredits', {manager: managers[manager] ?? t('me'), max: Math.max(0, maxPay)});
         return null;
     };
     /** The most I can pay for a player of this role and still finish my roster with the cheapest players left. */
-    const myMaxFor = (r: FantaRole) => Math.max(0, left - completionReserve(pool.players, prices, config, purchases, 0, r));
+    const myMaxFor = (r: FantaRole) => Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, 0, r));
     const confirmBuy = () => {
         if (!buying) return;
         const price = Math.max(0, Math.round(Number(buying.price) || 0));
         if (blocker(buying.player, buying.manager, price)) return;
         const next = {playerId: buying.player.id, price, manager: buying.manager};
         const at = purchases.findIndex((p) => p.playerId === buying.player.id);
+        // Keepers by block: the club's other keepers come with the first, at nothing.
+        const followers = blocks && buying.player.role === 'P' ? (blocks.byTeam.get(buying.player.team.id) ?? []).filter((id) => id !== buying.player.id).map((playerId) => ({playerId, price: 0, manager: buying.manager})) : [];
+        const followerIds = new Set(followers.map((f) => f.playerId));
         // A correction keeps its place in the order; a purchase goes at the end (the last one, for undo).
-        purchasesStore.write(at >= 0 && buying.editing ? purchases.map((p, i) => (i === at ? next : p)) : [...purchases.filter((p) => p.playerId !== buying.player.id), next]);
+        const rest = purchases.filter((p) => !followerIds.has(p.playerId));
+        purchasesStore.write(at >= 0 && buying.editing ? [...rest.map((p) => (p.playerId === buying.player.id ? next : p)), ...followers] : [...rest.filter((p) => p.playerId !== buying.player.id), next, ...followers]);
         setLastManager(buying.manager);
         setBuying(null);
     };
-    const release = (playerId: number) => purchasesStore.write(purchases.filter((p) => p.playerId !== playerId));
-    const lastPurchase = purchases.length > 0 ? purchases[purchases.length - 1] : null;
+    /** Takes a purchase back; a keeper's block goes back whole. */
+    const release = (playerId: number) => {
+        const player = byId.get(playerId);
+        const purchase = purchases.find((p) => p.playerId === playerId);
+        const ids = blocks && player?.role === 'P' && purchase ? new Set((blocks.byTeam.get(player.team.id) ?? []).filter((id) => purchases.some((p) => p.playerId === id && p.manager === purchase.manager))) : new Set([playerId]);
+        purchasesStore.write(purchases.filter((p) => !ids.has(p.playerId)));
+    };
+    // The last purchase registered: a block's followers belong to the keeper before them.
+    const lastPurchase = (() => {
+        for (let i = purchases.length - 1; i >= 0; i -= 1) if (!blocks?.backups.has(purchases[i].playerId) || purchases[i].price > 0) return purchases[i];
+        return null;
+    })();
     const undoLast = () => {
-        if (lastPurchase) purchasesStore.write(purchases.slice(0, -1));
+        if (lastPurchase) release(lastPurchase.playerId);
     };
     const toggleCompare = (id: number) => setCompare((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c.slice(-1), id]));
     const comparing = compare.length === 2 ? compare.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p) : [];
@@ -320,9 +354,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const toggleAvoid = (id: number) => configStore.write({...config, avoid: avoided.has(id) ? config.avoid.filter((x) => x !== id) : [...config.avoid, id], want: config.want.filter((x) => x !== id)});
     const roleShare = strategy?.share ?? ROLE_SHARE;
     // How the strategy in use is going, and the formation that gets the most out of my roster plus the plan's targets.
-    const takenByOthers = new Set(purchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
-    const ownPurchases = mine.filter((p) => byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-    const health = strategy ? strategyHealth(plans, strategy.key, baseline, config, ownPurchases, takenByOthers) : null;
+    const takenByOthers = new Set(marketPurchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
+    const ownPurchases = marketPurchases.filter((p) => p.manager === 0 && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
+    const health = strategy ? strategyHealth(plans, strategy.key, baseline, marketConfig, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
     const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: defenceOption(config)}) : null;
     /** The report card of a manager's roster: the team's mark, the eleven, a line per role. */
@@ -351,12 +385,16 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const lineup = rosterAfter.length >= 11 ? bestLineup(rosterAfter, {defenceModifier: defenceOption(config)}) : null;
         const def = strategy ? STRATEGIES.find((s) => s.key === strategy.key) : null;
         const plan = def && strategy
-            ? planStrategy(def, pool.players, prices, config, takenByOthers, [...others.map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price})), {playerId: player.id, role: player.role, price}], {want: wanted, avoid: avoided})
+            ? planStrategy(def, marketPlayers, prices, marketConfig, takenByOthers, [...others.filter((p) => !blocks?.backups.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price})), {playerId: player.id, role: player.role, price}], {want: wanted, avoid: avoided})
             : null;
         const max = maxBidOf(player.id);
         return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup, plan: plan && strategy ? {value: plan.lineupValue, delta: plan.lineupValue - strategy.lineupValue, name: tst(`${strategy.key}.name`)} : null, over: max !== null ? Math.max(0, price - max) : 0, already, missing: Math.max(0, 11 - rosterAfter.length)};
     };
     const priceCell = (id: number) => {
+        if (blocks?.backups.has(id)) {
+            const first = byId.get(blocks.starterOf.get(id)!);
+            return <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">{t('block.inBlock', {name: first?.name ?? '–'})}</span>;
+        }
         const list = listPrices.get(id) ?? 1;
         const purchase = bought.get(id);
         // Bought: what the list said, then what was actually paid, so the theory meets the table.
@@ -418,7 +456,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 {/* The table: every manager, credits and open slots */}
                 {managers.length > 1 && (
                     <TableBar
-                        managers={managers.map((name, manager) => ({manager, name: manager === 0 ? `${name} (${t('mine')})` : name, left: creditsLeftOf(manager), open: {P: Math.max(0, config.slots.P - roleCount(manager, 'P')), D: Math.max(0, config.slots.D - roleCount(manager, 'D')), C: Math.max(0, config.slots.C - roleCount(manager, 'C')), A: Math.max(0, config.slots.A - roleCount(manager, 'A'))}}))}
+                        managers={managers.map((name, manager) => ({manager, name: manager === 0 ? `${name} (${t('mine')})` : name, left: creditsLeftOf(manager), open: {P: blocks ? (roleCount(manager, 'P') > 0 ? 0 : 1) : Math.max(0, config.slots.P - roleCount(manager, 'P')), D: Math.max(0, config.slots.D - roleCount(manager, 'D')), C: Math.max(0, config.slots.C - roleCount(manager, 'C')), A: Math.max(0, config.slots.A - roleCount(manager, 'A'))}}))}
                         onOpen={(manager) => setTeamsTab(manager)}
                     />
                 )}
@@ -544,7 +582,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                             <button type="button" onClick={() => release(p.id)} aria-label={t('release')} title={t('release')} className="inline-flex w-6 h-6 items-center justify-center rounded border border-foreground bg-card hover:bg-accent"><X className="w-3 h-3" /></button>
                                                         </span>
                                                     ) : (
-                                                        <button type="button" onClick={() => openBuy(p)} className="bb-btn bg-accent h-7 px-2.5 text-[11px] font-extrabold">{t('buy')}</button>
+                                                        <button type="button" onClick={() => openBuy(p)} className="bb-btn bg-accent h-7 px-2.5 text-[11px] font-extrabold">{blocks?.backups.has(p.id) ? t('block.buy') : t('buy')}</button>
                                                     )}
                                                 </span>
                                             </td>
@@ -616,7 +654,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     </div>
                     <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
                         {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
-                        {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(pool.players, prices, config, purchases, 0), max: Math.max(0, left - completionReserve(pool.players, prices, config, purchases, 0, null))})}</span>}
+                        {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, 0), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, 0, null))})}</span>}
                         {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                         {guide && (
                             <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
@@ -658,7 +696,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     )}
                 </Panel>
                 <TargetsPanel
-                    players={pool.players}
+                    players={marketPlayers}
                     targets={strategy ? ROLES.flatMap((r) => strategy.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id)) : []}
                     prices={prices}
                     bought={bought}
@@ -749,6 +787,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         <p className="text-[11px] font-semibold text-muted-foreground">
                             {t('columns.price')}: {prices.get(buying.player.id) ?? 1} · {t('listPrice', {price: listPrices.get(buying.player.id) ?? 1})} · {t('columns.fantaAvg')}: {buying.player.scores.fantaAvg?.toFixed(2) ?? '–'}
                             {strategy && maxBidOf(buying.player.id) !== null && <span className="block text-foreground">{t('maxBidHint', {max: maxBidOf(buying.player.id)!})}</span>}
+                            {blocks && buying.player.role === 'P' && (blocks.byTeam.get(buying.player.team.id) ?? []).length > 1 && (
+                                <span className="block text-foreground">{t('block.note', {name: buying.player.name, others: (blocks.byTeam.get(buying.player.team.id) ?? []).filter((id) => id !== buying.player.id).map((id) => byId.get(id)?.name ?? '').filter(Boolean).join(', ')})}</span>
+                            )}
                         </p>
                         {(() => {
                             const price = Math.max(0, Math.round(Number(buying.price) || 0));
