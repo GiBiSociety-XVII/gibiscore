@@ -36,7 +36,7 @@ export interface MatchdayFixture {
     away: {id: number; name: string};
     /** Expected goals of each side and the outcome percentages, when the season has enough matches. */
     prediction: {lambdaHome: number; lambdaAway: number; home: number; draw: number; away: number} | null;
-    /** Goals per match each side has scored this season (the yardstick for a match's expected goals). */
+    /** Goals each side scores in an ordinary match (its attack strength, shrunk on a small sample): the yardstick for this match's expected goals. */
     avgFor: {home: number | null; away: number | null};
     /** Last results of each side, oldest first ("WWDLW"), null when unknown. */
     form: {home: string | null; away: string | null};

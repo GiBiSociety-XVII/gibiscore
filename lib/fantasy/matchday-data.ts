@@ -4,7 +4,7 @@ import {fetchAll} from '@/lib/db/paginate';
 import {footballDb, logReadError} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getSeasonStudy} from '@/lib/football/data/study';
-import {predictMatch} from '@/lib/football/prediction';
+import {attackBaseline, predictMatch} from '@/lib/football/prediction';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
 import type {MatchdayFixture, PlayerContext, RecentMatch} from './matchday';
 
@@ -94,10 +94,12 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
 
     // Predictions from the season's numbers.
     const study = await getSeasonStudy(season.id);
+    // What each club scores in an ordinary match (shrunk on a small sample): the yardstick for the fixture's expected goals.
     const avgFor = new Map<number, number>();
     const formOf = new Map<number, string>();
     for (const t of study?.teams ?? []) {
-        if (t.played > 0) avgFor.set(t.team.id, t.goalsFor / t.played);
+        const baseline = attackBaseline(study, t.team.id);
+        if (baseline !== null) avgFor.set(t.team.id, baseline);
         if (t.form.length > 0) formOf.set(t.team.id, t.form.join(''));
     }
     const matchday: MatchdayFixture[] = roundFixtures.map((f) => {

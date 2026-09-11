@@ -85,6 +85,22 @@ function formScore(form: TeamStudy['form']): number {
     return points / (form.length * 3);
 }
 
+/**
+ * Goals a side is expected to score in an ordinary match (an average
+ * opponent, no venue): its attack strength, shrunk towards the league
+ * rate on a small sample, times the league's goals per team. The
+ * yardstick for how much a given fixture moves a player's bonus rates:
+ * three matches of a season say little, this says what the club is.
+ */
+export function attackBaseline(study: SeasonStudy | null, teamId: number): number | null {
+    if (!study || study.played === 0) return null;
+    const team = study.teams.find((t) => t.team.id === teamId);
+    if (!team || team.played === 0) return null;
+    const perTeam = study.goalsPerMatch / 2;
+    const scored = (team.xgFor !== null && team.withStats >= 3 ? (team.goalsFor / team.played + team.xgFor) / 2 : team.goalsFor / team.played) * team.played;
+    return round(shrink(scored, team.played, perTeam));
+}
+
 export function predictMatch(study: SeasonStudy | null, homeId: number, awayId: number): MatchPrediction | null {
     if (!study || study.played < 10) return null;
     const home = study.teams.find((t) => t.team.id === homeId);

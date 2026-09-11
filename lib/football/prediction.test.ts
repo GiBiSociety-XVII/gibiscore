@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {SeasonStudy, SplitRow, TeamStudy} from './data/study';
-import {predictMatch} from './prediction';
+import {attackBaseline, predictMatch} from './prediction';
 
 const team = (id: number, name: string): TeamStudy['team'] => ({id, name, slug: name.toLowerCase(), shortCode: null, logoUrl: null});
 
@@ -60,5 +60,17 @@ describe('predictMatch', () => {
         expect(p.factors.some((f) => f.key === 'sample')).toBe(true);
         // Shrinkage: two matches cannot make a side overwhelming.
         expect(p.home).toBeLessThan(75);
+    });
+
+    it('the attack baseline is the club, not the last three results', () => {
+        expect(attackBaseline(null, 1)).toBeNull();
+        expect(attackBaseline(study, 99)).toBeNull();
+        // Ten matches: the strong side well above the league rate, the weak one below, neither at its raw average.
+        expect(attackBaseline(study, 1)!).toBeGreaterThan(1.8);
+        expect(attackBaseline(study, 1)!).toBeLessThan(2.5);
+        expect(attackBaseline(study, 2)!).toBeLessThan(1.1);
+        // Three matches without a goal: pulled most of the way back to the league rate.
+        const quiet: SeasonStudy = {...study, teams: [profile(1, 'Quiet', 3, 0, 5)]};
+        expect(attackBaseline(quiet, 1)!).toBeGreaterThan(0.9);
     });
 });
