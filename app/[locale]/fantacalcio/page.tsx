@@ -25,8 +25,11 @@ export default async function FantasyHome({params}: PageProps<"/[locale]/fantaca
                         <Link href="/fantacalcio/asta" className="bb-btn bg-accent px-4 h-10 inline-flex items-center self-start text-[13px] font-extrabold">{t('auctionCta')}</Link>
                     </div>
                 </Panel>
-                <Panel title={t('soonTitle')}>
-                    <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('soonText')}</p>
+                <Panel title={t('lineupTitle')}>
+                    <div className="px-3 py-3 flex flex-col gap-3">
+                        <p className="text-[13px] font-semibold">{t('lineupText')}</p>
+                        <Link href="/fantacalcio/formazione" className="bb-btn bg-accent px-4 h-10 inline-flex items-center self-start text-[13px] font-extrabold">{t('lineupCta')}</Link>
+                    </div>
                 </Panel>
             </div>
         </SiteShell>

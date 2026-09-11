@@ -1,6 +1,6 @@
 'use client';
 
-import {Activity, ArrowLeftRight, ChevronDown, ChevronUp, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
+import {Activity, ArrowLeftRight, ChevronDown, ChevronUp, ClipboardList, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
 import {useEffect, useMemo, useRef, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -450,6 +450,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: tst(`${health.best.key}.name`)})}</span>}
                             </button>
                         )}
+                        <Link href="/fantacalcio/formazione" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" aria-hidden="true" />{t('lineup')}</Link>
                         <CloudMenu config={config} purchases={purchases} />
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
                         <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>

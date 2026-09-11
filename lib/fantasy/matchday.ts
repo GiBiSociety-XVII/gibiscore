@@ -1,0 +1,251 @@
+import {DEFAULT_DEFENCE_BONUS, DEFENCE_THRESHOLDS, type DefenceBonus} from './config';
+import type {FantaEvents, FantaRole, FantaRules} from './scores';
+import {FORMATIONS, type FormationKey} from './strategies';
+
+/**
+ * The lineup for a matchday: who of a roster to field, in which
+ * formation, and how to order the bench, from what the coming round
+ * actually looks like. Each player gets a chance of playing (the club's
+ * official lineup when it is out, otherwise how the coach has used him
+ * this season and the auction's starter mark) and the fantasy points he
+ * is expected to score when he plays (his rating and bonus rates, moved
+ * by the match: home or away, how strong the opponent is, how many goals
+ * his side and the other are expected to score). Pure: the data comes
+ * from the matchday loader.
+ */
+
+export type UsageStatus = 'started' | 'sub' | 'bench' | 'out';
+
+export interface RecentMatch {
+    fixtureId: number;
+    /** How he was used: started, came on, sat the whole match, not in the squad. */
+    status: UsageStatus;
+    minutes: number;
+    rating: number | null;
+    goals: number;
+    assists: number;
+}
+
+export interface MatchdayFixture {
+    id: number;
+    round: string;
+    startingAt: string;
+    state: string;
+    home: {id: number; name: string};
+    away: {id: number; name: string};
+    /** Expected goals of each side and the outcome percentages, when the season has enough matches. */
+    prediction: {lambdaHome: number; lambdaAway: number; home: number; draw: number; away: number} | null;
+    /** Goals per match each side has scored this season (the yardstick for a match's expected goals). */
+    avgFor: {home: number | null; away: number | null};
+}
+
+export interface PlayerContext {
+    teamId: number;
+    /** This season's league matches of his club, most recent first. */
+    recent: RecentMatch[];
+    /** The club's official lineup for the round's fixture, once published. */
+    official: 'starter' | 'bench' | 'out' | null;
+    sidelined: {category: string; description: string | null; longTerm: boolean} | null;
+}
+
+export interface MatchdayPlayer {
+    id: number;
+    name: string;
+    slug: string;
+    role: FantaRole;
+    team: {id: number; name: string};
+    penaltyTaker: boolean;
+    scores: {starter: number; fantaAvg: number | null; events: FantaEvents | null};
+}
+
+export type ForecastReason =
+    | {kind: 'official'; status: 'starter' | 'bench' | 'out'}
+    | {kind: 'sidelined'; category: string; longTerm: boolean; description: string | null}
+    | {kind: 'doubtful'; description: string | null}
+    | {kind: 'noMatch'}
+    | {kind: 'usage'; started: number; came: number; total: number}
+    | {kind: 'noUsage'}
+    | {kind: 'match'; home: boolean; opponent: string; win: number; lambdaFor: number; lambdaAgainst: number}
+    | {kind: 'attack'; factor: number}
+    | {kind: 'cleanSheet'; pct: number}
+    | {kind: 'penalty'};
+
+export interface PlayerForecast {
+    player: MatchdayPlayer;
+    fixture: MatchdayFixture | null;
+    home: boolean | null;
+    opponent: {id: number; name: string} | null;
+    /** Chance he plays enough to get a vote. */
+    plays: number;
+    /** Expected rating (the vote alone) when he plays. */
+    rating: number;
+    /** Expected fantasy points when he plays. */
+    points: number;
+    /** What fielding him is worth: plays × points. */
+    value: number;
+    reasons: ForecastReason[];
+}
+
+export interface FormationTotal {
+    key: FormationKey;
+    total: number;
+}
+
+export interface LineupAdvice {
+    formation: FormationKey;
+    /** The eleven, keeper first then by role, best first within the role. */
+    starters: PlayerForecast[];
+    /** The rest of the roster as a bench: by role, the most useful first. */
+    bench: PlayerForecast[];
+    total: number;
+    /** Every formation, best first. */
+    formations: FormationTotal[];
+}
+
+export interface MatchdayOptions {
+    rules: FantaRules;
+    defenceModifier?: boolean | DefenceBonus;
+    /** The formation the roster was built for: chosen when within a hair of the best. */
+    prefer?: FormationKey | null;
+    /** A formation chosen by hand: fielded whatever it is worth. */
+    force?: FormationKey | null;
+}
+
+const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
+/** Rating a player without history is expected to get. */
+const ROLE_RATING: Record<FantaRole, number> = {P: 6.0, D: 6.0, C: 6.05, A: 6.1};
+/** Recent matches weigh 1, 0.8, 0.64... going back. */
+const RECENCY = 0.8;
+/** The auction's starter mark counts as this many matches beside the recent ones. */
+const PRIOR_MATCHES = 1.5;
+/** Goals a side scores per match when the season cannot say yet. */
+const LEAGUE_GOALS = 1.35;
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** The chance of a vote: the official lineup, else absences, else how the coach has used him and the auction's mark. */
+function playChance(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: MatchdayFixture | null, reasons: ForecastReason[]): number {
+    if (!fixture) {
+        reasons.push({kind: 'noMatch'});
+        return 0;
+    }
+    if (ctx?.official) {
+        reasons.push({kind: 'official', status: ctx.official});
+        return ctx.official === 'starter' ? 0.95 : ctx.official === 'bench' ? 0.25 : 0.02;
+    }
+    if (ctx?.sidelined && ctx.sidelined.category !== 'doubtful') {
+        reasons.push({kind: 'sidelined', category: ctx.sidelined.category, longTerm: ctx.sidelined.longTerm, description: ctx.sidelined.description});
+        return 0;
+    }
+    const recent = ctx?.recent ?? [];
+    let weight = 0;
+    let used = 0;
+    let started = 0;
+    let came = 0;
+    recent.slice(0, 8).forEach((m, i) => {
+        const w = RECENCY ** i;
+        weight += w;
+        if (m.status === 'started') {
+            used += w;
+            started += 1;
+        } else if (m.status === 'sub') {
+            used += 0.5 * w;
+            came += 1;
+        }
+    });
+    const prior = clamp(p.scores.starter / 100, 0, 1);
+    let chance = weight > 0 ? (used + PRIOR_MATCHES * prior) / (weight + PRIOR_MATCHES) : prior;
+    if (recent.length > 0) reasons.push({kind: 'usage', started, came, total: Math.min(8, recent.length)});
+    else reasons.push({kind: 'noUsage'});
+    if (ctx?.sidelined?.category === 'doubtful') {
+        reasons.push({kind: 'doubtful', description: ctx.sidelined.description});
+        chance *= 0.45;
+    }
+    return clamp(chance, 0.02, 0.97);
+}
+
+/** Expected rating and fantasy points when he plays, moved by the match ahead. */
+function expectedPoints(p: MatchdayPlayer, fixture: MatchdayFixture | null, home: boolean | null, rules: FantaRules, reasons: ForecastReason[]): {rating: number; points: number} {
+    const ev = p.scores.events;
+    const baseRating = ev?.rating ?? p.scores.fantaAvg ?? ROLE_RATING[p.role];
+    let rating = baseRating;
+    let attack = 1;
+    let lambdaAgainst: number | null = null;
+    const pr = fixture?.prediction ?? null;
+    if (fixture && pr && home !== null) {
+        const win = home ? pr.home : pr.away;
+        const lose = home ? pr.away : pr.home;
+        const lambdaFor = home ? pr.lambdaHome : pr.lambdaAway;
+        lambdaAgainst = home ? pr.lambdaAway : pr.lambdaHome;
+        // A side that wins rates better: a quarter of a point between a sure win and a sure loss; home a little more.
+        rating += 0.25 * ((win - lose) / 100) + (home ? 0.05 : -0.05);
+        const avg = (home ? fixture.avgFor.home : fixture.avgFor.away) ?? LEAGUE_GOALS;
+        attack = clamp(lambdaFor / Math.max(0.3, avg), 0.6, 1.6);
+        reasons.push({kind: 'match', home, opponent: home ? fixture.away.name : fixture.home.name, win, lambdaFor, lambdaAgainst});
+        if (Math.abs(attack - 1) >= 0.15 && p.role !== 'P') reasons.push({kind: 'attack', factor: attack});
+    }
+    if (!ev) return {rating, points: rating};
+    let points = rating + ev.goals * attack * rules.goal + ev.assists * attack * rules.assist + ev.yellow * rules.yellow + ev.red * rules.red + ev.penaltyMissed * rules.penaltyMissed;
+    if (p.role === 'P') {
+        const conceded = lambdaAgainst ?? ev.conceded;
+        const cleanSheet = lambdaAgainst !== null ? Math.exp(-lambdaAgainst) : ev.cleanSheet;
+        points += conceded * rules.goalConceded + cleanSheet * rules.cleanSheet + ev.penaltySaved * rules.penaltySaved;
+        if (lambdaAgainst !== null) reasons.push({kind: 'cleanSheet', pct: Math.round(cleanSheet * 100)});
+    }
+    if (p.penaltyTaker && p.role !== 'P') reasons.push({kind: 'penalty'});
+    return {rating, points: Math.round(points * 100) / 100};
+}
+
+/** One player's outlook for the round. */
+export function forecastPlayer(p: MatchdayPlayer, ctx: PlayerContext | null, fixtures: MatchdayFixture[], rules: FantaRules): PlayerForecast {
+    const fixture = fixtures.find((f) => f.home.id === p.team.id || f.away.id === p.team.id) ?? null;
+    const home = fixture ? fixture.home.id === p.team.id : null;
+    const opponent = fixture ? (home ? fixture.away : fixture.home) : null;
+    const reasons: ForecastReason[] = [];
+    const plays = playChance(p, ctx, fixture, reasons);
+    const {rating, points} = expectedPoints(p, fixture, home, rules, reasons);
+    return {player: p, fixture, home, opponent, plays, rating: Math.round(rating * 100) / 100, points, value: Math.round(plays * points * 100) / 100, reasons};
+}
+
+/** The defence modifier expected from a keeper and defenders' votes, paid in proportion to how surely they play. */
+function defenceBonusOf(keeper: PlayerForecast | undefined, defenders: PlayerForecast[], bonus: DefenceBonus): number {
+    if (!keeper || defenders.length < bonus.minDefenders) return 0;
+    const line = [keeper, ...defenders.slice(0, 3)];
+    const avg = line.reduce((s, f) => s + f.rating, 0) / line.length;
+    let points = 0;
+    DEFENCE_THRESHOLDS.forEach((from, i) => {
+        if (avg >= from) points = bonus.points[i] ?? points;
+    });
+    const onPitch = [keeper, ...defenders.slice(0, bonus.minDefenders)].reduce((s, f) => s + f.plays, 0) / (1 + bonus.minDefenders);
+    return points * onPitch;
+}
+
+/**
+ * The lineup advice for a roster: every formation valued with its
+ * automatic substitutions (when a starter misses, the first of the bench
+ * in his role plays), the best chosen, the whole bench ordered.
+ */
+export function recommendLineup(forecasts: PlayerForecast[], options: MatchdayOptions): LineupAdvice {
+    const bonus = options.defenceModifier === true ? DEFAULT_DEFENCE_BONUS : options.defenceModifier || null;
+    const byRole = {} as Record<FantaRole, PlayerForecast[]>;
+    for (const role of ROLES) byRole[role] = forecasts.filter((f) => f.player.role === role).sort((a, b) => b.value - a.value || b.plays - a.plays);
+    const valued = FORMATIONS.map((f) => {
+        let total = 0;
+        for (const role of ROLES) {
+            const fielded = byRole[role].slice(0, f.need[role]);
+            const cover = byRole[role][f.need[role]]?.value ?? 0;
+            const allPlay = fielded.reduce((prod, x) => prod * x.plays, 1);
+            total += fielded.reduce((s, x) => s + x.value, 0) + (fielded.length > 0 ? (1 - allPlay) * cover : 0);
+        }
+        if (bonus && f.need.D >= bonus.minDefenders) total += defenceBonusOf(byRole.P[0], byRole.D.slice(0, f.need.D), bonus);
+        return {key: f.key, total: Math.round(total * 10) / 10};
+    }).sort((a, b) => b.total - a.total);
+    const best = valued[0];
+    const forced = options.force ? valued.find((v) => v.key === options.force) : undefined;
+    const preferred = options.prefer ? valued.find((v) => v.key === options.prefer && v.total >= best.total * 0.98) : undefined;
+    const chosen = forced ?? preferred ?? best;
+    const shape = FORMATIONS.find((f) => f.key === chosen.key)!;
+    const starters = ROLES.flatMap((role) => byRole[role].slice(0, shape.need[role]));
+    const bench = ROLES.flatMap((role) => byRole[role].slice(shape.need[role]));
+    return {formation: chosen.key, starters, bench, total: chosen.total, formations: [chosen, ...valued.filter((v) => v !== chosen)]};
+}
