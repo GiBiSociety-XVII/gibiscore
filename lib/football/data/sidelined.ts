@@ -25,6 +25,8 @@ interface StoredRow {
     category: string;
     description: string | null;
     start_date: string | null;
+    end_date: string | null;
+    source: string | null;
     player: SidelinedPlayerRow | null;
 }
 
@@ -84,7 +86,7 @@ export async function loadTeamSidelined(db: ReturnType<typeof footballDb>, teamI
                 (a, b) =>
                     db
                         .from('sidelined')
-                        .select('player_id,team_id,category,description,start_date,player:players(id,name,slug,image_url,position),season:seasons!inner(is_current)')
+                        .select('player_id,team_id,category,description,start_date,end_date,source,player:players(id,name,slug,image_url,position),season:seasons!inner(is_current)')
                         .in('team_id', teamIds)
                         .eq('seasons.is_current', true)
                         .order('id')
@@ -98,7 +100,7 @@ export async function loadTeamSidelined(db: ReturnType<typeof footballDb>, teamI
         for (const r of rows) {
             if (!r.player || r.team_id === null || !r.start_date) continue;
             players.set(r.player_id, r.player);
-            input.push({playerId: r.player_id, teamId: r.team_id, date: r.start_date, category: r.category, description: r.description});
+            input.push({playerId: r.player_id, teamId: r.team_id, date: r.start_date, category: r.category, description: r.description, ...(r.source === 'player' ? {until: r.end_date} : {})});
         }
         for (const spell of buildSpells(input, {today, teamPlayedAfter: playedAfter(dates)})) {
             if (!spell.active) continue;

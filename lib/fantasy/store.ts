@@ -1,7 +1,7 @@
 'use client';
 
 import {useSyncExternalStore} from 'react';
-import {CLOUD_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
+import {CLOUD_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -92,6 +92,8 @@ function parsePins(raw: unknown): LineupPins {
     return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((id): id is number => typeof id === 'number' && Number.isInteger(id)).slice(0, 11)]));
 }
 export const pinsStore = createJsonStore<LineupPins>(PINS_KEY, parsePins, {});
+/** Players marked out by hand on the lineup page (the news is ahead of the data), player ids per saved team. */
+export const outsStore = createJsonStore<LineupPins>(OUTS_KEY, parsePins, {});
 
 const noop = () => () => {};
 /** False during server render and hydration, true afterwards: lets the page wait for localStorage before choosing what to show. */

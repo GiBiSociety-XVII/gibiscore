@@ -1,6 +1,6 @@
 'use client';
 
-import {Pin, PinOff, Settings2, Trash2} from "lucide-react";
+import {Ban, Pin, PinOff, Settings2, Trash2} from "lucide-react";
 import {useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -13,7 +13,7 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
-import {pinsStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
+import {outsStore, pinsStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -33,9 +33,11 @@ function toMatchdayPlayer(p: AuctionPlayer): MatchdayPlayer {
 }
 
 /** The club's use of the player this season, plus the official lineup: out when his club published one without him. */
-function contextOf(p: AuctionPlayer, ctx: MatchdayContext): PlayerContext | null {
+function contextOf(p: AuctionPlayer, ctx: MatchdayContext, manualOut: boolean): PlayerContext | null {
     const known = ctx.players[p.id];
     const official = ctx.official[p.id] ?? (ctx.officialTeams.includes(p.team.id) ? 'out' : null);
+    // Marked out by hand: the news is ahead of the data, and it beats even the official lineup.
+    if (manualOut) return {teamId: known?.teamId ?? p.team.id, recent: known?.recent ?? [], sidelined: {category: 'manual', description: null, longTerm: false}, official: null};
     if (!known && !official) return null;
     return {teamId: known?.teamId ?? p.team.id, recent: known?.recent ?? [], sidelined: known?.sidelined ?? null, official};
 }
@@ -56,6 +58,8 @@ function useReasonText() {
             case 'noUsage': return t('noUsage');
             case 'match': return t('match', {where: r.home ? t('home') : t('away'), opponent: r.opponent, win: Math.round(r.win), lambdaFor: r.lambdaFor.toFixed(1), lambdaAgainst: r.lambdaAgainst.toFixed(1)});
             case 'attack': return t(r.factor > 1 ? 'attackUp' : 'attackDown', {pct: Math.round(Math.abs(r.factor - 1) * 100)});
+            case 'form': return t('form', {own: r.own, opp: r.opp, of: r.of});
+            case 'manual': return t('manual');
             case 'cleanSheet': return t('cleanSheet', {pct: r.pct});
             case 'penalty': return t('penalty');
         }
@@ -107,7 +111,7 @@ function FantasyPitch({starters, formation, byId, pinned}: {starters: PlayerFore
     );
 }
 
-function ForecastRow({f, index, byId, reasonText, muted = false, pinned, onPin}: {f: PlayerForecast; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void}) {
+function ForecastRow({f, index, byId, reasonText, muted = false, pinned, onPin, out, onOut}: {f: PlayerForecast; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const p = byId.get(f.player.id);
@@ -116,11 +120,16 @@ function ForecastRow({f, index, byId, reasonText, muted = false, pinned, onPin}:
     const opponent = p && fixture ? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null} : null;
     const state = fixture ? (fixture.state === 'finished' ? t('played') : ['live', 'half_time', 'extra_time', 'penalties'].includes(fixture.state) ? t('live') : fixture.state === 'postponed' || fixture.state === 'cancelled' ? t('postponed') : null) : null;
     return (
-        <tr className={cn("border-t border-muted align-top", muted && !pinned && "opacity-70", pinned && "bg-accent/20")}>
+        <tr className={cn("border-t border-muted align-top", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
             <td className="px-1 py-1.5">
-                <button type="button" onClick={onPin} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center", pinned ? "bg-foreground text-background" : "bg-card")}>
-                    {pinned ? <PinOff className="w-3 h-3" aria-hidden="true" /> : <Pin className="w-3 h-3" aria-hidden="true" />}
-                </button>
+                <span className="flex items-center gap-0.5">
+                    <button type="button" onClick={onPin} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center", pinned ? "bg-foreground text-background" : "bg-card")}>
+                        {pinned ? <PinOff className="w-3 h-3" aria-hidden="true" /> : <Pin className="w-3 h-3" aria-hidden="true" />}
+                    </button>
+                    <button type="button" onClick={onOut} aria-pressed={out} title={out ? t('unout') : t('out')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center", out ? "bg-red-700 text-background" : "bg-card")}>
+                        <Ban className="w-3 h-3" aria-hidden="true" />
+                    </button>
+                </span>
             </td>
             {index !== null && <td className="px-2 py-1.5 font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground">{index}</td>}
             <td className="px-1 py-1.5"><RoleBadge role={f.player.role} /></td>
@@ -186,6 +195,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     const hydrated = useHydrated();
     const saved = teamsStore.useValue();
     const allPins = pinsStore.useValue();
+    const allOuts = outsStore.useValue();
     const [forced, setForced] = useState<FormationKey | null>(null);
 
     if (!hydrated) return <p className="text-sm font-semibold text-muted-foreground">…</p>;
@@ -259,7 +269,13 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
 
-    const forecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context), context.fixtures, current.rules));
+    // Players marked out by hand: the news is ahead of the data.
+    const outs = new Set((allOuts[current.id] ?? []).filter((id) => rosterIds.has(id)));
+    const toggleOut = (id: number) => {
+        const next = outs.has(id) ? [...outs].filter((x) => x !== id) : [...outs, id];
+        outsStore.write({...allOuts, [current.id]: next});
+    };
+    const forecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context, outs.has(p.id)), context.fixtures, current.rules));
     // Starters pinned by hand for this team: the lineup is built around them.
     const pinned = new Set((allPins[current.id] ?? []).filter((id) => rosterIds.has(id)));
     const togglePin = (id: number) => {
@@ -293,6 +309,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                     {missingCount > 0 && <p className="bb-surface px-3 py-2 text-[12px] font-semibold text-red-700">{t('short', {count: missingCount})}</p>}
                     <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
                         <Pin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        {outs.size > 0 && <span className="text-red-700 font-extrabold">{t('outsCount', {count: outs.size})}</span>}
                         {pinned.size === 0 ? (
                             <span className="text-muted-foreground">{t('pinsHint')}</span>
                         ) : (
@@ -309,7 +326,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <table className="w-full text-[12px]">
                                 <Head withIndex={false} />
                                 <tbody>
-                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} />)}
+                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -320,7 +337,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <table className="w-full text-[12px]">
                                 <Head withIndex />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -378,6 +395,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <li>{t('how4')}</li>
                             {defenceOption(current) !== false && <li>{t('how5')}</li>}
                             <li>{t('how6')}</li>
+                            <li>{t('how7')}</li>
                         </ul>
                     </Panel>
                 </div>

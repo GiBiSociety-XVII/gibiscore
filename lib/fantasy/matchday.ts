@@ -9,9 +9,9 @@ import {FORMATIONS, type FormationKey} from './strategies';
  * official lineup when it is out, otherwise how the coach has used him
  * this season and the auction's starter mark) and the fantasy points he
  * is expected to score when he plays (his rating and bonus rates, moved
- * by the match: home or away, how strong the opponent is, how many goals
- * his side and the other are expected to score). Pure: the data comes
- * from the matchday loader.
+ * by the match: home or away, how strong the opponent is, the form of
+ * both sides, how many goals his side and the other are expected to
+ * score). Pure: the data comes from the matchday loader.
  */
 
 export type UsageStatus = 'started' | 'sub' | 'bench' | 'out';
@@ -37,6 +37,8 @@ export interface MatchdayFixture {
     prediction: {lambdaHome: number; lambdaAway: number; home: number; draw: number; away: number} | null;
     /** Goals per match each side has scored this season (the yardstick for a match's expected goals). */
     avgFor: {home: number | null; away: number | null};
+    /** Last results of each side, oldest first ("WWDLW"), null when unknown. */
+    form: {home: string | null; away: string | null};
 }
 
 export interface PlayerContext {
@@ -66,6 +68,8 @@ export type ForecastReason =
     | {kind: 'usage'; started: number; came: number; total: number}
     | {kind: 'noUsage'}
     | {kind: 'match'; home: boolean; opponent: string; win: number; lambdaFor: number; lambdaAgainst: number}
+    | {kind: 'form'; own: number; opp: number; of: number}
+    | {kind: 'manual'}
     | {kind: 'attack'; factor: number}
     | {kind: 'cleanSheet'; pct: number}
     | {kind: 'penalty'};
@@ -124,6 +128,23 @@ const RECENCY = 0.8;
 const PRIOR_MATCHES = 1.5;
 /** Goals a side scores per match when the season cannot say yet. */
 const LEAGUE_GOALS = 1.35;
+/** Rating between a sure win and a sure loss. */
+const WIN_SWING = 0.35;
+/** Rating between a side in full form and one in none, against the opponent's. */
+const FORM_SWING = 0.2;
+/** Rating of a keeper or defender between a sure clean sheet and none, around the usual chance. */
+const CLEAN_SHEET_SWING = 0.3;
+const USUAL_CLEAN_SHEET = Math.exp(-1.3);
+/** How hard the match's expected goals move the bonus rates: above 1 stretches the gap between a big and a small opponent. */
+const ATTACK_POWER = 1.15;
+
+/** Points won in the last results as a fraction of the maximum, null when nothing is known. */
+export function formScore(form: string | null): number | null {
+    if (!form) return null;
+    const results = form.split('').filter((c) => c === 'W' || c === 'D' || c === 'L');
+    if (results.length === 0) return null;
+    return results.reduce((s, r) => s + (r === 'W' ? 3 : r === 'D' ? 1 : 0), 0) / (results.length * 3);
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -136,6 +157,10 @@ function playChance(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: Match
     if (ctx?.official) {
         reasons.push({kind: 'official', status: ctx.official});
         return ctx.official === 'starter' ? 0.95 : ctx.official === 'bench' ? 0.25 : 0.02;
+    }
+    if (ctx?.sidelined?.category === 'manual') {
+        reasons.push({kind: 'manual'});
+        return 0;
     }
     if (ctx?.sidelined && ctx.sidelined.category !== 'doubtful') {
         reasons.push({kind: 'sidelined', category: ctx.sidelined.category, longTerm: ctx.sidelined.longTerm, description: ctx.sidelined.description});
@@ -181,10 +206,21 @@ function expectedPoints(p: MatchdayPlayer, fixture: MatchdayFixture | null, home
         const lose = home ? pr.away : pr.home;
         const lambdaFor = home ? pr.lambdaHome : pr.lambdaAway;
         lambdaAgainst = home ? pr.lambdaAway : pr.lambdaHome;
-        // A side that wins rates better: a quarter of a point between a sure win and a sure loss; home a little more.
-        rating += 0.25 * ((win - lose) / 100) + (home ? 0.05 : -0.05);
+        // A side that wins rates better: a third of a point between a sure win and a sure loss (the gap between a
+        // big club and a small one, as the prediction sees it); home a little more.
+        rating += WIN_SWING * ((win - lose) / 100) + (home ? 0.05 : -0.05);
+        // Form on top: a side on a run against one in a slump, from the last results of both.
+        const own = formScore(home ? fixture.form.home : fixture.form.away);
+        const opp = formScore(home ? fixture.form.away : fixture.form.home);
+        if (own !== null && opp !== null) {
+            rating += FORM_SWING * (own - opp);
+            const of = Math.max((home ? fixture.form.home : fixture.form.away)!.length, 1) * 3;
+            if (Math.abs(own - opp) >= 0.2) reasons.push({kind: 'form', own: Math.round(own * of), opp: Math.round(opp * of), of});
+        }
+        // Keepers and defenders rate with the sheet: facing a weak attack lifts them, a strong one weighs.
+        if (p.role === 'P' || p.role === 'D') rating += CLEAN_SHEET_SWING * (Math.exp(-lambdaAgainst) - USUAL_CLEAN_SHEET);
         const avg = (home ? fixture.avgFor.home : fixture.avgFor.away) ?? LEAGUE_GOALS;
-        attack = clamp(lambdaFor / Math.max(0.3, avg), 0.6, 1.6);
+        attack = clamp((lambdaFor / Math.max(0.3, avg)) ** ATTACK_POWER, 0.5, 1.8);
         reasons.push({kind: 'match', home, opponent: home ? fixture.away.name : fixture.home.name, win, lambdaFor, lambdaAgainst});
         if (Math.abs(attack - 1) >= 0.15 && p.role !== 'P') reasons.push({kind: 'attack', factor: attack});
     }

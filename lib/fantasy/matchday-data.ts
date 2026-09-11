@@ -95,7 +95,11 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     // Predictions from the season's numbers.
     const study = await getSeasonStudy(season.id);
     const avgFor = new Map<number, number>();
-    for (const t of study?.teams ?? []) if (t.played > 0) avgFor.set(t.team.id, t.goalsFor / t.played);
+    const formOf = new Map<number, string>();
+    for (const t of study?.teams ?? []) {
+        if (t.played > 0) avgFor.set(t.team.id, t.goalsFor / t.played);
+        if (t.form.length > 0) formOf.set(t.team.id, t.form.join(''));
+    }
     const matchday: MatchdayFixture[] = roundFixtures.map((f) => {
         const p = predictMatch(study, f.home_team_id, f.away_team_id);
         return {
@@ -107,6 +111,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
             away: {id: f.away!.id, name: f.away!.name},
             prediction: p ? {lambdaHome: p.lambda.home, lambdaAway: p.lambda.away, home: p.home, draw: p.draw, away: p.away} : null,
             avgFor: {home: avgFor.get(f.home_team_id) ?? null, away: avgFor.get(f.away_team_id) ?? null},
+            form: {home: formOf.get(f.home_team_id) ?? null, away: formOf.get(f.away_team_id) ?? null},
         };
     });
 

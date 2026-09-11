@@ -630,8 +630,8 @@
     "officialBadge": "ufficiale",
     "howTitle": "Come funziona",
     "how1": "Gioca: con la formazione ufficiale (pubblicata circa un'ora prima) un titolare vale 95%, un panchinaro 25%, chi è fuori 2%. Prima, contano infortuni e squalifiche in corso, poi come il club l'ha usato nelle ultime otto partite (le recenti pesano di più) e la titolarità dell'asta.",
-    "how2": "Voto: la media reale, spostata dalla partita: chi gioca in casa e ha più probabilità di vincere prende un voto un po' più alto.",
-    "how3": "Bonus: i gol e assist a partita del giocatore, moltiplicati per quanto la sua squadra è attesa segnare in questa partita rispetto alla sua media (previsione da xG e classifica). Per i portieri contano i gol attesi dall'avversario e la probabilità di porta inviolata.",
+    "how2": "Voto: la media reale, spostata dalla partita: un terzo di punto tra una vittoria sicura e una sconfitta sicura (la forza del club contro l'avversario, come la vede la previsione), un quinto per la forma delle ultime cinque contro quella dell'avversario, un po' in più in casa. Portieri e difensori salgono contro un attacco debole e scendono contro uno forte.",
+    "how3": "Bonus: i gol e assist a partita del giocatore, scalati su quanto la sua squadra è attesa segnare in questa partita rispetto alla sua media (previsione da xG, classifica e forma), con la leva allargata: una big contro una piccola vale fino a +80%, il contrario fino a -50%. Per i portieri contano i gol attesi dall'avversario e la probabilità di porta inviolata.",
     "how4": "Modulo: per ogni modulo si sommano i valori degli undici, più la copertura della prima riserva quando un titolare rischia di non avere il voto.",
     "how5": "Modificatore difesa: stimato dai voti attesi di portiere e difensori, pesato su quanto è sicuro che giochino.",
     "reasons": {
@@ -654,7 +654,9 @@
       "attackUp": "partita da gol (+{pct}%)",
       "attackDown": "partita chiusa (-{pct}%)",
       "cleanSheet": "porta inviolata {pct}%",
-      "penalty": "rigorista"
+      "penalty": "rigorista",
+      "form": "forma {own}/{of} contro {opp}/{of}",
+      "manual": "segnato fuori da te"
     },
     "colPin": "Titolare fisso",
     "pin": "Titolare fisso: lo schiero comunque e costruisco la formazione intorno a lui",
@@ -670,6 +672,10 @@
     "how6": "Titolari fissi: chi fissi con lo spillo parte sempre nel suo ruolo; i moduli senza posto per tutti i fissi escono dalla scelta. Vedi subito quanti punti attesi ti costa la scelta.",
     "noTeams": "Nessuna squadra salvata su questo dispositivo. Le rose si salvano da sole dall'asta: la squadra in pianificazione, con i suoi acquisti e le regole della lega, compare qui. Un'asta per ogni fantacalcio, e qui le trovi tutte.",
     "removeTeam": "Togli questa squadra dalla lista",
-    "removeConfirm": "Togliere {team} ({league}) dalle squadre salvate? La rosa resta nell'asta, se è ancora quella."
+    "removeConfirm": "Togliere {team} ({league}) dalle squadre salvate? La rosa resta nell'asta, se è ancora quella.",
+    "out": "Segna fuori: infortunato o assente, anche se i dati non lo dicono ancora",
+    "unout": "Torna disponibile",
+    "outsCount": "{count, plural, one {# segnato fuori da te} other {# segnati fuori da te}}",
+    "how7": "Assenze: infortuni e squalifiche arrivano da due fonti del provider, la lista per partita (ogni due ore) e le schede per giocatore con data di rientro (ogni sei ore). Se una notizia è più veloce dei dati, il pulsante ⊘ segna il giocatore fuori: resta fuori finché non lo liberi."
   }
 }

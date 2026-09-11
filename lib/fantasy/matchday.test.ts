@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {CLASSIC_RULES} from './scores';
 import {forecastPlayer, recommendLineup, type MatchdayFixture, type MatchdayPlayer, type PlayerContext, type RecentMatch} from './matchday';
 
-const fixture: MatchdayFixture = {id: 1, round: 'R4', startingAt: '2026-09-13T18:45:00Z', state: 'scheduled', home: {id: 10, name: 'Inter'}, away: {id: 20, name: 'Lecce'}, prediction: {lambdaHome: 2.2, lambdaAway: 0.6, home: 72, draw: 18, away: 10}, avgFor: {home: 1.9, away: 0.9}};
+const fixture: MatchdayFixture = {id: 1, round: 'R4', startingAt: '2026-09-13T18:45:00Z', state: 'scheduled', home: {id: 10, name: 'Inter'}, away: {id: 20, name: 'Lecce'}, prediction: {lambdaHome: 2.2, lambdaAway: 0.6, home: 72, draw: 18, away: 10}, avgFor: {home: 1.9, away: 0.9}, form: {home: 'WWWDW', away: 'LLDLL'}};
 const player = (id: number, role: MatchdayPlayer['role'], teamId: number, starter: number, over: Partial<MatchdayPlayer['scores']['events']> = {}): MatchdayPlayer => ({
     id, name: `${role}${id}`, slug: `p${id}`, role, team: {id: teamId, name: teamId === 10 ? 'Inter' : 'Lecce'}, penaltyTaker: false,
     scores: {starter, fantaAvg: 6.8, events: {rating: 6.4, goals: 0.3, assists: 0.1, yellow: 0.1, red: 0, penaltyMissed: 0, penaltySaved: 0, conceded: 1.2, cleanSheet: 0.3, ...over}},
@@ -50,6 +50,27 @@ describe('forecastPlayer', () => {
         // Expected 0.6 conceded: -0.6, clean sheet 55%: +0.55.
         expect(keeper.points).toBeCloseTo(keeper.rating - 0.6 + Math.exp(-0.6), 1);
         expect(keeper.reasons.some((r) => r.kind === 'cleanSheet' && r.pct === 55)).toBe(true);
+    });
+
+    it('a big club in form against a small one in a slump: the rating moves both ways, the sheet lifts the defenders', () => {
+        const ctx: PlayerContext = {teamId: 10, recent: recent(['started']), official: null, sidelined: null};
+        const even: MatchdayFixture = {...fixture, prediction: {lambdaHome: 1.3, lambdaAway: 1.3, home: 38, draw: 26, away: 36}, form: {home: 'WDLWD', away: 'WDLWD'}};
+        const bigHome = forecastPlayer(player(1, 'C', 10, 90), ctx, [fixture], CLASSIC_RULES);
+        const evenHome = forecastPlayer(player(1, 'C', 10, 90), ctx, [even], CLASSIC_RULES);
+        const smallAway = forecastPlayer(player(2, 'C', 20, 90), {...ctx, teamId: 20}, [fixture], CLASSIC_RULES);
+        expect(bigHome.rating).toBeGreaterThan(evenHome.rating + 0.2);
+        expect(smallAway.rating).toBeLessThan(evenHome.rating - 0.3);
+        expect(bigHome.reasons.some((r) => r.kind === 'form' && r.own > r.opp)).toBe(true);
+        const bigDefender = forecastPlayer(player(3, 'D', 10, 90, {goals: 0, assists: 0}), ctx, [fixture], CLASSIC_RULES);
+        const bigMid = forecastPlayer(player(4, 'C', 10, 90, {goals: 0, assists: 0}), ctx, [fixture], CLASSIC_RULES);
+        expect(bigDefender.rating).toBeGreaterThan(bigMid.rating);
+    });
+
+    it('a player marked out by hand does not play', () => {
+        const ctx: PlayerContext = {teamId: 10, recent: recent(['started', 'started']), official: null, sidelined: {category: 'manual', description: null, longTerm: false}};
+        const f = forecastPlayer(player(1, 'A', 10, 95), ctx, [fixture], CLASSIC_RULES);
+        expect(f.plays).toBe(0);
+        expect(f.reasons[0]).toEqual({kind: 'manual'});
     });
 });
 
