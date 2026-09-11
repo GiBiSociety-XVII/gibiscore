@@ -2,7 +2,7 @@ import type {ReactNode} from "react";
 import {cn} from "@/components/shared/ui/cn";
 
 /** Card with a compact title row, used by rails and secondary boxes. `scroll` caps the body height and scrolls it. */
-export function Panel({title, action, children, className, scroll = false}: {title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; scroll?: boolean}) {
+export function Panel({title, action, children, className, scroll = false, grow = false}: {title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; scroll?: boolean; /** The body fills the panel's height (with a `flex-1` or `h-full` on the panel). */ grow?: boolean}) {
     return (
         <section className={cn("bb-surface overflow-hidden flex flex-col shrink-0", className)}>
             {title && (
@@ -11,7 +11,7 @@ export function Panel({title, action, children, className, scroll = false}: {tit
                     {action}
                 </div>
             )}
-            <div className={cn(scroll && "max-h-[360px] overflow-y-auto [scrollbar-width:thin]")}>{children}</div>
+            <div className={cn(scroll && "max-h-[360px] overflow-y-auto [scrollbar-width:thin]", grow && "flex-1 flex flex-col min-h-0")}>{children}</div>
         </section>
     );
 }

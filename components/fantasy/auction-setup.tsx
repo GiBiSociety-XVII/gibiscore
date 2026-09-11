@@ -110,68 +110,70 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                 </div>
             </Panel>
 
-            <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-                <Panel title={t('slots')} action={<span className="text-[11px] font-bold text-muted-foreground">{t('slotsTotal', {count: totalSlots(config.slots)})}</span>}>
-                    <div className="grid grid-cols-4 gap-2 px-3 py-3">
-                        {ROLES.map((r) => (
-                            <Field key={r} label={t(`roles.${r}`)}>
-                                <NumberField value={config.slots[r]} min={1} max={12} onCommit={(n) => set('slots', {...config.slots, [r]: n})} />
-                            </Field>
-                        ))}
-                    </div>
-                </Panel>
-                <Panel title={t('modifiers')}>
-                    <div className="flex flex-col gap-2 px-3 py-3">
-                        {(Object.keys(config.modifiers) as Array<keyof AuctionConfig['modifiers']>).map((k) => (
-                            <label key={k} className="flex items-center gap-2 text-[13px] font-bold">
-                                <input type="checkbox" checked={config.modifiers[k]} onChange={(e) => set('modifiers', {...config.modifiers, [k]: e.target.checked})} className="w-4 h-4 accent-[rgb(var(--accent))]" />
-                                {t(`modifier.${k}`)}
-                            </label>
-                        ))}
-                    </div>
-                    {config.modifiers.defence && (
-                        <div className="px-3 py-2 border-t border-muted flex flex-col gap-2">
-                            <p className="text-[11px] font-semibold text-muted-foreground">{t('defenceBonusHint')}</p>
-                            <div className="grid grid-cols-6 gap-2">
-                                <Field label={t('defenceMin')}>
-                                    <NumberField value={config.defenceBonus.minDefenders} min={3} max={5} onCommit={(n) => set('defenceBonus', {...config.defenceBonus, minDefenders: n})} />
+            {/* Two columns: slots and the managers on the left (the managers take the height that is left), modifiers and rules on the right. */}
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-2 items-stretch">
+                <div className="flex flex-col gap-3 min-h-0">
+                    <Panel title={t('slots')} action={<span className="text-[11px] font-bold text-muted-foreground">{t('slotsTotal', {count: totalSlots(config.slots)})}</span>}>
+                        <div className="grid grid-cols-4 gap-2 px-3 py-3">
+                            {ROLES.map((r) => (
+                                <Field key={r} label={t(`roles.${r}`)}>
+                                    <NumberField value={config.slots[r]} min={1} max={12} onCommit={(n) => set('slots', {...config.slots, [r]: n})} />
                                 </Field>
-                                {DEFENCE_THRESHOLDS.map((from, i) => (
-                                    <Field key={from} label={`≥ ${from}`}>
-                                        <NumberField value={config.defenceBonus.points[i] ?? 0} min={0} max={20} decimals onCommit={(n) => set('defenceBonus', {...config.defenceBonus, points: config.defenceBonus.points.map((v, j) => (j === i ? n : v))})} />
-                                    </Field>
-                                ))}
-                            </div>
+                            ))}
                         </div>
-                    )}
-                    <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
-                        <input type="checkbox" checked={config.cupsCount} onChange={(e) => set('cupsCount', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
-                        <span className="flex flex-col"><span className="text-[13px] font-bold">{t('cupsCount')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('cupsCountHint')}</span></span>
-                    </label>
-                    <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
-                        <input type="checkbox" checked={config.keeperBlock} onChange={(e) => set('keeperBlock', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
-                        <span className="flex flex-col"><span className="text-[13px] font-bold">{t('keeperBlock')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('keeperBlockHint')}</span></span>
-                    </label>
-                </Panel>
-            </div>
-
-            <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-                <Panel title={t('rules')}>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 py-3">
-                        {(Object.keys(config.rules) as Array<keyof AuctionConfig['rules']>).map((k) => (
-                            <Field key={k} label={t(`rule.${k}`)}>
-                                <NumberField value={config.rules[k]} min={-10} max={10} decimals onCommit={(n) => set('rules', {...config.rules, [k]: n})} />
-                            </Field>
-                        ))}
-                        <p className="col-span-full text-[11px] font-semibold text-muted-foreground">{t('rulesHint')}</p>
-                    </div>
-                </Panel>
-                <Panel title={t('managers')}>
-                    <div className="px-3 py-3 flex flex-col gap-1">
-                        <textarea className={`${input} h-28 py-2 resize-y`} value={managersText} onChange={(e) => setManagersText(e.target.value)} placeholder={'Io\nMarco\nLuca'} />
-                        <span className="text-[11px] font-semibold text-muted-foreground">{t('managersHint')}</span>
-                    </div>
-                </Panel>
+                    </Panel>
+                    <Panel title={t('managers')} className="flex-1" grow>
+                        <div className="px-3 py-3 flex-1 flex flex-col gap-1 min-h-0">
+                            <textarea className={`${input} flex-1 min-h-28 py-2 resize-y`} value={managersText} onChange={(e) => setManagersText(e.target.value)} placeholder={'Io\nMarco\nLuca'} />
+                            <span className="text-[11px] font-semibold text-muted-foreground">{t('managersHint')}</span>
+                        </div>
+                    </Panel>
+                </div>
+                <div className="flex flex-col gap-3">
+                    <Panel title={t('modifiers')}>
+                        <div className="flex flex-col gap-2 px-3 py-3">
+                            {(Object.keys(config.modifiers) as Array<keyof AuctionConfig['modifiers']>).map((k) => (
+                                <label key={k} className="flex items-center gap-2 text-[13px] font-bold">
+                                    <input type="checkbox" checked={config.modifiers[k]} onChange={(e) => set('modifiers', {...config.modifiers, [k]: e.target.checked})} className="w-4 h-4 accent-[rgb(var(--accent))]" />
+                                    {t(`modifier.${k}`)}
+                                </label>
+                            ))}
+                        </div>
+                        {config.modifiers.defence && (
+                            <div className="px-3 py-2 border-t border-muted flex flex-col gap-2">
+                                <p className="text-[11px] font-semibold text-muted-foreground">{t('defenceBonusHint')}</p>
+                                <div className="grid grid-cols-6 gap-2">
+                                    <Field label={t('defenceMin')}>
+                                        <NumberField value={config.defenceBonus.minDefenders} min={3} max={5} onCommit={(n) => set('defenceBonus', {...config.defenceBonus, minDefenders: n})} />
+                                    </Field>
+                                    {DEFENCE_THRESHOLDS.map((from, i) => (
+                                        <Field key={from} label={`≥ ${from}`}>
+                                            <NumberField value={config.defenceBonus.points[i] ?? 0} min={0} max={20} decimals onCommit={(n) => set('defenceBonus', {...config.defenceBonus, points: config.defenceBonus.points.map((v, j) => (j === i ? n : v))})} />
+                                        </Field>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
+                            <input type="checkbox" checked={config.cupsCount} onChange={(e) => set('cupsCount', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
+                            <span className="flex flex-col"><span className="text-[13px] font-bold">{t('cupsCount')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('cupsCountHint')}</span></span>
+                        </label>
+                        <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
+                            <input type="checkbox" checked={config.keeperBlock} onChange={(e) => set('keeperBlock', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
+                            <span className="flex flex-col"><span className="text-[13px] font-bold">{t('keeperBlock')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('keeperBlockHint')}</span></span>
+                        </label>
+                    </Panel>
+                    <Panel title={t('rules')}>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 py-3">
+                            {(Object.keys(config.rules) as Array<keyof AuctionConfig['rules']>).map((k) => (
+                                <Field key={k} label={t(`rule.${k}`)}>
+                                    <NumberField value={config.rules[k]} min={-10} max={10} decimals onCommit={(n) => set('rules', {...config.rules, [k]: n})} />
+                                </Field>
+                            ))}
+                            <p className="col-span-full text-[11px] font-semibold text-muted-foreground">{t('rulesHint')}</p>
+                        </div>
+                    </Panel>
+                </div>
             </div>
 
             <div className="flex items-center gap-2 justify-end">
