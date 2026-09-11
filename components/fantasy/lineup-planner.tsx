@@ -1,6 +1,6 @@
 'use client';
 
-import {ChevronLeft, ChevronRight, Settings2} from "lucide-react";
+import {Settings2} from "lucide-react";
 import {useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -169,7 +169,7 @@ function Head({withIndex}: {withIndex: boolean}) {
  * it, the eleven on a pitch and the whole rest of the roster as an
  * ordered bench, with the reasons behind every chance and every point.
  */
-export function LineupPlanner({pool, context, round}: {pool: AuctionPool | null; context: MatchdayContext | null; round: string | null}) {
+export function LineupPlanner({pool, context}: {pool: AuctionPool | null; context: MatchdayContext | null}) {
     const t = useTranslations('Fantasy.lineup');
     const ts = useTranslations('Fantasy.setup');
     const format = useFormatter();
@@ -193,7 +193,7 @@ export function LineupPlanner({pool, context, round}: {pool: AuctionPool | null;
         );
     }
     if (pool && pool.league !== config.league) {
-        router.replace(`/fantacalcio/formazione?league=${config.league}${round ? `&round=${encodeURIComponent(round)}` : ''}`);
+        router.replace(`/fantacalcio/formazione?league=${config.league}`);
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     }
     if (!pool) return <p className="bb-surface px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('noPool')}</p>;
@@ -204,6 +204,7 @@ export function LineupPlanner({pool, context, round}: {pool: AuctionPool | null;
     const byId = new Map(players.map((p) => [p.id, p]));
     const roster = purchases.filter((p) => p.manager === team && byId.has(p.playerId)).map((p) => byId.get(p.playerId)!);
     const rosterIds = new Set(roster.map((p) => p.id));
+    const roundInfo = context?.rounds.find((r) => r.round === context.round) ?? null;
     const otherManagers = managers.map((name, i) => ({name, i, count: purchases.filter((p) => p.manager === i && byId.has(p.playerId)).length}));
 
     const toolbar = (
@@ -215,21 +216,13 @@ export function LineupPlanner({pool, context, round}: {pool: AuctionPool | null;
                     {otherManagers.map((m) => <option key={m.i} value={m.i}>{m.name} ({m.count})</option>)}
                 </select>
             </label>
-            {context && (
-                <span className="ml-auto flex items-center gap-1">
-                    <RoundLink context={context} step={-1} league={config.league} />
-                    <select
-                        value={context.round}
-                        onChange={(e) => router.push(`/fantacalcio/formazione?league=${config.league}&round=${encodeURIComponent(e.target.value)}`)}
-                        className="bb-input h-8 px-2 text-[12px] font-extrabold"
-                        aria-label={t('roundLabel')}
-                    >
-                        {context.rounds.map((r) => <option key={r.round} value={r.round}>{t('round', {round: roundName(r.round)})}{r.state === 'next' ? ` · ${t('roundNext')}` : r.state === 'live' ? ` · ${t('roundLive')}` : r.state === 'played' ? ` · ${t('roundPlayed')}` : ''}</option>)}
-                    </select>
-                    <RoundLink context={context} step={1} league={config.league} />
+            {context && roundInfo && (
+                <span className="ml-auto text-[12px] font-extrabold">
+                    {t('round', {round: roundName(context.round)})}
+                    <span className="ml-1 text-[11px] font-bold text-muted-foreground">· {roundInfo.state === 'live' ? t('roundLive') : t('roundNext')}</span>
                 </span>
             )}
-            <Link href="/fantacalcio/asta" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{t('toAuction')}</Link>
+            <Link href="/fantacalcio/asta" className="ml-auto bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{t('toAuction')}</Link>
         </div>
     );
 
@@ -252,7 +245,6 @@ export function LineupPlanner({pool, context, round}: {pool: AuctionPool | null;
 
     const forecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context), context.fixtures, config.rules));
     const advice = recommendLineup(forecasts, {rules: config.rules, defenceModifier: defenceOption(config), prefer: config.formation as FormationKey | null, force: forced});
-    const roundInfo = context.rounds.find((r) => r.round === context.round);
     const rosterTeams = [...new Set(roster.map((p) => p.team.id))];
     const withOfficial = rosterTeams.filter((id) => context.officialTeams.includes(id)).length;
     const fixturesOfRoster = context.fixtures.filter((f) => rosterTeams.includes(f.home.id) || rosterTeams.includes(f.away.id));
@@ -263,8 +255,7 @@ export function LineupPlanner({pool, context, round}: {pool: AuctionPool | null;
         <div className="flex flex-col gap-3">
             {toolbar}
             <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold">
-                <span className="font-extrabold text-[14px]">{t('round', {round: roundName(context.round)})}</span>
-                {roundInfo && <span className="text-muted-foreground">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
+                {roundInfo && <span className="font-extrabold">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
                 <span className={cn("bb-badge text-[10px] h-5 px-1.5", withOfficial > 0 ? "bg-emerald-200" : "bg-card")}>{t('officialCount', {have: withOfficial, total: rosterTeams.length})}</span>
                 <span className="text-muted-foreground">{t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
             </div>
@@ -353,15 +344,3 @@ export function LineupPlanner({pool, context, round}: {pool: AuctionPool | null;
     );
 }
 
-function RoundLink({context, step, league}: {context: MatchdayContext; step: -1 | 1; league: string}) {
-    const t = useTranslations('Fantasy.lineup');
-    const at = context.rounds.findIndex((r) => r.round === context.round);
-    const target = context.rounds[at + step];
-    const Icon = step < 0 ? ChevronLeft : ChevronRight;
-    if (!target) return <span className="bb-btn bg-card h-8 w-8 inline-flex items-center justify-center opacity-40"><Icon className="w-4 h-4" aria-hidden="true" /></span>;
-    return (
-        <Link href={`/fantacalcio/formazione?league=${league}&round=${encodeURIComponent(target.round)}`} className="bb-btn bg-card h-8 w-8 inline-flex items-center justify-center" aria-label={step < 0 ? t('prevRound') : t('nextRound')}>
-            <Icon className="w-4 h-4" aria-hidden="true" />
-        </Link>
-    );
-}

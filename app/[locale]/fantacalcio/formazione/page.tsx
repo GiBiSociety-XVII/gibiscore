@@ -21,12 +21,11 @@ export default async function LineupPage({params, searchParams}: {params: Promis
     setRequestLocale(locale);
     const t = await getTranslations('Fantasy.lineup');
     const league: AuctionLeague = isAuctionLeague(typeof sp.league === 'string' ? sp.league : null) ? (sp.league as AuctionLeague) : 'serie-a';
-    const round = typeof sp.round === 'string' && sp.round.length > 0 && sp.round.length <= 40 ? sp.round : null;
-    const [pool, context] = await Promise.all([getAuctionPool(league), getMatchday(league, round)]);
+    const [pool, context] = await Promise.all([getAuctionPool(league), getMatchday(league)]);
     return (
         <SiteShell wide sidebar={false}>
             <PageHeader title={t('title')} meta={t('intro')} />
-            <LineupPlanner pool={pool} context={context} round={round} />
+            <LineupPlanner pool={pool} context={context} />
         </SiteShell>
     );
 }

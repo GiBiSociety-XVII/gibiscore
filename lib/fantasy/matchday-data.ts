@@ -10,7 +10,7 @@ import type {MatchdayFixture, PlayerContext, RecentMatch} from './matchday';
 
 /**
  * What a matchday looks like, for the lineup advice: the rounds of the
- * season and the one to play next, its fixtures with the match
+ * season and the one to play (live or next), its fixtures with the match
  * predictions, and for every player seen this season how his club has
  * used him lately, the official lineup once published, and whether he
  * is out. Cached ten minutes; the lineup sync refreshes it when official
@@ -28,7 +28,7 @@ export interface MatchdayContext {
     league: AuctionLeague;
     seasonId: number;
     rounds: MatchdayRound[];
-    /** The round the advice is for. */
+    /** The round the advice is for: the one being played, else the next. */
     round: string;
     fixtures: MatchdayFixture[];
     /** Per player id: this season's use and absences (players never seen in a lineup are absent). */
@@ -55,7 +55,7 @@ interface FixtureRow {
     away: {id: number; name: string} | null;
 }
 
-async function buildMatchday(league: AuctionLeague, wanted: string | null): Promise<MatchdayContext | null> {
+async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | null> {
     const slugs = AUCTION_LEAGUES.find((l) => l.key === league)?.slugs ?? [];
     // One competition, one calendar: a multi-league pool has no matchday of its own.
     if (slugs.length !== 1) return null;
@@ -88,7 +88,8 @@ async function buildMatchday(league: AuctionLeague, wanted: string | null): Prom
         if (state === 'next' || state === 'live') nextFound = true;
         return {round, from: list[0].starting_at, to: list[list.length - 1].starting_at, state};
     });
-    const round = (wanted && byRound.has(wanted) ? wanted : null) ?? rounds.find((r) => r.state === 'live' || r.state === 'next')?.round ?? rounds[rounds.length - 1].round;
+    // Only the round to play: a lineup for a later one would pretend to know how clubs and players will be by then.
+    const round = rounds.find((r) => r.state === 'live' || r.state === 'next')?.round ?? rounds[rounds.length - 1].round;
     const roundFixtures = byRound.get(round) ?? [];
 
     // Predictions from the season's numbers.
@@ -168,9 +169,9 @@ async function buildMatchday(league: AuctionLeague, wanted: string | null): Prom
 
 const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 600, tags: ['fantasy-matchday']});
 
-export async function getMatchday(league: AuctionLeague, round: string | null = null): Promise<MatchdayContext | null> {
+export async function getMatchday(league: AuctionLeague): Promise<MatchdayContext | null> {
     try {
-        return await cachedMatchday(league, round);
+        return await cachedMatchday(league);
     } catch (error) {
         logReadError(`getMatchday(${league})`, error);
         return null;
