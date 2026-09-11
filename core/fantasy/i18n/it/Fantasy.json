@@ -678,6 +678,33 @@
     "outsCount": "{count, plural, one {# segnato fuori da te} other {# segnati fuori da te}}",
     "how7": "Assenze: infortuni e squalifiche arrivano da due fonti del provider, la lista per partita (ogni due ore) e le schede per giocatore con data di rientro (ogni sei ore). Se una notizia è più veloce dei dati, il pulsante ⊘ segna il giocatore fuori: resta fuori finché non lo liberi.",
     "slotOf": "Da solo, senza sostituzione: {value} (probabilità × fantavoto)",
-    "playsSplit": "Titolare {start} · voto da subentrato {sub} (vale {subPoints} punti)"
+    "playsSplit": "Titolare {start} · voto da subentrato {sub} (vale {subPoints} punti)",
+    "colUsage": "Tit.",
+    "colUsageHint": "Partite da titolare sulle ultime del club (+ da subentrato).",
+    "colForm": "Forma",
+    "colFormHint": "Punti nelle ultime partite: la sua squadra · l'avversario.",
+    "colWin": "Vitt.",
+    "colWinHint": "Probabilità di vittoria della sua squadra nella previsione.",
+    "colGoals": "xG",
+    "colGoalsHint": "Gol attesi: la sua squadra - l'avversario. Per portieri e difensori conta il secondo numero, per gli altri il primo.",
+    "colFactor": "Gol±",
+    "colFactorHint": "Quanto la partita muove i suoi bonus rispetto a una partita normale del club. Per i portieri, la probabilità di porta inviolata.",
+    "cleanSheetShort": "PI {pct}%",
+    "legendGood": "a favore",
+    "legendBad": "contro",
+    "legendHint": "Passa sopra a un numero per la spiegazione; sul nome per tutte le ragioni.",
+    "status": {
+      "manual": "KO",
+      "official": {
+        "starter": "uff. titolare",
+        "bench": "uff. panchina",
+        "out": "uff. fuori"
+      },
+      "injury": "infortunato",
+      "suspension": "squalificato",
+      "absent": "assente",
+      "doubtful": "in dubbio",
+      "noMatch": "non gioca"
+    }
   }
 }

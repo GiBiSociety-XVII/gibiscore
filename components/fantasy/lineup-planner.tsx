@@ -111,6 +111,29 @@ function FantasyPitch({starters, formation, byId, pinned}: {starters: PlayerFore
     );
 }
 
+/** Green for what plays in his favour, red against, from thresholds; neutral in between. */
+type Tone = 'good' | 'fine' | 'none' | 'bad' | 'worst';
+const TONE_CLASS: Record<Tone, string> = {good: "bg-emerald-200", fine: "bg-emerald-100", none: "bg-card", bad: "bg-red-100", worst: "bg-red-200"};
+function toneOf(v: number, [worst, bad, fine, good]: [number, number, number, number]): Tone {
+    if (v >= good) return 'good';
+    if (v >= fine) return 'fine';
+    if (v <= worst) return 'worst';
+    if (v <= bad) return 'bad';
+    return 'none';
+}
+/** The same, for a number where lower is better. */
+const lowerIsBetter = (v: number, [good, fine, bad, worst]: [number, number, number, number]): Tone => (v <= good ? 'good' : v <= fine ? 'fine' : v >= worst ? 'worst' : v >= bad ? 'bad' : 'none');
+
+function Cell({tone, title, children, strong = false}: {tone: Tone; title?: string; children: React.ReactNode; strong?: boolean}) {
+    return <span className={cn("bb-badge font-mono tabular-nums h-5 px-1.5 whitespace-nowrap", strong ? "text-[12px] font-extrabold" : "text-[11px] font-bold", TONE_CLASS[tone])} title={title}>{children}</span>;
+}
+
+/** The forecast's reasons, one field each, for the columns. */
+function facts(f: PlayerForecast) {
+    const by = <K extends ForecastReason['kind']>(kind: K) => f.reasons.find((r): r is Extract<ForecastReason, {kind: K}> => r.kind === kind);
+    return {usage: by('usage'), form: by('form'), match: by('match'), attack: by('attack'), cleanSheet: by('cleanSheet'), official: by('official'), sidelined: by('sidelined'), doubtful: by('doubtful'), manual: by('manual'), noMatch: by('noMatch'), noUsage: by('noUsage')};
+}
+
 function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
@@ -119,8 +142,19 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
     const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
     const opponent = p && fixture ? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null} : null;
     const state = fixture ? (fixture.state === 'finished' ? t('played') : ['live', 'half_time', 'extra_time', 'penalties'].includes(fixture.state) ? t('live') : fixture.state === 'postponed' || fixture.state === 'cancelled' ? t('postponed') : null) : null;
+    const x = facts(f);
+    const defensive = f.player.role === 'P' || f.player.role === 'D';
+    // Status badges: what settles his chance before the numbers.
+    const status: Array<{key: string; label: string; tone: Tone; reason: ForecastReason}> = [];
+    if (x.manual) status.push({key: 'manual', label: t('status.manual'), tone: 'worst', reason: x.manual});
+    if (x.official) status.push({key: 'official', label: t(`status.official.${x.official.status}`), tone: x.official.status === 'starter' ? 'good' : x.official.status === 'bench' ? 'bad' : 'worst', reason: x.official});
+    if (x.sidelined) status.push({key: 'sidelined', label: t(x.sidelined.category === 'injury' ? 'status.injury' : x.sidelined.category === 'suspension' ? 'status.suspension' : 'status.absent'), tone: 'worst', reason: x.sidelined});
+    if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad', reason: x.doubtful});
+    if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst', reason: x.noMatch});
+    const usageRate = x.usage ? (x.usage.started + 0.5 * x.usage.came) / Math.max(1, x.usage.total) : null;
+    const td = "px-1.5 py-1.5 text-right";
     return (
-        <tr className={cn("border-t border-muted align-top", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+        <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
             <td className="px-1 py-1.5">
                 <span className="flex items-center gap-0.5">
                     <button type="button" onClick={onPin} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center", pinned ? "bg-foreground text-background" : "bg-card")}>
@@ -136,10 +170,14 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
             <td className="px-2 py-1.5 min-w-0">
                 <span className="flex items-center gap-1.5 min-w-0">
                     {p && <TeamCrest team={p.team} size={18} />}
-                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
+                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
                     {f.player.penaltyTaker && f.player.role !== 'P' && <span className="bb-badge bg-accent text-[9px] h-4 px-1" title={t('reasons.penalty')}>R</span>}
                 </span>
-                <span className="block text-[10px] font-semibold text-muted-foreground leading-snug">{f.reasons.map(reasonText).join(' · ')}</span>
+                {status.length > 0 && (
+                    <span className="flex flex-wrap gap-1 mt-0.5">
+                        {status.map((b) => <span key={b.key} className={cn("bb-badge text-[9px] h-4 px-1 uppercase", TONE_CLASS[b.tone])} title={reasonText(b.reason)}>{b.label}</span>)}
+                    </span>
+                )}
             </td>
             <td className="px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap">
                 {fixture && opponent ? (
@@ -151,29 +189,63 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                     <span className="text-muted-foreground">{t('noFixture')}</span>
                 )}
             </td>
-            <td className="px-2 py-1.5 text-right"><span className={cn("bb-badge font-mono text-[11px] tabular-nums h-5 px-1.5", chanceClass(f.plays))} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</span></td>
-            <td className="px-2 py-1.5 text-right font-mono text-[12px] font-bold tabular-nums">{f.rating.toFixed(2)}</td>
-            <td className="px-2 py-1.5 text-right font-mono text-[12px] font-bold tabular-nums">{f.points.toFixed(2)}</td>
-            <td className="px-2 py-1.5 text-right font-mono text-[13px] font-extrabold tabular-nums" title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</td>
+            <td className={td}>
+                {x.usage && usageRate !== null ? (
+                    <Cell tone={toneOf(usageRate, [0.3, 0.5, 0.75, 0.9])} title={reasonText(x.usage)}>{x.usage.started}/{x.usage.total}{x.usage.came > 0 && <span className="opacity-70"> +{x.usage.came}</span>}</Cell>
+                ) : x.noUsage ? (
+                    <Cell tone="bad" title={reasonText(x.noUsage)}>–</Cell>
+                ) : null}
+            </td>
+            <td className={td}>
+                {x.form && <Cell tone={toneOf(x.form.own - x.form.opp, [-5, -3, 3, 5])} title={reasonText(x.form)}>{x.form.own}<span className="opacity-60">·</span>{x.form.opp}</Cell>}
+            </td>
+            <td className={td}>
+                {x.match && <Cell tone={toneOf(x.match.win, [25, 35, 50, 60])} title={reasonText(x.match)}>{Math.round(x.match.win)}%</Cell>}
+            </td>
+            <td className={td}>
+                {x.match && (
+                    <Cell tone={defensive ? lowerIsBetter(x.match.lambdaAgainst, [0.9, 1.1, 1.5, 1.9]) : toneOf(x.match.lambdaFor, [0.9, 1.1, 1.6, 2.0])} title={x.cleanSheet ? `${reasonText(x.match)} · ${reasonText(x.cleanSheet)}` : reasonText(x.match)}>
+                        {x.match.lambdaFor.toFixed(1)}<span className="opacity-60">-</span>{x.match.lambdaAgainst.toFixed(1)}
+                    </Cell>
+                )}
+            </td>
+            <td className={td}>
+                {x.attack ? (
+                    <Cell tone={toneOf(x.attack.factor, [0.7, 0.85, 1.15, 1.3])} title={reasonText(x.attack)}>{x.attack.factor >= 1 ? '+' : '−'}{Math.round(Math.abs(x.attack.factor - 1) * 100)}%</Cell>
+                ) : x.cleanSheet ? (
+                    <Cell tone={toneOf(x.cleanSheet.pct, [15, 22, 35, 45])} title={reasonText(x.cleanSheet)}>{t('cleanSheetShort', {pct: x.cleanSheet.pct})}</Cell>
+                ) : x.match && f.player.role !== 'P' ? (
+                    <Cell tone="none">=</Cell>
+                ) : null}
+            </td>
+            <td className={td}><Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</Cell></td>
+            <td className={td}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
+            <td className={td}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
+            <td className={td}><Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])} title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</Cell></td>
         </tr>
     );
 }
 
 function Head({withIndex}: {withIndex: boolean}) {
     const t = useTranslations('Fantasy.lineup');
-    const th = "px-2 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground";
+    const th = "px-1.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-right whitespace-nowrap";
     return (
         <thead className="bg-card">
             <tr>
                 <th className={cn(th, "px-1")} aria-label={t('colPin')} />
-                {withIndex && <th className={cn(th, "text-left")}>#</th>}
+                {withIndex && <th className={cn(th, "text-left px-2")}>#</th>}
                 <th className={cn(th, "px-1")} aria-label={t('colRole')} />
-                <th className={cn(th, "text-left")}>{t('colPlayer')}</th>
-                <th className={cn(th, "text-left")}>{t('colMatch')}</th>
-                <th className={cn(th, "text-right")} title={t('colPlaysHint')}>{t('colPlays')}</th>
-                <th className={cn(th, "text-right")} title={t('colRatingHint')}>{t('colRating')}</th>
-                <th className={cn(th, "text-right")} title={t('colPointsHint')}>{t('colPoints')}</th>
-                <th className={cn(th, "text-right")} title={t('colValueHint')}>{t('colValue')}</th>
+                <th className={cn(th, "text-left px-2")}>{t('colPlayer')}</th>
+                <th className={cn(th, "text-left px-2")}>{t('colMatch')}</th>
+                <th className={th} title={t('colUsageHint')}>{t('colUsage')}</th>
+                <th className={th} title={t('colFormHint')}>{t('colForm')}</th>
+                <th className={th} title={t('colWinHint')}>{t('colWin')}</th>
+                <th className={th} title={t('colGoalsHint')}>{t('colGoals')}</th>
+                <th className={th} title={t('colFactorHint')}>{t('colFactor')}</th>
+                <th className={th} title={t('colPlaysHint')}>{t('colPlays')}</th>
+                <th className={th} title={t('colRatingHint')}>{t('colRating')}</th>
+                <th className={th} title={t('colPointsHint')}>{t('colPoints')}</th>
+                <th className={th} title={t('colValueHint')}>{t('colValue')}</th>
             </tr>
         </thead>
     );
@@ -322,6 +394,11 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                         )}
                     </div>
                     <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
+                        <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted flex flex-wrap gap-x-3 gap-y-1">
+                            <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.good)}> </span>{t('legendGood')}</span>
+                            <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.worst)}> </span>{t('legendBad')}</span>
+                            <span>{t('legendHint')}</span>
+                        </p>
                         <div className="overflow-x-auto">
                             <table className="w-full text-[12px]">
                                 <Head withIndex={false} />
