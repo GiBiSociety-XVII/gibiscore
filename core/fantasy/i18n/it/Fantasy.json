@@ -9,7 +9,7 @@
     "auctionText": "Configura crediti, partecipanti, rosa Classic o Mantra, regole e modificatori. Poi il listone con voti, fantamedia stimata, crediti consigliati e il tabellone degli acquisti.",
     "auctionCta": "Apri l'asta",
     "lineupTitle": "Formazione",
-    "lineupText": "Ogni settimana, la formazione consigliata della tua rosa per la prossima giornata: modulo, undici e panchina ordinata, calcolati su titolarità reale, infortuni, formazioni ufficiali e previsione della partita.",
+    "lineupText": "Ogni settimana, la formazione consigliata per ognuna delle tue squadre: modulo, undici e panchina ordinata, calcolati su titolarità reale, infortuni, formazioni ufficiali e previsione della partita. Le rose arrivano da sole dalle aste.",
     "lineupCta": "Apri la formazione"
   },
   "auction": {
@@ -588,13 +588,11 @@
     "title": "Formazione consigliata",
     "metaTitle": "Formazione consigliata fantacalcio",
     "metaDescription": "Modulo e undici consigliati per la giornata: titolarità reale, formazioni ufficiali, infortuni e previsione della partita per ogni giocatore della tua rosa.",
-    "intro": "La formazione per la prossima giornata di campionato, e solo per quella: ogni settimana si aggiorna con formazioni ufficiali, assenze e previsioni delle partite. Per ogni giocatore della rosa: la probabilità che giochi e i punti attesi nella partita che ha davanti.",
-    "noConfig": "Nessuna lega configurata su questo dispositivo: configura l'asta e registra la rosa, poi la formazione arriva da sola.",
-    "goSetup": "Configura l'asta",
+    "intro": "La formazione per la prossima giornata di campionato, e solo per quella: ogni settimana si aggiorna con formazioni ufficiali, assenze e previsioni delle partite. Le squadre sono quelle salvate dalle tue aste, una per fantacalcio: si cambia squadra qui, senza toccare l'asta.",
+    "goSetup": "Vai all'asta",
     "noPool": "Listone non disponibile in questo momento. Riprova tra qualche minuto.",
     "noMatchday": "Calendario non disponibile per questa lega: la formazione consigliata funziona con il campionato di un solo paese.",
-    "defaultTeam": "Squadra 1",
-    "teamLabel": "Formazione per",
+    "teamLabel": "Squadra",
     "round": "Giornata {round}",
     "roundNext": "prossima",
     "roundLive": "in corso",
@@ -669,6 +667,9 @@
     "clearPins": "Togli tutti",
     "noRoom": "I titolari fissi non ci stanno in questo modulo",
     "noRoomBadge": "non ci stanno",
-    "how6": "Titolari fissi: chi fissi con lo spillo parte sempre nel suo ruolo; i moduli senza posto per tutti i fissi escono dalla scelta. Vedi subito quanti punti attesi ti costa la scelta."
+    "how6": "Titolari fissi: chi fissi con lo spillo parte sempre nel suo ruolo; i moduli senza posto per tutti i fissi escono dalla scelta. Vedi subito quanti punti attesi ti costa la scelta.",
+    "noTeams": "Nessuna squadra salvata su questo dispositivo. Le rose si salvano da sole dall'asta: la squadra in pianificazione, con i suoi acquisti e le regole della lega, compare qui. Un'asta per ogni fantacalcio, e qui le trovi tutte.",
+    "removeTeam": "Togli questa squadra dalla lista",
+    "removeConfirm": "Togliere {team} ({league}) dalle squadre salvate? La rosa resta nell'asta, se è ancora quella."
   }
 }

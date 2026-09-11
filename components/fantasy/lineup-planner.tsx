@@ -1,6 +1,6 @@
 'use client';
 
-import {Pin, PinOff, Settings2} from "lucide-react";
+import {Pin, PinOff, Settings2, Trash2} from "lucide-react";
 import {useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -13,14 +13,14 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
-import {configStore, pinsStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
+import {pinsStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
 
 /** The pool's players as the league sees them: roles corrected by hand, cups in or out, the league's own rules. */
-function leaguePlayers(pool: AuctionPool, config: AuctionConfig): AuctionPlayer[] {
+function leaguePlayers(pool: AuctionPool, config: Pick<AuctionConfig, 'roleOverrides' | 'cupsCount' | 'rules'>): AuctionPlayer[] {
     const overrides = config.roleOverrides;
     const fixed = Object.keys(overrides).length > 0 ? pool.players.map((p) => (overrides[String(p.id)] && overrides[String(p.id)] !== p.role ? {...p, role: overrides[String(p.id)], roleSource: 'manual' as const} : p)) : pool.players;
     const chosen = config.cupsCount ? fixed : fixed.map((p) => ({...p, scores: p.scoresLeagueOnly}));
@@ -171,10 +171,11 @@ function Head({withIndex}: {withIndex: boolean}) {
 }
 
 /**
- * The lineup advice for a matchday: my roster (or any team at the table)
- * valued for the round ahead, the formation that gets the most out of
- * it, the eleven on a pitch and the whole rest of the roster as an
- * ordered bench, with the reasons behind every chance and every point.
+ * The lineup advice for a matchday: one of my teams (saved by the
+ * auction board, one per fantasy league) valued for the round ahead, the
+ * formation that gets the most out of it, the eleven on a pitch and the
+ * whole rest of the roster as an ordered bench, with the reasons behind
+ * every chance and every point.
  */
 export function LineupPlanner({pool, context}: {pool: AuctionPool | null; context: MatchdayContext | null}) {
     const t = useTranslations('Fantasy.lineup');
@@ -183,54 +184,61 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     const reasonText = useReasonText();
     const router = useRouter();
     const hydrated = useHydrated();
-    const config = configStore.useValue();
-    const purchases = purchasesStore.useValue();
+    const saved = teamsStore.useValue();
     const allPins = pinsStore.useValue();
-    const [teamChoice, setTeamChoice] = useState<number | null>(null);
     const [forced, setForced] = useState<FormationKey | null>(null);
 
     if (!hydrated) return <p className="text-sm font-semibold text-muted-foreground">…</p>;
-    if (!config) {
+    const teams = [...saved.teams].sort((a, b) => a.leagueName.localeCompare(b.leagueName) || a.name.localeCompare(b.name));
+    const current = teams.find((x) => x.id === saved.current) ?? teams[0];
+    if (!current) {
         return (
             <Panel title={t('title')}>
                 <div className="px-3 py-3 flex flex-col gap-3">
-                    <p className="text-[13px] font-semibold">{t('noConfig')}</p>
+                    <p className="text-[13px] font-semibold">{t('noTeams')}</p>
                     <Link href="/fantacalcio/asta" className="bb-btn bg-accent px-4 h-10 inline-flex items-center self-start text-[13px] font-extrabold">{t('goSetup')}</Link>
                 </div>
             </Panel>
         );
     }
-    if (pool && pool.league !== config.league) {
-        router.replace(`/fantacalcio/formazione?league=${config.league}`);
+    if (pool && pool.league !== current.league) {
+        router.replace(`/fantacalcio/formazione?league=${current.league}`);
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     }
     if (!pool) return <p className="bb-surface px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('noPool')}</p>;
 
-    const managers = config.managers.length > 0 ? config.managers : [t('defaultTeam')];
-    const team = teamChoice !== null && teamChoice < managers.length ? teamChoice : Math.min(config.me, managers.length - 1);
-    const players = leaguePlayers(pool, config);
+    const players = leaguePlayers(pool, current);
     const byId = new Map(players.map((p) => [p.id, p]));
-    const roster = purchases.filter((p) => p.manager === team && byId.has(p.playerId)).map((p) => byId.get(p.playerId)!);
+    const roster = current.players.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p);
     const rosterIds = new Set(roster.map((p) => p.id));
     const roundInfo = context?.rounds.find((r) => r.round === context.round) ?? null;
-    const otherManagers = managers.map((name, i) => ({name, i, count: purchases.filter((p) => p.manager === i && byId.has(p.playerId)).length}));
+    const leagueLabel = (x: typeof current) => x.leagueName || ts(`leagues.${x.league}`);
+    const choose = (id: string) => {
+        teamsStore.write({...saved, current: id});
+        setForced(null);
+    };
+    const remove = () => {
+        if (!window.confirm(t('removeConfirm', {team: current.name, league: leagueLabel(current)}))) return;
+        teamsStore.write({teams: saved.teams.filter((x) => x.id !== current.id), current: null});
+    };
 
     const toolbar = (
         <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)}</span>
-            <label className="flex items-center gap-1.5 text-[11px] font-bold">
+            <label className="flex items-center gap-1.5 text-[11px] font-bold min-w-0">
                 <span className="text-muted-foreground">{t('teamLabel')}</span>
-                <select value={team} onChange={(e) => setTeamChoice(Number(e.target.value))} className="bb-input h-8 px-2 text-[12px] font-extrabold">
-                    {otherManagers.map((m) => <option key={m.i} value={m.i}>{m.name} ({m.count})</option>)}
+                <select value={current.id} onChange={(e) => choose(e.target.value)} className="bb-input h-8 px-2 text-[12px] font-extrabold max-w-[260px]">
+                    {teams.map((x) => <option key={x.id} value={x.id}>{x.name} · {leagueLabel(x)} ({x.players.length})</option>)}
                 </select>
             </label>
+            <span className="text-[11px] font-semibold text-muted-foreground hidden sm:inline">{ts(`modes.${current.mode}`)}{current.formation ? ` · ${current.formation}` : ''}</span>
+            <button type="button" onClick={remove} title={t('removeTeam')} className="bb-btn bg-card h-8 w-8 inline-flex items-center justify-center"><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /></button>
             {context && roundInfo && (
                 <span className="ml-auto text-[12px] font-extrabold">
                     {t('round', {round: roundName(context.round)})}
                     <span className="ml-1 text-[11px] font-bold text-muted-foreground">· {roundInfo.state === 'live' ? t('roundLive') : t('roundNext')}</span>
                 </span>
             )}
-            <Link href="/fantacalcio/asta" className="ml-auto bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{t('toAuction')}</Link>
+            <Link href="/fantacalcio/asta" className={cn("bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", !(context && roundInfo) && "ml-auto")}><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{t('toAuction')}</Link>
         </div>
     );
 
@@ -238,7 +246,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         return (
             <div className="flex flex-col gap-3">
                 {toolbar}
-                <p className="bb-surface px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('emptyRoster', {team: managers[team]})}</p>
+                <p className="bb-surface px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('emptyRoster', {team: current.name})}</p>
             </div>
         );
     }
@@ -251,15 +259,15 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
 
-    const forecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context), context.fixtures, config.rules));
+    const forecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context), context.fixtures, current.rules));
     // Starters pinned by hand for this team: the lineup is built around them.
-    const pinned = new Set((allPins[String(team)] ?? []).filter((id) => rosterIds.has(id)));
+    const pinned = new Set((allPins[current.id] ?? []).filter((id) => rosterIds.has(id)));
     const togglePin = (id: number) => {
         const next = pinned.has(id) ? [...pinned].filter((x) => x !== id) : [...pinned, id];
-        pinsStore.write({...allPins, [String(team)]: next});
+        pinsStore.write({...allPins, [current.id]: next});
     };
-    const clearPins = () => pinsStore.write({...allPins, [String(team)]: []});
-    const options = {rules: config.rules, defenceModifier: defenceOption(config), prefer: config.formation as FormationKey | null};
+    const clearPins = () => pinsStore.write({...allPins, [current.id]: []});
+    const options = {rules: current.rules, defenceModifier: defenceOption(current), prefer: current.formation as FormationKey | null};
     const advice = recommendLineup(forecasts, {...options, force: forced, pinned});
     // What the pins cost: the same roster left to the numbers alone.
     const free = pinned.size > 0 ? recommendLineup(forecasts, options) : advice;
@@ -330,7 +338,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                                         {!f.feasible && <span className="bb-badge bg-red-200 text-[9px] h-4 px-1">{t('noRoomBadge')}</span>}
                                         {i === 0 && f.key === advice.formation && forced === null && <span className="bb-badge bg-accent text-[9px] h-4 px-1">{t('best')}</span>}
                                         {forced === f.key && <span className="bb-badge bg-foreground text-background text-[9px] h-4 px-1">{t('forced')}</span>}
-                                        {config.formation === f.key && <span className="bb-badge bg-card text-[9px] h-4 px-1">{t('leagueFormation')}</span>}
+                                        {current.formation === f.key && <span className="bb-badge bg-card text-[9px] h-4 px-1">{t('leagueFormation')}</span>}
                                     </button>
                                 </li>
                             ))}
@@ -368,7 +376,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <li>{t('how2')}</li>
                             <li>{t('how3')}</li>
                             <li>{t('how4')}</li>
-                            {defenceOption(config) !== false && <li>{t('how5')}</li>}
+                            {defenceOption(current) !== false && <li>{t('how5')}</li>}
                             <li>{t('how6')}</li>
                         </ul>
                     </Panel>

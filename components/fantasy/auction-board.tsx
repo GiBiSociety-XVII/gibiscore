@@ -19,12 +19,12 @@ import {TableBar} from "./table-bar";
 import {TargetsPanel} from "./targets-panel";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {keeperBlocks} from "@/lib/fantasy/block";
-import {DEFAULT_RULES, ROLE_SHARE, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
+import {DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
-import {cloudStore, configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
+import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, STRATEGIES, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
@@ -207,6 +207,18 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
             return (vb as number) - (va as number) || b.scores.overall - a.scores.overall;
         });
     }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices]);
+
+    // The planning team is kept for the lineup page: every purchase of mine, and the league's settings, as they change.
+    useEffect(() => {
+        if (!config) return;
+        const names = config.managers.length > 0 ? config.managers : [t('me')];
+        const index = Math.min(config.me, names.length - 1);
+        const team = savedTeamOf(config, purchases, index, names[index]);
+        const stored = teamsStore.read();
+        const previous = stored.teams.find((x) => x.id === team.id);
+        if (previous ? sameSavedTeam(previous, team) : team.players.length === 0) return;
+        teamsStore.write({...stored, teams: [...stored.teams.filter((x) => x.id !== team.id), team]});
+    }, [config, purchases, t]);
 
     if (!hydrated) return <p className="text-sm font-semibold text-muted-foreground">…</p>;
 
