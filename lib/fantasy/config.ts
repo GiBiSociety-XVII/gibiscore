@@ -116,7 +116,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
 };
 
 /** Share of the market that usually goes to each role (Serie A leagues, classic). */
-export const ROLE_SHARE: Record<FantaRole, number> = {P: 0.11, D: 0.11, C: 0.24, A: 0.54};
+export const ROLE_SHARE: Record<FantaRole, number> = {P: 0.1, D: 0.13, C: 0.24, A: 0.53};
 
 export const STORAGE_KEY = 'gibiscore:fanta:auction';
 export const ROSTER_KEY = 'gibiscore:fanta:roster';
