@@ -1,7 +1,7 @@
 'use client';
 
 import {useSyncExternalStore} from 'react';
-import {CLOUD_KEY, ROSTER_KEY, STORAGE_KEY, normalizeConfig, type AuctionConfig, type Purchase} from './config';
+import {CLOUD_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, normalizeConfig, type AuctionConfig, type Purchase} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -72,6 +72,14 @@ function parseCloudLink(raw: unknown): CloudLink | null {
     return r && typeof r.id === 'string' && typeof r.savedAt === 'string' ? {id: r.id, savedAt: r.savedAt} : null;
 }
 export const cloudStore = createJsonStore<CloudLink | null>(CLOUD_KEY, parseCloudLink, null);
+
+/** Starters pinned by hand on the lineup page, player ids per manager index. */
+export type LineupPins = Record<string, number[]>;
+function parsePins(raw: unknown): LineupPins {
+    if (!raw || typeof raw !== 'object') return {};
+    return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter(([k, v]) => /^\d+$/.test(k) && Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((id): id is number => typeof id === 'number' && Number.isInteger(id)).slice(0, 11)]));
+}
+export const pinsStore = createJsonStore<LineupPins>(PINS_KEY, parsePins, {});
 
 const noop = () => () => {};
 /** False during server render and hydration, true afterwards: lets the page wait for localStorage before choosing what to show. */

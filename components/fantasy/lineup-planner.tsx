@@ -1,6 +1,6 @@
 'use client';
 
-import {Settings2} from "lucide-react";
+import {Pin, PinOff, Settings2} from "lucide-react";
 import {useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -13,7 +13,7 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
-import {configStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
+import {configStore, pinsStore, purchasesStore, useHydrated} from "@/lib/fantasy/store";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -70,7 +70,7 @@ function chanceClass(plays: number): string {
     return "bg-red-200";
 }
 
-function PitchDot({f, byId}: {f: PlayerForecast; byId: Map<number, AuctionPlayer>}) {
+function PitchDot({f, byId, pinned}: {f: PlayerForecast; byId: Map<number, AuctionPlayer>; pinned: boolean}) {
     const p = byId.get(f.player.id);
     const surname = f.player.name.split(' ').slice(-1)[0] ?? f.player.name;
     return (
@@ -80,6 +80,7 @@ function PitchDot({f, byId}: {f: PlayerForecast; byId: Map<number, AuctionPlayer
                     {p ? <TeamCrest team={p.team} size={26} /> : <RoleBadge role={f.player.role} />}
                 </span>
                 <span className={cn("absolute -top-1.5 -right-3 font-mono text-[9px] font-extrabold tabular-nums px-1 rounded border border-foreground leading-[14px] text-foreground", chanceClass(f.plays))}>{pct(f.plays)}</span>
+                {pinned && <span className="absolute -top-1.5 -left-2 inline-flex items-center justify-center w-4 h-4 rounded-full border border-foreground bg-foreground text-background"><Pin className="w-2.5 h-2.5" aria-hidden="true" /></span>}
             </span>
             <span className="text-[10px] md:text-[11px] font-bold leading-tight text-center truncate max-w-full text-background [text-shadow:0_1px_2px_rgba(0,0,0,.6)] group-hover:underline decoration-accent decoration-2 underline-offset-2">{surname}</span>
             <span className="font-mono text-[10px] font-extrabold tabular-nums leading-none text-background [text-shadow:0_1px_2px_rgba(0,0,0,.6)]">{f.points.toFixed(1)}</span>
@@ -88,7 +89,7 @@ function PitchDot({f, byId}: {f: PlayerForecast; byId: Map<number, AuctionPlayer
 }
 
 /** The eleven on a pitch: attackers at the top, the keeper at the bottom. */
-function FantasyPitch({starters, formation, byId}: {starters: PlayerForecast[]; formation: FormationKey; byId: Map<number, AuctionPlayer>}) {
+function FantasyPitch({starters, formation, byId, pinned}: {starters: PlayerForecast[]; formation: FormationKey; byId: Map<number, AuctionPlayer>; pinned: ReadonlySet<number>}) {
     const rows = [...ROLES].reverse().map((role) => starters.filter((f) => f.player.role === role));
     return (
         <div className="relative rounded-xl border-[2.5px] border-foreground overflow-hidden bg-[#3f8f3a] text-background">
@@ -99,14 +100,14 @@ function FantasyPitch({starters, formation, byId}: {starters: PlayerForecast[]; 
             <div className="relative flex flex-col gap-2 md:gap-3 px-2 py-3">
                 <div className="flex items-center justify-end px-1 text-[11px] font-extrabold uppercase tracking-wide"><span className="font-mono">{formation}</span></div>
                 {rows.map((line, i) => (
-                    <div key={i} className="flex justify-around">{line.map((f) => <PitchDot key={f.player.id} f={f} byId={byId} />)}</div>
+                    <div key={i} className="flex justify-around">{line.map((f) => <PitchDot key={f.player.id} f={f} byId={byId} pinned={pinned.has(f.player.id)} />)}</div>
                 ))}
             </div>
         </div>
     );
 }
 
-function ForecastRow({f, index, byId, reasonText, muted = false}: {f: PlayerForecast; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean}) {
+function ForecastRow({f, index, byId, reasonText, muted = false, pinned, onPin}: {f: PlayerForecast; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const p = byId.get(f.player.id);
@@ -115,7 +116,12 @@ function ForecastRow({f, index, byId, reasonText, muted = false}: {f: PlayerFore
     const opponent = p && fixture ? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null} : null;
     const state = fixture ? (fixture.state === 'finished' ? t('played') : ['live', 'half_time', 'extra_time', 'penalties'].includes(fixture.state) ? t('live') : fixture.state === 'postponed' || fixture.state === 'cancelled' ? t('postponed') : null) : null;
     return (
-        <tr className={cn("border-t border-muted align-top", muted && "opacity-70")}>
+        <tr className={cn("border-t border-muted align-top", muted && !pinned && "opacity-70", pinned && "bg-accent/20")}>
+            <td className="px-1 py-1.5">
+                <button type="button" onClick={onPin} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center", pinned ? "bg-foreground text-background" : "bg-card")}>
+                    {pinned ? <PinOff className="w-3 h-3" aria-hidden="true" /> : <Pin className="w-3 h-3" aria-hidden="true" />}
+                </button>
+            </td>
             {index !== null && <td className="px-2 py-1.5 font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground">{index}</td>}
             <td className="px-1 py-1.5"><RoleBadge role={f.player.role} /></td>
             <td className="px-2 py-1.5 min-w-0">
@@ -150,6 +156,7 @@ function Head({withIndex}: {withIndex: boolean}) {
     return (
         <thead className="bg-card">
             <tr>
+                <th className={cn(th, "px-1")} aria-label={t('colPin')} />
                 {withIndex && <th className={cn(th, "text-left")}>#</th>}
                 <th className={cn(th, "px-1")} aria-label={t('colRole')} />
                 <th className={cn(th, "text-left")}>{t('colPlayer')}</th>
@@ -178,6 +185,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     const hydrated = useHydrated();
     const config = configStore.useValue();
     const purchases = purchasesStore.useValue();
+    const allPins = pinsStore.useValue();
     const [teamChoice, setTeamChoice] = useState<number | null>(null);
     const [forced, setForced] = useState<FormationKey | null>(null);
 
@@ -244,7 +252,18 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     }
 
     const forecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context), context.fixtures, config.rules));
-    const advice = recommendLineup(forecasts, {rules: config.rules, defenceModifier: defenceOption(config), prefer: config.formation as FormationKey | null, force: forced});
+    // Starters pinned by hand for this team: the lineup is built around them.
+    const pinned = new Set((allPins[String(team)] ?? []).filter((id) => rosterIds.has(id)));
+    const togglePin = (id: number) => {
+        const next = pinned.has(id) ? [...pinned].filter((x) => x !== id) : [...pinned, id];
+        pinsStore.write({...allPins, [String(team)]: next});
+    };
+    const clearPins = () => pinsStore.write({...allPins, [String(team)]: []});
+    const options = {rules: config.rules, defenceModifier: defenceOption(config), prefer: config.formation as FormationKey | null};
+    const advice = recommendLineup(forecasts, {...options, force: forced, pinned});
+    // What the pins cost: the same roster left to the numbers alone.
+    const free = pinned.size > 0 ? recommendLineup(forecasts, options) : advice;
+    const pinCost = Math.round((free.total - advice.total) * 10) / 10;
     const rosterTeams = [...new Set(roster.map((p) => p.team.id))];
     const withOfficial = rosterTeams.filter((id) => context.officialTeams.includes(id)).length;
     const fixturesOfRoster = context.fixtures.filter((f) => rosterTeams.includes(f.home.id) || rosterTeams.includes(f.away.id));
@@ -262,14 +281,27 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
 
             <div className="grid gap-3 grid-cols-1 lg:grid-cols-3 items-start">
                 <div className="lg:col-span-2 flex flex-col gap-3 min-w-0">
-                    <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} />
+                    <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} pinned={pinned} />
                     {missingCount > 0 && <p className="bb-surface px-3 py-2 text-[12px] font-semibold text-red-700">{t('short', {count: missingCount})}</p>}
+                    <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
+                        <Pin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        {pinned.size === 0 ? (
+                            <span className="text-muted-foreground">{t('pinsHint')}</span>
+                        ) : (
+                            <>
+                                <span className="font-extrabold">{t('pinsCount', {count: pinned.size})}</span>
+                                <span className={cn(pinCost > 0 ? "text-red-700" : "text-muted-foreground")}>{pinCost > 0 ? t('pinsCost', {cost: pinCost.toFixed(1), formation: free.formation}) : t('pinsFree')}</span>
+                                {!advice.formations[0].feasible && <span className="text-red-700">{t('pinsNoRoom')}</span>}
+                                <button type="button" onClick={clearPins} className="bb-btn bg-card h-6 px-2 text-[11px] font-extrabold ml-auto">{t('clearPins')}</button>
+                            </>
+                        )}
+                    </div>
                     <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
                         <div className="overflow-x-auto">
                             <table className="w-full text-[12px]">
                                 <Head withIndex={false} />
                                 <tbody>
-                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} index={null} byId={byId} reasonText={reasonText} />)}
+                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -280,7 +312,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <table className="w-full text-[12px]">
                                 <Head withIndex />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -292,9 +324,10 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                         <ul className="flex flex-col divide-y divide-muted">
                             {advice.formations.map((f, i) => (
                                 <li key={f.key}>
-                                    <button type="button" onClick={() => setForced(forced === f.key ? null : f.key)} aria-pressed={f.key === advice.formation} className={cn("w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-muted", f.key === advice.formation && "bg-accent/30")}>
+                                    <button type="button" onClick={() => setForced(forced === f.key ? null : f.key)} aria-pressed={f.key === advice.formation} disabled={!f.feasible && advice.formations[0].feasible} title={!f.feasible ? t('noRoom') : undefined} className={cn("w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent", f.key === advice.formation && "bg-accent/30")}>
                                         <span className="font-mono text-[13px] font-extrabold w-12">{f.key}</span>
                                         <span className="font-mono text-[12px] font-bold tabular-nums">{f.total.toFixed(1)}</span>
+                                        {!f.feasible && <span className="bb-badge bg-red-200 text-[9px] h-4 px-1">{t('noRoomBadge')}</span>}
                                         {i === 0 && f.key === advice.formation && forced === null && <span className="bb-badge bg-accent text-[9px] h-4 px-1">{t('best')}</span>}
                                         {forced === f.key && <span className="bb-badge bg-foreground text-background text-[9px] h-4 px-1">{t('forced')}</span>}
                                         {config.formation === f.key && <span className="bb-badge bg-card text-[9px] h-4 px-1">{t('leagueFormation')}</span>}
@@ -336,6 +369,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <li>{t('how3')}</li>
                             <li>{t('how4')}</li>
                             {defenceOption(config) !== false && <li>{t('how5')}</li>}
+                            <li>{t('how6')}</li>
                         </ul>
                     </Panel>
                 </div>

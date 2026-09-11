@@ -657,6 +657,18 @@
       "attackDown": "partita chiusa (-{pct}%)",
       "cleanSheet": "porta inviolata {pct}%",
       "penalty": "rigorista"
-    }
+    },
+    "colPin": "Titolare fisso",
+    "pin": "Titolare fisso: lo schiero comunque e costruisco la formazione intorno a lui",
+    "unpin": "Togli dai titolari fissi",
+    "pinsHint": "Ci credi in qualcuno? Con lo spillo lo fissi tra i titolari e la formazione si costruisce intorno a lui.",
+    "pinsCount": "{count, plural, one {# titolare fisso} other {# titolari fissi}}",
+    "pinsCost": "Costano {cost} punti attesi rispetto alla formazione libera ({formation}).",
+    "pinsFree": "Non costano nulla: erano già negli undici.",
+    "pinsNoRoom": "Sono più di quanti ne entrino in un modulo: qualcuno resta fuori.",
+    "clearPins": "Togli tutti",
+    "noRoom": "I titolari fissi non ci stanno in questo modulo",
+    "noRoomBadge": "non ci stanno",
+    "how6": "Titolari fissi: chi fissi con lo spillo parte sempre nel suo ruolo; i moduli senza posto per tutti i fissi escono dalla scelta. Vedi subito quanti punti attesi ti costa la scelta."
   }
 }

@@ -83,4 +83,31 @@ describe('recommendLineup', () => {
         const held = recommendLineup(forecasts, {rules: CLASSIC_RULES, prefer: free.formations[1].key});
         expect(held.formation).toBe(free.formations[1].total >= free.total * 0.98 ? free.formations[1].key : free.formation);
     });
+
+    it('builds the lineup around the pinned starters, dropping the formations with no room for them', () => {
+        const ctx: PlayerContext = {teamId: 10, recent: recent(['started', 'started']), official: null, sidelined: null};
+        const roster: MatchdayPlayer[] = [
+            player(1, 'P', 10, 100),
+            ...[2, 3, 4, 5, 6].map((id) => player(id, 'D', 10, 90)),
+            ...[7, 8, 9, 10, 11].map((id) => player(id, 'C', 10, 90)),
+            player(12, 'A', 10, 90, {goals: 0.6}), player(13, 'A', 10, 90, {goals: 0.5}), player(14, 'A', 10, 90, {goals: 0.4}),
+            // A fourth striker who never plays: pinned, he starts anyway.
+            player(15, 'A', 10, 5),
+        ];
+        const forecasts = roster.map((p) => forecastPlayer(p, ctx, [fixture], CLASSIC_RULES));
+        const free = recommendLineup(forecasts, {rules: CLASSIC_RULES});
+        expect(free.starters.some((f) => f.player.id === 15)).toBe(false);
+        const pinnedOne = recommendLineup(forecasts, {rules: CLASSIC_RULES, pinned: new Set([15])});
+        expect(pinnedOne.starters.some((f) => f.player.id === 15)).toBe(true);
+        expect(pinnedOne.total).toBeLessThanOrEqual(free.total);
+        // Four pinned strikers: no formation holds them, the three-striker ones come first and the rest is marked.
+        const pinnedFour = recommendLineup(forecasts, {rules: CLASSIC_RULES, pinned: new Set([12, 13, 14, 15])});
+        expect(pinnedFour.formations.every((f) => !f.feasible)).toBe(true);
+        expect(pinnedFour.formations[0].total).toBeGreaterThanOrEqual(pinnedFour.formations[1].total);
+        // Three pinned strikers: only the 3-4-3 and 4-3-3 fit, a forced 4-4-2 is ignored.
+        const three = recommendLineup(forecasts, {rules: CLASSIC_RULES, pinned: new Set([12, 13, 15]), force: '4-4-2'});
+        expect(['3-4-3', '4-3-3']).toContain(three.formation);
+        expect(three.formations.filter((f) => f.feasible).map((f) => f.key).sort()).toEqual(['3-4-3', '4-3-3']);
+        expect(three.starters.filter((f) => f.player.role === 'A').map((f) => f.player.id).sort()).toEqual([12, 13, 15]);
+    });
 });

@@ -89,6 +89,8 @@ export interface PlayerForecast {
 export interface FormationTotal {
     key: FormationKey;
     total: number;
+    /** False when the pinned starters of a role do not fit in it. */
+    feasible: boolean;
 }
 
 export interface LineupAdvice {
@@ -107,8 +109,10 @@ export interface MatchdayOptions {
     defenceModifier?: boolean | DefenceBonus;
     /** The formation the roster was built for: chosen when within a hair of the best. */
     prefer?: FormationKey | null;
-    /** A formation chosen by hand: fielded whatever it is worth. */
+    /** A formation chosen by hand: fielded whatever it is worth (when the pinned starters fit). */
     force?: FormationKey | null;
+    /** Players (ids) that must start, whatever the numbers say: the lineup is built around them. */
+    pinned?: ReadonlySet<number>;
 }
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -223,13 +227,22 @@ function defenceBonusOf(keeper: PlayerForecast | undefined, defenders: PlayerFor
 /**
  * The lineup advice for a roster: every formation valued with its
  * automatic substitutions (when a starter misses, the first of the bench
- * in his role plays), the best chosen, the whole bench ordered.
+ * in his role plays), the best chosen, the whole bench ordered. Pinned
+ * players start first in their role; a formation with no room for them
+ * is out of the running (all of them out: the pins are more than any
+ * formation holds, and the best formation is chosen as if they were
+ * ordinary).
  */
 export function recommendLineup(forecasts: PlayerForecast[], options: MatchdayOptions): LineupAdvice {
     const bonus = options.defenceModifier === true ? DEFAULT_DEFENCE_BONUS : options.defenceModifier || null;
+    const pinned = options.pinned ?? new Set<number>();
+    const isPinned = (f: PlayerForecast) => (pinned.has(f.player.id) ? 1 : 0);
     const byRole = {} as Record<FantaRole, PlayerForecast[]>;
-    for (const role of ROLES) byRole[role] = forecasts.filter((f) => f.player.role === role).sort((a, b) => b.value - a.value || b.plays - a.plays);
+    for (const role of ROLES) byRole[role] = forecasts.filter((f) => f.player.role === role).sort((a, b) => isPinned(b) - isPinned(a) || b.value - a.value || b.plays - a.plays);
+    const pins = {} as Record<FantaRole, number>;
+    for (const role of ROLES) pins[role] = byRole[role].filter(isPinned).length;
     const valued = FORMATIONS.map((f) => {
+        const feasible = ROLES.every((role) => f.need[role] >= pins[role]);
         let total = 0;
         for (const role of ROLES) {
             const fielded = byRole[role].slice(0, f.need[role]);
@@ -238,11 +251,12 @@ export function recommendLineup(forecasts: PlayerForecast[], options: MatchdayOp
             total += fielded.reduce((s, x) => s + x.value, 0) + (fielded.length > 0 ? (1 - allPlay) * cover : 0);
         }
         if (bonus && f.need.D >= bonus.minDefenders) total += defenceBonusOf(byRole.P[0], byRole.D.slice(0, f.need.D), bonus);
-        return {key: f.key, total: Math.round(total * 10) / 10};
-    }).sort((a, b) => b.total - a.total);
+        return {key: f.key, total: Math.round(total * 10) / 10, feasible};
+    }).sort((a, b) => Number(b.feasible) - Number(a.feasible) || b.total - a.total);
     const best = valued[0];
-    const forced = options.force ? valued.find((v) => v.key === options.force) : undefined;
-    const preferred = options.prefer ? valued.find((v) => v.key === options.prefer && v.total >= best.total * 0.98) : undefined;
+    const fits = (v: FormationTotal | undefined) => (v && (v.feasible || !best.feasible) ? v : undefined);
+    const forced = fits(options.force ? valued.find((v) => v.key === options.force) : undefined);
+    const preferred = fits(options.prefer ? valued.find((v) => v.key === options.prefer && v.total >= best.total * 0.98) : undefined);
     const chosen = forced ?? preferred ?? best;
     const shape = FORMATIONS.find((f) => f.key === chosen.key)!;
     const starters = ROLES.flatMap((role) => byRole[role].slice(0, shape.need[role]));
