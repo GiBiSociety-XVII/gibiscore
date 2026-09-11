@@ -66,14 +66,18 @@ export interface AuctionConfig {
     modifiers: Modifiers;
     /** The league's defence modifier table, when the modifier is on. */
     defenceBonus: DefenceBonus;
-    /** Who is at the auction (names), first one is the user. */
+    /** Who is at the auction (names). */
     managers: string[];
+    /** Index in `managers` of the team the planning is for (my roster, strategies, ceilings). */
+    me: number;
     /** Chosen auction strategy (lib/fantasy/strategies.ts), drives my role budgets. */
     strategy: string | null;
     /** Formation the plans must be built for (e.g. "3-4-3"); null = the one that gets the most out of the roster. */
     formation: string | null;
     /** Whether cups (domestic and European) count in the marks; off = only the main league of each country. */
     cupsCount: boolean;
+    /** Keepers go by club: buying one keeper takes every keeper of his club, at one price, as the league's keeper slots. */
+    keeperBlock: boolean;
     /** Roles corrected by hand, by player id. */
     roleOverrides: Record<string, FantaRole>;
     /** Players the strategies must plan for (ids), whatever the marks say. */
@@ -106,9 +110,11 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     modifiers: {defence: true},
     defenceBonus: DEFAULT_DEFENCE_BONUS,
     managers: [],
+    me: 0,
     strategy: null,
     formation: null,
     cupsCount: false,
+    keeperBlock: false,
     roleOverrides: {},
     want: [],
     avoid: [],
@@ -116,11 +122,14 @@ export const DEFAULT_CONFIG: AuctionConfig = {
 };
 
 /** Share of the market that usually goes to each role (Serie A leagues, classic). */
-export const ROLE_SHARE: Record<FantaRole, number> = {P: 0.11, D: 0.11, C: 0.24, A: 0.54};
+export const ROLE_SHARE: Record<FantaRole, number> = {P: 0.1, D: 0.13, C: 0.24, A: 0.53};
 
 export const STORAGE_KEY = 'gibiscore:fanta:auction';
 export const ROSTER_KEY = 'gibiscore:fanta:roster';
 export const CLOUD_KEY = 'gibiscore:fanta:cloud';
+export const PINS_KEY = 'gibiscore:fanta:pins';
+export const OUTS_KEY = 'gibiscore:fanta:outs';
+export const TEAMS_KEY = 'gibiscore:fanta:teams';
 
 /** Bought player as stored on the client. */
 export interface Purchase {
@@ -160,13 +169,93 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
             }),
         },
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
+        me: typeof r.me === 'number' && Number.isInteger(r.me) && r.me >= 0 ? r.me : 0,
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : false,
+        keeperBlock: typeof r.keeperBlock === 'boolean' ? r.keeperBlock : false,
         roleOverrides: Object.fromEntries(Object.entries(r.roleOverrides ?? {}).filter(([, v]) => v === 'P' || v === 'D' || v === 'C' || v === 'A')) as Record<string, FantaRole>,
         want: ids(r.want),
         avoid: ids(r.avoid),
         // 135 was the default before the value model was retuned: it reads as the new default.
         priceLevel: r.priceLevel === 135 ? DEFAULT_CONFIG.priceLevel : num(r.priceLevel, DEFAULT_CONFIG.priceLevel, 50, 300),
+    };
+}
+
+/**
+ * A roster kept for the lineup page: my team in one fantasy league, with
+ * the league's settings that shape the marks. Written by the auction
+ * board for the planning team, so the lineup page knows every team of
+ * mine without touching the auction.
+ */
+export interface SavedTeam {
+    /** Deterministic: league name and team name, so a new auction of the same league replaces the old roster. */
+    id: string;
+    name: string;
+    leagueName: string;
+    league: AuctionLeague;
+    mode: AuctionMode;
+    rules: ScoringRules;
+    modifiers: Modifiers;
+    defenceBonus: DefenceBonus;
+    formation: string | null;
+    cupsCount: boolean;
+    roleOverrides: Record<string, FantaRole>;
+    players: number[];
+    savedAt: string;
+}
+
+export function savedTeamId(leagueName: string, teamName: string): string {
+    return `${leagueName.trim().toLowerCase()}|${teamName.trim().toLowerCase()}`;
+}
+
+/** The planning team of an auction as a saved team. */
+export function savedTeamOf(config: AuctionConfig, purchases: Purchase[], manager: number, teamName: string): SavedTeam {
+    const players = purchases.filter((p) => p.manager === manager).map((p) => p.playerId);
+    const mine = new Set(players.map(String));
+    return {
+        id: savedTeamId(config.name, teamName),
+        name: teamName,
+        leagueName: config.name,
+        league: config.league,
+        mode: config.mode,
+        rules: config.rules,
+        modifiers: config.modifiers,
+        defenceBonus: config.defenceBonus,
+        formation: config.formation,
+        cupsCount: config.cupsCount,
+        roleOverrides: Object.fromEntries(Object.entries(config.roleOverrides).filter(([id]) => mine.has(id))),
+        players,
+        savedAt: new Date().toISOString(),
+    };
+}
+
+/** Whether two saved teams say the same thing (the time of saving apart). */
+export function sameSavedTeam(a: SavedTeam, b: SavedTeam): boolean {
+    const strip = (x: SavedTeam) => JSON.stringify({...x, savedAt: ''});
+    return strip(a) === strip(b);
+}
+
+export function normalizeSavedTeam(raw: unknown): SavedTeam | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const r = raw as Partial<SavedTeam>;
+    if (typeof r.id !== 'string' || typeof r.name !== 'string') return null;
+    // The league's settings go through the config normalizer: same rules, same defaults.
+    const config = normalizeConfig({league: r.league, mode: r.mode, rules: r.rules, modifiers: r.modifiers, defenceBonus: r.defenceBonus, formation: r.formation, cupsCount: r.cupsCount, roleOverrides: r.roleOverrides});
+    if (!config) return null;
+    return {
+        id: r.id,
+        name: r.name,
+        leagueName: typeof r.leagueName === 'string' ? r.leagueName : '',
+        league: config.league,
+        mode: config.mode,
+        rules: config.rules,
+        modifiers: config.modifiers,
+        defenceBonus: config.defenceBonus,
+        formation: config.formation,
+        cupsCount: config.cupsCount,
+        roleOverrides: config.roleOverrides,
+        players: Array.isArray(r.players) ? [...new Set(r.players.filter((id): id is number => typeof id === 'number' && Number.isInteger(id)))].slice(0, 60) : [],
+        savedAt: typeof r.savedAt === 'string' ? r.savedAt : new Date(0).toISOString(),
     };
 }

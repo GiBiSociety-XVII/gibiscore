@@ -1,7 +1,7 @@
 'use client';
 
 import {useSyncExternalStore} from 'react';
-import {CLOUD_KEY, ROSTER_KEY, STORAGE_KEY, normalizeConfig, type AuctionConfig, type Purchase} from './config';
+import {CLOUD_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -72,6 +72,28 @@ function parseCloudLink(raw: unknown): CloudLink | null {
     return r && typeof r.id === 'string' && typeof r.savedAt === 'string' ? {id: r.id, savedAt: r.savedAt} : null;
 }
 export const cloudStore = createJsonStore<CloudLink | null>(CLOUD_KEY, parseCloudLink, null);
+
+/** My teams across the fantasy leagues, for the lineup page, and the one being looked at. */
+export interface SavedTeams {
+    teams: SavedTeam[];
+    current: string | null;
+}
+function parseTeams(raw: unknown): SavedTeams {
+    const r = raw as Partial<SavedTeams> | null;
+    const teams = Array.isArray(r?.teams) ? r!.teams.map(normalizeSavedTeam).filter((t): t is SavedTeam => t !== null).slice(0, 30) : [];
+    return {teams, current: typeof r?.current === 'string' ? r.current : null};
+}
+export const teamsStore = createJsonStore<SavedTeams>(TEAMS_KEY, parseTeams, {teams: [], current: null});
+
+/** Starters pinned by hand on the lineup page, player ids per saved team. */
+export type LineupPins = Record<string, number[]>;
+function parsePins(raw: unknown): LineupPins {
+    if (!raw || typeof raw !== 'object') return {};
+    return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((id): id is number => typeof id === 'number' && Number.isInteger(id)).slice(0, 11)]));
+}
+export const pinsStore = createJsonStore<LineupPins>(PINS_KEY, parsePins, {});
+/** Players marked out by hand on the lineup page (the news is ahead of the data), player ids per saved team. */
+export const outsStore = createJsonStore<LineupPins>(OUTS_KEY, parsePins, {});
 
 const noop = () => () => {};
 /** False during server render and hydration, true afterwards: lets the page wait for localStorage before choosing what to show. */

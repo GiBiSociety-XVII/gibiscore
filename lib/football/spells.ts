@@ -14,6 +14,12 @@ export interface SidelinedRow {
     date: string;
     category: string;
     description: string | null;
+    /**
+     * Per-player rows (the provider's spells): the expected return, null
+     * when open-ended. Absent on per-fixture rows, which are read as a
+     * missed fixture on `date`.
+     */
+    until?: string | null;
 }
 
 export interface Spell {
@@ -82,14 +88,17 @@ export function buildSpells(rows: SidelinedRow[], options: BuildOptions): Spell[
         const latest = byDate.get(dates[dates.length - 1])!;
         const last = latest.date;
         const played = options.teamPlayedAfter?.(latest.teamId, last) ?? false;
-        const active = last >= options.today || (!played && daysBetween(last, options.today) <= STALE_DAYS);
+        // A spell with a known end is out until that day; open-ended, until told otherwise.
+        const ongoing = group.filter((r) => r.until !== undefined && r.date <= options.today && (r.until === null || r.until >= options.today));
+        const firm = ongoing.find((r) => r.category !== 'doubtful') ?? ongoing[0] ?? null;
+        const active = firm !== null || last >= options.today || (!played && daysBetween(last, options.today) <= STALE_DAYS);
         spells.push({
             playerId: latest.playerId,
             teamId: latest.teamId,
-            category: latest.category,
-            description: latest.description,
-            since: dates[start],
-            last,
+            category: firm?.category ?? latest.category,
+            description: firm?.description ?? latest.description,
+            since: firm && firm.date < dates[start] ? firm.date : dates[start],
+            last: firm && firm.until && firm.until > last ? firm.until : last,
             missed: dates.length - start,
             active,
         });

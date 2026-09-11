@@ -20,7 +20,7 @@ export interface TableManager {
  * credits left and the slots still open per role. The richest is marked,
  * so is anyone down to a credit a slot, who can only pick up leftovers.
  */
-export function TableBar({managers, onOpen}: {managers: TableManager[]; onOpen: (manager: number) => void}) {
+export function TableBar({managers, onOpen, me}: {managers: TableManager[]; onOpen: (manager: number) => void; /** The team the planning is for, marked. */ me: number}) {
     const t = useTranslations('Fantasy.table');
     const richest = managers.reduce((best, m) => (m.left > (best?.left ?? -1) ? m : best), null as TableManager | null);
     return (
@@ -40,7 +40,7 @@ export function TableBar({managers, onOpen}: {managers: TableManager[]; onOpen: 
                         title={title}
                         className={cn(
                             "shrink-0 flex flex-col gap-0.5 rounded-lg border-2 px-2 py-1 text-left min-w-[96px] transition-colors hover:bg-muted",
-                            m.manager === 0 ? "border-foreground bg-accent/30" : "border-foreground/30 bg-card",
+                            m.manager === me ? "border-foreground bg-accent/30" : "border-foreground/30 bg-card",
                             done && "opacity-60",
                         )}
                     >

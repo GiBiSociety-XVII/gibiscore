@@ -549,7 +549,7 @@ const ROLE_FANTA: Record<FantaRole, number> = {P: 5.7, D: 6.05, C: 6.2, A: 6.5};
  * free player brings below his fantamedia, since he does not play every
  * week and is fielded only when the starter is out.
  */
-export const PRICE_TUNING = {tail: 1.0, ceiling: 0.42};
+export const PRICE_TUNING = {tail: 1.0, ceiling: 0.45};
 /**
  * The free alternative per role: which starters (as a share of what the
  * league buys, from..to) stand for the player nobody pays for, and what
@@ -563,7 +563,7 @@ export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: numb
     P: {from: 0.85, to: 1, gap: 0.1},
     D: {from: 0.85, to: 1, gap: 0.1},
     C: {from: 0.9, to: 1, gap: 0.1},
-    A: {from: 0.85, to: 1, gap: 0.25},
+    A: {from: 0.9, to: 1, gap: 0.25},
 };
 /**
  * Scarcity per role: the fantasy averages of keepers and defenders sit
@@ -571,7 +571,7 @@ export const FREE_PLAYER: Record<FantaRole, {from: number; to: number; gap: numb
  * not three), so a gentler curve keeps their prices on a human scale;
  * attack is where the table fights.
  */
-export const PRICE_POWER: Record<FantaRole, number> = {P: 1.3, D: 1.3, C: 1.6, A: 1.3};
+export const PRICE_POWER: Record<FantaRole, number> = {P: 1.3, D: 1.38, C: 1.5, A: 1.3};
 
 /**
  * What a player is expected to bring over the free alternative, per
@@ -585,7 +585,9 @@ export const PRICE_POWER: Record<FantaRole, number> = {P: 1.3, D: 1.3, C: 1.6, A
 /** How much the club moves a price: the factor runs from 1 - pull/2 (a club at 0) to 1 + pull/2 (at 100). */
 export const CLUB_PULL = 1.0;
 /** The chance of playing enters the price with this exponent: below 1 a rotation player keeps more of his value. */
-export const PLAY_CURVE = 0.7;
+export const PLAY_CURVE = 0.8;
+/** How much of the value a place fully contested (chance of playing 0) loses on top of the minutes: the table pays certainty. */
+export const CONTEST_DISCOUNT = 0.3;
 /** What a starter of the role at a top club averages above one at a bottom club: where a thin fantamedia is shrunk towards. */
 const CLUB_SHIFT: Record<FantaRole, number> = {P: 0.6, D: 0.4, C: 0.6, A: 1.0};
 
@@ -603,6 +605,7 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     const young = p.age !== null && p.age !== undefined && p.age <= 23;
     const hot = (p.scores.form ?? 50) >= 60;
     const thin = p.scores.confidence !== undefined && p.scores.confidence !== 'high';
+    // What the weeks he does not play are still worth: a bet on the young, the hot, the unknown.
     const upside = Math.min(0.45, 0.1 + (young ? 0.2 : 0) + (hot ? 0.1 : 0) + (thin ? 0.1 : 0));
     const avail = 0.4 + (0.6 * (p.scores.fitness ?? 70)) / 100;
     // A fantamedia built on a dozen matches is a guess: it is already shrunk towards the role's level,
@@ -613,7 +616,9 @@ export function expectedValue(p: PriceablePlayer, replacement: number, roleLevel
     const club = 1 + CLUB_PULL * ((p.scores.team ?? 50) / 100 - 0.5);
     // The table pays a sure starter in full and a rotation player more than his minutes say: a name is bought for the weeks he plays.
     const onPitch = play ** PLAY_CURVE;
-    return Math.max(0, fm - replacement) * evidence * (onPitch + (1 - onPitch) * upside) * avail * club;
+    // ...but a contested place is also a headache every matchday: the table pays certainty.
+    const certainty = 1 - CONTEST_DISCOUNT * (1 - play);
+    return Math.max(0, fm - replacement) * evidence * (onPitch + (1 - onPitch) * upside) * certainty * avail * club;
 }
 
 /**

@@ -191,6 +191,16 @@ export interface AfInjuryResponse {
     league: {id: number; season: number; name: string; country: string; logo: string | null; flag: string | null};
 }
 
+/** A spell out, from the per-player sidelined endpoint: the kind of problem and the dates. */
+export interface AfSidelinedSpell {
+    type: string | null;
+    start: string | null;
+    end: string | null;
+}
+
+/** With `players=` the spells come grouped per player; with `player=` they come flat. */
+export type AfSidelinedResponse = {player: {id: number; name: string | null}; sidelined: AfSidelinedSpell[]} | AfSidelinedSpell;
+
 export interface AfStatusResponse {
     account: {firstname: string; lastname: string; email: string};
     subscription: {plan: string; end: string; active: boolean};
