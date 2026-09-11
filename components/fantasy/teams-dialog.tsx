@@ -41,7 +41,7 @@ function Mark({value}: {value: number}) {
  * then one tab per manager with the report card and the players, role
  * by role, with their marks and what they cost.
  */
-export function TeamsDialog({teams, credits, tiers, initial, onClose, onRelease}: {teams: DialogTeam[]; credits: number; tiers: Map<number, Tier>; initial: TeamsTab; onClose: () => void; onRelease: (playerId: number) => void}) {
+export function TeamsDialog({teams, credits, tiers, initial, onClose, onRelease, me = 0}: {teams: DialogTeam[]; credits: number; tiers: Map<number, Tier>; initial: TeamsTab; onClose: () => void; onRelease: (playerId: number) => void; me?: number}) {
     const t = useTranslations('Fantasy.roster.report');
     const tb = useTranslations('Fantasy.board');
     const [tab, setTab] = useState<TeamsTab>(initial);
@@ -89,7 +89,7 @@ export function TeamsDialog({teams, credits, tiers, initial, onClose, onRelease}
                                             <span className="inline-flex items-center gap-2">
                                                 <span className="font-mono text-[11px] text-muted-foreground tabular-nums w-4">{i + 1}</span>
                                                 <span className="font-extrabold truncate max-w-[12rem]">{team.name}</span>
-                                                {team.manager === 0 && <span className="text-[10px] uppercase text-muted-foreground">{tb('mine')}</span>}
+                                                {team.manager === me && <span className="text-[10px] uppercase text-muted-foreground">{tb('mine')}</span>}
                                             </span>
                                         </td>
                                         <td className="px-2 py-1.5 text-center">{team.report.filled === 0 ? '–' : <Mark value={team.report.overall} />}</td>

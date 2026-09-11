@@ -82,7 +82,7 @@
       "defence": "Modificatore difesa"
     },
     "managers": "Squadre al tavolo",
-    "managersHint": "Un nome per riga, il primo sei tu. Facoltativo: serve per segnare a chi va ogni giocatore.",
+    "managersHint": "Un nome per riga, tutte le squadre del tavolo. Nella pagina dell'asta scegli per quale squadra pianificare.",
     "save": "Salva e apri il listone",
     "cancel": "Annulla",
     "cupsCount": "Conta le coppe nel calcolo",
@@ -145,12 +145,12 @@
     "buy": "Compra",
     "bought": "Preso",
     "boughtBy": "{manager} · {price} cr.",
-    "mine": "Mia",
+    "mine": "in pianificazione",
     "release": "Annulla acquisto",
     "buyTitle": "Acquisto",
     "price": "Prezzo",
     "manager": "Squadra",
-    "me": "Io",
+    "me": "Squadra 1",
     "confirm": "Conferma",
     "seasonsTitle": "Ultime stagioni",
     "seasonCols": {
@@ -269,7 +269,9 @@
     "brokeBadge": "Solo riempitivi"
   },
   "roster": {
-    "title": "La mia rosa",
+    "title": "Rosa",
+    "planFor": "Pianifica per",
+    "planForHint": "La squadra per cui il sito pianifica: rosa, strategie, offerte massime e riserva sono i suoi. Cambiala quando vuoi.",
     "credits": "Crediti",
     "left": "rimasti",
     "spent": "spesi",

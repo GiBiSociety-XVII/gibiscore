@@ -66,8 +66,10 @@ export interface AuctionConfig {
     modifiers: Modifiers;
     /** The league's defence modifier table, when the modifier is on. */
     defenceBonus: DefenceBonus;
-    /** Who is at the auction (names), first one is the user. */
+    /** Who is at the auction (names). */
     managers: string[];
+    /** Index in `managers` of the team the planning is for (my roster, strategies, ceilings). */
+    me: number;
     /** Chosen auction strategy (lib/fantasy/strategies.ts), drives my role budgets. */
     strategy: string | null;
     /** Formation the plans must be built for (e.g. "3-4-3"); null = the one that gets the most out of the roster. */
@@ -108,6 +110,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     modifiers: {defence: true},
     defenceBonus: DEFAULT_DEFENCE_BONUS,
     managers: [],
+    me: 0,
     strategy: null,
     formation: null,
     cupsCount: false,
@@ -163,6 +166,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
             }),
         },
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
+        me: typeof r.me === 'number' && Number.isInteger(r.me) && r.me >= 0 ? r.me : 0,
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : false,

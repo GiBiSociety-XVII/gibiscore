@@ -124,7 +124,7 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                     </Panel>
                     <Panel title={t('managers')} className="flex-1" grow>
                         <div className="px-3 py-3 flex-1 flex flex-col gap-1 min-h-0">
-                            <textarea className={`${input} flex-1 min-h-28 py-2 resize-y`} value={managersText} onChange={(e) => setManagersText(e.target.value)} placeholder={'Io\nMarco\nLuca'} />
+                            <textarea className={`${input} flex-1 min-h-28 py-2 resize-y`} value={managersText} onChange={(e) => setManagersText(e.target.value)} placeholder={'FC Aston Birra\nSavoia 1908\nCUCS'} />
                             <span className="text-[11px] font-semibold text-muted-foreground">{t('managersHint')}</span>
                         </div>
                     </Panel>

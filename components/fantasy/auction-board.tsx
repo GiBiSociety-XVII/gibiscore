@@ -189,8 +189,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const plans = useMemo(() => {
         if (!board) return [];
         const byId = new Map(board.players.map((p) => [p.id, p]));
-        const taken = new Set(board.purchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
-        const mine = board.purchases.filter((p) => p.manager === 0 && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
+        const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
+        const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
         return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)});
     }, [board, prices]);
     // The same strategies on the full list at list prices: what each was worth when the auction started.
@@ -244,7 +244,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     };
 
     const managers = config.managers.length > 0 ? config.managers : [t('me')];
-    const mine = purchases.filter((p) => p.manager === 0);
+    // The team the planning is for: its roster, strategies, ceilings and reserve are "mine".
+    const me = Math.min(config.me, managers.length - 1);
+    const setMe = (index: number) => configStore.write({...config, me: index});
+    const mine = purchases.filter((p) => p.manager === me);
     const spent = mine.reduce((s, p) => s + p.price, 0);
     const left = config.credits - spent;
     const slotsTotal = totalSlots(config.slots);
@@ -274,7 +277,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         return null;
     };
     /** The most I can pay for a player of this role and still finish my roster with the cheapest players left. */
-    const myMaxFor = (r: FantaRole) => Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, 0, r));
+    const myMaxFor = (r: FantaRole) => Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, r));
     const confirmBuy = () => {
         if (!buying) return;
         const price = Math.max(0, Math.round(Number(buying.price) || 0));
@@ -354,14 +357,14 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const toggleAvoid = (id: number) => configStore.write({...config, avoid: avoided.has(id) ? config.avoid.filter((x) => x !== id) : [...config.avoid, id], want: config.want.filter((x) => x !== id)});
     const roleShare = strategy?.share ?? ROLE_SHARE;
     // How the strategy in use is going, and the formation that gets the most out of my roster plus the plan's targets.
-    const takenByOthers = new Set(marketPurchases.filter((p) => p.manager !== 0).map((p) => p.playerId));
-    const ownPurchases = marketPurchases.filter((p) => p.manager === 0 && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
+    const takenByOthers = new Set(marketPurchases.filter((p) => p.manager !== me).map((p) => p.playerId));
+    const ownPurchases = marketPurchases.filter((p) => p.manager === me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
     const health = strategy ? strategyHealth(plans, strategy.key, baseline, marketConfig, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
     const rosterLineup = mine.length >= 11 ? bestLineup(mine.map((p) => byId.get(p.playerId)).filter((p): p is AuctionPlayer => !!p), {defenceModifier: defenceOption(config)}) : null;
     /** The report card of a manager's roster: the team's mark, the eleven, a line per role. */
     const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: defenceOption(config)});
-    const myReport = reportOf(0);
+    const myReport = reportOf(me);
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
     // never more than what leaves me enough to finish the roster with the cheapest players left.
@@ -380,7 +383,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const slotsAfter = Math.max(0, slotsTotal - others.length - 1);
         const roleSpent = others.filter((p) => byId.get(p.playerId)!.role === player.role).reduce((s, p) => s + p.price, 0) + price;
         const roleBudget = Math.round(config.credits * roleShare[player.role]);
-        if (manager !== 0) return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup: null, plan: null, over: 0, already};
+        if (manager !== me) return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup: null, plan: null, over: 0, already};
         const rosterAfter = [...others.map((p) => byId.get(p.playerId)!), player];
         const lineup = rosterAfter.length >= 11 ? bestLineup(rosterAfter, {defenceModifier: defenceOption(config)}) : null;
         const def = strategy ? STRATEGIES.find((s) => s.key === strategy.key) : null;
@@ -456,8 +459,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 {/* The table: every manager, credits and open slots */}
                 {managers.length > 1 && (
                     <TableBar
-                        managers={managers.map((name, manager) => ({manager, name: manager === 0 ? `${name} (${t('mine')})` : name, left: creditsLeftOf(manager), open: {P: blocks ? (roleCount(manager, 'P') > 0 ? 0 : 1) : Math.max(0, config.slots.P - roleCount(manager, 'P')), D: Math.max(0, config.slots.D - roleCount(manager, 'D')), C: Math.max(0, config.slots.C - roleCount(manager, 'C')), A: Math.max(0, config.slots.A - roleCount(manager, 'A'))}}))}
+                        managers={managers.map((name, manager) => ({manager, name, left: creditsLeftOf(manager), open: {P: blocks ? (roleCount(manager, 'P') > 0 ? 0 : 1) : Math.max(0, config.slots.P - roleCount(manager, 'P')), D: Math.max(0, config.slots.D - roleCount(manager, 'D')), C: Math.max(0, config.slots.C - roleCount(manager, 'C')), A: Math.max(0, config.slots.A - roleCount(manager, 'A'))}}))}
                         onOpen={(manager) => setTeamsTab(manager)}
+                        me={me}
                     />
                 )}
 
@@ -547,7 +551,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 const expanded = open === p.id;
                                 return (
                                     <FragmentRow key={p.id}>
-                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", purchase && (purchase.manager === 0 ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
+                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", purchase && (purchase.manager === me ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
                                             <td className="px-2 py-1 min-w-0">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/40 bg-card shrink-0">
@@ -573,7 +577,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? 0)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                                    <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                                     <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">
@@ -638,7 +642,14 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
             {/* My roster and the strategies */}
             <div className="flex flex-col gap-3">
-                <Panel title={tr('title')}>
+                <Panel title={tr('title')} action={managers.length > 1 ? (
+                    <label className="flex items-center gap-1 text-[11px] font-bold" title={tr('planForHint')}>
+                        <span className="text-muted-foreground">{tr('planFor')}</span>
+                        <select value={me} onChange={(e) => setMe(Number(e.target.value))} className="bb-input h-7 px-1.5 text-[12px] font-extrabold max-w-[10rem]">
+                            {managers.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                        </select>
+                    </label>
+                ) : undefined}>
                     <div className="grid grid-cols-2 divide-x divide-muted border-b border-muted">
                         <div className="px-3 py-2 flex flex-col"><span className={cn("font-mono text-xl font-extrabold tabular-nums", left < 0 && "text-red-700")}>{left}</span><span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tr('credits')} {tr('left')}</span></div>
                         <div className="px-3 py-2 flex flex-col"><span className="font-mono text-xl font-extrabold tabular-nums">{spent}</span><span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tr('credits')} {tr('spent')}</span></div>
@@ -654,7 +665,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     </div>
                     <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
                         {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
-                        {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, 0), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, 0, null))})}</span>}
+                        {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, null))})}</span>}
                         {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                         {guide && (
                             <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
@@ -673,7 +684,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </div>
                     )}
                     <div className="border-b border-muted">
-                        <TeamRecap report={myReport} onOpen={() => setTeamsTab(0)} />
+                        <TeamRecap report={myReport} onOpen={() => setTeamsTab(me)} />
                     </div>
                     {mine.length === 0 ? (
                         <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{tr('empty')}</p>
@@ -701,7 +712,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     prices={prices}
                     bought={bought}
                     avoided={avoided}
-                    managers={managers.map((m, i) => (i === 0 ? t('me') : m))}
+                    managers={managers}
                     myIds={new Set(mine.map((p) => p.playerId))}
                     onBuy={openBuy}
                 />
@@ -710,12 +721,13 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
             {/* Every roster, in full */}
             {teamsTab !== null && (
                 <TeamsDialog
-                    teams={managers.map((name, manager) => ({manager, name: manager === 0 ? `${name} (${t('mine')})` : name, report: reportOf(manager), players: rosterOf(manager).map((pu) => ({player: byId.get(pu.playerId)!, price: pu.price})), spent: config.credits - creditsLeftOf(manager), left: creditsLeftOf(manager)}))}
+                    teams={managers.map((name, manager) => ({manager, name, report: reportOf(manager), players: rosterOf(manager).map((pu) => ({player: byId.get(pu.playerId)!, price: pu.price})), spent: config.credits - creditsLeftOf(manager), left: creditsLeftOf(manager)}))}
                     credits={config.credits}
                     tiers={tiers}
                     initial={teamsTab}
                     onClose={() => setTeamsTab(null)}
                     onRelease={release}
+                    me={me}
                 />
             )}
 
@@ -780,7 +792,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <label className="flex flex-col gap-1">
                                 <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('manager')}</span>
                                 <select className="bb-input h-10 px-2.5 text-[14px] font-bold" value={buying.manager} onChange={(e) => setBuying({...buying, manager: Number(e.target.value)})}>
-                                    {managers.map((m, i) => <option key={i} value={i} disabled={roleFull(i, buying.player.role) && !purchases.some((p) => p.playerId === buying.player.id && p.manager === i)}>{i === 0 ? `${m} (${t('mine')})` : m}{roleFull(i, buying.player.role) ? ` · ${t('full')}` : ''}</option>)}
+                                    {managers.map((m, i) => <option key={i} value={i} disabled={roleFull(i, buying.player.role) && !purchases.some((p) => p.playerId === buying.player.id && p.manager === i)}>{m}{roleFull(i, buying.player.role) ? ` · ${t('full')}` : ''}</option>)}
                                 </select>
                             </label>
                         </div>
@@ -801,7 +813,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('preview.title', {price})}</span>
                                         <span className={cn(pv.leftAfter < pv.slotsAfter && "text-red-700")}>{pv.slotsAfter > 0 ? t('preview.left', {left: pv.leftAfter, slots: pv.slotsAfter, perSlot: Math.max(0, Math.floor(pv.leftAfter / pv.slotsAfter))}) : t('preview.leftNone', {left: pv.leftAfter})}</span>
                                         <span className={cn(pv.roleSpent > pv.roleBudget * 1.15 && "text-red-700")}>{t('preview.role', {role: ts(`roles.${buying.player.role}`), spent: pv.roleSpent, budget: pv.roleBudget})}</span>
-                                        {buying.manager === 0 && (pv.lineup ? <span>{t('preview.lineup', {formation: pv.lineup.formation, value: pv.lineup.value.toFixed(1)})}</span> : <span className="text-muted-foreground">{t('preview.lineupShort', {missing: pv.missing ?? 0})}</span>)}
+                                        {buying.manager === me && (pv.lineup ? <span>{t('preview.lineup', {formation: pv.lineup.formation, value: pv.lineup.value.toFixed(1)})}</span> : <span className="text-muted-foreground">{t('preview.lineupShort', {missing: pv.missing ?? 0})}</span>)}
                                         {pv.plan && <span className={cn(pv.plan.delta < -0.5 && "text-red-700")}>{t(pv.plan.delta < -0.5 ? 'preview.planWorse' : 'preview.plan', {name: pv.plan.name, value: pv.plan.value.toFixed(1), delta: `${pv.plan.delta >= 0 ? '+' : ''}${pv.plan.delta.toFixed(1)}`})}</span>}
                                         {pv.over > 0 && <span className="text-red-700">{t('preview.over', {over: pv.over})}</span>}
                                     </div>
