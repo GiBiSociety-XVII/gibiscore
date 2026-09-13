@@ -3,11 +3,9 @@ import {getFormatter, getTranslations} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {shiftDay, type ScoresPage} from "@/lib/football/data/scores";
-import {CompetitionBlock} from "./competition-block";
 import {AutoRefresh} from "./auto-refresh";
 import {DatePicker} from "./date-picker";
-import {FavoritesFirst} from "./favorites-first";
-import {ScoreFilters} from "./score-filters";
+import {LiveScores} from "./live-scores";
 
 function dayHref(day: string, today: string): string {
     return day === today ? '/' : `/scores/${day}`;
@@ -70,45 +68,16 @@ async function DateStrip({page}: {page: ScoresPage}) {
 export async function ScoresView({page}: {page: ScoresPage}) {
     const t = await getTranslations('Pages.scores');
     const isLive = page.mode === 'live';
-    const counts = {all: page.total, live: page.liveCount, finished: page.finishedCount, scheduled: page.scheduledCount};
     const labels = {all: t('filters.all'), live: t('filters.live'), finished: t('filters.finished'), scheduled: t('filters.scheduled')};
-
+    // The rows move on their own (LiveScores polls); the rest of the page (date strip, rail) follows every two minutes.
     const refresh = isLive || (page.date === page.today && page.liveCount + page.scheduledCount > 0);
     return (
         <div className="bb-surface overflow-hidden">
-            <AutoRefresh seconds={isLive ? 20 : 45} enabled={refresh} />
+            <AutoRefresh seconds={120} enabled={refresh} />
             <DateStrip page={page} />
             <div className="p-1.5 md:p-2 flex flex-col gap-2">
-                {isLive ? (
-                    <p className="text-xs font-bold text-muted-foreground px-1">{t('liveHint', {count: page.liveCount})}</p>
-                ) : (
-                    <ScoreFilters counts={counts} labels={labels}>
-                        <ScoresList page={page} emptyText={t('emptyDay')} />
-                    </ScoreFilters>
-                )}
-                {isLive && <ScoresList page={page} emptyText={t('emptyLive')} />}
+                <LiveScores page={page} labels={labels} emptyText={isLive ? t('emptyLive') : t('emptyDay')} favoritesLabel={t('favoritesGroup')} />
             </div>
-        </div>
-    );
-}
-
-async function ScoresList({page, emptyText}: {page: ScoresPage; emptyText: string}) {
-    const t = await getTranslations('Pages.scores');
-    if (page.total === 0) return <p className="px-2 py-6 text-center text-[13px] font-semibold text-muted-foreground">{emptyText}</p>;
-    return (
-        <div className="flex flex-col gap-2">
-            <FavoritesFirst label={t('favoritesGroup')} />
-            {page.pinned.length > 0 && (
-                <div data-group className="border-2 border-foreground rounded-lg overflow-hidden">
-                    {page.pinned.map((g) => <CompetitionBlock key={g.competition.slug} group={g} />)}
-                </div>
-            )}
-            {page.countries.map((c) => (
-                <div key={c.country} data-group className="border-2 border-foreground/30 rounded-lg overflow-hidden">
-                    {c.competitions.map((g) => <CompetitionBlock key={g.competition.slug} group={g} />)}
-                </div>
-            ))}
-            <p data-empty className="hidden px-2 py-6 text-center text-[13px] font-semibold text-muted-foreground">{emptyText}</p>
         </div>
     );
 }

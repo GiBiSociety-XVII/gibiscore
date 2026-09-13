@@ -13,8 +13,8 @@ import {roundStates, type MatchdayFixture, type PlayerContext, type RecentMatch,
  * season and the one to play (live or next), its fixtures with the match
  * predictions, and for every player seen this season how his club has
  * used him lately, the official lineup once published, and whether he
- * is out. Cached ten minutes; the lineup sync refreshes it when official
- * lineups arrive.
+ * is out. Cached two minutes; the lineup and absence syncs refresh it
+ * when something new arrives.
  */
 
 export interface MatchdayRound {
@@ -166,7 +166,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], generatedAt: new Date().toISOString()};
 }
 
-const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 600, tags: ['fantasy-matchday']});
+const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 120, tags: ['fantasy-matchday']});
 
 export async function getMatchday(league: AuctionLeague): Promise<MatchdayContext | null> {
     try {

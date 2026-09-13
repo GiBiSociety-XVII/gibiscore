@@ -5,15 +5,15 @@ import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {chunk, ensurePlayers, failSync, finishRun, footballClient, idMap, startRun, type MinimalPlayer, type SyncRun} from './context';
 
 /** Featured fixtures kicking off within this many minutes are asked for their official lineups. */
-const WINDOW_MINUTES = 75;
+const WINDOW_MINUTES = 90;
 /** Fixtures per request. */
 const BATCH = 20;
 
 /**
- * sync-lineups (every ten minutes)
+ * sync-lineups (every five minutes)
  *
  * The official lineups the provider publishes about an hour before
- * kick-off, for featured fixtures about to start that have none stored
+ * kick-off, for featured fixtures starting within ninety minutes that have none stored
  * yet: one request per twenty fixtures, nothing at all when no kick-off
  * is near. Stored as expected lineups (is_expected = true), the rows the
  * fantasy matchday reads; the match itself later stores the real ones.

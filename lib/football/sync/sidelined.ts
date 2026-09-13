@@ -14,7 +14,7 @@ const GRACE_DAYS = 2;
 const AHEAD_DAYS = 30;
 
 /**
- * sync-sidelined (every 6 hours, the squads of the fantasy leagues: ~300 requests)
+ * sync-sidelined (every 2 hours, the squads of the fantasy leagues: ~300 requests)
  *
  * The provider's per-player spells: for every injury or suspension the
  * kind of problem, the start and the expected return. They often arrive

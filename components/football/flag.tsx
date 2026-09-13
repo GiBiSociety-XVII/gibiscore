@@ -1,4 +1,4 @@
-import {flagUrl} from "@/lib/football/data/shared";
+import {flagUrl} from "@/lib/football/flags";
 import {cn} from "@/components/shared/ui/cn";
 
 /** Country flag (or competition logo for international ones), plain img: hundreds per page. */
