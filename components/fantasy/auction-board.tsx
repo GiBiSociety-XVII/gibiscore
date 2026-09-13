@@ -17,6 +17,7 @@ import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
 import {TableBar} from "./table-bar";
 import {TargetsPanel} from "./targets-panel";
+import {useAccountTeams} from "./account-teams";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {keeperBlocks} from "@/lib/fantasy/block";
 import {DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
@@ -130,6 +131,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const healthReason = useHealthReason();
     const router = useRouter();
     const hydrated = useHydrated();
+    // The planning team follows the signed-in user's account, for the lineup page on every device.
+    useAccountTeams();
     const config = configStore.useValue();
     const purchases = purchasesStore.useValue();
     const [editing, setEditing] = useState(false);

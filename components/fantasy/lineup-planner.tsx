@@ -17,6 +17,8 @@ import {locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLo
 import type {MatchdayRound} from "@/lib/fantasy/matchday-data";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
+import {hashOf} from "@/lib/fantasy/hash";
+import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
@@ -273,6 +275,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     const router = useRouter();
     const hydrated = useHydrated();
     const saved = teamsStore.useValue();
+    const account = useAccountTeams();
 
     if (!hydrated) return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     const teams = [...saved.teams].sort((a, b) => a.leagueName.localeCompare(b.leagueName) || a.name.localeCompare(b.name));
@@ -282,6 +285,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
             <Panel title={t('title')}>
                 <div className="px-3 py-3 flex flex-col gap-3">
                     <p className="text-[13px] font-semibold">{t('noTeams')}</p>
+                    <AccountTeamsBadge status={account.status} next="/fantacalcio/formazione" />
                     <Link href="/fantacalcio/asta" className="bb-btn bg-accent px-4 h-10 inline-flex items-center self-start text-[13px] font-extrabold">{t('goSetup')}</Link>
                 </div>
             </Panel>
@@ -314,6 +318,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
             </label>
             <span className="text-[11px] font-semibold text-muted-foreground hidden sm:inline">{ts(`modes.${current.mode}`)}{current.formation ? ` · ${current.formation}` : ''}</span>
             <button type="button" onClick={remove} title={t('removeTeam')} className="bb-btn bg-card h-8 w-8 inline-flex items-center justify-center"><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /></button>
+            <AccountTeamsBadge status={account.status} next="/fantacalcio/formazione" />
             {context && roundInfo && (
                 <span className="ml-auto text-[12px] font-extrabold">
                     {t('round', {round: roundName(context.round)})}
@@ -342,13 +347,6 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     }
 
     return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} toolbar={toolbar} roundInfo={roundInfo} />;
-}
-
-/** djb2 over a string: enough to tell two snapshots apart. */
-function hashOf(text: string): string {
-    let h = 5381;
-    for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
-    return `${text.length}:${h >>> 0}`;
 }
 
 /** The advice for one team: forecasts, pins and outs, the formation, the tables; frozen once the round has kicked off. */
