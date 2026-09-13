@@ -12,7 +12,7 @@ import {MatchStudy} from "@/components/football/match-study";
 import {AbsenceList} from "@/components/football/absences";
 import {PredictionPanel} from "@/components/football/prediction";
 import {predictMatch} from "@/lib/football/prediction";
-import {getSeasonStudy} from "@/lib/football/data/study";
+import {getPriorStudy, getSeasonStudy} from "@/lib/football/data/study";
 import {NotFoundBox} from "@/components/football/page-header";
 import {PlayerMatchTable} from "@/components/football/player-match-table";
 import {HeadToHeadPanel, StandingsPanel} from "@/components/football/rail";
@@ -62,8 +62,8 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     }
 
     const {fixture} = page;
-    const study = fixture.seasonId ? await getSeasonStudy(fixture.seasonId) : null;
-    const prediction = predictMatch(study, fixture.home.id, fixture.away.id);
+    const [study, prior] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId)]) : [null, null];
+    const prediction = predictMatch(study, fixture.home.id, fixture.away.id, prior);
     const hasAbsences = page.absences.home.length > 0 || page.absences.away.length > 0;
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const isLive = LIVE_STATES.includes(fixture.state);

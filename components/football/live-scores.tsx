@@ -44,7 +44,7 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
     const [updates, setUpdates] = useState<Map<number, Update>>(() => new Map());
     const live = page.mode === 'live';
     // Only while something can still change: a live list, or today with matches open or in play.
-    const active = live || (page.date === page.today && page.liveCount + page.scheduledCount > 0);
+    const active = live || (page.date === page.today && (page.total === 0 || page.liveCount + page.scheduledCount > 0));
 
     useEffect(() => {
         if (!active) return;
@@ -63,6 +63,12 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
                 const next = new Map<number, Update>();
                 for (const u of body.fixtures) next.set(u.id, u);
                 setUpdates(next);
+                // The server page came out empty (a database hiccup at render) while the day has matches: refresh it.
+                if (!live && known.size === 0 && body.fixtures.length > 0 && !refreshing) {
+                    refreshing = true;
+                    router.refresh();
+                    return;
+                }
                 // Live mode: the list itself changed (a match kicked off, one ended): the server knows the rows.
                 if (live && !refreshing) {
                     const nowLive = body.fixtures.filter((u) => isLive(u.state)).map((u) => u.id);
