@@ -129,6 +129,7 @@ export const ROSTER_KEY = 'gibiscore:fanta:roster';
 export const CLOUD_KEY = 'gibiscore:fanta:cloud';
 export const PINS_KEY = 'gibiscore:fanta:pins';
 export const OUTS_KEY = 'gibiscore:fanta:outs';
+export const LOCKS_KEY = 'gibiscore:fanta:lineup-locks';
 export const TEAMS_KEY = 'gibiscore:fanta:teams';
 
 /** Bought player as stored on the client. */

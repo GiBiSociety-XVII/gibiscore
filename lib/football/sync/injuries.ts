@@ -7,7 +7,7 @@ import {allowance, currentSeasons, ensurePlayers, ensureTeams, failSync, finishR
 const LOOKAHEAD_MS = 7 * 24 * 3_600_000;
 
 /**
- * sync-injuries (every 2 hours, featured leagues only: up to ~13 requests)
+ * sync-injuries (every 30 minutes, featured leagues only: up to ~13 requests)
  *
  * One request per featured season with a match in the next seven days.
  * API-Football reports injuries and suspensions per upcoming fixture

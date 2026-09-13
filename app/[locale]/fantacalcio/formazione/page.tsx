@@ -7,8 +7,8 @@ import {isAuctionLeague, type AuctionLeague} from "@/lib/fantasy/config";
 import {getAuctionPool} from "@/lib/fantasy/data";
 import {getMatchday} from "@/lib/fantasy/matchday-data";
 
-// The matchday itself is cached ten minutes and refreshed when official lineups arrive.
-export const revalidate = 300;
+// The matchday itself is cached two minutes and refreshed when official lineups or absences arrive.
+export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Fantasy.lineup');

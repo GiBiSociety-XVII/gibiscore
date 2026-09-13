@@ -708,6 +708,15 @@
       "noMatch": "non gioca"
     },
     "colRecent": "Ult.",
-    "colRecentHint": "Media dei suoi ultimi voti (fino a cinque partite giocate) e quante sono: verde sopra la sua media stagionale, rosso sotto. Sposta il voto atteso fino a un 40%, di più con più partite."
+    "colRecentHint": "Media dei suoi ultimi voti (fino a cinque partite giocate) e quante sono: verde sopra la sua media stagionale, rosso sotto. Sposta il voto atteso fino a un 40%, di più con più partite.",
+    "locksAt": "Si blocca {when}",
+    "frozenAt": "Formazione delle {when}",
+    "lockedNoChange": "La giornata è iniziata: la formazione è bloccata",
+    "locked": {
+      "title": "Formazione bloccata.",
+      "text": "La giornata è iniziata {deadline}: da quel momento in nessuna lega si può più cambiare. Questa è la consigliata come era alle {savedAt}, l'ultima vista prima del fischio d'inizio. Si sblocca con la prossima giornata.",
+      "fresh": "La giornata è iniziata {deadline} e non avevi aperto la pagina prima: la consigliata è stata calcolata ora, con i dati di adesso, e resta questa fino alla prossima giornata."
+    },
+    "how8": "Blocco: al primo calcio d'inizio della giornata la formazione consigliata si congela così com'era all'ultima apertura della pagina prima del fischio (spilli e KO compresi) e non cambia più fino alla giornata successiva. Apri la pagina poco prima dell'inizio per avere le ultime notizie dentro."
   }
 }

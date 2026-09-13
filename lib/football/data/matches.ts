@@ -21,6 +21,8 @@ interface EventRow {
 interface LineupRow {
     team_id: number;
     is_starter: boolean;
+    /** True for the lineup announced before kick-off; the match's own rows say false. */
+    is_expected: boolean;
     formation: string | null;
     formation_position: number | null;
     jersey_number: number | null;
@@ -81,7 +83,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
                 `${FIXTURE_SELECT},season_id,venue_name,referee,home_score_ht,away_score_ht,` +
                     'events:fixture_events(id,team_id,type,minute,extra_minute,info,sort_order,player_name,related_player_name,' +
                     'player:players!fixture_events_player_id_fkey(id,name,slug),related:players!fixture_events_related_player_id_fkey(id,name,slug)),' +
-                    'lineups(team_id,is_starter,formation,formation_position,jersey_number,player:players(id,name,slug,position)),' +
+                    'lineups(team_id,is_starter,is_expected,formation,formation_position,jersey_number,player:players(id,name,slug,position)),' +
                     'team_stats:fixture_team_stats(team_id,possession,shots_total,shots_on_target,corners,fouls,yellow_cards,red_cards,passes_total,pass_accuracy,xg),' +
                     'player_stats:fixture_player_stats(team_id,minutes_played,rating,goals,assists,shots_total,shots_on_target,key_passes,yellow_cards,red_cards,stats,' +
                     'player:players(id,name,slug,image_url,position))',
@@ -111,7 +113,11 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         const awayId = row.away.id;
         const side = (teamId: number | null): 'home' | 'away' | null => (teamId === homeId ? 'home' : teamId === awayId ? 'away' : null);
 
+        // A goal the VAR took back: the provider usually replaces it, but when both are listed the goal is dropped.
+        const disallowed = (row.events ?? []).filter((e) => e.type === 'var' && /goal/i.test(e.info ?? '') && /(disallow|cancel|annul)/i.test(e.info ?? ''));
+        const cancelled = (e: EventRow) => (e.type === 'goal' || e.type === 'penalty' || e.type === 'own_goal') && disallowed.some((v) => v.team_id === e.team_id && Math.abs((v.minute ?? -99) - (e.minute ?? 99)) <= 1 && (!v.player_name || !e.player_name || v.player_name === e.player_name));
         const events: MatchEvent[] = [...(row.events ?? [])]
+            .filter((e) => !cancelled(e))
             .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.minute ?? 0) - (b.minute ?? 0))
             .map((e) => {
                 return {
@@ -153,7 +159,10 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
                 .sort((a, b) => Number(b.minutes !== null) - Number(a.minutes !== null) || (b.rating ?? 0) - (a.rating ?? 0));
 
         const lineupFor = (teamId: number, team: TeamRow): TeamLineup | null => {
-            const entries = (row.lineups ?? []).filter((l) => l.team_id === teamId && l.player);
+            // Both the announced lineup and the match's own can be stored: the match's own wins once it is there.
+            const all = (row.lineups ?? []).filter((l) => l.team_id === teamId && l.player);
+            const actual = all.filter((l) => !l.is_expected);
+            const entries = actual.length > 0 ? actual : all;
             if (entries.length === 0) return null;
             const toPlayer = (l: LineupRow): LineupPlayer => ({
                 id: l.player!.id,

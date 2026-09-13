@@ -3,7 +3,7 @@ import {fetchAll} from '@/lib/db/paginate';
 import {featuredPriority} from '../competitions';
 import {predictMatch, type MatchPrediction} from '../prediction';
 import {LIVE_STATES, type CompetitionSummary, type FixtureSummary} from '../types';
-import {getSeasonStudy} from './study';
+import {getPriorStudy, getSeasonStudy} from './study';
 import {LEAGUE_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, type FixtureRow, type LeagueRow} from './shared';
 
 export interface PredictedFixture {
@@ -42,6 +42,7 @@ export async function getUpcomingPredictions(days = 3): Promise<PredictionBlock[
         )) as unknown as Array<FixtureRow & {season_id: number | null; league: LeagueRow | null}>;
         const seasonIds = [...new Set(rows.map((r) => r.season_id).filter((id): id is number => id !== null))];
         const studies = new Map(await Promise.all(seasonIds.map(async (id) => [id, await getSeasonStudy(id)] as const)));
+        const priors = new Map(await Promise.all(seasonIds.map(async (id) => [id, await getPriorStudy(id)] as const)));
         const blocks = new Map<number, PredictionBlock>();
         for (const row of rows) {
             if (!row.league) continue;
@@ -49,7 +50,8 @@ export async function getUpcomingPredictions(days = 3): Promise<PredictionBlock[
             if (!fixture) continue;
             if (!blocks.has(row.league.id)) blocks.set(row.league.id, {competition: toCompetition(row.league), fixtures: []});
             const study = row.season_id ? (studies.get(row.season_id) ?? null) : null;
-            blocks.get(row.league.id)!.fixtures.push({fixture, prediction: predictMatch(study, fixture.home.id, fixture.away.id)});
+            const prior = row.season_id ? (priors.get(row.season_id) ?? null) : null;
+            blocks.get(row.league.id)!.fixtures.push({fixture, prediction: predictMatch(study, fixture.home.id, fixture.away.id, prior)});
         }
         return [...blocks.values()].sort((a, b) => featuredPriority(a.competition.slug) - featuredPriority(b.competition.slug) || a.competition.name.localeCompare(b.competition.name));
     } catch (error) {

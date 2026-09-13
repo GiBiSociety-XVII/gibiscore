@@ -1,6 +1,9 @@
 import 'server-only';
 import {createPublicClient} from '@/lib/db/server';
 import type {CompetitionSummary, FixtureState, FixtureSummary, StandingRow, StandingZone, TeamSummary} from '../types';
+import {normalizeCountryCode} from '../flags';
+
+export {flagUrl, normalizeCountryCode} from '../flags';
 
 /**
  * Shared pieces of the read layer: the anonymous client (public schema,
@@ -84,18 +87,6 @@ export function toCompetition(row: LeagueRow): CompetitionSummary {
 }
 
 /** Two-letter code or null ("World" and confederations have none). */
-export function normalizeCountryCode(code: string | null | undefined): string | null {
-    if (!code) return null;
-    const c = code.trim().toLowerCase();
-    return /^[a-z]{2}$/.test(c) ? c : null;
-}
-
-/** Flag of a country as served by the data provider's CDN. */
-export function flagUrl(code: string | null | undefined): string | null {
-    const c = normalizeCountryCode(code);
-    return c ? `https://media.api-sports.io/flags/${c}.svg` : null;
-}
-
 export function toFixture(row: FixtureRow): FixtureSummary | null {
     if (!row.home || !row.away || !row.league) return null;
     const homeStats = row.stats?.find((s) => s.team_id === row.home!.id) ?? null;

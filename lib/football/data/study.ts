@@ -204,6 +204,37 @@ async function computeStudy(seasonId: number): Promise<SeasonStudy | null> {
 
 export const getSeasonStudy = unstable_cache(computeStudy, ['season-study'], {revalidate: 600});
 
+/** The same league's season before this one, when the database has it. */
+async function previousSeasonId(seasonId: number): Promise<number | null> {
+    const db = footballDb();
+    const {data: season, error} = await db.from('seasons').select('league_id,year').eq('id', seasonId).maybeSingle();
+    if (error || !season) return null;
+    const {data: previous, error: previousError} = await db.from('seasons').select('id').eq('league_id', season.league_id as number).eq('year', (season.year as number) - 1).maybeSingle();
+    if (previousError || !previous) return null;
+    return previous.id as number;
+}
+
+/**
+ * Last season's study, the prior of this season's predictions: what each
+ * club was, before the new season says. Null without a previous season
+ * or without its matches. A finished season does not move: cached an hour.
+ */
+export const getPriorStudy = unstable_cache(
+    async (seasonId: number): Promise<SeasonStudy | null> => {
+        try {
+            const previous = await previousSeasonId(seasonId);
+            if (!previous) return null;
+            const study = await computeStudy(previous);
+            return study && study.played >= 30 ? study : null;
+        } catch (error) {
+            logReadError(`getPriorStudy(${seasonId})`, error);
+            return null;
+        }
+    },
+    ['season-prior-study'],
+    {revalidate: 3600},
+);
+
 export interface PositionBenchmark {
     position: string;
     players: number;

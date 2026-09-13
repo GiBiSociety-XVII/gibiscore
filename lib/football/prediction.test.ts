@@ -73,4 +73,20 @@ describe('predictMatch', () => {
         const quiet: SeasonStudy = {...study, teams: [profile(1, 'Quiet', 3, 0, 5)]};
         expect(attackBaseline(quiet, 1)!).toBeGreaterThan(0.9);
     });
+
+    it('early in a season the prior tells a strong side from a weak one that have drawn every match so far', () => {
+        // Three draws each: this season alone says they are equals.
+        const current: SeasonStudy = {...study, played: 30, teams: [profile(1, 'Strong', 3, 3, 3), profile(2, 'Weak', 3, 3, 3), profile(3, 'New', 0, 0, 0)], home: [], away: []};
+        const even = predictMatch(current, 1, 2)!;
+        expect(Math.abs(even.lambda.home - even.lambda.away)).toBeLessThan(0.35);
+        // Last season's study as the prior: the strong side is favoured, the promoted one is weaker than average.
+        const withPrior = predictMatch(current, 1, 2, study)!;
+        expect(withPrior.lambda.home - withPrior.lambda.away).toBeGreaterThan(0.6);
+        expect(withPrior.home).toBeGreaterThan(50);
+        const promoted = predictMatch(current, 3, 2, study)!;
+        expect(promoted.lambda.home).toBeLessThan(withPrior.lambda.home);
+        // A side without a match yet: judged on the prior alone.
+        expect(promoted.sample).toBe(0);
+        expect(attackBaseline(current, 1, study)!).toBeGreaterThan(attackBaseline(current, 2, study)! + 0.5);
+    });
 });

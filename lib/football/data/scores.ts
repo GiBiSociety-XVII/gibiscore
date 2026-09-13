@@ -123,7 +123,11 @@ export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: st
             countries,
         };
     } catch (error) {
+        // Thrown, not swallowed: a page that fails to render keeps its last good copy (ISR), while an
+        // empty page would be cached and shown to everyone as "no matches" for the next half minute.
+        // At build time (a prerender without the database) an empty page is the honest fallback.
         logReadError('getScores', error);
-        return empty;
+        if (process.env.NEXT_PHASE === 'phase-production-build') return empty;
+        throw error;
     }
 }
