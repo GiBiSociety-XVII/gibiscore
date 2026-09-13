@@ -1,7 +1,7 @@
 'use client';
 
 import {useSyncExternalStore} from 'react';
-import {CLOUD_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
+import {CLOUD_KEY, LOCKS_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -94,6 +94,36 @@ function parsePins(raw: unknown): LineupPins {
 export const pinsStore = createJsonStore<LineupPins>(PINS_KEY, parsePins, {});
 /** Players marked out by hand on the lineup page (the news is ahead of the data), player ids per saved team. */
 export const outsStore = createJsonStore<LineupPins>(OUTS_KEY, parsePins, {});
+
+/**
+ * The lineup as it stood before the round kicked off, per saved team: the
+ * forecasts, the pins and outs and the forced formation of the last view
+ * before the deadline, frozen from then until the next round.
+ */
+export interface LineupLock {
+    round: string;
+    /** First kick-off of the round, ISO. */
+    deadline: string;
+    savedAt: string;
+    /** Cheap hash of the content, to write only what changed. */
+    fingerprint: string;
+    forecasts: unknown[];
+    forced: string | null;
+    pinned: number[];
+    outs: number[];
+}
+export type LineupLocks = Record<string, LineupLock>;
+function parseLocks(raw: unknown): LineupLocks {
+    if (!raw || typeof raw !== 'object') return {};
+    const out: LineupLocks = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        const l = v as Partial<LineupLock> | null;
+        if (!l || typeof l.round !== 'string' || typeof l.deadline !== 'string' || !Array.isArray(l.forecasts)) continue;
+        out[k] = {round: l.round, deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: Array.isArray(l.pinned) ? l.pinned.filter((id): id is number => typeof id === 'number') : [], outs: Array.isArray(l.outs) ? l.outs.filter((id): id is number => typeof id === 'number') : []};
+    }
+    return out;
+}
+export const locksStore = createJsonStore<LineupLocks>(LOCKS_KEY, parseLocks, {});
 
 const noop = () => () => {};
 /** False during server render and hydration, true afterwards: lets the page wait for localStorage before choosing what to show. */

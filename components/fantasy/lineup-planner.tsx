@@ -1,7 +1,7 @@
 'use client';
 
-import {Ban, Pin, PinOff, Settings2, Trash2} from "lucide-react";
-import {useState} from "react";
+import {Ban, Lock, Pin, PinOff, Settings2, Trash2} from "lucide-react";
+import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -13,7 +13,9 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
-import {outsStore, pinsStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
+import {locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLock} from "@/lib/fantasy/store";
+import type {MatchdayRound} from "@/lib/fantasy/matchday-data";
+import type {SavedTeam} from "@/lib/fantasy/config";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -137,7 +139,7 @@ function facts(f: PlayerForecast) {
     return {usage: by('usage'), form: by('form'), playerForm: by('playerForm'), match: by('match'), attack: by('attack'), cleanSheet: by('cleanSheet'), official: by('official'), sidelined: by('sidelined'), doubtful: by('doubtful'), manual: by('manual'), noMatch: by('noMatch'), noUsage: by('noUsage')};
 }
 
-function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void}) {
+function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const p = byId.get(f.player.id);
@@ -160,10 +162,10 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
         <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
             <td className="px-1 py-1.5">
                 <span className="flex items-center gap-0.5">
-                    <button type="button" onClick={onPin} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center", pinned ? "bg-foreground text-background" : "bg-card")}>
+                    <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={locked ? t('lockedNoChange') : pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>
                         {pinned ? <PinOff className="w-3 h-3" aria-hidden="true" /> : <Pin className="w-3 h-3" aria-hidden="true" />}
                     </button>
-                    <button type="button" onClick={onOut} aria-pressed={out} title={out ? t('unout') : t('out')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center", out ? "bg-red-700 text-background" : "bg-card")}>
+                    <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={locked ? t('lockedNoChange') : out ? t('unout') : t('out')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}>
                         <Ban className="w-3 h-3" aria-hidden="true" />
                     </button>
                 </span>
@@ -268,14 +270,9 @@ function Head({withIndex}: {withIndex: boolean}) {
 export function LineupPlanner({pool, context}: {pool: AuctionPool | null; context: MatchdayContext | null}) {
     const t = useTranslations('Fantasy.lineup');
     const ts = useTranslations('Fantasy.setup');
-    const format = useFormatter();
-    const reasonText = useReasonText();
     const router = useRouter();
     const hydrated = useHydrated();
     const saved = teamsStore.useValue();
-    const allPins = pinsStore.useValue();
-    const allOuts = outsStore.useValue();
-    const [forced, setForced] = useState<FormationKey | null>(null);
 
     if (!hydrated) return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     const teams = [...saved.teams].sort((a, b) => a.leagueName.localeCompare(b.leagueName) || a.name.localeCompare(b.name));
@@ -299,13 +296,9 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     const players = leaguePlayers(pool, current);
     const byId = new Map(players.map((p) => [p.id, p]));
     const roster = current.players.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p);
-    const rosterIds = new Set(roster.map((p) => p.id));
     const roundInfo = context?.rounds.find((r) => r.round === context.round) ?? null;
     const leagueLabel = (x: typeof current) => x.leagueName || ts(`leagues.${x.league}`);
-    const choose = (id: string) => {
-        teamsStore.write({...saved, current: id});
-        setForced(null);
-    };
+    const choose = (id: string) => teamsStore.write({...saved, current: id});
     const remove = () => {
         if (!window.confirm(t('removeConfirm', {team: current.name, league: leagueLabel(current)}))) return;
         teamsStore.write({teams: saved.teams.filter((x) => x.id !== current.id), current: null});
@@ -348,22 +341,73 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
 
+    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} toolbar={toolbar} roundInfo={roundInfo} />;
+}
+
+/** djb2 over a string: enough to tell two snapshots apart. */
+function hashOf(text: string): string {
+    let h = 5381;
+    for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+    return `${text.length}:${h >>> 0}`;
+}
+
+/** The advice for one team: forecasts, pins and outs, the formation, the tables; frozen once the round has kicked off. */
+function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null}) {
+    const t = useTranslations('Fantasy.lineup');
+    const format = useFormatter();
+    const reasonText = useReasonText();
+    const allPins = pinsStore.useValue();
+    const allOuts = outsStore.useValue();
+    const locks = locksStore.useValue();
+    const [forced, setForced] = useState<FormationKey | null>(null);
+    // The clock, so the page locks itself at kick-off while open.
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const id = window.setInterval(() => setNow(Date.now()), 30_000);
+        return () => window.clearInterval(id);
+    }, []);
+    const rosterIds = new Set(roster.map((p) => p.id));
     // Players marked out by hand: the news is ahead of the data.
-    const outs = new Set((allOuts[current.id] ?? []).filter((id) => rosterIds.has(id)));
+    const liveOuts = new Set((allOuts[current.id] ?? []).filter((id) => rosterIds.has(id)));
     const toggleOut = (id: number) => {
-        const next = outs.has(id) ? [...outs].filter((x) => x !== id) : [...outs, id];
+        const next = liveOuts.has(id) ? [...liveOuts].filter((x) => x !== id) : [...liveOuts, id];
         outsStore.write({...allOuts, [current.id]: next});
     };
-    const forecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context, outs.has(p.id)), context.fixtures, current.rules));
+    const liveForecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context, liveOuts.has(p.id)), context.fixtures, current.rules));
     // Starters pinned by hand for this team: the lineup is built around them.
-    const pinned = new Set((allPins[current.id] ?? []).filter((id) => rosterIds.has(id)));
+    const livePinned = new Set((allPins[current.id] ?? []).filter((id) => rosterIds.has(id)));
     const togglePin = (id: number) => {
-        const next = pinned.has(id) ? [...pinned].filter((x) => x !== id) : [...pinned, id];
+        const next = livePinned.has(id) ? [...livePinned].filter((x) => x !== id) : [...livePinned, id];
         pinsStore.write({...allPins, [current.id]: next});
     };
     const clearPins = () => pinsStore.write({...allPins, [current.id]: []});
+
+    // The deadline: the round's first kick-off. From then on the lineup cannot be changed in any league,
+    // so the advice freezes as it stood at the last view before it, and stays until the next round.
+    const deadline = roundInfo ? Date.parse(roundInfo.from) : NaN;
+    const locked = !!roundInfo && (roundInfo.state === 'live' || roundInfo.state === 'played' || (Number.isFinite(deadline) && now >= deadline));
+    const stored = locks[current.id];
+    const frozen: LineupLock | null = locked && stored && stored.round === context.round ? stored : null;
+    const serialized = JSON.stringify({round: context.round, deadline: roundInfo?.from ?? '', forecasts: liveForecasts, forced, pinned: [...livePinned], outs: [...liveOuts]});
+    const fingerprint = hashOf(serialized);
+    const hasRound = roundInfo !== null;
+    useEffect(() => {
+        if (!hasRound) return;
+        const known = locks[current.id];
+        const valid = known?.round === context.round;
+        // Frozen: nothing more to write. Open: keep the last view; just kicked off without a view before: freeze now.
+        if (locked && valid) return;
+        if (valid && known.fingerprint === fingerprint) return;
+        const snapshot = JSON.parse(serialized) as Omit<LineupLock, 'fingerprint' | 'savedAt'>;
+        locksStore.write({...locks, [current.id]: {...snapshot, fingerprint, savedAt: new Date().toISOString()}});
+    }, [hasRound, locked, locks, current.id, context.round, fingerprint, serialized]);
+    const forecasts = frozen ? (frozen.forecasts as PlayerForecast[]) : liveForecasts;
+    const pinned = frozen ? new Set(frozen.pinned) : livePinned;
+    const outs = frozen ? new Set(frozen.outs) : liveOuts;
+    const forcedNow = frozen ? (frozen.forced as FormationKey | null) : forced;
+    const frozenFresh = frozen ? Date.parse(frozen.savedAt) >= Date.parse(frozen.deadline) : false;
     const options = {rules: current.rules, defenceModifier: defenceOption(current), prefer: current.formation as FormationKey | null};
-    const advice = recommendLineup(forecasts, {...options, force: forced, pinned});
+    const advice = recommendLineup(forecasts, {...options, force: forcedNow, pinned});
     // What the pins cost: the same roster left to the numbers alone.
     const free = pinned.size > 0 ? recommendLineup(forecasts, options) : advice;
     const pinCost = Math.round((free.total - advice.total) * 10) / 10;
@@ -379,8 +423,21 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
             <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold">
                 {roundInfo && <span className="font-extrabold">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
                 <span className={cn("bb-badge text-[10px] h-5 px-1.5", withOfficial > 0 ? "bg-emerald-200" : "bg-card")}>{t('officialCount', {have: withOfficial, total: rosterTeams.length})}</span>
-                <span className="text-muted-foreground">{t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
+                {frozen ? (
+                    <span className="text-muted-foreground">{t('frozenAt', {when: when(frozen.savedAt)})}</span>
+                ) : (
+                    <>
+                        <span className="text-muted-foreground">{t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
+                        {roundInfo && <span className="inline-flex items-center gap-1 text-muted-foreground"><Lock className="w-3 h-3" aria-hidden="true" />{t('locksAt', {when: when(roundInfo.from)})}</span>}
+                    </>
+                )}
             </div>
+            {frozen && (
+                <div className="bb-surface px-3 py-2 flex items-start gap-2 text-[12px] font-semibold bg-amber-100">
+                    <Lock className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span><span className="font-extrabold">{t('locked.title')}</span> {frozenFresh ? t('locked.fresh', {deadline: when(frozen.deadline)}) : t('locked.text', {deadline: when(frozen.deadline), savedAt: when(frozen.savedAt)})}</span>
+                </div>
+            )}
 
             <div className="grid gap-3 grid-cols-1 lg:grid-cols-3 items-start">
                 <div className="lg:col-span-2 flex flex-col gap-3 min-w-0">
@@ -396,7 +453,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                                 <span className="font-extrabold">{t('pinsCount', {count: pinned.size})}</span>
                                 <span className={cn(pinCost > 0 ? "text-red-700" : "text-muted-foreground")}>{pinCost > 0 ? t('pinsCost', {cost: pinCost.toFixed(1), formation: free.formation}) : t('pinsFree')}</span>
                                 {!advice.formations[0].feasible && <span className="text-red-700">{t('pinsNoRoom')}</span>}
-                                <button type="button" onClick={clearPins} className="bb-btn bg-card h-6 px-2 text-[11px] font-extrabold ml-auto">{t('clearPins')}</button>
+                                {!frozen && <button type="button" onClick={clearPins} className="bb-btn bg-card h-6 px-2 text-[11px] font-extrabold ml-auto">{t('clearPins')}</button>}
                             </>
                         )}
                     </div>
@@ -410,7 +467,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <table className="w-full text-[12px]">
                                 <Head withIndex={false} />
                                 <tbody>
-                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
+                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -421,7 +478,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             <table className="w-full text-[12px]">
                                 <Head withIndex />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -433,12 +490,12 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                         <ul className="flex flex-col divide-y divide-muted">
                             {advice.formations.map((f, i) => (
                                 <li key={f.key}>
-                                    <button type="button" onClick={() => setForced(forced === f.key ? null : f.key)} aria-pressed={f.key === advice.formation} disabled={!f.feasible && advice.formations[0].feasible} title={!f.feasible ? t('noRoom') : undefined} className={cn("w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent", f.key === advice.formation && "bg-accent/30")}>
+                                    <button type="button" onClick={() => setForced(forcedNow === f.key ? null : f.key)} aria-pressed={f.key === advice.formation} disabled={!!frozen || (!f.feasible && advice.formations[0].feasible)} title={frozen ? t('lockedNoChange') : !f.feasible ? t('noRoom') : undefined} className={cn("w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent", f.key === advice.formation && "bg-accent/30")}>
                                         <span className="font-mono text-[13px] font-extrabold w-12">{f.key}</span>
                                         <span className="font-mono text-[12px] font-bold tabular-nums">{f.total.toFixed(1)}</span>
                                         {!f.feasible && <span className="bb-badge bg-red-200 text-[9px] h-4 px-1">{t('noRoomBadge')}</span>}
-                                        {i === 0 && f.key === advice.formation && forced === null && <span className="bb-badge bg-accent text-[9px] h-4 px-1">{t('best')}</span>}
-                                        {forced === f.key && <span className="bb-badge bg-foreground text-background text-[9px] h-4 px-1">{t('forced')}</span>}
+                                        {i === 0 && f.key === advice.formation && forcedNow === null && <span className="bb-badge bg-accent text-[9px] h-4 px-1">{t('best')}</span>}
+                                        {forcedNow === f.key && <span className="bb-badge bg-foreground text-background text-[9px] h-4 px-1">{t('forced')}</span>}
                                         {current.formation === f.key && <span className="bb-badge bg-card text-[9px] h-4 px-1">{t('leagueFormation')}</span>}
                                     </button>
                                 </li>
@@ -480,6 +537,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
                             {defenceOption(current) !== false && <li>{t('how5')}</li>}
                             <li>{t('how6')}</li>
                             <li>{t('how7')}</li>
+                            <li>{t('how8')}</li>
                         </ul>
                     </Panel>
                 </div>
@@ -487,4 +545,3 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         </div>
     );
 }
-
