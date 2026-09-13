@@ -567,7 +567,12 @@
     "shareCopied": "Link copiato",
     "shareOpen": "Apri",
     "shareStop": "Smetti di condividere",
-    "shareNeedsSave": "Salva l'asta nel cloud per condividerla."
+    "shareNeedsSave": "Salva l'asta nel cloud per condividerla.",
+    "teamsSignIn": "Accedi: squadre e formazione su ogni dispositivo",
+    "teamsSynced": "Nell'account",
+    "teamsSyncedHint": "Rosa, titolari fissi, KO e formazione bloccata sono salvati nel tuo account: li trovi uguali da ogni dispositivo.",
+    "teamsPulling": "Sincronizzo…",
+    "teamsError": "Account non raggiungibile: modifiche solo su questo dispositivo"
   },
   "shared": {
     "metaTitle": "Asta condivisa",
@@ -671,7 +676,7 @@
     "noRoom": "I titolari fissi non ci stanno in questo modulo",
     "noRoomBadge": "non ci stanno",
     "how6": "Titolari fissi: chi fissi con lo spillo parte sempre nel suo ruolo; i moduli senza posto per tutti i fissi escono dalla scelta. Vedi subito quanti punti attesi ti costa la scelta.",
-    "noTeams": "Nessuna squadra salvata su questo dispositivo. Le rose si salvano da sole dall'asta: la squadra in pianificazione, con i suoi acquisti e le regole della lega, compare qui. Un'asta per ogni fantacalcio, e qui le trovi tutte.",
+    "noTeams": "Nessuna squadra su questo dispositivo. Le rose si salvano da sole dall'asta: la squadra in pianificazione, con i suoi acquisti e le regole della lega, compare qui. Con l'accesso fatto, squadre e formazione sono nell'account e le trovi da ogni dispositivo.",
     "removeTeam": "Togli questa squadra dalla lista",
     "removeConfirm": "Togliere {team} ({league}) dalle squadre salvate? La rosa resta nell'asta, se è ancora quella.",
     "out": "Segna fuori: infortunato o assente, anche se i dati non lo dicono ancora",
