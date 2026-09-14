@@ -66,6 +66,8 @@ function useReasonText() {
             case 'attack': return t(r.factor > 1 ? 'attackUp' : 'attackDown', {pct: Math.round(Math.abs(r.factor - 1) * 100)});
             case 'form': return t('form', {own: r.own, opp: r.opp, of: r.of});
             case 'playerForm': return t('playerForm', {avg: r.avg.toFixed(2), matches: r.matches, base: r.base.toFixed(2)});
+            case 'bonusForm': return t('bonusForm', {goals: r.goals, assists: r.assists, matches: r.matches});
+            case 'cards': return t(r.factor > 1 ? 'cardsUp' : 'cardsDown', {pct: Math.round(Math.abs(r.factor - 1) * 100)});
             case 'manual': return t('manual');
             case 'cleanSheet': return t('cleanSheet', {pct: r.pct});
             case 'penalty': return t('penalty');
