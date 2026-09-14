@@ -382,7 +382,7 @@ describe('what the review fixed', () => {
 });
 
 describe('strategies of my own', () => {
-    const custom = {id: 's1', name: 'Mia', base: 'balanced', share: {P: 0.05, D: 0.1, C: 0.2, A: 0.65}, focus: {P: 0.6, D: 0.3, C: 0.4, A: 0.8}, formations: ['3-4-3'], prefer: 'none' as const};
+    const custom = {id: 's1', name: 'Mia', base: 'balanced', share: {P: 0.05, D: 0.1, C: 0.2, A: 0.65}, focus: {P: 0.6, D: 0.3, C: 0.4, A: 0.8}, formations: ['3-4-3'], prefer: 'none' as const, want: [] as number[]};
 
     it('is planned and ranked with the built-in ones under its own key and name', () => {
         const players = pool();
@@ -393,6 +393,17 @@ describe('strategies of my own', () => {
         expect(mine!.name).toBe('Mia');
         expect(mine!.budget.A).toBeGreaterThan(mine!.budget.C + mine!.budget.D);
         expect(mine!.strategy.prefer).toBe('none');
+    });
+
+    it('plans the players it wants in, whatever the marks say, without touching the other strategies', () => {
+        const players = pool();
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        // The worst attacker of the pool.
+        const worst = players.filter((p) => p.role === 'A').sort((a, b) => a.scores.overall - b.scores.overall)[0];
+        const ranked = rankStrategies(players, prices, config, new Set(), [], {}, [{...custom, want: [worst.id]}]);
+        const mine = ranked.find((p) => p.key === 'custom:s1')!;
+        expect(mine.picks.A.some((p) => p.id === worst.id && p.pinned)).toBe(true);
+        expect(ranked.find((p) => p.key === 'balanced')!.picks.A.some((p) => p.id === worst.id)).toBe(false);
     });
 
     it('can be copied from a built-in strategy to edit', () => {

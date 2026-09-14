@@ -70,7 +70,7 @@ function Status({p, rivals, rivalsTaken = []}: {p: AuctionPlayer; rivals: Auctio
 }
 
 /** The notes of the detail row: absence in full, rivals for the spot, new signing, penalties, European cups. */
-function Notes({p, onRole, wanted, avoided, onWant, onAvoid}: {p: AuctionPlayer; onRole: (role: FantaRole | null) => void; wanted: boolean; avoided: boolean; onWant: () => void; onAvoid: () => void}) {
+function Notes({p}: {p: AuctionPlayer}) {
     const t = useTranslations('Fantasy.board');
     const ts = useTranslations('Fantasy.setup');
     const format = useFormatter();
@@ -93,30 +93,29 @@ function Notes({p, onRole, wanted, avoided, onWant, onAvoid}: {p: AuctionPlayer;
     if (p.penaltyTaker) lines.push({key: 'pen', text: t('info.penaltyTaker')});
     if (p.europe) lines.push({key: 'europe', text: t('info.europe', {competition: p.europe})});
     return (
-        <div className="flex flex-col gap-0.5 mb-2">
+        <div className="flex flex-col gap-1 min-w-0">
             <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('info.title')}</span>
             {lines.length === 0 ? (
                 <span className="text-[12px] font-semibold text-muted-foreground">{t('info.none')}</span>
             ) : (
-                <ul className="flex flex-col gap-0.5 text-[12px] font-semibold list-disc pl-4">
-                    {lines.map((l) => <li key={l.key} className={l.tone}>{l.text}</li>)}
+                <ul className="flex flex-col gap-1 text-[12px] font-semibold">
+                    {lines.map((l) => <li key={l.key} className={cn("rounded-md border border-foreground/20 bg-card px-2 py-1 leading-snug", l.tone)}>{l.text}</li>)}
                 </ul>
             )}
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('info.fixRole')}</span>
-                {ROLES.map((r) => (
-                    <button key={r} type="button" onClick={() => onRole(r)} className={cn("bb-btn h-6 w-7 font-mono text-[11px] font-extrabold", p.role === r ? "bg-accent" : "bg-card")} aria-pressed={p.role === r}>{r}</button>
-                ))}
-                {p.roleSource === 'manual' && <button type="button" onClick={() => onRole(null)} className="bb-btn h-6 px-2 text-[11px] font-extrabold bg-card">{t('info.fixRoleReset')}</button>}
-                <span className="basis-full text-[10px] font-semibold text-muted-foreground">{t('info.fixRoleHint')}</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('info.plan')}</span>
-                <button type="button" onClick={onWant} aria-pressed={wanted} className={cn("bb-btn h-6 px-2 text-[11px] font-extrabold", wanted ? "bg-accent" : "bg-card")}>★ {t('info.want')}</button>
-                <button type="button" onClick={onAvoid} aria-pressed={avoided} className={cn("bb-btn h-6 px-2 text-[11px] font-extrabold", avoided ? "bg-foreground text-background" : "bg-card")}>✕ {t('info.avoid')}</button>
-                <span className="basis-full text-[10px] font-semibold text-muted-foreground">{t('info.planHint')}</span>
-            </div>
         </div>
+    );
+}
+
+/** The two buttons of the plan on a player's row: wanted (the strategies plan him in) and ignored (they never propose him). */
+function PlanButtons({wanted, avoided, target, onWant, onAvoid, size = 5}: {wanted: boolean; avoided: boolean; target: boolean; onWant: () => void; onAvoid: () => void; size?: 5 | 7}) {
+    const t = useTranslations('Fantasy.board');
+    const tst = useTranslations('Fantasy.strategies');
+    const box = size === 7 ? "w-7 h-7 text-[13px]" : "w-5 h-5 text-[11px]";
+    return (
+        <>
+            <button type="button" onClick={onWant} aria-pressed={wanted} title={wanted ? tst('pinned') : target ? tst('target') : t('info.wantHint')} className={cn("inline-flex items-center justify-center rounded border shrink-0 font-extrabold leading-none", box, wanted ? "border-foreground bg-foreground text-background" : target ? "border-foreground bg-accent" : "border-foreground/40 bg-card text-muted-foreground hover:text-foreground")}>★</button>
+            <button type="button" onClick={onAvoid} aria-pressed={avoided} title={avoided ? tst('ignored') : t('info.avoidHint')} className={cn("inline-flex items-center justify-center rounded border shrink-0 font-extrabold leading-none", box, avoided ? "border-foreground bg-foreground text-background" : "border-foreground/40 bg-card text-muted-foreground hover:text-foreground")}>✕</button>
+        </>
     );
 }
 
@@ -381,6 +380,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const roleShare = strategy?.share ?? ROLE_SHARE;
     // How the strategy in use is going, and the formation that gets the most out of my roster plus the plan's targets.
     const takenByOthers = new Set(marketPurchases.filter((p) => p.manager !== me).map((p) => p.playerId));
+    // The pool as the strategy editor sees it: whoever is still on the market or mine, to pin by name.
+    const strategyPlayers = marketPlayers.filter((p) => !takenByOthers.has(p.id)).map((p) => ({id: p.id, name: p.name, role: p.role, team: p.team.name}));
     const ownPurchases = marketPurchases.filter((p) => p.manager === me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
     const health = strategy ? strategyHealth(plans, strategy.key, baseline, marketConfig, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
@@ -447,15 +448,18 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     /** The detail row of a player: his notes (absence, rivals, role fix, plan) and his last seasons. */
     const details = (p: AuctionPlayer) => (
         <>
-                    <Notes p={p} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} onRole={(r) => { const next = {...config.roleOverrides}; if (r === null) delete next[String(p.id)]; else next[String(p.id)] = r; configStore.write({...config, roleOverrides: next}); }} />
+            <div className="flex flex-col md:flex-row gap-3 items-start whitespace-normal w-full">
+                <div className="flex-1 min-w-0 w-full"><Notes p={p} /></div>
+                <div className="flex flex-col gap-1 min-w-0 max-w-full overflow-x-auto shrink-0">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('seasonsTitle')}</span>
                     {p.seasons.length === 0 ? (
                         <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
                     ) : (
-                        <table className="text-[12px]">
+                        <table className="text-[12px] rounded-md border border-foreground/20 bg-card">
                             <thead><tr className="text-[10px] font-bold uppercase text-muted-foreground">{(['season', 'team', 'league', 'apps', 'lineups', 'minutes', 'goals', 'assists', 'rating'] as const).map((c) => <th key={c} className={cn("px-2 py-0.5", c === 'season' || c === 'team' || c === 'league' ? "text-left" : "text-right font-mono")}>{t(`seasonCols.${c}`)}</th>)}</tr></thead>
                             <tbody>
                                 {p.seasons.map((s, i) => (
-                                    <tr key={i} className="font-semibold">
+                                    <tr key={i} className={cn("font-semibold border-t border-foreground/10", i % 2 === 1 && "bg-muted/60")}>
                                         <td className="px-2 py-0.5 font-mono">{s.year}/{String(s.year + 1).slice(2)}</td>
                                         <td className="px-2 py-0.5">{s.team}</td>
                                         <td className="px-2 py-0.5 text-muted-foreground">{s.league}</td>
@@ -466,6 +470,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             </tbody>
                         </table>
                     )}
+                </div>
+            </div>
         </>
     );
 
@@ -623,7 +629,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         <span className="flex flex-col leading-tight min-w-0">
                                             <span className="inline-flex items-center gap-1 min-w-0">
                                                 <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[14px] truncate">{p.name}</Link>
-                                                {targets.has(p.id) && !purchase && <span className={cn("bb-badge text-[9px] h-4 px-1 shrink-0", wanted.has(p.id) ? "bg-foreground text-background" : "bg-accent")}>★</span>}
                                             </span>
                                             <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground truncate"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{p.team.name}{p.age !== null ? ` · ${p.age}` : ''}</span>
                                         </span>
@@ -636,6 +641,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                         <span className="ml-auto inline-flex items-center gap-1">
                                             <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground/40 bg-card">{expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>
+                                            {!purchase && <PlanButtons size={7} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} />}
                                             {purchase ? (
                                                 <>
                                                     <span className="text-[11px] font-bold text-foreground">{t('boughtBy', {manager: managers[purchase.manager] ?? t('me'), price: purchase.price})}</span>
@@ -680,12 +686,11 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                     <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/40 bg-card shrink-0">
                                                         {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                                                     </button>
+                                                    {!purchase && <PlanButtons wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} />}
                                                     <TeamCrest team={p.team} size={16} />
                                                     <span className="flex flex-col leading-tight min-w-0">
                                                         <span className="inline-flex items-center gap-1 min-w-0">
                                                             <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" title={p.fullName ?? undefined} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
-                                                            {targets.has(p.id) && !purchase && <span className={cn("bb-badge text-[9px] h-4 px-1 shrink-0", wanted.has(p.id) ? "bg-foreground text-background" : "bg-accent")} title={wanted.has(p.id) ? tst('pinned') : tst('target')}>★</span>}
-                                                            {avoided.has(p.id) && !purchase && <span className="bb-badge bg-card text-[9px] h-4 px-1 shrink-0 text-muted-foreground" title={tst('ignored')}>✕</span>}
                                                         </span>
                                                         <span className="text-[10px] font-semibold text-muted-foreground truncate">{p.team.name}{p.age !== null ? ` · ${p.age}` : ''} · <span title={t(`confidence.${p.scores.confidence}`)}>{p.scores.sample} PG</span></span>
                                                     </span>
@@ -716,7 +721,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={showScores ? 14 : 7} className="px-3 py-2">
+                                                <td colSpan={7 + (strategy ? 1 : 0) + (showScores ? SCORE_KEYS.length : 0)} className="px-3 py-2">
                                                     {details(p)}
                                                 </td>
                                             </tr>
@@ -840,7 +845,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button type="button" onClick={() => setShowStrategies(false)} aria-label={ts('cancel')} className="inline-flex items-center justify-center w-9 h-9 rounded-md border-2 border-foreground bg-background"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="bg-background rounded-xl">
-                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} customs={config.strategies} onSaveCustom={saveCustom} onDeleteCustom={deleteCustom} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} wanted={config.want.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} avoided={config.avoid.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} onWant={toggleWant} onAvoid={toggleAvoid} />
+                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} customs={config.strategies} onSaveCustom={saveCustom} onDeleteCustom={deleteCustom} players={strategyPlayers} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} wanted={config.want.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} avoided={config.avoid.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} onWant={toggleWant} onAvoid={toggleAvoid} />
                         </div>
                     </div>
                 </div>

@@ -223,15 +223,12 @@
       "fixedStarter": "Titolare fisso: ha iniziato {starts} partite su {total} in cui era convocato (pesate).",
       "backup": "Chi lo sostituisce nel suo ruolo: {names}.",
       "roleManual": "Ruolo {role} impostato da te",
-      "fixRole": "Correggi ruolo",
-      "fixRoleReset": "Torna al listone",
-      "plan": "Strategie",
       "want": "Voglio",
       "avoid": "Ignora",
-      "planHint": "\"Voglio\": le strategie lo pianificano comunque e riadattano il resto. \"Ignora\": non lo propongono mai.",
-      "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
       "fvm": "FVM {fvm}",
-      "mantra": "Mantra: {roles}"
+      "mantra": "Mantra: {roles}",
+      "wantHint": "Voglio: le strategie lo pianificano comunque e riadattano il resto",
+      "avoidHint": "Ignora: le strategie non lo propongono mai"
     },
     "close": "Chiudi",
     "paidVsList": "Listino {list} · pagato {paid} ({gap})",
@@ -519,7 +516,12 @@
         "defence": "Portiere e difensori delle squadre che subiscono poco, meglio se dello stesso club del portiere."
       },
       "delete": "Elimina",
-      "save": "Salva e usa"
+      "save": "Salva e usa",
+      "want": "Giocatori che voglio",
+      "wantHint": "Entrano nel piano di questa strategia al prezzo attuale, nello slot più grande del loro ruolo; il resto si adatta. Quelli fissati dal listone con ★ valgono per tutte le strategie.",
+      "wantSearch": "Cerca un giocatore per nome",
+      "wantNone": "Nessun giocatore fissato: li sceglie la strategia.",
+      "wantRemove": "Togli {name}"
     }
   },
   "tiers": {

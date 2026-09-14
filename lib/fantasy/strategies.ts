@@ -59,6 +59,8 @@ export interface Strategy {
     fractions?: Partial<Record<FantaRole, number[]>>;
     /** The formations the strategy is built for: they win when the values are within a hair. */
     formations?: FormationKey[];
+    /** Players the strategy plans in whatever the marks say, on top of the plan's own wanted list. */
+    want?: number[];
 }
 
 const starterBonus = (p: PoolPlayer) => (p.scores.starter >= 75 ? 8 : p.scores.starter >= 60 ? 3 : p.scores.starter < 40 ? -12 : 0);
@@ -129,12 +131,12 @@ export const STRATEGIES: Strategy[] = [
 /** A strategy of the user's own, as the planner runs it. */
 export function toStrategy(custom: CustomStrategy): Strategy {
     const formations = custom.formations.filter((f): f is FormationKey => FORMATIONS.some((k) => k.key === f));
-    return {key: customStrategyKey(custom.id), name: custom.name, share: custom.share, focus: custom.focus, prefer: custom.prefer, formations: formations.length > 0 ? formations : undefined};
+    return {key: customStrategyKey(custom.id), name: custom.name, share: custom.share, focus: custom.focus, prefer: custom.prefer, formations: formations.length > 0 ? formations : undefined, want: custom.want.length > 0 ? custom.want : undefined};
 }
 
 /** The editable copy of a strategy (a built-in one or a plan's), to start a strategy of the user's own from. */
 export function customFrom(strategy: Strategy, id: string, name: string): CustomStrategy {
-    return {id, name, base: strategy.key.startsWith('custom:') ? null : strategy.key, share: {...strategy.share}, focus: {...strategy.focus}, formations: [...(strategy.formations ?? [])], prefer: strategy.prefer ?? 'none'};
+    return {id, name, base: strategy.key.startsWith('custom:') ? null : strategy.key, share: {...strategy.share}, focus: {...strategy.focus}, formations: [...(strategy.formations ?? [])], prefer: strategy.prefer ?? 'none', want: [...(strategy.want ?? [])]};
 }
 
 /** A fresh id for a custom strategy, unlike the ones taken. */
@@ -327,8 +329,9 @@ export function bestLineup(players: LineupPlayer[], options: LineupOptions = {})
 
 /** Simulates one strategy on the pool: fills every slot with the best player (by mark plus what the strategy prefers) affordable for that slot's budget. */
 export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers' | 'formation' | 'defenceBonus'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan {
-    const want = prefs.want ?? new Set<number>();
-    const avoid = prefs.avoid ?? new Set<number>();
+    // Wanted by the user for every plan, or by this strategy alone; a wanted player is never ignored.
+    const want = new Set<number>([...(prefs.want ?? []), ...(strategy.want ?? [])]);
+    const avoid = new Set<number>([...(prefs.avoid ?? [])].filter((id) => !want.has(id)));
     // A fixed formation bends the split towards the roles it fields more of and pays its starters first.
     const forced = FORMATIONS.find((f) => f.key === config.formation) ?? null;
     const share = shareFor(strategy.share, forced);

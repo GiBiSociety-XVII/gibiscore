@@ -156,6 +156,8 @@ export interface CustomStrategy {
     /** Formations the strategy is built for ("4-3-3"): they win when the values are within a hair. */
     formations: string[];
     prefer: PreferKey;
+    /** Players this strategy plans in whatever the marks say (ids), on top of the auction's own wanted list. */
+    want: number[];
 }
 
 /** The key under which a custom strategy is selected and planned. */
@@ -185,6 +187,7 @@ export function normalizeCustomStrategy(raw: unknown): CustomStrategy | null {
         focus,
         formations: Array.isArray(r.formations) ? [...new Set(r.formations.filter((f): f is string => typeof f === 'string' && /^\d-\d-\d$/.test(f)))].slice(0, 7) : [],
         prefer: PREFER_KEYS.includes(r.prefer as PreferKey) ? (r.prefer as PreferKey) : 'none',
+        want: Array.isArray(r.want) ? [...new Set(r.want.filter((id): id is number => typeof id === 'number' && Number.isInteger(id)))].slice(0, 30) : [],
     };
 }
 
