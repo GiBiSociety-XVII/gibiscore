@@ -149,13 +149,17 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     const recentIds = [...new Set([...recentOf.values()].flat().map((f) => f.id))];
     // The votes users typed in, the latest per player and round: each on its club's match of that round.
     const {data: typedRows} = await db.rpc('fantasy_round_votes', {p_season: season.id});
+    // A typed vote (0 = "no vote") counts like an official one; a row with no vote typed corrects the events only.
     const typed = new Map<string, VotoEntry>();
+    const typedEvents = new Map<string, VotoEntry>();
     for (const r of (typedRows ?? []) as TypedVoteRow[]) {
         const f = (byRound.get(r.round) ?? []).find((x) => x.home_team_id === r.team_id || x.away_team_id === r.team_id);
         if (!f) continue;
-        typed.set(`${f.id}:${r.player_id}`, {team: '', role: 'C', name: '', voto: r.voto === null ? null : Number(r.voto), goals: r.goals, conceded: r.conceded, penaltiesScored: 0, penaltiesSaved: r.penalties_saved, penaltiesMissed: r.penalties_missed, ownGoals: r.own_goals, yellow: r.yellow, red: r.red, assists: r.assists});
+        const voto = r.voto === null ? null : Number(r.voto);
+        const entry: VotoEntry = {team: '', role: 'C', name: '', voto: voto === 0 ? null : voto, goals: r.goals, conceded: r.conceded, penaltiesScored: 0, penaltiesSaved: r.penalties_saved, penaltiesMissed: r.penalties_missed, ownGoals: r.own_goals, yellow: r.yellow, red: r.red, assists: r.assists};
+        (voto === null ? typedEvents : typed).set(`${f.id}:${r.player_id}`, entry);
     }
-    const typedFixtureIds = [...new Set([...typed.keys()].map((k) => Number(k.split(':')[0])))];
+    const typedFixtureIds = [...new Set([...typed.keys(), ...typedEvents.keys()].map((k) => Number(k.split(':')[0])))];
     const statIds = [...new Set([...recentIds, ...typedFixtureIds])];
     const [lineupRows, statRows, officialRows, sidelined] = await Promise.all([
         recentIds.length > 0
@@ -258,36 +262,41 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     }
     const teamRecent: MatchdayContext['teamRecent'] = {};
     for (const [teamId, list] of recentOf) teamRecent[teamId] = list.map((f) => f.id);
-    // The recap: the last round played and, while one is on, its matches already over. Everyone in a
-    // squad, with the official vote when the workbook is in, else the vote typed in, else the provider's
-    // numbers (a player typed in without a squad row counts too).
+    // The recap: the round being played (its matches already over) or, between rounds, the last one
+    // played. Everyone in a squad, with the official vote when the workbook is in, else the vote typed in,
+    // else the provider's numbers (a player typed in without a squad row counts too).
     const results: RoundResults[] = [];
     const lastPlayed = [...rounds].reverse().find((r) => r.state === 'played') ?? null;
     const live = rounds.find((r) => r.state === 'live') ?? null;
-    for (const [info, state] of [[live, 'live'], [lastPlayed, 'played']] as Array<[MatchdayRound | null, RoundResults['state']]>) {
+    const recap: Array<[MatchdayRound | null, RoundResults['state']]> = live ? [[live, 'live']] : [[lastPlayed, 'played']];
+    for (const [info, state] of recap) {
         if (!info) continue;
         const officialRound = votesByRound.has(roundNumber(info.round) ?? -1);
         const statsOf: Record<number, RoundStat> = {};
         const finishedTeams: number[] = [];
         const matches: RoundResults['matches'] = [];
-        for (const f of (byRound.get(info.round) ?? []).filter((x) => FINISHED.has(x.state))) {
+        for (const f of byRound.get(info.round) ?? []) {
+            const finished = FINISHED.has(f.state);
+            matches.push({home: {id: f.home!.id, name: f.home!.name}, away: {id: f.away!.id, name: f.away!.name}, finished, score: f.home_score !== null && f.away_score !== null ? [f.home_score, f.away_score] : null});
+            if (!finished) continue;
             finishedTeams.push(f.home_team_id, f.away_team_id);
-            matches.push({home: {id: f.home!.id, name: f.home!.name}, away: {id: f.away!.id, name: f.away!.name}, score: f.home_score !== null && f.away_score !== null ? [f.home_score, f.away_score] : null});
             const inSquad = lineupRows.filter((l) => l.fixture_id === f.id);
-            const typedHere = [...typed.keys()].filter((k) => k.startsWith(`${f.id}:`)).map((k) => Number(k.split(':')[1]));
+            const typedHere = [...typed.keys(), ...typedEvents.keys()].filter((k) => k.startsWith(`${f.id}:`)).map((k) => Number(k.split(':')[1]));
             const ids = [...new Set([...inSquad.map((l) => l.player_id), ...typedHere])];
             for (const playerId of ids) {
+                const key = `${f.id}:${playerId}`;
                 const l = inSquad.find((x) => x.player_id === playerId);
-                const stat = stats.get(`${f.id}:${playerId}`);
-                const entry = votoOf.get(`${f.id}:${playerId}`);
-                const source: RoundStat['source'] | undefined = entry ? (officialRound && !typed.has(`${f.id}:${playerId}`) ? 'official' : 'manual') : undefined;
+                const stat = stats.get(key);
+                const voted = votoOf.get(key);
+                const entry = voted ?? typedEvents.get(key);
+                const source: RoundStat['source'] | undefined = voted ? (officialRound && !typed.has(key) ? 'official' : 'manual') : undefined;
                 const teamId = l?.team_id ?? teamOf.get(playerId)?.team ?? null;
                 const against = teamId === f.home_team_id ? f.away_score : teamId === f.away_team_id ? f.home_score : null;
-                const minutes = stat?.minutes_played ?? (entry && entry.voto !== null ? 90 : 0);
+                const minutes = stat?.minutes_played ?? (voted && voted.voto !== null ? 90 : 0);
                 statsOf[playerId] = {
                     minutes,
                     rating: stat?.rating !== null && stat?.rating !== undefined ? Number(stat.rating) : null,
-                    ...(entry ? {voto: entry.voto, source} : {}),
+                    ...(voted ? {voto: voted.voto, source} : {}),
                     goals: entry?.goals ?? stat?.goals ?? 0,
                     assists: entry?.assists ?? stat?.assists ?? 0,
                     yellow: entry?.yellow ?? stat?.yellow_cards ?? 0,

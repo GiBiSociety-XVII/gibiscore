@@ -28,6 +28,11 @@ describe('withManualVotes', () => {
         const manual = {1: {teamId: 5, voto: 7.5, goals: 1, assists: 0, yellow: 1, red: 0, conceded: 0, penaltiesSaved: 0, penaltiesMissed: 0, ownGoals: 0, at: 'now'}, 2: {teamId: 5, voto: 4, goals: 0, assists: 0, yellow: 0, red: 0, conceded: 0, penaltiesSaved: 0, penaltiesMissed: 0, ownGoals: 0, at: 'now'}, 3: {teamId: 5, voto: 6.5, goals: 0, assists: 0, yellow: 0, red: 0, conceded: 0, penaltiesSaved: 0, penaltiesMissed: 0, ownGoals: 0, at: 'now'}};
         const out = withManualVotes(results, manual);
         expect(out.stats[1]).toMatchObject({voto: 7.5, source: 'manual', goals: 1, yellow: 1, rating: 7});
+        // Only the events typed: the site's vote (the estimate) stays; a typed 0 is "no vote".
+        const events = withManualVotes(results, {1: {...manual[1], voto: null, goals: 2}});
+        expect(events.stats[1].voto).toBeUndefined();
+        expect(events.stats[1].goals).toBe(2);
+        expect(withManualVotes(results, {1: {...manual[1], voto: 0}}).stats[1]).toMatchObject({voto: null, source: 'manual'});
         expect(out.stats[2]).toMatchObject({voto: 6, source: 'official'});
         // Nobody in the provider's squad: the typed vote makes him a player of the round.
         expect(out.stats[3]).toMatchObject({voto: 6.5, minutes: 90});

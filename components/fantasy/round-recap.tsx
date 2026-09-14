@@ -1,6 +1,6 @@
 'use client';
 
-import {ChevronDown, ChevronUp, ClipboardCheck, Pencil} from "lucide-react";
+import {ChevronDown, ChevronUp, ClipboardCheck, Pencil, RotateCcw} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
@@ -49,14 +49,17 @@ function deltaClass(delta: number): string {
     return "bg-card";
 }
 
-/** The vote as typed: a number in quarters, or empty for "no vote" (the field is cleared on purpose) or unknown. */
+const NO_VOTE = new Set(['sv', 's.v.', 's.v', '0', '-', 'senza voto']);
+const asText = (stat: RoundStat | undefined) => (stat?.voto === undefined ? '' : stat.voto === null ? 's.v.' : String(stat.voto));
+
+/** The vote as typed: a number in quarters, "sv" (or 0) for no vote, empty to fall back on the site's own estimate. */
 function VoteInput({stat, role, calibration, disabled, title, onChange}: {stat: RoundStat | undefined; role: FantaRole; calibration: VotoCalibration; disabled: boolean; title: string; onChange: (voto: number | null | undefined) => void}) {
     const known = stat?.voto !== undefined;
     const estimate = stat ? toVotoEstimate(stat, role, calibration) : null;
-    const [text, setText] = useState(known && stat?.voto !== null ? String(stat.voto) : '');
-    const shown = useRef(known && stat?.voto !== null ? String(stat.voto) : '');
+    const [text, setText] = useState(asText(stat));
+    const shown = useRef(asText(stat));
     // A vote that arrives from elsewhere (the account, the server) replaces what the field shows, not what is being typed.
-    const incoming = known && stat?.voto !== null ? String(stat!.voto) : '';
+    const incoming = asText(stat);
     useEffect(() => {
         if (incoming !== shown.current) {
             shown.current = incoming;
@@ -64,9 +67,16 @@ function VoteInput({stat, role, calibration, disabled, title, onChange}: {stat: 
         }
     }, [incoming]);
     const commit = () => {
-        const v = text.trim().replace(',', '.');
+        const v = text.trim().replace(',', '.').toLowerCase();
         if (v === '') {
-            onChange(known ? null : undefined);
+            shown.current = '';
+            if (known) onChange(undefined);
+            return;
+        }
+        if (NO_VOTE.has(v)) {
+            setText('s.v.');
+            shown.current = 's.v.';
+            onChange(null);
             return;
         }
         const n = Number(v);
@@ -141,13 +151,14 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
     const allVotes = votesStore.useValue();
     const key = votesKey(seasonId, results.round);
     const mine = allVotes[key] ?? {};
-    const shown = withManualVotes(results, mine);
+    const finished = new Set(results.finishedTeams);
+    // Only the matches over count: a player still to play has no numbers, whatever the data says.
+    const shown = withManualVotes({...results, stats: Object.fromEntries(Object.entries(results.stats).filter(([id]) => finished.has(byId.get(Number(id))?.team.id ?? -1)))}, mine);
     const defence = defenceOption(team);
     const nameOf = (id: number) => byId.get(id)?.name ?? '–';
     const lp = (p: {id: number; role: FantaRole}) => ({id: p.id, role: p.role});
     const best = bestHindsight(roster.map(lp), shown, team.rules, calibration, defence);
     const inBest = new Set(best?.ids ?? []);
-    const finished = new Set(results.finishedTeams);
 
     // The advice as it stood at the lock, replayed with its pins and forced formation, then scored.
     const forecasts = past ? (past.forecasts as PlayerForecast[]).filter((f) => byId.has(f.player.id)) : [];
@@ -209,16 +220,24 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
         }
         schedule();
     };
+    // What is typed for him so far: the vote only when it was typed (a null vote leaves the site's own).
     const baseOf = (id: number, teamId: number): ManualVote => {
         const s = shown.stats[id] ?? EMPTY_STAT;
-        return {teamId, voto: s.voto ?? null, goals: s.goals, assists: s.assists, yellow: s.yellow, red: s.red, conceded: s.conceded, penaltiesSaved: s.penaltiesSaved, penaltiesMissed: s.penaltiesMissed, ownGoals: s.ownGoals, at: new Date().toISOString()};
+        const typedVoto = mine[id]?.voto ?? (s.source === 'manual' ? (s.voto ?? 0) : null);
+        return {teamId, voto: typedVoto, goals: s.goals, assists: s.assists, yellow: s.yellow, red: s.red, conceded: s.conceded, penaltiesSaved: s.penaltiesSaved, penaltiesMissed: s.penaltiesMissed, ownGoals: s.ownGoals, at: new Date().toISOString()};
     };
-    const setVote = (id: number, teamId: number, voto: number | null | undefined) => {
-        if (voto === undefined) {
-            write(id, null);
-            return;
-        }
-        write(id, {...baseOf(id, teamId), voto, at: new Date().toISOString()});
+    // Cleared: the site's own vote again, the events typed stay. "sv": a typed no vote, stored as 0.
+    const setVote = (id: number, teamId: number, voto: number | null | undefined) => write(id, {...baseOf(id, teamId), voto: voto === undefined ? null : voto === null ? 0 : voto, at: new Date().toISOString()});
+    // Everything typed for this round, on the device and in the account, thrown away.
+    const reset = () => {
+        if (!window.confirm(t('resetConfirm'))) return;
+        const ids = [...new Set([...Object.keys(mine).map(Number), ...roster.filter((p) => results.stats[p.id]?.source === 'manual').map((p) => p.id)])];
+        const rest = {...allVotes};
+        delete rest[key];
+        votesStore.write(rest);
+        pending.current = {votes: {}, remove: new Set(ids)};
+        if (timer.current !== null) window.clearTimeout(timer.current);
+        flush();
     };
     const setEvent = (id: number, teamId: number, k: EventKey, value: number) => write(id, {...baseOf(id, teamId), [k]: value, at: new Date().toISOString()});
 
@@ -233,6 +252,10 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
                 </span>
             }
         >
+            <p className="px-3 py-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold border-b border-muted">
+                <span className="text-muted-foreground">{results.matches.some((m) => m.finished) ? t('finished', {done: results.matches.filter((m) => m.finished).length, total: results.matches.length}) : t('noneFinished')}</span>
+                {results.matches.filter((m) => m.finished).map((m) => <span key={`${m.home.id}-${m.away.id}`} className="font-bold">{m.home.name} <span className="font-mono">{m.score ? `${m.score[0]}-${m.score[1]}` : '–'}</span> {m.away.name}</span>)}
+            </p>
             <div className="px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] font-semibold">
                 {played && advice ? (
                     <span className="inline-flex items-baseline gap-1.5" title={t('advisedHint', {subs: MAX_SUBS})}>
@@ -275,6 +298,7 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
                     <p className="px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-muted-foreground border-b border-muted">
                         <span>{t('voteHint')}</span>
                         <span className={cn("ml-auto font-bold", save === 'error' && "text-red-700")}>{!signedIn ? t('signInToSave') : save === 'saving' ? t('saving') : save === 'saved' ? t('saved') : save === 'error' ? t('saveError') : t('autoSave')}</span>
+                        {typedCount > 0 && <button type="button" onClick={reset} className="bb-btn bg-card h-6 px-2 text-[10px] font-extrabold inline-flex items-center gap-1"><RotateCcw className="w-3 h-3" aria-hidden="true" />{t('reset')}</button>}
                     </p>
                     <div className="overflow-x-auto">
                         <table className="w-full text-[12px]">

@@ -46,7 +46,7 @@ export interface RoundResults {
     official: boolean;
     /** Clubs whose match of the round is over: their players can be voted. */
     finishedTeams: number[];
-    /** The matches of the round already over, with their score: what every line of the recap is about. */
+    /** The matches of the round, the ones over with their score: what every line of the recap is about. */
     matches: RoundMatch[];
     stats: Record<number, RoundStat>;
 }
@@ -54,19 +54,21 @@ export interface RoundResults {
 export interface RoundMatch {
     home: {id: number; name: string};
     away: {id: number; name: string};
+    finished: boolean;
     score: [number, number] | null;
 }
 
 /** The match a club played in the round, as "Inter 2-1 Roma"; null when it is not over. */
 export function matchLabel(results: RoundResults, teamId: number): string | null {
     const m = results.matches.find((x) => x.home.id === teamId || x.away.id === teamId);
-    if (!m) return null;
+    if (!m || !m.finished) return null;
     return `${m.home.name} ${m.score ? `${m.score[0]}-${m.score[1]}` : '–'} ${m.away.name}`;
 }
 
 /** A vote typed in by hand for a player of a round, with the events; kept on the device and in the account. */
 export interface ManualVote {
     teamId: number;
+    /** The vote; 0 is a typed "no vote"; null means it was not typed (only the events were), so the site's own vote stays. */
     voto: number | null;
     goals: number;
     assists: number;
@@ -84,7 +86,7 @@ const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Mat
 export function parseManualVote(raw: unknown): ManualVote | null {
     const m = raw as Partial<ManualVote> | null;
     if (!m || typeof m !== 'object' || typeof m.teamId !== 'number') return null;
-    const voto = typeof m.voto === 'number' && Number.isFinite(m.voto) && m.voto >= 1 && m.voto <= 10 ? Math.round(m.voto * 4) / 4 : null;
+    const voto = typeof m.voto === 'number' && Number.isFinite(m.voto) ? (m.voto === 0 ? 0 : m.voto >= 1 && m.voto <= 10 ? Math.round(m.voto * 4) / 4 : null) : null;
     return {teamId: m.teamId, voto, goals: count(m.goals), assists: count(m.assists), yellow: count(m.yellow), red: count(m.red), conceded: count(m.conceded), penaltiesSaved: count(m.penaltiesSaved), penaltiesMissed: count(m.penaltiesMissed), ownGoals: count(m.ownGoals), at: typeof m.at === 'string' ? m.at : ''};
 }
 
@@ -98,7 +100,8 @@ export function withManualVotes(results: RoundResults, manual: Record<number, Ma
         const id = Number(key);
         const base = stats[id] ?? EMPTY_STAT;
         if (base.source === 'official') continue;
-        stats[id] = {...base, minutes: base.minutes > 0 ? base.minutes : m.voto !== null ? 90 : 0, voto: m.voto, source: 'manual', goals: m.goals, assists: m.assists, yellow: m.yellow, red: m.red, conceded: m.conceded, penaltiesSaved: m.penaltiesSaved, penaltiesMissed: m.penaltiesMissed, ownGoals: m.ownGoals};
+        const typedVoto = m.voto === null ? {} : {voto: m.voto === 0 ? null : m.voto, source: 'manual' as const};
+        stats[id] = {...base, minutes: base.minutes > 0 ? base.minutes : m.voto !== null && m.voto !== 0 ? 90 : 0, ...typedVoto, goals: m.goals, assists: m.assists, yellow: m.yellow, red: m.red, conceded: m.conceded, penaltiesSaved: m.penaltiesSaved, penaltiesMissed: m.penaltiesMissed, ownGoals: m.ownGoals};
     }
     return {...results, stats};
 }
