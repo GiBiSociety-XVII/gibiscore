@@ -1,4 +1,5 @@
 import 'server-only';
+import {isBuildPhase} from '@/lib/db/phase';
 import {unstable_cache} from 'next/cache';
 import {fetchAll} from '@/lib/db/paginate';
 import {normalizePosition} from '@/lib/football/data/matches';
@@ -603,7 +604,8 @@ const lastGoodPool = new Map<AuctionLeague, AuctionPool>();
  * is ever cached, so the next request builds it again.
  */
 export async function getAuctionPool(league: AuctionLeague): Promise<AuctionPool | null> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    const attempts = isBuildPhase() ? 1 : 3;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {
             const pool = await cachedPool(league);
             if (pool) lastGoodPool.set(league, pool);

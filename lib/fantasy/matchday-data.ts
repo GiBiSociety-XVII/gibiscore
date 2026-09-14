@@ -1,6 +1,7 @@
 import 'server-only';
 import {unstable_cache} from 'next/cache';
 import {fetchAll} from '@/lib/db/paginate';
+import {isBuildPhase} from '@/lib/db/phase';
 import {footballDb, logReadError} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getPriorStudy, getSeasonStudy} from '@/lib/football/data/study';
@@ -226,7 +227,8 @@ const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', proces
 const lastGoodMatchday = new Map<AuctionLeague, MatchdayContext>();
 
 export async function getMatchday(league: AuctionLeague): Promise<MatchdayContext | null> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    const attempts = isBuildPhase() ? 1 : 3;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {
             const context = await cachedMatchday(league);
             if (context) lastGoodMatchday.set(league, context);

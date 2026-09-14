@@ -4,9 +4,12 @@
  * second time. Every page read goes through here: three attempts, a
  * short pause between them, the last error thrown.
  */
+import {isBuildPhase} from './phase';
+
 const DELAYS_MS = [250, 900];
 
-export async function withRetry<T>(read: () => Promise<T>, attempts = DELAYS_MS.length + 1): Promise<T> {
+/** At build time one attempt: a page that cannot read falls back to its empty state rather than hold the build. */
+export async function withRetry<T>(read: () => Promise<T>, attempts = isBuildPhase() ? 1 : DELAYS_MS.length + 1): Promise<T> {
     let last: unknown;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {

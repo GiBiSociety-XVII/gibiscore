@@ -1,4 +1,5 @@
 import 'server-only';
+import {isBuildPhase} from '@/lib/db/phase';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionFixtures, type FixtureSummary} from '../types';
 import {fetchAll} from '@/lib/db/paginate';
@@ -130,7 +131,7 @@ export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: st
         // empty page would be cached and shown to everyone as "no matches" for the next half minute.
         // At build time (a prerender without the database) an empty page is the honest fallback.
         logReadError('getScores', error);
-        if (process.env.NEXT_PHASE === 'phase-production-build') return empty;
+        if (isBuildPhase()) return empty;
         throw error;
     }
 }

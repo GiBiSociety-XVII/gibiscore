@@ -2,6 +2,7 @@ import 'server-only';
 import {createServerClient} from '@supabase/ssr';
 import {createClient as createSupabaseClient} from '@supabase/supabase-js';
 import {cookies} from 'next/headers';
+import {requestTimeoutMs, timedFetch} from './phase';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -38,8 +39,10 @@ export async function createClient() {
 export function createPublicClient() {
     return createSupabaseClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: {persistSession: false, autoRefreshToken: false},
+        global: {fetch: timedFetch(requestTimeoutMs())},
     });
 }
+
 
 /**
  * Service-role client for cron jobs and sync workers. Bypasses RLS: never
