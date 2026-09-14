@@ -7,6 +7,17 @@ const line = (year: number, over: Partial<SeasonLine> = {}): SeasonLine => ({
     ...over,
 });
 
+describe('scorePlayer with a learnt vote scale', () => {
+    it('moves the fantasy average with the scale, the 1-100 marks stay', () => {
+        const input = {role: 'A' as const, age: 27, currentYear: 2026, seasons: [line(2025)], injury: null, teamAttack: null, teamDefence: null};
+        const base = scorePlayer(input);
+        const lower = scorePlayer(input, {P: {slope: 0.64, intercept: 1.62}, D: {slope: 0.8, intercept: 0.57}, C: {slope: 0.75, intercept: 0.85}, A: {slope: 0.68, intercept: 1.08}});
+        expect(lower.fantaAvg!).toBeLessThan(base.fantaAvg! - 0.2);
+        expect(lower.rating).toBe(base.rating);
+        expect(lower.overall).toBe(base.overall);
+    });
+});
+
 describe('seasonWeights', () => {
     it('September: last season first, the current one a little, the one before last third', () => {
         const w = seasonWeights([line(2026, {games: 3}), line(2025), line(2024)], 2026);

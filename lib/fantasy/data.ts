@@ -14,6 +14,7 @@ import {matchListone, parseListone, type ListoneMatch, type ListoneRow} from './
 import {lastWindowClose, resolveClub, type ClubEvidence} from './membership';
 import {deriveRole, findRivals, isContested, type Availability, type SlotStart, type SlotUse} from './roles';
 import {scorePlayer, type FantaRole, type FantaScores, type SeasonLine} from './scores';
+import {getTypedCalibration} from './calibration-data';
 
 /**
  * Player pool of a fantasy auction: every player in the current squads
@@ -194,6 +195,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             .map((l) => ({league: l, season: l.seasons.filter((s) => s.is_current).sort((a, b) => b.year - a.year)[0] ?? null}))
             .filter((x): x is {league: (typeof leagues)[number]; season: {id: number; year: number; is_current: boolean}} => x.season !== null);
         if (seasons.length === 0) throw new Error(`no current season for ${league}`);
+        // The vote scale learnt from the votes typed in: the fantasy averages of the list follow it.
+        const calibration = await getTypedCalibration(league);
         const year = Math.max(...seasons.map((s) => s.season.year));
         const currentIds = seasons.map((s) => s.season.id);
         const previousIds = leagues.flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => s.id));
@@ -519,8 +522,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 clubConcededPer90: clubConcededOf(team.id),
                 clubStrength: clubStrengthOf(team.id),
             };
-            const scores = scorePlayer(inputBase);
-            const scoresLeagueOnly = scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)});
+            const scores = scorePlayer(inputBase, calibration);
+            const scoresLeagueOnly = scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)}, calibration);
             players.push({
                 id: player.id,
                 name: player.name,

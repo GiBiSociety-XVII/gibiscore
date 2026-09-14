@@ -1,4 +1,4 @@
-import {toVoto} from './voto';
+import {DEFAULT_CALIBRATION, toVoto, type VotoCalibration} from './voto';
 /**
  * Fantasy auction scores. Every player gets 1-100 marks on the things
  * that decide a fantasy price (starter reliability, bonus potential,
@@ -237,7 +237,7 @@ function createsFromShape(attack: number | null | undefined): number | null {
     return Math.max(0.6, Math.min(1.5, 1 + Math.log(a / (1 - a)) / 3));
 }
 
-function aggregateYear(lines: SeasonLine[], role: FantaRole, currentTeamId: number | null | undefined, clubConcededPer90: number | null = null, clubStrength: number | null = null, clubCreates: number | null = null): YearAgg {
+function aggregateYear(lines: SeasonLine[], role: FantaRole, currentTeamId: number | null | undefined, clubConcededPer90: number | null = null, clubStrength: number | null = null, clubCreates: number | null = null, calibration: VotoCalibration = DEFAULT_CALIBRATION): YearAgg {
     const a: YearAgg = {games: 0, apps: 0, lineups: 0, bench: 0, minutes: 0, wApps: 0, wLineups: 0, wBench: 0, wMinutes: 0, ratingSum: 0, votoSum: 0, ratingApps: 0, goals: 0, assists: 0, tGoals: 0, tAssists: 0, penMissed: 0, penSaved: 0, yellow: 0, red: 0, conceded: 0, level: 0, atClub: 0, leagueLines: 0, inSquadLeague: 0};
     let levelW = 0;
     for (const l of lines) {
@@ -268,7 +268,7 @@ function aggregateYear(lines: SeasonLine[], role: FantaRole, currentTeamId: numb
             // Ratings in weaker leagues are worth less: the excess over 6 is scaled by the league's level.
             a.ratingSum += (6 + (l.rating - 6) * level + ratingShift) * l.appearances;
             // The same on the fantasy vote scale, for the fantasy average: the marks stay on the provider's scale.
-            a.votoSum += (6 + (toVoto(l.rating, role) - 6) * level + ratingShift) * l.appearances;
+            a.votoSum += (6 + (toVoto(l.rating, role, calibration) - 6) * level + ratingShift) * l.appearances;
             a.ratingApps += l.appearances;
         }
         a.goals += l.goals;
@@ -307,7 +307,8 @@ const WEIGHTS: Record<FantaRole, Record<Exclude<keyof FantaScores, 'overall' | '
     A: {starter: 22, bonus: 36, rating: 14, discipline: 4, fitness: 8, team: 5, form: 11},
 };
 
-export function scorePlayer(input: AuctionInput): FantaScores {
+/** @param calibration How the provider's ratings map to fantasy votes: the scale learnt from the votes typed in, or the defaults. */
+export function scorePlayer(input: AuctionInput, calibration: VotoCalibration = DEFAULT_CALIBRATION): FantaScores {
     const weights = seasonWeights(input.seasons, input.currentYear);
     const years = [...weights.keys()];
     if (years.length === 0) {
@@ -328,7 +329,7 @@ export function scorePlayer(input: AuctionInput): FantaScores {
 
     for (const y of years) {
         const w = weights.get(y)!;
-        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.role, input.currentTeamId, input.clubConcededPer90 ?? null, input.clubStrength ?? null, createsFromShape(input.teamAttack));
+        const a = aggregateYear(input.seasons.filter((s) => s.year === y), input.role, input.currentTeamId, input.clubConcededPer90 ?? null, input.clubStrength ?? null, createsFromShape(input.teamAttack), calibration);
         // Rates per 90 are measured over at least six full matches: a goal in the twenty minutes of
         // a substitute is not a goal a match. A keeper's missing minutes concede at his club's rate.
         const per90 = a.minutes > 0 ? 90 / Math.max(a.minutes, RATE_MINUTES) : 0;

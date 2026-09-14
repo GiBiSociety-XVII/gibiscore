@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
         const {error} = await db.from('fantasy_votes').delete().eq('season_id', seasonId).eq('round', round).in('player_id', remove);
         if (error) return NextResponse.json({error: error.message}, {status: 500});
     }
-    revalidateTag('fantasy-matchday', 'max');
+    for (const tag of ['fantasy-votes', 'fantasy-matchday', 'fantasy-pool']) revalidateTag(tag, 'max');
     for (const path of ['/fantacalcio/formazione', '/it/fantacalcio/formazione']) revalidatePath(path);
     return NextResponse.json({saved: rows.length, removed: remove.length});
 }

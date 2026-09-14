@@ -13,6 +13,7 @@ import type {FantaRole} from './scores';
 import {DEFAULT_CALIBRATION, fitCalibration, type VotoCalibration, type VotoPair} from './voto';
 import {matchVoti, parseVoti, type VotoEntry, type VotoRow} from './voti';
 import type {RoundResults, RoundStat} from './recap';
+import {getTypedPairs} from './calibration-data';
 
 /** The official votes on disk, by league (core/fantasy/voti). */
 const OFFICIAL_VOTES: Partial<Record<AuctionLeague, Array<{round: number; rows: VotoRow[]}>>> = {'serie-a': SERIE_A_VOTI};
@@ -225,14 +226,10 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
             }
         }
     }
-    // Typed votes fill in where no official workbook covers the match, and tune the scale like the official ones.
-    for (const [key, entry] of typed) {
-        if (votoOf.has(key)) continue;
-        votoOf.set(key, entry);
-        const stat = stats.get(key);
-        const role = roleOf.get(Number(key.split(':')[1]));
-        if (entry.voto !== null && stat?.rating !== null && stat?.rating !== undefined && role) pairs.push({rating: Number(stat.rating), voto: entry.voto, role});
-    }
+    // Typed votes fill in where no official workbook covers the match; their pairs (this season and
+    // the last) come from the shared loader, the same the auction pool tunes its scale with.
+    for (const [key, entry] of typed) if (!votoOf.has(key)) votoOf.set(key, entry);
+    pairs.push(...(await getTypedPairs(league)));
     const calibration = pairs.length > 0 ? fitCalibration(pairs) : DEFAULT_CALIBRATION;
     const players: MatchdayContext['players'] = {};
     for (const [playerId, {team}] of teamOf) {
