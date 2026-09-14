@@ -1,6 +1,6 @@
 'use client';
 
-import {ArrowRight, ClipboardList, Cloud, Gavel, Lock, Plus, Smartphone, Users} from "lucide-react";
+import {AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, Cloud, Gavel, Lock, Plus, Smartphone, Users} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -8,7 +8,8 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {totalSlots} from "@/lib/fantasy/config";
 import {listAuctions, loadAuction, type CloudAuction} from "@/lib/fantasy/cloud";
-import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
+import {advisedStarters, teamAlerts, type AlertKind, type StatusResponse} from "@/lib/fantasy/alerts";
+import {cloudStore, configStore, locksStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 
 const ROME = 'Europe/Rome';
@@ -29,6 +30,7 @@ const roundName = (round: string) => (/^Regular Season - \d+$/.test(round) ? rou
 export function FantasyHome({round}: {round: NextRound | null}) {
     const t = useTranslations('Fantasy.home');
     const ts = useTranslations('Fantasy.setup');
+    const tl = useTranslations('Fantasy.lineup');
     const ta = useTranslations('Fantasy.auction');
     const tc = useTranslations('Fantasy.cloud');
     const format = useFormatter();
@@ -38,7 +40,31 @@ export function FantasyHome({round}: {round: NextRound | null}) {
     const purchases = purchasesStore.useValue();
     const link = cloudStore.useValue();
     const saved = teamsStore.useValue();
+    const locks = locksStore.useValue();
     const account = useAccountTeams();
+    // Where the players of my teams stand for the round (official lineups, absences): asked once, again every five minutes while the tab is open.
+    const idsKey = [...new Set(saved.teams.flatMap((team) => team.players))].sort((a, b) => a - b).join(',');
+    const [status, setStatus] = useState<StatusResponse | null>(null);
+    useEffect(() => {
+        if (!idsKey) return;
+        let alive = true;
+        const load = () => {
+            if (document.visibilityState !== 'visible') return;
+            fetch(`/api/fantasy/status?ids=${idsKey}`)
+                .then((r) => (r.ok ? (r.json() as Promise<StatusResponse>) : null))
+                .then((data) => { if (alive && data) setStatus(data); })
+                .catch(() => undefined);
+        };
+        load();
+        const id = window.setInterval(load, 5 * 60_000);
+        document.addEventListener('visibilitychange', load);
+        return () => {
+            alive = false;
+            window.clearInterval(id);
+            document.removeEventListener('visibilitychange', load);
+        };
+    }, [idsKey]);
+    const alertLabel = (kind: AlertKind) => (kind === 'benchOfficial' ? tl('status.official.bench') : kind === 'outOfficial' ? tl('status.official.out') : tl(`status.${kind}`));
     // The auctions saved in the account, newest first; the one open on this device is marked.
     const [cloud, setCloud] = useState<CloudAuction[] | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
@@ -154,18 +180,34 @@ export function FantasyHome({round}: {round: NextRound | null}) {
                         <p className="text-[13px] font-semibold text-muted-foreground">{t('dash.noTeams')}</p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-muted rounded-lg border-2 border-foreground/20 bg-card overflow-hidden">
-                            {teams.map((team) => (
-                                <li key={team.id}>
-                                    <Link href="/fantacalcio/formazione" onClick={() => teamsStore.write({...saved, current: team.id})} className="flex items-center gap-2 px-3 h-10 hover:bg-muted">
-                                        <Users className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                                        <span className="flex flex-col leading-tight min-w-0">
-                                            <span className="text-[13px] font-extrabold truncate">{team.name}</span>
-                                            <span className="text-[10px] font-semibold text-muted-foreground truncate">{team.leagueName || ts(`leagues.${team.league}`)} · {t('dash.players', {count: team.players.length})}</span>
-                                        </span>
-                                        <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-extrabold">{t('dash.openLineup')}<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></span>
-                                    </Link>
-                                </li>
-                            ))}
+                            {teams.map((team) => {
+                                const alerts = status ? teamAlerts(team, status.players, advisedStarters(team, locks[team.id], status.round)) : null;
+                                const bad = alerts ? alerts.starters.filter((a) => a.kind !== 'doubtful' && a.kind !== 'benchOfficial') : [];
+                                return (
+                                    <li key={team.id} className="flex flex-col">
+                                        <Link href="/fantacalcio/formazione" onClick={() => teamsStore.write({...saved, current: team.id})} className="flex items-center gap-2 px-3 h-10 hover:bg-muted">
+                                            <Users className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
+                                            <span className="flex flex-col leading-tight min-w-0">
+                                                <span className="text-[13px] font-extrabold truncate">{team.name}</span>
+                                                <span className="text-[10px] font-semibold text-muted-foreground truncate">{team.leagueName || ts(`leagues.${team.league}`)} · {t('dash.players', {count: team.players.length})}</span>
+                                            </span>
+                                            <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-extrabold">{t('dash.openLineup')}<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                                        </Link>
+                                        {/* The alerts: a starter out, in doubt or left out of the official lineup; the rest of the roster only when out */}
+                                        {alerts && (alerts.starters.length > 0 || alerts.others.length > 0 || alerts.hasLineup) && (
+                                            <div className={cn("px-3 pb-2 -mt-1 flex flex-wrap items-center gap-1 text-[11px] font-bold", bad.length > 0 ? "text-red-800" : alerts.starters.length > 0 ? "text-amber-800" : "text-emerald-800")}>
+                                                {alerts.starters.length === 0 && alerts.hasLineup && <span className="inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />{t('dash.alertsOk')}</span>}
+                                                {alerts.starters.length > 0 && <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
+                                                {alerts.starters.slice(0, 5).map((a) => (
+                                                    <span key={a.playerId} className={cn("inline-flex items-center gap-1 h-5 px-1.5 rounded border", a.kind === 'doubtful' || a.kind === 'benchOfficial' ? "border-amber-700/40 bg-amber-100" : "border-red-700/40 bg-red-100")} title={a.description ?? undefined}>{a.name} · {alertLabel(a.kind)}</span>
+                                                ))}
+                                                {alerts.starters.length > 5 && <span>+{alerts.starters.length - 5}</span>}
+                                                {alerts.others.length > 0 && <span className="text-muted-foreground font-semibold" title={alerts.others.map((a) => `${a.name} · ${alertLabel(a.kind)}`).join(', ')}>{t('dash.alertsOthers', {count: alerts.others.length, names: alerts.others.slice(0, 3).map((a) => a.name).join(', ')})}</span>}
+                                            </div>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                     <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">

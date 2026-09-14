@@ -36,7 +36,9 @@
       "currentAuction": "Aperta",
       "onDevice": "Su questo dispositivo",
       "purchases": "{count, plural, =0 {nessun acquisto} =1 {1 acquisto} other {# acquisti}}",
-      "rosterOf": "{filled}/{total} in rosa · {credits} cr."
+      "rosterOf": "{filled}/{total} in rosa · {credits} cr.",
+      "alertsOk": "Titolari a posto",
+      "alertsOthers": "{count, plural, =1 {altro in rosa fuori: {names}} other {altri # in rosa fuori: {names}}}"
     }
   },
   "auction": {
