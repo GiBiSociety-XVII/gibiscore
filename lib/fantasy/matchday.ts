@@ -1,6 +1,7 @@
 import {DEFAULT_DEFENCE_BONUS, DEFENCE_THRESHOLDS, type DefenceBonus} from './config';
 import type {FantaEvents, FantaRole, FantaRules} from './scores';
 import {FORMATIONS, type FormationKey} from './strategies';
+import {DEFAULT_CALIBRATION, toVoto, type VotoCalibration} from './voto';
 
 /**
  * The lineup for a matchday: who of a roster to field, in which
@@ -22,7 +23,10 @@ export interface RecentMatch {
     /** How he was used: started, came on, sat the whole match, not in the squad. */
     status: UsageStatus;
     minutes: number;
+    /** The provider's match rating (its own scale), null when he had none. */
     rating: number | null;
+    /** The official fantasy vote, when the round's votes are in (null there too when he had no vote). */
+    voto?: number | null;
     goals: number;
     assists: number;
 }
@@ -54,17 +58,22 @@ const LIVE_STATES = new Set(['live', 'half_time', 'extra_time', 'penalties']);
 const OPEN_STATES = new Set(['scheduled', ...LIVE_STATES]);
 
 /** "Regular Season - 10" sorts as 10; other labels by their first kick-off. */
-function roundNumber(round: string): number | null {
+export function roundNumber(round: string): number | null {
     const m = /(\d+)\s*$/.exec(round);
     return m ? Number(m[1]) : null;
 }
 
+/** A match this far from the round's usual weekend is a straggler (postponed and rescheduled): it does not hold the round open. */
+const ROUND_WINDOW_MS = 7 * 86_400_000;
+
 /**
- * The rounds of a season in order, each with its state: the round to
- * play next is the first, in round order, with most of its matches
- * still to play. A single match postponed from an earlier round (or
- * brought forward) does not make that round the next one: the fantasy
- * matchday follows the round's number, not the calendar.
+ * The rounds of a season in order, each with its state. The round shown
+ * is the one in progress or the next one: the first, in round order,
+ * with a match of its weekend still to play. A round stays the current
+ * one until its last match is over, however many were played before;
+ * a match postponed to another week (or brought forward) does not hold
+ * its round open, nor pull it forward: the fantasy matchday follows the
+ * round's number, not the calendar.
  */
 export function roundStates(fixtures: RoundFixture[]): Array<{round: string; from: string; to: string; state: RoundState}> {
     const byRound = new Map<string, RoundFixture[]>();
@@ -76,17 +85,23 @@ export function roundStates(fixtures: RoundFixture[]): Array<{round: string; fro
         if (na !== null && nb !== null && na !== nb) return na - nb;
         return first(a[1]).localeCompare(first(b[1]));
     });
-    let nextFound = false;
+    let currentFound = false;
     return ordered.map(([round, list]) => {
-        const live = list.some((f) => LIVE_STATES.has(f.state));
-        const open = list.filter((f) => OPEN_STATES.has(f.state)).length;
+        // The round's weekend: the matches on the calendar within a week of the median kick-off.
+        const dated = list.filter((f) => f.state !== 'postponed' && f.state !== 'cancelled');
+        const kickoffs = dated.map((f) => Date.parse(f.startingAt)).sort((a, b) => a - b);
+        const median = kickoffs[Math.floor(kickoffs.length / 2)] ?? NaN;
+        const weekend = dated.filter((f) => Math.abs(Date.parse(f.startingAt) - median) <= ROUND_WINDOW_MS);
+        const core = weekend.length > 0 ? weekend : dated;
+        const live = core.some((f) => LIVE_STATES.has(f.state));
+        const done = !core.some((f) => OPEN_STATES.has(f.state));
         let state: RoundState = 'played';
         if (live) state = 'live';
-        else if (open * 2 >= list.length && !nextFound) state = 'next';
-        else if (open * 2 >= list.length) state = 'future';
-        if (state === 'next' || state === 'live') nextFound = true;
-        // The round's span: a played round's matches are the ones played, an open round's the ones on the calendar.
-        const regular = state === 'played' ? list.filter((f) => f.state === 'finished') : list.filter((f) => f.state !== 'postponed' && f.state !== 'cancelled');
+        else if (!done && !currentFound) state = 'next';
+        else if (!done) state = 'future';
+        if (state === 'next' || state === 'live') currentFound = true;
+        // The round's span: a played round's matches are the ones played, an open round's its weekend on the calendar.
+        const regular = state === 'played' ? list.filter((f) => f.state === 'finished') : core;
         const span = regular.length > 0 ? regular : list;
         const dates = span.map((f) => f.startingAt).sort();
         return {round, from: dates[0], to: dates[dates.length - 1], state};
@@ -122,6 +137,10 @@ export type ForecastReason =
     | {kind: 'match'; home: boolean; opponent: string; win: number; lambdaFor: number; lambdaAgainst: number}
     | {kind: 'form'; own: number; opp: number; of: number}
     | {kind: 'playerForm'; avg: number; matches: number; base: number}
+    /** Goals and assists in his last matches played: they pull his bonus rates. */
+    | {kind: 'bonusForm'; goals: number; assists: number; matches: number}
+    /** How the match moves his card risk: the weaker side chasing the game fouls more. */
+    | {kind: 'cards'; factor: number}
     | {kind: 'manual'}
     | {kind: 'attack'; factor: number}
     | {kind: 'cleanSheet'; pct: number}
@@ -213,6 +232,14 @@ const PLAYER_FORM_PULL = 0.4;
 /** Recent votes count fully after this many: n / (n + this). */
 const PLAYER_FORM_SAMPLE = 3;
 const PLAYER_FORM_MATCHES = 5;
+/** His last matches played pull his goal and assist rates: a third of the way with four matches' worth of minutes. */
+const BONUS_FORM_PULL = 0.35;
+const BONUS_FORM_SAMPLE = 4;
+const BONUS_FORM_MATCHES = 5;
+/** A start is about 84 minutes: what a per-90 rate is worth per match. */
+const START_MINUTES = 84 / 90;
+/** Cards: the side likely to lose (chasing, fouling) picks up more, the likely winner fewer; away a little more. */
+const CARD_SWING = 0.3;
 
 /** Points won in the last results as a fraction of the maximum, null when nothing is known. */
 export function formScore(form: string | null): number | null {
@@ -283,18 +310,20 @@ function playChance(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: Match
 }
 
 /** Expected rating and fantasy points when he plays, moved by the match ahead. */
-function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: MatchdayFixture | null, home: boolean | null, rules: FantaRules, reasons: ForecastReason[]): {rating: number; points: number; subPoints: number} {
+function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: MatchdayFixture | null, home: boolean | null, rules: FantaRules, reasons: ForecastReason[], calibration: VotoCalibration): {rating: number; points: number; subPoints: number} {
     const ev = p.scores.events;
     const baseRating = ev?.rating ?? p.scores.fantaAvg ?? ROLE_RATING[p.role];
     let rating = baseRating;
-    // His own recent votes: a player on a run (or in a hole) moves from his season average, more the more votes there are.
-    const voted = (ctx?.recent ?? []).filter((m) => m.rating !== null && m.status !== 'bench' && m.status !== 'out').slice(0, PLAYER_FORM_MATCHES);
+    // His own recent votes: the official ones when the round's are in, else the provider's rating on the vote scale.
+    // A player on a run (or in a hole) moves from his season average, more the more votes there are.
+    const voteOf = (m: RecentMatch): number | null => (m.voto !== undefined && m.voto !== null ? m.voto : m.voto === null && m.rating === null ? null : m.rating !== null ? toVoto(m.rating, p.role, calibration) : null);
+    const voted = (ctx?.recent ?? []).filter((m) => voteOf(m) !== null && m.status !== 'bench' && m.status !== 'out').slice(0, PLAYER_FORM_MATCHES);
     if (voted.length > 0) {
         let sum = 0;
         let weight = 0;
         voted.forEach((m, i) => {
             const w = RECENCY ** i;
-            sum += m.rating! * w;
+            sum += voteOf(m)! * w;
             weight += w;
         });
         const avg = sum / weight;
@@ -302,11 +331,13 @@ function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: M
         reasons.push({kind: 'playerForm', avg: Math.round(avg * 100) / 100, matches: voted.length, base: Math.round(baseRating * 100) / 100});
     }
     let attack = 1;
+    let cards = 1;
     let lambdaAgainst: number | null = null;
     const pr = fixture?.prediction ?? null;
     if (fixture && pr && home !== null) {
         const win = home ? pr.home : pr.away;
         const lose = home ? pr.away : pr.home;
+        cards = clamp(1 + CARD_SWING * ((lose - win) / 100) + (home ? -0.05 : 0.05), 0.6, 1.4);
         const lambdaFor = home ? pr.lambdaHome : pr.lambdaAway;
         lambdaAgainst = home ? pr.lambdaAway : pr.lambdaHome;
         // A side that wins rates better: a third of a point between a sure win and a sure loss (the gap between a
@@ -328,7 +359,29 @@ function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: M
         if (Math.abs(attack - 1) >= 0.15 && p.role !== 'P') reasons.push({kind: 'attack', factor: attack});
     }
     if (!ev) return {rating, points: rating, subPoints: SUB_RATING};
-    const bonus = ev.goals * attack * rules.goal + ev.assists * attack * rules.assist + ev.yellow * rules.yellow + ev.red * rules.red + ev.penaltyMissed * rules.penaltyMissed;
+    // His goals and assists of late pull his season rates: a striker on a scoring run is worth more than his average says, one in a drought less.
+    let goals = ev.goals;
+    let assists = ev.assists;
+    const played = (ctx?.recent ?? []).filter((m) => (m.status === 'started' || m.status === 'sub') && m.minutes > 0).slice(0, BONUS_FORM_MATCHES);
+    if (played.length > 0) {
+        let g = 0;
+        let a = 0;
+        let k = 0;
+        played.forEach((m, i) => {
+            const w = RECENCY ** i;
+            g += m.goals * w;
+            a += m.assists * w;
+            k += (m.minutes / 90) * w;
+        });
+        if (k > 0) {
+            const pull = BONUS_FORM_PULL * (k / (k + BONUS_FORM_SAMPLE));
+            goals = Math.max(0, ev.goals + pull * ((g / k) * START_MINUTES - ev.goals));
+            assists = Math.max(0, ev.assists + pull * ((a / k) * START_MINUTES - ev.assists));
+            reasons.push({kind: 'bonusForm', goals: played.reduce((s, m) => s + m.goals, 0), assists: played.reduce((s, m) => s + m.assists, 0), matches: played.length});
+        }
+    }
+    if (Math.abs(cards - 1) >= 0.15 && (ev.yellow > 0 || ev.red > 0)) reasons.push({kind: 'cards', factor: cards});
+    const bonus = goals * attack * rules.goal + assists * attack * rules.assist + (ev.yellow * rules.yellow + ev.red * rules.red) * cards + ev.penaltyMissed * rules.penaltyMissed;
     let points = rating + bonus;
     // Off the bench: the sub's plain vote, a share of his bonus and malus for the minutes he gets.
     let subPoints = SUB_RATING + bonus * SUB_SHARE;
@@ -345,13 +398,13 @@ function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: M
 }
 
 /** One player's outlook for the round. */
-export function forecastPlayer(p: MatchdayPlayer, ctx: PlayerContext | null, fixtures: MatchdayFixture[], rules: FantaRules): PlayerForecast {
+export function forecastPlayer(p: MatchdayPlayer, ctx: PlayerContext | null, fixtures: MatchdayFixture[], rules: FantaRules, calibration: VotoCalibration = DEFAULT_CALIBRATION): PlayerForecast {
     const fixture = fixtures.find((f) => f.home.id === p.team.id || f.away.id === p.team.id) ?? null;
     const home = fixture ? fixture.home.id === p.team.id : null;
     const opponent = fixture ? (home ? fixture.away : fixture.home) : null;
     const reasons: ForecastReason[] = [];
     const chance = playChance(p, ctx, fixture, reasons);
-    const {rating, points, subPoints} = expectedPoints(p, ctx, fixture, home, rules, reasons);
+    const {rating, points, subPoints} = expectedPoints(p, ctx, fixture, home, rules, reasons, calibration);
     const plays = Math.round((chance.start + chance.sub) * 1000) / 1000;
     const starts = Math.round(chance.start * 1000) / 1000;
     return {player: p, fixture, home, opponent, plays, starts, rating: Math.round(rating * 100) / 100, points, subPoints, value: Math.round((chance.start * points + chance.sub * subPoints) * 100) / 100, reasons};

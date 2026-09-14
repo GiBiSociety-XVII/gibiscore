@@ -70,8 +70,10 @@ export interface AuctionConfig {
     managers: string[];
     /** Index in `managers` of the team the planning is for (my roster, strategies, ceilings). */
     me: number;
-    /** Chosen auction strategy (lib/fantasy/strategies.ts), drives my role budgets. */
+    /** Chosen auction strategy (lib/fantasy/strategies.ts): a built-in key or `custom:<id>`, drives my role budgets. */
     strategy: string | null;
+    /** Strategies of my own for this auction: edited copies of the built-in ones or built from scratch. */
+    strategies: CustomStrategy[];
     /** Formation the plans must be built for (e.g. "3-4-3"); null = the one that gets the most out of the roster. */
     formation: string | null;
     /** Whether cups (domestic and European) count in the marks; off = only the main league of each country. */
@@ -112,6 +114,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     managers: [],
     me: 0,
     strategy: null,
+    strategies: [],
     formation: null,
     cupsCount: false,
     keeperBlock: false,
@@ -130,7 +133,65 @@ export const CLOUD_KEY = 'gibiscore:fanta:cloud';
 export const PINS_KEY = 'gibiscore:fanta:pins';
 export const OUTS_KEY = 'gibiscore:fanta:outs';
 export const LOCKS_KEY = 'gibiscore:fanta:lineup-locks';
+export const HISTORY_KEY = 'gibiscore:fanta:lineup-history';
+export const VOTES_KEY = 'gibiscore:fanta:votes';
 export const TEAMS_KEY = 'gibiscore:fanta:teams';
+
+/** What a strategy may look for in a player beyond his marks. */
+export const PREFER_KEYS = ['none', 'penalty', 'starters', 'young', 'defence'] as const;
+export type PreferKey = (typeof PREFER_KEYS)[number];
+
+/**
+ * A strategy of the user's own: the split of the credits between roles,
+ * how concentrated the spending is inside each role, the formations it
+ * is built for and what it looks for. Planned like the built-in ones.
+ */
+export interface CustomStrategy {
+    id: string;
+    name: string;
+    /** The built-in strategy it was copied from, when it was. */
+    base: string | null;
+    /** Share of the credits per role, summing to one. */
+    share: Record<FantaRole, number>;
+    /** 0 flat spending inside the role .. 1 one star and fillers. */
+    focus: Record<FantaRole, number>;
+    /** Formations the strategy is built for ("4-3-3"): they win when the values are within a hair. */
+    formations: string[];
+    prefer: PreferKey;
+    /** Players this strategy plans in whatever the marks say (ids), on top of the auction's own wanted list. */
+    want: number[];
+}
+
+/** The key under which a custom strategy is selected and planned. */
+export const customStrategyKey = (id: string) => `custom:${id}`;
+
+/** A stored custom strategy made whole: shares renormalized, focus clamped, junk dropped. Null when it cannot be one. */
+export function normalizeCustomStrategy(raw: unknown): CustomStrategy | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const r = raw as Partial<CustomStrategy>;
+    if (typeof r.id !== 'string' || !/^[a-z0-9]{1,24}$/i.test(r.id)) return null;
+    const unit = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback);
+    const roles: FantaRole[] = ['P', 'D', 'C', 'A'];
+    // Any positive weights (percentages included): renormalized to sum to one.
+    const weight = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+    const share = {} as Record<FantaRole, number>;
+    for (const role of roles) share[role] = weight(r.share?.[role]);
+    const total = roles.reduce((s, role) => s + share[role], 0);
+    if (total <= 0) return null;
+    for (const role of roles) share[role] = share[role] / total;
+    const focus = {} as Record<FantaRole, number>;
+    for (const role of roles) focus[role] = unit(r.focus?.[role], 0.45);
+    return {
+        id: r.id,
+        name: typeof r.name === 'string' ? r.name.trim().slice(0, 40) : '',
+        base: typeof r.base === 'string' ? r.base : null,
+        share,
+        focus,
+        formations: Array.isArray(r.formations) ? [...new Set(r.formations.filter((f): f is string => typeof f === 'string' && /^\d-\d-\d$/.test(f)))].slice(0, 7) : [],
+        prefer: PREFER_KEYS.includes(r.prefer as PreferKey) ? (r.prefer as PreferKey) : 'none',
+        want: Array.isArray(r.want) ? [...new Set(r.want.filter((id): id is number => typeof id === 'number' && Number.isInteger(id)))].slice(0, 30) : [],
+    };
+}
 
 /** Bought player as stored on the client. */
 export interface Purchase {
@@ -172,6 +233,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         managers: Array.isArray(r.managers) ? r.managers.filter((m): m is string => typeof m === 'string').slice(0, 20) : [],
         me: typeof r.me === 'number' && Number.isInteger(r.me) && r.me >= 0 ? r.me : 0,
         strategy: typeof r.strategy === 'string' ? r.strategy : null,
+        strategies: Array.isArray(r.strategies) ? r.strategies.map(normalizeCustomStrategy).filter((c): c is CustomStrategy => c !== null).slice(0, 12) : [],
         formation: typeof r.formation === 'string' && /^\d-\d-\d(-\d)?$/.test(r.formation) ? r.formation : null,
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : false,
         keeperBlock: typeof r.keeperBlock === 'boolean' ? r.keeperBlock : false,

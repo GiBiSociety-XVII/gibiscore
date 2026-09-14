@@ -1,7 +1,9 @@
 import 'server-only';
+import {isBuildPhase} from '@/lib/db/phase';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionFixtures, type FixtureSummary} from '../types';
 import {fetchAll} from '@/lib/db/paginate';
+import {withRetry} from '@/lib/db/retry';
 import {FIXTURE_LIST_SELECT, footballDb, logReadError, toFixtures} from './shared';
 
 const ROME = 'Europe/Rome';
@@ -103,9 +105,11 @@ export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: st
         const db = footballDb();
         let rows: unknown;
         if (mode === 'live') {
-            const {data, error} = await db.from('fixtures').select(FIXTURE_LIST_SELECT).in('state', [...LIVE_STATES]).order('starting_at').limit(500);
-            if (error) throw error;
-            rows = data;
+            rows = await withRetry(async () => {
+                const {data, error} = await db.from('fixtures').select(FIXTURE_LIST_SELECT).in('state', [...LIVE_STATES]).order('starting_at').limit(500);
+                if (error) throw error;
+                return data;
+            });
         } else {
             const {from, to} = romeDayBounds(day);
             // A busy Saturday has well over 1000 matches worldwide: page through them.
@@ -127,7 +131,7 @@ export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: st
         // empty page would be cached and shown to everyone as "no matches" for the next half minute.
         // At build time (a prerender without the database) an empty page is the honest fallback.
         logReadError('getScores', error);
-        if (process.env.NEXT_PHASE === 'phase-production-build') return empty;
+        if (isBuildPhase()) return empty;
         throw error;
     }
 }

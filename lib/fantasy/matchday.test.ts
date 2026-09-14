@@ -171,22 +171,26 @@ describe('recommendLineup', () => {
         expect(ghost.reasons.some((r) => r.kind === 'usage' && r.started === 0)).toBe(true);
     });
 
-    it('his own recent votes pull the expected rating', () => {
-        const voted = (ratings: number[]): RecentMatch[] => ratings.map((rating, i) => ({fixtureId: 200 + i, status: 'started', minutes: 90, rating, goals: 0, assists: 0}));
+    it('his own recent votes pull the expected rating: the official ones as they are, the provider ratings on the vote scale', () => {
+        const official = (votes: number[]): RecentMatch[] => votes.map((voto, i) => ({fixtureId: 200 + i, status: 'started', minutes: 90, rating: 7.0, voto, goals: 0, assists: 0}));
+        const rated = (ratings: number[]): RecentMatch[] => ratings.map((rating, i) => ({fixtureId: 200 + i, status: 'started', minutes: 90, rating, goals: 0, assists: 0}));
         const base = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: recent(['started', 'started', 'started']), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
-        const hot = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: voted([7.4, 7.2, 7.5]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
-        const cold = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: voted([5.8, 5.9, 6.0]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        const hot = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: official([7, 7, 7.5]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        const cold = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: rated([6.0, 6.1, 6.2]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
         expect(hot.rating).toBeGreaterThan(base.rating + 0.1);
         expect(cold.rating).toBeLessThan(base.rating - 0.1);
         // Three votes: half of the full pull, a bit less.
-        expect(hot.rating - base.rating).toBeLessThan(0.4 * 0.5 * (7.4 - 6.4) + 0.01);
+        expect(hot.rating - base.rating).toBeLessThan(0.4 * 0.5 * (7.5 - 6.4) + 0.01);
         expect(hot.reasons.some((r) => r.kind === 'playerForm' && r.matches === 3)).toBe(true);
+        // A provider rating of 6.9 is an ordinary vote, not a good one: it does not lift him.
+        const plain = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: rated([6.9, 6.9, 6.9]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        expect(Math.abs(plain.rating - base.rating)).toBeLessThan(0.1);
     });
 });
 
 describe('roundStates', () => {
     const f = (round: number, day: number, state: string) => ({round: `Regular Season - ${round}`, startingAt: `2026-09-${String(day).padStart(2, '0')}T18:00:00Z`, state});
-    it('the next round is the first with most matches to play; a postponed match does not hold its round back', () => {
+    it('the round shown is the first with a match still to play; a postponed match does not hold its round back', () => {
         const fixtures = [
             ...[1, 2, 3, 4].map(() => f(1, 1, 'finished')),
             ...[1, 2, 3].map(() => f(2, 8, 'finished')), f(2, 30, 'scheduled'),
@@ -198,10 +202,47 @@ describe('roundStates', () => {
         // The played round's span ignores the match moved to the 30th.
         expect(rounds[1].to.startsWith('2026-09-08')).toBe(true);
     });
+    it('a round stays the current one until its last match is over, however many were played', () => {
+        const fixtures = [
+            ...[1, 2, 3, 4].map(() => f(3, 12, 'finished')),
+            ...[1, 2, 3].map(() => f(4, 13, 'finished')), f(4, 14, 'scheduled'),
+            ...[1, 2, 3, 4].map(() => f(5, 20, 'scheduled')),
+        ];
+        const rounds = roundStates(fixtures);
+        expect(rounds.map((r) => r.state)).toEqual(['played', 'next', 'future']);
+        expect(rounds[1].from.startsWith('2026-09-13')).toBe(true);
+        // The last match over: the next round takes over.
+        const after = roundStates(fixtures.map((x) => (x.round.endsWith('4') ? {...x, state: 'finished'} : x)));
+        expect(after.map((r) => r.state)).toEqual(['played', 'played', 'next']);
+    });
     it('a round with a match live is the live one, and rounds sort by number', () => {
         const fixtures = [f(10, 20, 'scheduled'), f(10, 20, 'scheduled'), f(9, 13, 'live'), f(9, 12, 'finished'), f(2, 1, 'finished'), f(2, 1, 'finished')];
         const rounds = roundStates(fixtures);
         expect(rounds.map((r) => r.round)).toEqual(['Regular Season - 2', 'Regular Season - 9', 'Regular Season - 10']);
         expect(rounds.map((r) => r.state)).toEqual(['played', 'live', 'future']);
+    });
+});
+
+describe('bonus and malus follow the match and his form', () => {
+    const ctxOf = (matches: RecentMatch[]): PlayerContext => ({teamId: 10, recent: matches, official: null, sidelined: null});
+    it('a striker scoring of late is worth more than his season rate says, one in a drought less', () => {
+        const hot = recent(['started', 'started', 'started', 'started', 'started']).map((m) => ({...m, goals: 1}));
+        const cold = recent(['started', 'started', 'started', 'started', 'started']);
+        const base = forecastPlayer(player(1, 'A', 10, 90, {goals: 0.4}), null, [fixture], CLASSIC_RULES).points;
+        const up = forecastPlayer(player(1, 'A', 10, 90, {goals: 0.4}), ctxOf(hot), [fixture], CLASSIC_RULES);
+        const down = forecastPlayer(player(1, 'A', 10, 90, {goals: 0.4}), ctxOf(cold), [fixture], CLASSIC_RULES);
+        expect(up.points).toBeGreaterThan(base);
+        expect(down.points).toBeLessThan(base);
+        expect(up.reasons.find((r) => r.kind === 'bonusForm')).toEqual({kind: 'bonusForm', goals: 5, assists: 0, matches: 5});
+        // A third of the way at most: five goals in five does not turn 0.4 into 1.
+        expect(up.points - base).toBeLessThan(3 * 0.6 * 0.4);
+    });
+    it('the likely loser away carries more card malus than the favourite at home', () => {
+        const away = forecastPlayer(player(2, 'C', 20, 90, {goals: 0, assists: 0, yellow: 0.3}), null, [fixture], CLASSIC_RULES);
+        const home = forecastPlayer(player(3, 'C', 10, 90, {goals: 0, assists: 0, yellow: 0.3}), null, [fixture], CLASSIC_RULES);
+        const cardsAway = away.reasons.find((r) => r.kind === 'cards');
+        const cardsHome = home.reasons.find((r) => r.kind === 'cards');
+        expect(cardsAway && cardsAway.kind === 'cards' && cardsAway.factor > 1).toBe(true);
+        expect(cardsHome && cardsHome.kind === 'cards' && cardsHome.factor < 1).toBe(true);
     });
 });

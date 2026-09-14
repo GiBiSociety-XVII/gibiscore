@@ -4,13 +4,42 @@
     "title": "Fantacalcio",
     "metaTitle": "Fantacalcio",
     "metaDescription": "Strumenti per il fantacalcio: asta guidata con voti da 1 a 100 su titolarità, bonus, rendimento, malus, affidabilità fisica e squadra, calcolati su tre stagioni.",
-    "intro": "Gli strumenti GiBiScore per il fantacalcio. Si parte dall'asta: si configura la lega e ogni giocatore riceve i voti da 1 a 100 sui punti che contano.",
+    "intro": "Asta guidata e formazione consigliata ogni settimana. Configuri la lega, registri gli acquisti, e da lì il sito lavora per te.",
     "auctionTitle": "Asta",
     "auctionText": "Configura crediti, partecipanti, rosa Classic o Mantra, regole e modificatori. Poi il listone con voti, fantamedia stimata, crediti consigliati e il tabellone degli acquisti.",
     "auctionCta": "Apri l'asta",
     "lineupTitle": "Formazione",
     "lineupText": "Ogni settimana, la formazione consigliata per ognuna delle tue squadre: modulo, undici e panchina ordinata, calcolati su titolarità reale, infortuni, formazioni ufficiali e previsione della partita. Le rose arrivano da sole dalle aste.",
-    "lineupCta": "Apri la formazione"
+    "lineupCta": "Apri la formazione",
+    "dash": {
+      "defaultTeam": "Squadra 1",
+      "creditsLeft": "crediti rimasti",
+      "rosterFilled": "giocatori in rosa",
+      "continueAuction": "Continua l'asta",
+      "openAuction": "Apri l'asta",
+      "setupAuction": "Configura l'asta",
+      "round": "Giornata {round}",
+      "locked": "Bloccata",
+      "locksAt": "Si blocca {when}",
+      "noTeams": "Nessuna squadra ancora: registra gli acquisti nell'asta e la tua rosa compare qui, pronta per la formazione.",
+      "players": "{count} giocatori",
+      "openLineup": "Formazione",
+      "howTitle": "Come funziona",
+      "step1Title": "Configura l'asta",
+      "step1Text": "Crediti, partecipanti, regole della lega e le squadre al tavolo. Un minuto.",
+      "step2Title": "Registra gli acquisti",
+      "step2Text": "Durante l'asta segni chi compra chi e a quanto: prezzi vivi, strategie e offerte massime si aggiornano da soli.",
+      "step3Title": "Ogni settimana la formazione",
+      "step3Text": "Modulo, undici e panchina consigliati con formazioni ufficiali, infortuni e previsione della partita. Si blocca al fischio d'inizio.",
+      "newAuction": "Nuova asta",
+      "noAuctions": "Nessuna asta ancora: creane una, ci vuole un minuto.",
+      "currentAuction": "Aperta",
+      "onDevice": "Su questo dispositivo",
+      "purchases": "{count, plural, =0 {nessun acquisto} =1 {1 acquisto} other {# acquisti}}",
+      "rosterOf": "{filled}/{total} in rosa · {credits} cr.",
+      "alertsOk": "Titolari a posto",
+      "alertsOthers": "{count, plural, =1 {altro in rosa fuori: {names}} other {altri # in rosa fuori: {names}}}"
+    }
   },
   "auction": {
     "title": "Asta",
@@ -20,7 +49,6 @@
     "empty": "Listone non disponibile in questo momento: il database sta rispondendo lentamente o le rose non sono ancora state importate. Riprova tra qualche minuto.",
     "settings": "Impostazioni",
     "changeSettings": "Modifica impostazioni",
-    "reset": "Nuova asta",
     "resetConfirm": "Cancellare impostazioni e acquisti di questa asta?",
     "updated": "Dati aggiornati ogni ora",
     "strategies": "Strategie"
@@ -116,7 +144,8 @@
       "status": "Stato",
       "tier": "Fascia",
       "form": "Partenza",
-      "maxBid": "Max"
+      "maxBid": "Max",
+      "bargain": "Affare"
     },
     "columnHints": {
       "starter": "Titolarità: quanto spesso parte titolare e quanti minuti gioca",
@@ -202,13 +231,8 @@
       "fixedStarter": "Titolare fisso: ha iniziato {starts} partite su {total} in cui era convocato (pesate).",
       "backup": "Chi lo sostituisce nel suo ruolo: {names}.",
       "roleManual": "Ruolo {role} impostato da te",
-      "fixRole": "Correggi ruolo",
-      "fixRoleReset": "Torna al listone",
-      "plan": "Strategie",
       "want": "Voglio",
       "avoid": "Ignora",
-      "planHint": "\"Voglio\": le strategie lo pianificano comunque e riadattano il resto. \"Ignora\": non lo propongono mai.",
-      "fixRoleHint": "Se la tua lega usa un ruolo diverso da quello del listone Fantacalcio.it, correggilo qui: vale per questa asta, e prezzi, fasce e strategie si ricalcolano. I voti restano quelli del ruolo di origine.",
       "fvm": "FVM {fvm}",
       "mantra": "Mantra: {roles}"
     },
@@ -224,6 +248,10 @@
       "note": "Portieri a blocco: con {name} prendi anche {others}, a questo prezzo. Il blocco riempie gli slot portiere."
     },
     "rivalTakenBadge": "Rivale preso",
+    "bargain": {
+      "badge": "Affare",
+      "hint": "Affare: costa poco e rende molto. Quotazione Fantacalcio.it {quote}, ma per il sito è il {rank}º {role} del listone: chi sta lì nel listone Fantacalcio.it è quotato {equiv}. Al tavolo si paga di solito intorno alla quotazione."
+    },
     "rivalTakenHint": "Chi si gioca il posto con lui è già stato comprato: {names}",
     "undoLast": "Annulla ultimo",
     "undoLastHint": "Annulla l'ultimo acquisto registrato: {name} a {manager} per {price} cr. (Ctrl+Z)",
@@ -240,7 +268,15 @@
       "planWorse": "Strategia {name}: {value} pt. ({delta}), il piano perde qualcosa",
       "over": "Sopra il massimo consigliato di {over} cr."
     },
-    "lineup": "Formazione"
+    "lineup": "Formazione",
+    "showScores": "Voti",
+    "showScoresHint": "Mostra i sette voti dietro al totale (titolarità, bonus, rendimento, malus, fisico, club, partenza)",
+    "plan": {
+      "none": "Nessuna strategia lo propone. Clicca: lo voglio, le strategie lo pianificano comunque",
+      "target": "Obiettivo della strategia in uso. Clicca: escludilo, nessuna strategia lo proporrà più",
+      "wanted": "Lo vuoi: entra in ogni piano al prezzo attuale. Clicca per togliere il vincolo",
+      "avoided": "Escluso: nessuna strategia lo propone. Clicca per togliere il vincolo"
+    }
   },
   "targets": {
     "title": "Obiettivi e piani B",
@@ -344,7 +380,8 @@
       "colPrice": "Pagato",
       "playerInjured": "Infortunato a lungo",
       "playerContested": "Posto conteso"
-    }
+    },
+    "spentLine": "Spesi {spent} su {total} cr."
   },
   "strategies": {
     "title": "Strategie consigliate",
@@ -435,7 +472,73 @@
     "formationPick": "Modulo",
     "formationAuto": "Auto",
     "formationAutoHint": "Auto: ogni strategia sceglie il modulo che rende di più con la rosa che compra. Scegli un modulo e i piani comprano i titolari di quel modulo, spostando i crediti verso i reparti con più titolari.",
-    "formationFixed": "Modulo {formation}: i piani pagano i titolari di questo modulo più una riserva per reparto, gli altri posti a un credito. Il valore XI è calcolato in questo modulo."
+    "formationFixed": "Modulo {formation}: i piani pagano i titolari di questo modulo più una riserva per reparto, gli altri posti a un credito. Il valore XI è calcolato in questo modulo.",
+    "optimized": {
+      "name": "Ottimizzata sul listone",
+      "tagline": "La divisione dei crediti che compra l'undici migliore su questo listone",
+      "description": "Le altre strategie hanno la divisione dei crediti decisa a priori; questa la cerca sul listone reale ai prezzi di adesso: prova decine di divisioni tra i ruoli e tiene quella che compra la formazione che vale di più, ripartendo da quello che hai già in rosa. Cambia durante l'asta insieme ai prezzi. Nessuna preferenza sui profili: contano solo i numeri."
+    },
+    "custom": {
+      "name": "Strategia personalizzata",
+      "badge": "Mia",
+      "tagline": "Costruita da te",
+      "taglineFrom": "Da «{name}», modificata da te",
+      "copyName": "{name} (mia)",
+      "create": "Crea la tua strategia",
+      "createHint": "Divisione dei crediti, concentrazione della spesa, moduli e profili a modo tuo. Viene simulata e classificata come le altre.",
+      "customize": "Personalizza",
+      "customizeHint": "Crea una copia di questa strategia da modificare: budget per ruolo, concentrazione, moduli, preferenze",
+      "edit": "Modifica",
+      "description": "Divisione {split}. Preferenza: {prefer}. Moduli: {formations}.",
+      "anyFormation": "quello che rende di più"
+    },
+    "editor": {
+      "titleNew": "Nuova strategia",
+      "titleEdit": "Modifica strategia",
+      "intro": "Simulata sul listone appena la salvi",
+      "name": "Nome",
+      "namePlaceholder": "Es. Difesa forte e due top",
+      "split": "Budget per ruolo",
+      "splitHint": "Muovi un ruolo e gli altri si adattano in proporzione: il totale è sempre il 100% dei crediti.",
+      "focus": "Come spendere dentro al ruolo",
+      "focusStep": {
+        "flat": "Piatta",
+        "mid": "Media",
+        "star": "Un top",
+        "superstar": "Una stella"
+      },
+      "focusHint": {
+        "flat": "Tutti i posti del ruolo costano più o meno uguale: titolari affidabili, nessun top",
+        "mid": "Un giocatore caro, gli altri di fascia media",
+        "star": "Metà del budget del ruolo su un solo giocatore, il resto riempitivi titolari",
+        "superstar": "Quasi tutto su una stella, gli altri a un credito"
+      },
+      "focusHintAll": "Piatta = tanti titolari uguali; Una stella = quasi tutto il budget del ruolo su un nome.",
+      "formations": "Moduli preferiti",
+      "formationsHint": "Nessuno = il modulo che rende di più. Con uno o più moduli scelti, a parità di valore (entro il 2%) vince uno di questi.",
+      "prefer": "Cosa cercare oltre ai voti",
+      "preferKey": {
+        "none": "Solo i numeri",
+        "penalty": "Rigoristi e bonus",
+        "starters": "Titolari sicuri",
+        "young": "Giovani in crescita",
+        "defence": "Difesa e portiere da voto"
+      },
+      "preferHint": {
+        "none": "I candidati sono ordinati solo per voto totale.",
+        "penalty": "Un rigorista e chi fa bonus stabili passano avanti a un pari voto.",
+        "starters": "Titolari fissi con buona affidabilità fisica passano avanti; chi gioca poco scende.",
+        "young": "Under 25 titolari passano avanti, gli over 32 scendono.",
+        "defence": "Portiere e difensori delle squadre che subiscono poco, meglio se dello stesso club del portiere."
+      },
+      "delete": "Elimina",
+      "save": "Salva e usa",
+      "want": "Giocatori che voglio",
+      "wantHint": "Entrano nel piano di questa strategia al prezzo attuale, nello slot più grande del loro ruolo; il resto si adatta. Quelli fissati dal listone con ★ valgono per tutte le strategie.",
+      "wantSearch": "Cerca un giocatore per nome",
+      "wantNone": "Nessun giocatore fissato: li sceglie la strategia.",
+      "wantRemove": "Togli {name}"
+    }
   },
   "tiers": {
     "title": "Fasce",
@@ -635,8 +738,8 @@
     "officialBadge": "ufficiale",
     "howTitle": "Come funziona",
     "how1": "Gioca: con la formazione ufficiale (pubblicata circa un'ora prima) un titolare vale 95%, un panchinaro 3% di partire e 22% di prendere il voto entrando, chi è fuori 2%. Prima, contano infortuni e squalifiche in corso, poi come il club l'ha usato nelle ultime otto partite (le recenti pesano di più: le partite da titolare e quelle da subentrato separate) e la titolarità dell'asta.",
-    "how2": "Voto: la media reale, tirata verso i suoi ultimi voti (fino al 40% con cinque partite), poi spostata dalla partita: un terzo di punto tra una vittoria sicura e una sconfitta sicura (la forza del club contro l'avversario, come la vede la previsione), un quinto per la forma delle ultime cinque contro quella dell'avversario, un po' in più in casa. Portieri e difensori salgono contro un attacco debole e scendono contro uno forte.",
-    "how3": "Bonus: i gol e assist a partita del giocatore, scalati su quanto la sua squadra è attesa segnare in questa partita rispetto a una partita normale del club (la forza d'attacco del club da xG e gol, stabilizzata sulle poche partite di inizio stagione), con la leva allargata: una big contro una piccola vale fino a +80%, il contrario fino a -50%. Per i portieri contano i gol attesi dall'avversario e la probabilità di porta inviolata. Coppe dentro o fuori come nelle impostazioni della lega.",
+    "how2": "Voto: tutto è sulla scala dei voti del Fantacalcio (media di un titolare intorno a 6, non ai 6,9 dei rating del provider). I rating del provider vengono tradotti in voti per ruolo con una retta tarata sui voti ufficiali di Fantacalcio.it appena ce ne sono abbastanza, prima con la distribuzione delle ultime due stagioni. La media reale viene tirata verso i suoi ultimi voti (quelli ufficiali quando ci sono; fino al 40% con cinque partite), poi spostata dalla partita: un terzo di punto tra una vittoria sicura e una sconfitta sicura (la forza del club contro l'avversario, come la vede la previsione), un quinto per la forma delle ultime cinque contro quella dell'avversario, un po' in più in casa. Portieri e difensori salgono contro un attacco debole e scendono contro uno forte.",
+    "how3": "Bonus: i gol e assist a partita del giocatore, tirati verso quello che ha fatto nelle ultime cinque giocate (fino a un terzo, con abbastanza minuti), poi scalati su quanto la sua squadra è attesa segnare in questa partita rispetto a una partita normale del club (la forza d'attacco del club da xG e gol, stabilizzata sulle poche partite di inizio stagione), con la leva allargata: una big contro una piccola vale fino a +80%, il contrario fino a -50%. Malus: i cartellini a partita salgono per chi rischia di perdere (fino a +30%) e in trasferta, scendono per chi è favorito. Per i portieri contano i gol attesi dall'avversario e la probabilità di porta inviolata. Coppe dentro o fuori come nelle impostazioni della lega.",
     "how4": "Modulo: per ogni modulo si sommano i valori degli undici, più la copertura della prima riserva quando un titolare rischia di non avere il voto. Un giocatore migliore ma un po' meno sicuro passa davanti a uno più sicuro ma più debole, perché se manca entra la riserva, non zero.",
     "how5": "Modificatore difesa: stimato dai voti attesi di portiere e difensori, pesato su quanto è sicuro che giochino.",
     "reasons": {
@@ -662,7 +765,10 @@
       "penalty": "rigorista",
       "form": "forma {own}/{of} contro {opp}/{of}",
       "manual": "segnato fuori da te",
-      "playerForm": "ultime {matches} con voto: media {avg} (stagionale {base})"
+      "playerForm": "ultime {matches} con voto: media {avg} (stagionale {base})",
+      "bonusForm": "ultime {matches} giocate: {goals} gol, {assists} assist",
+      "cardsUp": "più rischio cartellini (+{pct}%)",
+      "cardsDown": "meno rischio cartellini (-{pct}%)"
     },
     "colPin": "Titolare fisso",
     "pin": "Titolare fisso: lo schiero comunque e costruisco la formazione intorno a lui",
@@ -698,7 +804,7 @@
     "cleanSheetShort": "PI {pct}%",
     "legendGood": "a favore",
     "legendBad": "contro",
-    "legendHint": "Passa sopra a un numero per la spiegazione; sul nome per tutte le ragioni.",
+    "legendHint": "Passa sopra a un numero per la spiegazione; il bottone \"?\" accanto al nome apre tutte le ragioni.",
     "status": {
       "manual": "KO",
       "official": {
@@ -710,10 +816,13 @@
       "suspension": "squalificato",
       "absent": "assente",
       "doubtful": "in dubbio",
-      "noMatch": "non gioca"
+      "noMatch": "non gioca",
+      "locked": "Formazione bloccata",
+      "open": "Aperta · si blocca {when}",
+      "openNoDate": "Aperta"
     },
     "colRecent": "Ult.",
-    "colRecentHint": "Media dei suoi ultimi voti (fino a cinque partite giocate) e quante sono: verde sopra la sua media stagionale, rosso sotto. Sposta il voto atteso fino a un 40%, di più con più partite.",
+    "colRecentHint": "Media dei suoi ultimi voti (fino a cinque partite giocate) e quante sono: i voti ufficiali del Fantacalcio quando sono caricati, altrimenti i rating del provider riportati sulla scala dei voti. Verde sopra la sua media stagionale, rosso sotto. Sposta il voto atteso fino a un 40%, di più con più partite.",
     "locksAt": "Si blocca {when}",
     "frozenAt": "Formazione delle {when}",
     "lockedNoChange": "La giornata è iniziata: la formazione è bloccata",
@@ -722,6 +831,118 @@
       "text": "La giornata è iniziata {deadline}: da quel momento in nessuna lega si può più cambiare. Questa è la consigliata come era alle {savedAt}, l'ultima vista prima del fischio d'inizio. Si sblocca con la prossima giornata.",
       "fresh": "La giornata è iniziata {deadline} e non avevi aperto la pagina prima: la consigliata è stata calcolata ora, con i dati di adesso, e resta questa fino alla prossima giornata."
     },
-    "how8": "Blocco: al primo calcio d'inizio della giornata la formazione consigliata si congela così com'era all'ultima apertura della pagina prima del fischio (spilli e KO compresi) e non cambia più fino alla giornata successiva. Apri la pagina poco prima dell'inizio per avere le ultime notizie dentro."
+    "how8": "Giornata: la formazione consigliata è quella della giornata in corso finché la sua ultima partita non è finita, poi passa alla successiva. Blocco: al primo calcio d'inizio della giornata la consigliata si congela così com'era all'ultima apertura della pagina prima del fischio (spilli e KO compresi) e non cambia più fino alla giornata successiva. Apri la pagina poco prima dell'inizio per avere le ultime notizie dentro.",
+    "howOpen": "apri",
+    "cardForm": "forma",
+    "cardWin": "vitt.",
+    "cardGoals": "gol",
+    "cardMore": "dettagli",
+    "cardLess": "chiudi",
+    "copy": "Copia",
+    "copied": "Copiata",
+    "copyTitle": "Copia undici e panchina come testo, da incollare nell'app della lega",
+    "copyBench": "Panchina",
+    "roundLabel": "Giornata {round}",
+    "why": "Perché",
+    "whyHint": "Perché: tutte le ragioni dietro ai numeri di questo giocatore",
+    "whyClose": "Chiudi",
+    "recap": {
+      "title": "Consuntivo giornata {round}",
+      "official": "voti ufficiali",
+      "officialHint": "Voti e bonus/malus ufficiali del Fantacalcio per questa giornata.",
+      "estimated": "stima",
+      "estimatedHint": "I voti ufficiali di questa giornata non sono ancora caricati: il voto è il rating del provider riportato sulla scala dei voti, con gol, assist e cartellini del provider. Rigori parati o sbagliati e autogol non entrano nella stima.",
+      "advised": "punti della consigliata",
+      "advisedPartial": "punti finora della consigliata",
+      "live": "in corso",
+      "advisedHint": "La formazione consigliata come era al blocco (spilli e KO compresi), calcolata con le sostituzioni automatiche della lega: fino a {subs} dalla panchina, stesso ruolo, in ordine di panchina.",
+      "best": "miglior undici possibile",
+      "bestHint": "Col senno di poi: l'undici della rosa che avrebbe fatto più punti, in qualsiasi modulo.",
+      "gap": "{gap} dal massimo",
+      "noBest": "Non abbastanza giocatori con voto per un modulo intero.",
+      "subs": "{count, plural, =0 {nessuna sostituzione} one {# sostituzione} other {# sostituzioni}}",
+      "holes": "{count, plural, one {# titolare senza voto e senza riserva} other {# titolari senza voto e senza riserva}}",
+      "defence": "modificatore difesa +{points}",
+      "noPast": "La consigliata di questa giornata non è stata salvata: non avevi aperto la pagina prima del fischio d'inizio. Qui sotto i punti di tutta la rosa e l'undici migliore col senno di poi.",
+      "surprises": "Sorprese",
+      "surprisesHint": "Punti reali meno punti attesi da titolare, per chi ha preso il voto: le differenze più grandi.",
+      "details": "Dettagli",
+      "close": "Chiudi",
+      "colPlayer": "Giocatore",
+      "colVoto": "Voto",
+      "colEvents": "Bonus / malus",
+      "colEventsHint": "Solo in questa partita: gol, assist, cartellini e, per i portieri, gol subiti nella partita di questa giornata. Niente dati stagionali.",
+      "colPoints": "FV",
+      "colExpected": "Atteso",
+      "colDelta": "Diff.",
+      "noVote": "s.v.",
+      "cameIn": "entrato per {name}",
+      "replaced": "sostituito da {name}",
+      "hole": "senza voto",
+      "benchLabel": "panchina",
+      "inBest": "miglior XI",
+      "typedCount": "{count, plural, one {# voto inserito} other {# voti inseriti}}",
+      "voteHint": "Tutto quello che vedi qui è della sola partita di questa giornata (sotto ogni nome c'è quale). Scrivi il voto in pagella (non il fantavoto) per chi ha già finito la partita: bonus e malus li aggiunge il sito con le regole della tua lega. Senza voto: scrivi sv (o 0). Campo vuoto: torna alla stima del sito. Con la matita correggi gol, assist, cartellini, rigori e autogol. I voti inseriti tarano la scala dei voti e le ultime prestazioni usate per i consigli.",
+      "voteLabel": "Voto di {name}",
+      "reset": "Annulla gli inserimenti",
+      "resetConfirm": "Cancellare tutti i voti e le correzioni inserite per questa giornata, su questo dispositivo e nell'account?",
+      "finished": "Partite concluse: {done} su {total}",
+      "noneFinished": "Nessuna partita della giornata è ancora finita: i voti si inseriscono partita per partita, man mano che finiscono.",
+      "notFinished": "partita da giocare",
+      "editEvents": "Correggi bonus e malus",
+      "autoSave": "Si salva da solo",
+      "saving": "Salvataggio…",
+      "saved": "Salvato nell'account",
+      "saveError": "Salvataggio non riuscito: riprova",
+      "signInToSave": "Salvato su questo dispositivo. Accedi per tenerlo nell'account e tarare il modello.",
+      "source": {
+        "official": "ufficiale",
+        "manual": "inserito"
+      },
+      "edit": {
+        "goals": "Gol",
+        "assists": "Assist",
+        "yellow": "Amm.",
+        "red": "Esp.",
+        "penaltiesMissed": "Rig. sbagliati",
+        "ownGoals": "Autogol",
+        "penaltiesSaved": "Rig. parati",
+        "conceded": "Gol subiti"
+      },
+      "events": {
+        "goals": "{count} gol",
+        "assists": "{count} assist",
+        "conceded": "{count} subiti",
+        "cleanSheet": "porta inviolata",
+        "penaltySaved": "rigore parato",
+        "penaltyMissed": "rigore sbagliato",
+        "ownGoal": "autogol",
+        "yellow": "amm.",
+        "red": "esp."
+      }
+    }
+  },
+  "import": {
+    "title": "Importa le rose da Leghe Fantacalcio",
+    "button": "Importa da Leghe",
+    "cardTitle": "Hai già fatto l'asta su Leghe Fantacalcio?",
+    "cardText": "Esporta le rose dalla lega (Esporta rose, file CSV) e caricale qui: tutte le squadre entrano in un minuto, la tua è pronta per la formazione consigliata.",
+    "intro": "Su Leghe Fantacalcio: Rose → Esporta rose. Scegli il file scaricato oppure incolla il suo contenuto. I giocatori vengono riconosciuti dal codice del listone Fantacalcio.it.",
+    "file": "Scegli il file esportato",
+    "paste": "Oppure incolla il testo del file",
+    "team": "Squadra",
+    "players": "Giocatori",
+    "spent": "Spesi",
+    "yourTeam": "La tua squadra",
+    "yourTeamHint": "Seleziona la tua squadra: la formazione consigliata parte da questa. Le altre servono per prezzi, obiettivi e strategie.",
+    "leagueName": "Nome della lega",
+    "defaultName": "Lega Fantacalcio",
+    "credits": "Crediti per squadra",
+    "creditsHint": "Quelli della tua lega: servono per calcolare i crediti rimasti. Proposti in base a quanto ha speso la squadra che ha speso di più.",
+    "unmatchedHint": "{count, plural, =1 {1 giocatore non è nel listone del sito} other {# giocatori non sono nel listone del sito}} (ceduto all'estero o codice non in lista): resta fuori dalla rosa, puoi aggiungerlo a mano dall'asta.",
+    "replaceConfirm": "Sul dispositivo c'è già un'asta: l'importazione la sostituisce (quella salvata nel cloud resta). Continuare?",
+    "confirm": "Importa le rose",
+    "cancel": "Annulla",
+    "error": "Non riesco a leggere il file: dev'essere l'export di Leghe Fantacalcio (blocchi $,$,$ con squadra, codice e prezzo)."
   }
 }

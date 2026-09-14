@@ -1,7 +1,8 @@
 'use client';
 
+import {parseManualVote, type ManualVote} from './recap';
 import {useSyncExternalStore} from 'react';
-import {CLOUD_KEY, LOCKS_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
+import {CLOUD_KEY, HISTORY_KEY, LOCKS_KEY, VOTES_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -102,6 +103,8 @@ export const outsStore = createJsonStore<LineupPins>(OUTS_KEY, parsePins, {});
  */
 export interface LineupLock {
     round: string;
+    /** The forecast model the snapshot was drawn with: an older one is drawn again rather than kept frozen. */
+    model?: number;
     /** First kick-off of the round, ISO. */
     deadline: string;
     savedAt: string;
@@ -119,11 +122,46 @@ function parseLocks(raw: unknown): LineupLocks {
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
         const l = v as Partial<LineupLock> | null;
         if (!l || typeof l.round !== 'string' || typeof l.deadline !== 'string' || !Array.isArray(l.forecasts)) continue;
-        out[k] = {round: l.round, deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: Array.isArray(l.pinned) ? l.pinned.filter((id): id is number => typeof id === 'number') : [], outs: Array.isArray(l.outs) ? l.outs.filter((id): id is number => typeof id === 'number') : []};
+        out[k] = {round: l.round, ...(typeof l.model === 'number' ? {model: l.model} : {}), deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: Array.isArray(l.pinned) ? l.pinned.filter((id): id is number => typeof id === 'number') : [], outs: Array.isArray(l.outs) ? l.outs.filter((id): id is number => typeof id === 'number') : []};
     }
     return out;
 }
 export const locksStore = createJsonStore<LineupLocks>(LOCKS_KEY, parseLocks, {});
+
+/** Rounds kept per team once played: the recap compares what was advised with what happened. */
+export const HISTORY_ROUNDS = 6;
+/** Per saved team, the locks of the last rounds, oldest first. */
+export type LineupHistory = Record<string, LineupLock[]>;
+function parseHistory(raw: unknown): LineupHistory {
+    if (!raw || typeof raw !== 'object') return {};
+    const out: LineupHistory = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (!Array.isArray(v)) continue;
+        const locks = Object.values(parseLocks(Object.fromEntries(v.map((l, i) => [String(i), l]))));
+        if (locks.length > 0) out[k] = locks.slice(-HISTORY_ROUNDS);
+    }
+    return out;
+}
+export const historyStore = createJsonStore<LineupHistory>(HISTORY_KEY, parseHistory, {});
+
+/** Votes typed on this device: per "season:round", per player id. Shown at once; the account keeps them too. */
+export type ManualVotes = Record<string, Record<number, ManualVote>>;
+export const votesKey = (seasonId: number, round: string) => `${seasonId}:${round}`;
+function parseVotes(raw: unknown): ManualVotes {
+    if (!raw || typeof raw !== 'object') return {};
+    const out: ManualVotes = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (!v || typeof v !== 'object') continue;
+        const votes: Record<number, ManualVote> = {};
+        for (const [id, m] of Object.entries(v as Record<string, unknown>)) {
+            const vote = parseManualVote(m);
+            if (vote && Number.isInteger(Number(id))) votes[Number(id)] = vote;
+        }
+        if (Object.keys(votes).length > 0) out[k] = votes;
+    }
+    return out;
+}
+export const votesStore = createJsonStore<ManualVotes>(VOTES_KEY, parseVotes, {});
 
 const noop = () => () => {};
 /** False during server render and hydration, true afterwards: lets the page wait for localStorage before choosing what to show. */

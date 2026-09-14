@@ -11,7 +11,7 @@ import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {CloudMenu, CloudPanel} from "./cloud-panel";
 import {CompareDialog} from "./compare-dialog";
-import {RoleBadge} from "./role-badge";
+import {RoleBadge, ROLE_CLASS} from "./role-badge";
 import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
@@ -20,19 +20,21 @@ import {TargetsPanel} from "./targets-panel";
 import {useAccountTeams} from "./account-teams";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {keeperBlocks} from "@/lib/fantasy/block";
-import {DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
+import {customStrategyKey, DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
-import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, STRATEGIES, type StrategyKey} from "@/lib/fantasy/strategies";
+import {LegheImport} from "./leghe-import";
+import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
+import {bargains, type Bargain} from "@/lib/fantasy/bargains";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
-type SortKey = 'overall' | 'price' | 'fantaAvg' | (typeof SCORE_KEYS)[number] | 'name';
+type SortKey = 'overall' | 'price' | 'fantaAvg' | 'bargain' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
 
 
@@ -48,10 +50,11 @@ function ScoreCell({value}: {value: number}) {
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 /** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
-function Status({p, rivals, rivalsTaken = []}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]}) {
+function Status({p, rivals, rivalsTaken = [], deal}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]; deal?: Bargain}) {
     const t = useTranslations('Fantasy.board');
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
+            {deal?.bargain && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-emerald-700 border-emerald-700" title={t('bargain.hint', {quote: deal.quote, equiv: deal.equivQuote, rank: deal.rank, role: p.role})}>{t('bargain.badge')}</Badge>}
             {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
             {p.injury && (() => {
                 const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
@@ -70,7 +73,7 @@ function Status({p, rivals, rivalsTaken = []}: {p: AuctionPlayer; rivals: Auctio
 }
 
 /** The notes of the detail row: absence in full, rivals for the spot, new signing, penalties, European cups. */
-function Notes({p, onRole, wanted, avoided, onWant, onAvoid}: {p: AuctionPlayer; onRole: (role: FantaRole | null) => void; wanted: boolean; avoided: boolean; onWant: () => void; onAvoid: () => void}) {
+function Notes({p}: {p: AuctionPlayer}) {
     const t = useTranslations('Fantasy.board');
     const ts = useTranslations('Fantasy.setup');
     const format = useFormatter();
@@ -93,30 +96,38 @@ function Notes({p, onRole, wanted, avoided, onWant, onAvoid}: {p: AuctionPlayer;
     if (p.penaltyTaker) lines.push({key: 'pen', text: t('info.penaltyTaker')});
     if (p.europe) lines.push({key: 'europe', text: t('info.europe', {competition: p.europe})});
     return (
-        <div className="flex flex-col gap-0.5 mb-2">
+        <div className="flex flex-col gap-1 min-w-0">
             <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('info.title')}</span>
             {lines.length === 0 ? (
                 <span className="text-[12px] font-semibold text-muted-foreground">{t('info.none')}</span>
             ) : (
-                <ul className="flex flex-col gap-0.5 text-[12px] font-semibold list-disc pl-4">
-                    {lines.map((l) => <li key={l.key} className={l.tone}>{l.text}</li>)}
+                <ul className="flex flex-col gap-1 text-[12px] font-semibold">
+                    {lines.map((l) => <li key={l.key} className={cn("rounded-md border border-foreground/20 bg-card px-2 py-1 leading-snug", l.tone)}>{l.text}</li>)}
                 </ul>
             )}
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('info.fixRole')}</span>
-                {ROLES.map((r) => (
-                    <button key={r} type="button" onClick={() => onRole(r)} className={cn("bb-btn h-6 w-7 font-mono text-[11px] font-extrabold", p.role === r ? "bg-accent" : "bg-card")} aria-pressed={p.role === r}>{r}</button>
-                ))}
-                {p.roleSource === 'manual' && <button type="button" onClick={() => onRole(null)} className="bb-btn h-6 px-2 text-[11px] font-extrabold bg-card">{t('info.fixRoleReset')}</button>}
-                <span className="basis-full text-[10px] font-semibold text-muted-foreground">{t('info.fixRoleHint')}</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('info.plan')}</span>
-                <button type="button" onClick={onWant} aria-pressed={wanted} className={cn("bb-btn h-6 px-2 text-[11px] font-extrabold", wanted ? "bg-accent" : "bg-card")}>★ {t('info.want')}</button>
-                <button type="button" onClick={onAvoid} aria-pressed={avoided} className={cn("bb-btn h-6 px-2 text-[11px] font-extrabold", avoided ? "bg-foreground text-background" : "bg-card")}>✕ {t('info.avoid')}</button>
-                <span className="basis-full text-[10px] font-semibold text-muted-foreground">{t('info.planHint')}</span>
-            </div>
         </div>
+    );
+}
+
+/**
+ * One star for the plan on a player's row. Grey: nobody proposes him, a
+ * click makes him a wanted target the strategies plan in whatever the
+ * marks say. Blue: the strategy in use proposes him, a click excludes him
+ * so no strategy proposes him again. Black (wanted) or crossed (excluded):
+ * a click clears it.
+ */
+function PlanStar({wanted, avoided, target, onClick, size = 5}: {wanted: boolean; avoided: boolean; target: boolean; onClick: () => void; size?: 5 | 7}) {
+    const t = useTranslations('Fantasy.board');
+    const box = size === 7 ? "w-7 h-7 text-[13px]" : "w-5 h-5 text-[11px]";
+    const state = wanted ? 'wanted' : avoided ? 'avoided' : target ? 'target' : 'none';
+    const look = {
+        wanted: "border-foreground bg-foreground text-background",
+        avoided: "border-foreground/40 bg-muted text-muted-foreground",
+        target: "border-foreground bg-accent text-foreground",
+        none: "border-foreground/40 bg-card text-muted-foreground hover:text-foreground",
+    }[state];
+    return (
+        <button type="button" onClick={onClick} aria-pressed={wanted || avoided} title={t(`plan.${state}`)} className={cn("inline-flex items-center justify-center rounded border shrink-0 font-extrabold leading-none", box, look)}>{state === 'avoided' ? '✕' : '★'}</button>
     );
 }
 
@@ -128,7 +139,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const ts = useTranslations('Fantasy.setup');
     const tst = useTranslations('Fantasy.strategies');
     const tt = useTranslations('Fantasy.tiers');
-    const healthReason = useHealthReason();
     const router = useRouter();
     const hydrated = useHydrated();
     // The planning team follows the signed-in user's account, for the lineup page on every device.
@@ -145,6 +155,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const [view, setView] = useState<'list' | 'tiers'>('list');
     const [teamId, setTeamId] = useState<number | 'all'>('all');
     const [hideBought, setHideBought] = useState(false);
+    /** The seven marks behind the total, hidden by default: the list reads faster with the total, the average and the price. */
+    const [showScores, setShowScores] = useState(false);
     const [sort, setSort] = useState<SortKey>('overall');
     const [limit, setLimit] = useState(PAGE);
     const [open, setOpen] = useState<number | null>(null);
@@ -182,8 +194,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!board) return new Map<number, number>();
         return suggestPrices(board.players, {credits: board.config.credits, participants: board.config.participants, slots: board.config.slots, roleShare: ROLE_SHARE, level: board.config.priceLevel / 100});
     }, [board]);
-    // Cheap enough to redo on every render: a few hundred players, a handful of purchases.
-    const prices = board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices;
+    // Cheap on Fantacalcio.it, worth much more to the site: ranked on the list prices, so the auction does not move them.
+    const deals = useMemo(() => (board ? bargains(board.players.map((p) => ({id: p.id, role: p.role, listQuote: p.listQuote, value: p.scores.overall})), listPrices) : new Map<number, Bargain>()), [board, listPrices]);
+    // Live prices follow the purchases: the plans below hang on them, so they are drawn once per purchase.
+    const prices = useMemo(() => (board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices), [board, listPrices]);
     const market = board ? marketState(board.players, listPrices, board.config, board.purchases) : null;
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
     const tierInfos = useMemo(() => (pool && config ? explainTiers(pool.players, config) : new Map<number, TierInfo>()), [pool, config]);
@@ -194,22 +208,24 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const byId = new Map(board.players.map((p) => [p.id, p]));
         const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
         const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-        return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)});
+        return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
     }, [board, prices]);
+    // A warning in words; a custom strategy has no translation, so it is named from the plans.
+    const healthReason = useHealthReason((key) => plans.find((p) => p.key === key)?.name ?? tst(`${key}.name`));
     // The same strategies on the full list at list prices: what each was worth when the auction started.
-    const baseline = useMemo(() => (board ? rankStrategies(board.players, listPrices, board.config, new Set(), [], {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}) : []), [board, listPrices]);
+    const baseline = useMemo(() => (board ? rankStrategies(board.players, listPrices, board.config, new Set(), [], {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies) : []), [board, listPrices]);
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
         const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (tier === 'all' || tiers.get(p.id) === tier) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || playerMatches(p, needle)));
-        const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'name' ? p.name : p.scores[sort]);
+        const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'bargain' ? (deals.has(p.id) ? (deals.get(p.id)!.bargain ? 100 : 0) + deals.get(p.id)!.index : 0) : sort === 'name' ? p.name : p.scores[sort]);
         return list.sort((a, b) => {
             const va = value(a);
             const vb = value(b);
             if (typeof va === 'string' && typeof vb === 'string') return va.localeCompare(vb);
             return (vb as number) - (va as number) || b.scores.overall - a.scores.overall;
         });
-    }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices]);
+    }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices, deals]);
 
     // The planning team is kept for the lineup page: every purchase of mine, and the league's settings, as they change.
     useEffect(() => {
@@ -230,10 +246,21 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         setEditing(false);
         if (!pool || next.league !== pool.league) router.push(`/fantacalcio/asta?league=${next.league}`);
     };
+    // Rosters exported by Leghe Fantacalcio: a whole league in, the cloud link dropped (it was another auction's).
+    const importable = (pool?.players ?? []).map((p) => ({id: p.id, role: p.role, listCode: p.listCode}));
+    const importLeghe = (next: AuctionConfig, rows: Purchase[]) => {
+        purchasesStore.write(rows);
+        configStore.write(next);
+        cloudStore.write(null);
+        setEditing(false);
+        setOpen(null);
+        router.push('/fantacalcio/asta');
+    };
     if (!config) {
         return (
             <div className="flex flex-col gap-3">
                 <CloudPanel purchases={purchases} />
+                <LegheImport players={importable} hasAuction={false} onImport={importLeghe} />
                 <AuctionSetup initial={null} onSave={save} />
             </div>
         );
@@ -268,13 +295,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const slotsTotal = totalSlots(config.slots);
     const freeSlots = Math.max(0, slotsTotal - mine.length);
     const mineByRole = (r: FantaRole) => mine.filter((p) => byId.get(p.playerId)?.role === r);
-    const reset = () => {
-        if (window.confirm(ta('resetConfirm'))) {
-            purchasesStore.write([]);
-            configStore.write(null);
-            cloudStore.write(null);
-        }
-    };
     // Roster limits per manager: slots of the role, and credits that must leave 1 per open slot.
     const rosterOf = (manager: number) => purchases.filter((p) => p.manager === manager && byId.has(p.playerId));
     const roleCount = (manager: number, r: FantaRole) => rosterOf(manager).filter((p) => byId.get(p.playerId)!.role === r).length;
@@ -365,6 +385,11 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     };
     const strategy = plans.find((p) => p.key === config.strategy) ?? null;
     const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
+    /** A strategy's name: the user's own for his, the translation for the built-in ones. */
+    const strategyName = (plan: {key: string; name?: string}) => plan.name ?? tst(`${plan.key}.name`);
+    // The user's own strategies: saved into the auction (so they travel with it), the saved one is put in use.
+    const saveCustom = (custom: CustomStrategy) => configStore.write({...config, strategies: [...config.strategies.filter((c) => c.id !== custom.id), custom], strategy: customStrategyKey(custom.id)});
+    const deleteCustom = (id: string) => configStore.write({...config, strategies: config.strategies.filter((c) => c.id !== id), strategy: config.strategy === customStrategyKey(id) ? null : config.strategy});
     // The user's say on the targets: a wanted player is planned in, an ignored one never suggested. One or the other.
     const wanted = new Set(config.want);
     const avoided = new Set(config.avoid);
@@ -373,6 +398,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const roleShare = strategy?.share ?? ROLE_SHARE;
     // How the strategy in use is going, and the formation that gets the most out of my roster plus the plan's targets.
     const takenByOthers = new Set(marketPurchases.filter((p) => p.manager !== me).map((p) => p.playerId));
+    // The pool as the strategy editor sees it: whoever is still on the market or mine, to pin by name.
+    const strategyPlayers = marketPlayers.filter((p) => !takenByOthers.has(p.id)).map((p) => ({id: p.id, name: p.name, role: p.role, team: p.team.name}));
     const ownPurchases = marketPurchases.filter((p) => p.manager === me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
     const health = strategy ? strategyHealth(plans, strategy.key, baseline, marketConfig, ownPurchases, takenByOthers) : null;
     const guide = strategy ?? plans.find((p) => p.available) ?? null;
@@ -381,6 +408,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: defenceOption(config)});
     const myReport = reportOf(me);
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
+    /** The star's click: wanted or excluded clears; a strategy's target is excluded; anyone else becomes wanted. */
+    const cyclePlan = (id: number) => {
+        if (wanted.has(id) || avoided.has(id)) configStore.write({...config, want: config.want.filter((x) => x !== id), avoid: config.avoid.filter((x) => x !== id)});
+        else if (targets.has(id)) toggleAvoid(id);
+        else toggleWant(id);
+    };
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
     // never more than what leaves me enough to finish the roster with the cheapest players left.
     const maxBidOf = (id: number): number | null => {
@@ -401,12 +434,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (manager !== me) return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup: null, plan: null, over: 0, already};
         const rosterAfter = [...others.map((p) => byId.get(p.playerId)!), player];
         const lineup = rosterAfter.length >= 11 ? bestLineup(rosterAfter, {defenceModifier: defenceOption(config)}) : null;
-        const def = strategy ? STRATEGIES.find((s) => s.key === strategy.key) : null;
+        const def = strategy?.strategy ?? null;
         const plan = def && strategy
             ? planStrategy(def, marketPlayers, prices, marketConfig, takenByOthers, [...others.filter((p) => !blocks?.backups.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price})), {playerId: player.id, role: player.role, price}], {want: wanted, avoid: avoided})
             : null;
         const max = maxBidOf(player.id);
-        return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup, plan: plan && strategy ? {value: plan.lineupValue, delta: plan.lineupValue - strategy.lineupValue, name: tst(`${strategy.key}.name`)} : null, over: max !== null ? Math.max(0, price - max) : 0, already, missing: Math.max(0, 11 - rosterAfter.length)};
+        return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup, plan: plan && strategy ? {value: plan.lineupValue, delta: plan.lineupValue - strategy.lineupValue, name: strategyName(strategy)} : null, over: max !== null ? Math.max(0, price - max) : 0, already, missing: Math.max(0, 11 - rosterAfter.length)};
     };
     const priceCell = (id: number) => {
         if (blocks?.backups.has(id)) {
@@ -436,6 +469,36 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         );
     };
 
+    /** The detail row of a player: his notes (absence, rivals, role fix, plan) and his last seasons. */
+    const details = (p: AuctionPlayer) => (
+        <>
+            <div className="flex flex-col md:flex-row gap-3 items-start whitespace-normal w-full">
+                <div className="flex-1 min-w-0 w-full"><Notes p={p} /></div>
+                <div className="flex flex-col gap-1 min-w-0 max-w-full overflow-x-auto shrink-0">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('seasonsTitle')}</span>
+                    {p.seasons.length === 0 ? (
+                        <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
+                    ) : (
+                        <table className="text-[12px] rounded-md border border-foreground/20 bg-card">
+                            <thead><tr className="text-[10px] font-bold uppercase text-muted-foreground">{(['season', 'team', 'league', 'apps', 'lineups', 'minutes', 'goals', 'assists', 'rating'] as const).map((c) => <th key={c} className={cn("px-2 py-0.5", c === 'season' || c === 'team' || c === 'league' ? "text-left" : "text-right font-mono")}>{t(`seasonCols.${c}`)}</th>)}</tr></thead>
+                            <tbody>
+                                {p.seasons.map((s, i) => (
+                                    <tr key={i} className={cn("font-semibold border-t border-foreground/10", i % 2 === 1 && "bg-muted/60")}>
+                                        <td className="px-2 py-0.5 font-mono">{s.year}/{String(s.year + 1).slice(2)}</td>
+                                        <td className="px-2 py-0.5">{s.team}</td>
+                                        <td className="px-2 py-0.5 text-muted-foreground">{s.league}</td>
+                                        {[s.apps, s.lineups, s.minutes, s.goals, s.assists].map((v, j) => <td key={j} className="px-2 py-0.5 text-right font-mono tabular-nums">{v}</td>)}
+                                        <td className="px-2 py-0.5 text-right font-mono tabular-nums">{s.rating?.toFixed(2) ?? '–'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+
     const shown = players.slice(0, limit);
     const selectClass = "bb-input h-8 px-2 text-[12px] font-bold";
 
@@ -447,6 +510,38 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)}</span>
                     <span className="text-[11px] font-semibold text-muted-foreground">· {ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr.</span>
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
+                        <Link href="/fantacalcio/formazione" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" aria-hidden="true" />{t('lineup')}</Link>
+                        <CloudMenu config={config} purchases={purchases} />
+                        <LegheImport players={importable} hasAuction={purchases.length > 0} onImport={importLeghe} variant="button" />
+                        <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
+                    </span>
+                </div>
+
+                {/* Always on screen while the list scrolls: my credits, my slots, the formation, the strategy, the last purchase */}
+                <div className="sticky top-0 z-20 bb-surface bg-background px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <span className="flex items-baseline gap-1.5">
+                        <span className={cn("font-mono text-2xl font-extrabold tabular-nums leading-none", left < 0 && "text-red-700")}>{left}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground leading-none">{tr('credits')} {tr('left')}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                        {ROLES.map((r) => {
+                            const filled = mineByRole(r).length;
+                            const full = filled >= config.slots[r];
+                            return (
+                                <span key={r} title={`${ts(`roles.${r}`)} · ~${Math.round(config.credits * roleShare[r])} cr.`} className={cn("inline-flex items-center gap-1 h-7 pl-1 pr-1.5 rounded-md border-2 font-mono text-[12px] font-extrabold tabular-nums", full ? "border-foreground bg-foreground text-background" : "border-foreground/30 bg-card")}>
+                                    <span className={cn("inline-flex items-center justify-center w-4 h-4 rounded text-[9px] text-foreground", ROLE_CLASS[r])}>{r}</span>
+                                    {filled}/{config.slots[r]}
+                                </span>
+                            );
+                        })}
+                    </span>
+                    {freeSlots > 0 && <span className="text-[11px] font-semibold text-muted-foreground hidden sm:inline">{tr('perSlot', {credits: Math.max(0, Math.floor(left / freeSlots))})}</span>}
+                    {(rosterLineup || guide) && (
+                        <span className="text-[11px] font-bold hidden md:inline" title={tr('formationHint')}>
+                            {rosterLineup ? tr('formationNow', {formation: rosterLineup.formation}) : config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide!.formation})}
+                        </span>
+                    )}
+                    <span className="ml-auto flex flex-wrap items-center gap-1.5">
                         {lastPurchase && byId.has(lastPurchase.playerId) && (
                             <button type="button" onClick={undoLast} title={t('undoLastHint', {name: byId.get(lastPurchase.playerId)!.name, manager: managers[lastPurchase.manager] ?? t('me'), price: lastPurchase.price})} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5">
                                 <Undo2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -456,19 +551,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         )}
                         <button type="button" onClick={() => setShowStrategies(true)} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", strategy ? "bg-accent" : "bg-card")}>
                             <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
-                            {strategy ? tst(`${strategy.key}.name`) : ta('strategies')}
+                            {strategy ? strategyName(strategy) : ta('strategies')}
                         </button>
                         {health && (
                             <button type="button" onClick={() => setShowStrategies(true)} title={health.reasons.length > 0 ? health.reasons.map(healthReason).join('\n') : tst('health.fine')} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", HEALTH_CLASS[health.status])}>
                                 <Activity className="w-3.5 h-3.5" aria-hidden="true" />
                                 {tst(`health.${health.status}`)}
-                                {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: tst(`${health.best.key}.name`)})}</span>}
+                                {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: strategyName(health.best)})}</span>}
                             </button>
                         )}
-                        <Link href="/fantacalcio/formazione" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" aria-hidden="true" />{t('lineup')}</Link>
-                        <CloudMenu config={config} purchases={purchases} />
-                        <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
-                        <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
                 </div>
 
@@ -510,21 +601,23 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         {TIERS.map((k) => <option key={k} value={k}>{tt(`${k}.name`)}</option>)}
                     </select>
                     <select className={selectClass} value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={t('sort')}>
-                        {(['overall', 'price', 'fantaAvg', ...SCORE_KEYS, 'name'] as SortKey[]).map((k) => <option key={k} value={k}>{t('sort')}: {k === 'name' ? t('columns.player') : t(`columns.${k === 'team' ? 'team_' : k}`)}</option>)}
+                        {(['overall', 'price', 'fantaAvg', 'bargain', ...SCORE_KEYS, 'name'] as SortKey[]).map((k) => <option key={k} value={k}>{t('sort')}: {k === 'name' ? t('columns.player') : t(`columns.${k === 'team' ? 'team_' : k}`)}</option>)}
                     </select>
                     <label className="flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap">
                         <input type="checkbox" checked={hideBought} onChange={(e) => setHideBought(e.target.checked)} className="w-4 h-4" />
                         {t('hideBought')}
                     </label>
-                    <div role="radiogroup" aria-label={t('view')} className="flex gap-1 ml-auto">
+                    <button type="button" onClick={() => setShowScores((v) => !v)} aria-pressed={showScores} title={t('showScoresHint')} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold hidden md:inline-flex", showScores ? "bg-foreground text-background" : "bg-card")}>{t('showScores')}</button>
+                </div>
+
+                {/* View tabs, then the teams on one row, crests only: one at a time, the active one again to clear it */}
+                <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:thin] pb-1 -mb-1">
+                    <div role="radiogroup" aria-label={t('view')} className="flex gap-1 shrink-0 pr-2 mr-1 border-r-2 border-foreground/30">
                         {(['list', 'tiers'] as const).map((v) => (
                             <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", view === v ? "bg-foreground text-background" : "bg-card")}>{v === 'list' ? t('viewList') : t('viewTiers')}</button>
                         ))}
                     </div>
-                </div>
-
-                {/* Teams on one row, crests only: one at a time, the active one again to clear it */}
-                <div role="radiogroup" aria-label={t('allTeams')} className="flex items-center gap-1 overflow-x-auto [scrollbar-width:thin] pb-1 -mb-1">
+                    <div role="radiogroup" aria-label={t('allTeams')} className="contents">
                     <button type="button" role="radio" aria-checked={teamId === 'all'} onClick={() => { setTeamId('all'); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold shrink-0", teamId === 'all' ? "bg-foreground text-background" : "bg-card")}>{t('allTeams')}</button>
                     {pool.teams.map((tm) => {
                         const active = teamId === tm.id;
@@ -534,6 +627,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             </button>
                         );
                     })}
+                    </div>
                 </div>
 
                 {view === 'tiers' && (
@@ -546,14 +640,56 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
                 {/* List */}
                 <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="text-[11px] font-semibold text-muted-foreground">{ta('updated')}</span>}>
-                    <div className="overflow-x-auto">
+                    {/* Phones: one card per player, the numbers that decide and a Buy button; no sideways scrolling */}
+                    <ul className="md:hidden flex flex-col">
+                        {shown.map((p) => {
+                            const purchase = bought.get(p.id);
+                            const expanded = open === p.id;
+                            return (
+                                <li key={p.id} id={`auction-card-${p.id}`} className={cn("px-2.5 py-2 flex flex-col gap-1.5 border-t border-muted first:border-t-0", purchase && (purchase.manager === me ? "bg-accent/15" : "opacity-60"), compare.includes(p.id) && "bg-sky-100/60")}>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <RoleBadge role={p.role} />
+                                        <TeamCrest team={p.team} size={18} />
+                                        <span className="flex flex-col leading-tight min-w-0">
+                                            <span className="inline-flex items-center gap-1 min-w-0">
+                                                <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[14px] truncate">{p.name}</Link>
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground truncate"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{p.team.name}{p.age !== null ? ` · ${p.age}` : ''}</span>
+                                        </span>
+                                        <span className="ml-auto inline-flex items-center justify-center w-10 h-7 rounded bg-foreground text-background font-mono text-[13px] font-extrabold tabular-nums shrink-0">{p.scores.overall}</span>
+                                    </div>
+                                    <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] font-semibold text-muted-foreground">
+                                        <span>{t('columns.fantaAvg')} <span className="font-mono font-extrabold text-foreground tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</span></span>
+                                        <span>{t('columns.price')} <span className="text-foreground">{priceCell(p.id)}</span></span>
+                                        {strategy && maxBidOf(p.id) !== null && <span>{t('columns.maxBid')} <span className="font-mono font-extrabold text-accent-text tabular-nums">{maxBidOf(p.id)}</span></span>}
+                                        <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                        <span className="ml-auto inline-flex items-center gap-1">
+                                            <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground/40 bg-card">{expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>
+                                            {!purchase && <PlanStar size={7} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onClick={() => cyclePlan(p.id)} />}
+                                            {purchase ? (
+                                                <>
+                                                    <span className="text-[11px] font-bold text-foreground">{t('boughtBy', {manager: managers[purchase.manager] ?? t('me'), price: purchase.price})}</span>
+                                                    <button type="button" onClick={() => openEdit(p)} aria-label={t('edit')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground bg-card"><Pencil className="w-3.5 h-3.5" /></button>
+                                                    <button type="button" onClick={() => release(p.id)} aria-label={t('release')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground bg-card"><X className="w-3.5 h-3.5" /></button>
+                                                </>
+                                            ) : (
+                                                <button type="button" onClick={() => openBuy(p)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold">{blocks?.backups.has(p.id) ? t('block.buy') : t('buy')}</button>
+                                            )}
+                                        </span>
+                                    </div>
+                                    {expanded && <div className="rounded-md bg-muted/30 px-2 py-2 overflow-x-auto">{details(p)}</div>}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className="overflow-x-auto hidden md:block">
                     <table className="w-full text-[12px] whitespace-nowrap">
                         <thead>
                             <tr className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground border-b-2 border-foreground">
                                 <th className="px-2 py-1.5 text-left w-full">{t('columns.player')}</th>
                                 <th className="px-1 py-1.5 text-center">{t('columns.role')}</th>
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.tier')}>{t('columns.tier')}</th>
-                                {SCORE_KEYS.map((k) => <th key={k} className="px-1 py-1.5 text-center" title={t(`columnHints.${k === 'team' ? 'team_' : k}`)}>{t(`columns.${k === 'team' ? 'team_' : k}`)}</th>)}
+                                {showScores && SCORE_KEYS.map((k) => <th key={k} className="px-1 py-1.5 text-center" title={t(`columnHints.${k === 'team' ? 'team_' : k}`)}>{t(`columns.${k === 'team' ? 'team_' : k}`)}</th>)}
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.overall')}>{t('columns.overall')}</th>
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.price')}>{t('columns.price')}</th>
@@ -562,23 +698,23 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             </tr>
                         </thead>
                         <tbody>
-                            {shown.map((p) => {
+                            {shown.map((p, i) => {
                                 const purchase = bought.get(p.id);
                                 const expanded = open === p.id;
+                                const plain = !purchase && !compare.includes(p.id);
                                 return (
                                     <FragmentRow key={p.id}>
-                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", purchase && (purchase.manager === me ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
+                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", plain && (i % 2 === 1 ? "bg-muted/60 hover:bg-accent/15" : "hover:bg-accent/15"), purchase && (purchase.manager === me ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
                                             <td className="px-2 py-1 min-w-0">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/40 bg-card shrink-0">
                                                         {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                                                     </button>
+                                                    {!purchase && <PlanStar wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onClick={() => cyclePlan(p.id)} />}
                                                     <TeamCrest team={p.team} size={16} />
                                                     <span className="flex flex-col leading-tight min-w-0">
                                                         <span className="inline-flex items-center gap-1 min-w-0">
                                                             <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" title={p.fullName ?? undefined} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{p.name}</Link>
-                                                            {targets.has(p.id) && !purchase && <span className={cn("bb-badge text-[9px] h-4 px-1 shrink-0", wanted.has(p.id) ? "bg-foreground text-background" : "bg-accent")} title={wanted.has(p.id) ? tst('pinned') : tst('target')}>★</span>}
-                                                            {avoided.has(p.id) && !purchase && <span className="bb-badge bg-card text-[9px] h-4 px-1 shrink-0 text-muted-foreground" title={tst('ignored')}>✕</span>}
                                                         </span>
                                                         <span className="text-[10px] font-semibold text-muted-foreground truncate">{p.team.name}{p.age !== null ? ` · ${p.age}` : ''} · <span title={t(`confidence.${p.scores.confidence}`)}>{p.scores.sample} PG</span></span>
                                                     </span>
@@ -586,14 +722,14 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             </td>
                                             <td className="px-1 py-1 text-center"><RoleBadge role={p.role} /></td>
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center gap-1"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{tierInfos.get(p.id) && <TierWhy player={p} info={tierInfos.get(p.id)!} />}</span></td>
-                                            {SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
+                                            {showScores && SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
                                             <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>
                                             <td className="px-1 py-1 text-right">{priceCell(p.id)}</td>
                                             {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                                    <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                                     <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">
@@ -609,26 +745,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={14} className="px-3 py-2">
-                                                    <Notes p={p} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} onRole={(r) => { const next = {...config.roleOverrides}; if (r === null) delete next[String(p.id)]; else next[String(p.id)] = r; configStore.write({...config, roleOverrides: next}); }} />
-                                                    {p.seasons.length === 0 ? (
-                                                        <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
-                                                    ) : (
-                                                        <table className="text-[12px]">
-                                                            <thead><tr className="text-[10px] font-bold uppercase text-muted-foreground">{(['season', 'team', 'league', 'apps', 'lineups', 'minutes', 'goals', 'assists', 'rating'] as const).map((c) => <th key={c} className={cn("px-2 py-0.5", c === 'season' || c === 'team' || c === 'league' ? "text-left" : "text-right font-mono")}>{t(`seasonCols.${c}`)}</th>)}</tr></thead>
-                                                            <tbody>
-                                                                {p.seasons.map((s, i) => (
-                                                                    <tr key={i} className="font-semibold">
-                                                                        <td className="px-2 py-0.5 font-mono">{s.year}/{String(s.year + 1).slice(2)}</td>
-                                                                        <td className="px-2 py-0.5">{s.team}</td>
-                                                                        <td className="px-2 py-0.5 text-muted-foreground">{s.league}</td>
-                                                                        {[s.apps, s.lineups, s.minutes, s.goals, s.assists].map((v, j) => <td key={j} className="px-2 py-0.5 text-right font-mono tabular-nums">{v}</td>)}
-                                                                        <td className="px-2 py-0.5 text-right font-mono tabular-nums">{s.rating?.toFixed(2) ?? '–'}</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    )}
+                                                <td colSpan={7 + (strategy ? 1 : 0) + (showScores ? SCORE_KEYS.length : 0)} className="px-3 py-2">
+                                                    {details(p)}
                                                 </td>
                                             </tr>
                                         )}
@@ -666,23 +784,19 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </select>
                     </label>
                 ) : undefined}>
-                    <div className="grid grid-cols-2 divide-x divide-muted border-b border-muted">
-                        <div className="px-3 py-2 flex flex-col"><span className={cn("font-mono text-xl font-extrabold tabular-nums", left < 0 && "text-red-700")}>{left}</span><span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tr('credits')} {tr('left')}</span></div>
-                        <div className="px-3 py-2 flex flex-col"><span className="font-mono text-xl font-extrabold tabular-nums">{spent}</span><span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tr('credits')} {tr('spent')}</span></div>
-                    </div>
+                    {/* Credits left, slots, average and strategy live in the bar above the table: here only what it does not say. */}
+                    <p className="px-3 pt-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('roleBudget')}</p>
                     <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
                         {ROLES.map((r) => (
                             <div key={r} className="px-2 py-1.5 flex flex-col items-center gap-0.5">
                                 <RoleBadge role={r} />
-                                <span className="font-mono text-[12px] font-extrabold tabular-nums">{tr('slots', {filled: mineByRole(r).length, total: config.slots[r]})}</span>
-                                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">~{Math.round(config.credits * roleShare[r])} cr.</span>
+                                <span className="font-mono text-[11px] font-extrabold tabular-nums whitespace-nowrap">~{Math.round(config.credits * roleShare[r])} cr.</span>
                             </div>
                         ))}
                     </div>
                     <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                        {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
+                        {tr('spentLine', {spent, total: config.credits})}
                         {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, null))})}</span>}
-                        {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                         {guide && (
                             <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
                                 {config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide.formation})}
@@ -755,7 +869,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button type="button" onClick={() => setShowStrategies(false)} aria-label={ts('cancel')} className="inline-flex items-center justify-center w-9 h-9 rounded-md border-2 border-foreground bg-background"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="bg-background rounded-xl">
-                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} wanted={config.want.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} avoided={config.avoid.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} onWant={toggleWant} onAvoid={toggleAvoid} />
+                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} customs={config.strategies} onSaveCustom={saveCustom} onDeleteCustom={deleteCustom} players={strategyPlayers} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} wanted={config.want.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} avoided={config.avoid.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} onWant={toggleWant} onAvoid={toggleAvoid} />
                         </div>
                     </div>
                 </div>

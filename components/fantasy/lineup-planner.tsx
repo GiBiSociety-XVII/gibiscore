@@ -1,6 +1,6 @@
 'use client';
 
-import {Ban, Lock, Pin, PinOff, Settings2, Trash2} from "lucide-react";
+import {Ban, Check, Copy, HelpCircle, Lock, Pin, PinOff, Settings2, Trash2, X} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -13,15 +13,18 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
-import {locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLock} from "@/lib/fantasy/store";
+import {HISTORY_ROUNDS, historyStore, locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLock} from "@/lib/fantasy/store";
 import type {MatchdayRound} from "@/lib/fantasy/matchday-data";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 import {hashOf} from "@/lib/fantasy/hash";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
+import {RoundRecap} from "./round-recap";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
+/** Bumped when the forecast changes scale or meaning: a frozen snapshot from before is drawn again. 2: votes on the fantasy scale. */
+const LINEUP_MODEL = 2;
 
 /** The pool's players as the league sees them: roles corrected by hand, cups in or out, the league's own rules. */
 function leaguePlayers(pool: AuctionPool, config: Pick<AuctionConfig, 'roleOverrides' | 'cupsCount' | 'rules'>): AuctionPlayer[] {
@@ -66,6 +69,8 @@ function useReasonText() {
             case 'attack': return t(r.factor > 1 ? 'attackUp' : 'attackDown', {pct: Math.round(Math.abs(r.factor - 1) * 100)});
             case 'form': return t('form', {own: r.own, opp: r.opp, of: r.of});
             case 'playerForm': return t('playerForm', {avg: r.avg.toFixed(2), matches: r.matches, base: r.base.toFixed(2)});
+            case 'bonusForm': return t('bonusForm', {goals: r.goals, assists: r.assists, matches: r.matches});
+            case 'cards': return t(r.factor > 1 ? 'cardsUp' : 'cardsDown', {pct: Math.round(Math.abs(r.factor - 1) * 100)});
             case 'manual': return t('manual');
             case 'cleanSheet': return t('cleanSheet', {pct: r.pct});
             case 'penalty': return t('penalty');
@@ -132,7 +137,7 @@ function toneOf(v: number, [worst, bad, fine, good]: [number, number, number, nu
 const lowerIsBetter = (v: number, [good, fine, bad, worst]: [number, number, number, number]): Tone => (v <= good ? 'good' : v <= fine ? 'fine' : v >= worst ? 'worst' : v >= bad ? 'bad' : 'none');
 
 function Cell({tone, title, children, strong = false}: {tone: Tone; title?: string; children: React.ReactNode; strong?: boolean}) {
-    return <span className={cn("bb-badge font-mono tabular-nums h-5 px-1.5 whitespace-nowrap", strong ? "text-[12px] font-extrabold" : "text-[11px] font-bold", TONE_CLASS[tone])} title={title}>{children}</span>;
+    return <span className={cn("bb-badge font-mono tabular-nums h-5 px-1 whitespace-nowrap", strong ? "text-[12px] font-extrabold" : "text-[11px] font-bold", TONE_CLASS[tone])} title={title}>{children}</span>;
 }
 
 /** The forecast's reasons, one field each, for the columns. */
@@ -141,12 +146,13 @@ function facts(f: PlayerForecast) {
     return {usage: by('usage'), form: by('form'), playerForm: by('playerForm'), match: by('match'), attack: by('attack'), cleanSheet: by('cleanSheet'), official: by('official'), sidelined: by('sidelined'), doubtful: by('doubtful'), manual: by('manual'), noMatch: by('noMatch'), noUsage: by('noUsage')};
 }
 
-function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
+function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; /** Every other row, so the eye follows one across the columns. */ stripe?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
+    const [why, setWhy] = useState(false);
     const p = byId.get(f.player.id);
     const fixture = f.fixture;
-    const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
+    const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
     const opponent = p && fixture ? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null} : null;
     const state = fixture ? (fixture.state === 'finished' ? t('played') : ['live', 'half_time', 'extra_time', 'penalties'].includes(fixture.state) ? t('live') : fixture.state === 'postponed' || fixture.state === 'cancelled' ? t('postponed') : null) : null;
     const x = facts(f);
@@ -159,22 +165,31 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
     if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad', reason: x.doubtful});
     if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst', reason: x.noMatch});
     const usageRate = x.usage ? (x.usage.started + 0.5 * x.usage.came) / Math.max(1, x.usage.total) : null;
-    const td = "px-1.5 py-1.5 text-right";
+    const td = "px-1 py-1.5 text-center";
+    const bg = pinned ? "bg-accent/20" : out ? "bg-red-100/60" : stripe ? "bg-muted/60" : "";
     return (
-        <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+        <>
+        <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", bg)}>
             <td className="px-1 py-1.5">
                 <span className="flex items-center gap-0.5">
-                    <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={locked ? t('lockedNoChange') : pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>
+                    <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={locked ? t('lockedNoChange') : pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>
                         {pinned ? <PinOff className="w-3 h-3" aria-hidden="true" /> : <Pin className="w-3 h-3" aria-hidden="true" />}
                     </button>
-                    <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={locked ? t('lockedNoChange') : out ? t('unout') : t('out')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}>
+                    <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={locked ? t('lockedNoChange') : out ? t('unout') : t('out')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}>
                         <Ban className="w-3 h-3" aria-hidden="true" />
+                    </button>
+                    <button type="button" onClick={() => setWhy((v) => !v)} aria-expanded={why} aria-label={t('why')} title={t('whyHint')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center", why ? "bg-foreground text-background" : "bg-card")}>
+                        <HelpCircle className="w-3 h-3" aria-hidden="true" />
                     </button>
                 </span>
             </td>
-            {index !== null && <td className="px-2 py-1.5 font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground">{index}</td>}
-            <td className="px-1 py-1.5"><RoleBadge role={f.player.role} /></td>
-            <td className="px-2 py-1.5 min-w-0">
+            <td className="px-1 py-1.5">
+                <span className="inline-flex items-center gap-0.5">
+                    {index !== null && <span className="font-mono text-[10px] font-extrabold tabular-nums text-muted-foreground w-3.5 text-right">{index}</span>}
+                    <RoleBadge role={f.player.role} />
+                </span>
+            </td>
+            <td className="px-2 py-1.5 w-full max-w-0 lg:min-w-[8rem]">
                 <span className="flex items-center gap-1.5 min-w-0">
                     {p && <TeamCrest team={p.team} size={18} />}
                     <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
@@ -186,11 +201,11 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                     </span>
                 )}
             </td>
-            <td className="px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap">
+            <td className="px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap max-w-[8.75rem]">
                 {fixture && opponent ? (
-                    <span className="flex flex-col">
-                        <span className="font-extrabold">{f.home ? t('vsHome', {team: opponent.name}) : t('vsAway', {team: opponent.name})}</span>
-                        <span className="text-muted-foreground">{kickoff}{state && <span className="ml-1 uppercase">· {state}</span>}</span>
+                    <span className="flex flex-col min-w-0">
+                        <span className="font-extrabold truncate" title={opponent.name}>{f.home ? t('vsHome', {team: opponent.name}) : t('vsAway', {team: opponent.name})}</span>
+                        <span className="text-muted-foreground truncate">{kickoff}{state && <span className="ml-1 uppercase">· {state}</span>}</span>
                     </span>
                 ) : (
                     <span className="text-muted-foreground">{t('noFixture')}</span>
@@ -203,7 +218,7 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                     <Cell tone="bad" title={reasonText(x.noUsage)}>–</Cell>
                 ) : null}
             </td>
-            <td className={td}>
+            <td className={cn(td, "hidden lg:table-cell")}>
                 {x.playerForm && <Cell tone={toneOf(x.playerForm.avg - x.playerForm.base, [-0.5, -0.25, 0.25, 0.5])} title={reasonText(x.playerForm)}>{x.playerForm.avg.toFixed(1)}<span className="opacity-60 text-[9px]">×{x.playerForm.matches}</span></Cell>}
             </td>
             <td className={td}>
@@ -229,34 +244,123 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                 ) : null}
             </td>
             <td className={td}><Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</Cell></td>
-            <td className={td}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
-            <td className={td}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
+            <td className={cn(td, "hidden lg:max-xl:table-cell min-[1360px]:table-cell")}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
+            <td className={cn(td, "hidden lg:max-xl:table-cell min-[1360px]:table-cell")}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
             <td className={td}><Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])} title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</Cell></td>
         </tr>
+        {why && (
+            <tr className={cn("align-top", bg)}>
+                <td colSpan={14} className="px-3 pb-2 pt-0">
+                    <div className="rounded-lg border-2 border-foreground bg-card px-3 py-2 flex flex-col gap-1">
+                        <span className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wide">
+                            {f.player.name}
+                            <span className="font-mono normal-case tracking-normal text-muted-foreground">{t('colRating')} {f.rating.toFixed(2)} · {t('colPoints')} {f.points.toFixed(2)} · {t('colValue')} {(slot ?? f.value).toFixed(2)}</span>
+                            <button type="button" onClick={() => setWhy(false)} aria-label={t('whyClose')} className="ml-auto inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-background hover:bg-accent"><X className="w-3 h-3" aria-hidden="true" /></button>
+                        </span>
+                        <ul className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2 text-[11px] font-semibold list-disc pl-4">
+                            {f.reasons.map((r, i) => <li key={i}>{reasonText(r)}</li>)}
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        )}
+        </>
     );
 }
 
-function Head({withIndex}: {withIndex: boolean}) {
+/** A player's forecast as a card, for phones: the numbers that decide, the status and the pin and out buttons, the reasons on request. */
+function ForecastCard({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; locked: boolean}) {
     const t = useTranslations('Fantasy.lineup');
-    const th = "px-1.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-right whitespace-nowrap";
+    const format = useFormatter();
+    const [more, setMore] = useState(false);
+    const p = byId.get(f.player.id);
+    const x = facts(f);
+    const fixture = f.fixture;
+    const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
+    const status: Array<{key: string; label: string; tone: Tone}> = [];
+    if (x.manual) status.push({key: 'manual', label: t('status.manual'), tone: 'worst'});
+    if (x.official) status.push({key: 'official', label: t(`status.official.${x.official.status}`), tone: x.official.status === 'starter' ? 'good' : x.official.status === 'bench' ? 'bad' : 'worst'});
+    if (x.sidelined) status.push({key: 'sidelined', label: t(x.sidelined.category === 'injury' ? 'status.injury' : x.sidelined.category === 'suspension' ? 'status.suspension' : 'status.absent'), tone: 'worst'});
+    if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad'});
+    if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst'});
+    return (
+        <li className={cn("px-2.5 py-2 flex flex-col gap-1.5 border-t border-muted first:border-t-0", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+            <div className="flex items-center gap-2 min-w-0">
+                {index !== null && <span className="font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground w-4">{index}</span>}
+                <RoleBadge role={f.player.role} />
+                {p && <TeamCrest team={p.team} size={18} />}
+                <span className="flex flex-col leading-tight min-w-0">
+                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[14px] truncate">{f.player.name}</Link>
+                    <span className="text-[10px] font-semibold text-muted-foreground truncate">{fixture && f.opponent ? `${f.home ? t('vsHome', {team: f.opponent.name}) : t('vsAway', {team: f.opponent.name})} · ${kickoff}` : t('noFixture')}</span>
+                </span>
+                <span className="ml-auto flex items-center gap-1 shrink-0">
+                    <Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'}>{pct(f.plays)}</Cell>
+                    <Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])}>{(slot ?? f.value).toFixed(1)}</Cell>
+                </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+                {status.map((b) => <span key={b.key} className={cn("bb-badge text-[9px] h-4 px-1 uppercase", TONE_CLASS[b.tone])}>{b.label}</span>)}
+                {x.form && <Cell tone={toneOf(x.form.own - x.form.opp, [-5, -3, 3, 5])}>{t('cardForm')} {x.form.own}·{x.form.opp}</Cell>}
+                {x.match && <Cell tone={toneOf(x.match.win, [25, 35, 50, 60])}>{t('cardWin')} {Math.round(x.match.win)}%</Cell>}
+                {x.attack && <Cell tone={toneOf(x.attack.factor, [0.7, 0.85, 1.15, 1.3])}>{t('cardGoals')} {x.attack.factor >= 1 ? '+' : '−'}{Math.round(Math.abs(x.attack.factor - 1) * 100)}%</Cell>}
+                {x.cleanSheet && <Cell tone={toneOf(x.cleanSheet.pct, [15, 22, 35, 45])}>{t('cleanSheetShort', {pct: x.cleanSheet.pct})}</Cell>}
+                <span className="ml-auto inline-flex items-center gap-1">
+                    <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} className="bb-btn h-7 px-2 text-[11px] font-extrabold bg-card">{more ? t('cardLess') : t('cardMore')}</button>
+                    <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>{pinned ? <PinOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Pin className="w-3.5 h-3.5" aria-hidden="true" />}</button>
+                    <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={out ? t('unout') : t('out')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}><Ban className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                </span>
+            </div>
+            {more && (
+                <div className="text-[11px] font-semibold text-muted-foreground flex flex-col gap-0.5">
+                    <span>{t('colRating')} {f.rating.toFixed(2)} · {t('colPoints')} {f.points.toFixed(2)} · {t('colValue')} {(slot ?? f.value).toFixed(2)}</span>
+                    <span>{f.reasons.map(reasonText).join(' · ')}</span>
+                </div>
+            )}
+        </li>
+    );
+}
+
+/** Copies the eleven and the bench as plain text, ready to paste in the league's app. */
+function CopyLineup({text}: {text: string}) {
+    const t = useTranslations('Fantasy.lineup');
+    const [copied, setCopied] = useState(false);
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+        } catch {
+            window.prompt(t('copyTitle'), text);
+        }
+    };
+    return (
+        <button type="button" onClick={copy} title={t('copyTitle')} className={cn("bb-btn h-7 px-2 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0", copied ? "bg-emerald-200" : "bg-accent")}>
+            {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+            {copied ? t('copied') : t('copy')}
+        </button>
+    );
+}
+
+function Head() {
+    const t = useTranslations('Fantasy.lineup');
+    const th = "px-1 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-center whitespace-nowrap";
     return (
         <thead className="bg-card">
             <tr>
                 <th className={cn(th, "px-1")} aria-label={t('colPin')} />
-                {withIndex && <th className={cn(th, "text-left px-2")}>#</th>}
                 <th className={cn(th, "px-1")} aria-label={t('colRole')} />
                 <th className={cn(th, "text-left px-2")}>{t('colPlayer')}</th>
                 <th className={cn(th, "text-left px-2")}>{t('colMatch')}</th>
-                <th className={th} title={t('colUsageHint')}>{t('colUsage')}</th>
-                <th className={th} title={t('colRecentHint')}>{t('colRecent')}</th>
-                <th className={th} title={t('colFormHint')}>{t('colForm')}</th>
-                <th className={th} title={t('colWinHint')}>{t('colWin')}</th>
-                <th className={th} title={t('colGoalsHint')}>{t('colGoals')}</th>
-                <th className={th} title={t('colFactorHint')}>{t('colFactor')}</th>
-                <th className={th} title={t('colPlaysHint')}>{t('colPlays')}</th>
-                <th className={th} title={t('colRatingHint')}>{t('colRating')}</th>
-                <th className={th} title={t('colPointsHint')}>{t('colPoints')}</th>
-                <th className={th} title={t('colValueHint')}>{t('colValue')}</th>
+                <th className={cn(th, "min-w-[3.75rem]")} title={t('colUsageHint')}>{t('colUsage')}</th>
+                <th className={cn(th, "min-w-[3.75rem] hidden lg:table-cell")} title={t('colRecentHint')}>{t('colRecent')}</th>
+                <th className={cn(th, "min-w-[3rem]")} title={t('colFormHint')}>{t('colForm')}</th>
+                <th className={cn(th, "min-w-[3rem]")} title={t('colWinHint')}>{t('colWin')}</th>
+                <th className={cn(th, "min-w-[3.75rem]")} title={t('colGoalsHint')}>{t('colGoals')}</th>
+                <th className={cn(th, "min-w-[3.5rem]")} title={t('colFactorHint')}>{t('colFactor')}</th>
+                <th className={cn(th, "min-w-[3rem]")} title={t('colPlaysHint')}>{t('colPlays')}</th>
+                <th className={cn(th, "min-w-[3.25rem] hidden lg:max-xl:table-cell min-[1360px]:table-cell")} title={t('colRatingHint')}>{t('colRating')}</th>
+                <th className={cn(th, "min-w-[3.25rem] hidden lg:max-xl:table-cell min-[1360px]:table-cell")} title={t('colPointsHint')}>{t('colPoints')}</th>
+                <th className={cn(th, "min-w-[3.25rem]")} title={t('colValueHint')}>{t('colValue')}</th>
             </tr>
         </thead>
     );
@@ -346,17 +450,19 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
 
-    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} toolbar={toolbar} roundInfo={roundInfo} />;
+    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} toolbar={toolbar} roundInfo={roundInfo} signedIn={account.user !== null} />;
 }
 
 /** The advice for one team: forecasts, pins and outs, the formation, the tables; frozen once the round has kicked off. */
-function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null}) {
+function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signedIn}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null; signedIn: boolean}) {
     const t = useTranslations('Fantasy.lineup');
+    const router = useRouter();
     const format = useFormatter();
     const reasonText = useReasonText();
     const allPins = pinsStore.useValue();
     const allOuts = outsStore.useValue();
     const locks = locksStore.useValue();
+    const history = historyStore.useValue();
     const [forced, setForced] = useState<FormationKey | null>(null);
     // The clock, so the page locks itself at kick-off while open.
     const [now, setNow] = useState(() => Date.now());
@@ -371,7 +477,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
         const next = liveOuts.has(id) ? [...liveOuts].filter((x) => x !== id) : [...liveOuts, id];
         outsStore.write({...allOuts, [current.id]: next});
     };
-    const liveForecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context, liveOuts.has(p.id)), context.fixtures, current.rules));
+    const liveForecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context, liveOuts.has(p.id)), context.fixtures, current.rules, context.calibration));
     // Starters pinned by hand for this team: the lineup is built around them.
     const livePinned = new Set((allPins[current.id] ?? []).filter((id) => rosterIds.has(id)));
     const togglePin = (id: number) => {
@@ -385,20 +491,26 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     const deadline = roundInfo ? Date.parse(roundInfo.from) : NaN;
     const locked = !!roundInfo && (roundInfo.state === 'live' || roundInfo.state === 'played' || (Number.isFinite(deadline) && now >= deadline));
     const stored = locks[current.id];
-    const frozen: LineupLock | null = locked && stored && stored.round === context.round ? stored : null;
-    const serialized = JSON.stringify({round: context.round, deadline: roundInfo?.from ?? '', forecasts: liveForecasts, forced, pinned: [...livePinned], outs: [...liveOuts]});
+    // A snapshot from an older model is not worth keeping: the round is drawn again with the current one.
+    const frozen: LineupLock | null = locked && stored && stored.round === context.round && stored.model === LINEUP_MODEL ? stored : null;
+    const serialized = JSON.stringify({round: context.round, model: LINEUP_MODEL, deadline: roundInfo?.from ?? '', forecasts: liveForecasts, forced, pinned: [...livePinned], outs: [...liveOuts]});
     const fingerprint = hashOf(serialized);
     const hasRound = roundInfo !== null;
     useEffect(() => {
         if (!hasRound) return;
         const known = locks[current.id];
-        const valid = known?.round === context.round;
+        const valid = known?.round === context.round && known.model === LINEUP_MODEL;
+        // A lock of a round now over is kept aside before it is overwritten: the recap reads it back.
+        if (known && known.round !== context.round) {
+            const kept = history[current.id] ?? [];
+            if (!kept.some((l) => l.round === known.round)) historyStore.write({...history, [current.id]: [...kept, known].slice(-HISTORY_ROUNDS)});
+        }
         // Frozen: nothing more to write. Open: keep the last view; just kicked off without a view before: freeze now.
         if (locked && valid) return;
         if (valid && known.fingerprint === fingerprint) return;
         const snapshot = JSON.parse(serialized) as Omit<LineupLock, 'fingerprint' | 'savedAt'>;
         locksStore.write({...locks, [current.id]: {...snapshot, fingerprint, savedAt: new Date().toISOString()}});
-    }, [hasRound, locked, locks, current.id, context.round, fingerprint, serialized]);
+    }, [hasRound, locked, locks, history, current.id, context.round, fingerprint, serialized]);
     const forecasts = frozen ? (frozen.forecasts as PlayerForecast[]) : liveForecasts;
     const pinned = frozen ? new Set(frozen.pinned) : livePinned;
     const outs = frozen ? new Set(frozen.outs) : liveOuts;
@@ -414,21 +526,25 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     const fixturesOfRoster = context.fixtures.filter((f) => rosterTeams.includes(f.home.id) || rosterTeams.includes(f.away.id));
     const missingCount = ROLES.reduce((s, r) => s + Math.max(0, (FORMATIONS.find((f) => f.key === advice.formation)?.need[r] ?? 0) - forecasts.filter((f) => f.player.role === r).length), 0);
     const when = (iso: string) => format.dateTime(new Date(iso), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME});
+    // The rounds of the recap: each with its lock, still in place or already kept aside.
+    const lockOf = (round: string) => (stored?.round === round ? stored : (history[current.id] ?? []).find((l) => l.round === round) ?? null);
+    const lineupText = [
+        `${current.name} · ${t('roundLabel', {round: context.round})} · ${advice.formation}`,
+        ...ROLES.map((r) => `${r}: ${advice.starters.filter((f) => f.player.role === r).map((f) => f.player.name).join(', ')}`),
+        `${t('copyBench')}: ${advice.bench.map((f, i) => `${i + 1}. ${f.player.name} (${f.player.role})`).join(', ')}`,
+    ].join('\n');
 
     return (
         <div className="flex flex-col gap-3">
             {toolbar}
-            <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold">
-                {roundInfo && <span className="font-extrabold">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
+            <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] font-semibold">
+                <span className={cn("inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border-2 border-foreground font-extrabold", frozen ? "bg-amber-200" : "bg-emerald-200")}>
+                    <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                    {frozen ? t('status.locked') : roundInfo ? t('status.open', {when: when(roundInfo.from)}) : t('status.openNoDate')}
+                </span>
+                {roundInfo && <span className="text-muted-foreground">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
                 <span className={cn("bb-badge text-[10px] h-5 px-1.5", withOfficial > 0 ? "bg-emerald-200" : "bg-card")}>{t('officialCount', {have: withOfficial, total: rosterTeams.length})}</span>
-                {frozen ? (
-                    <span className="text-muted-foreground">{t('frozenAt', {when: when(frozen.savedAt)})}</span>
-                ) : (
-                    <>
-                        <span className="text-muted-foreground">{t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
-                        {roundInfo && <span className="inline-flex items-center gap-1 text-muted-foreground"><Lock className="w-3 h-3" aria-hidden="true" />{t('locksAt', {when: when(roundInfo.from)})}</span>}
-                    </>
-                )}
+                <span className="text-muted-foreground ml-auto">{frozen ? t('frozenAt', {when: when(frozen.savedAt)}) : t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
             </div>
             {frozen && (
                 <div className="bb-surface px-3 py-2 flex items-start gap-2 text-[12px] font-semibold bg-amber-100">
@@ -437,8 +553,10 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                 </div>
             )}
 
-            <div className="grid gap-3 grid-cols-1 lg:grid-cols-3 items-start">
-                <div className="lg:col-span-2 flex flex-col gap-3 min-w-0">
+            {context.results.map((results) => <RoundRecap key={results.round} team={current} results={results} seasonId={context.seasonId} roster={roster} byId={byId} past={lockOf(results.round)} calibration={context.calibration} signedIn={signedIn} onSaved={() => router.refresh()} />)}
+
+            <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
+                <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">
                     <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} pinned={pinned} />
                     {missingCount > 0 && <p className="bb-surface px-3 py-2 text-[12px] font-semibold text-red-700">{t('short', {count: missingCount})}</p>}
                     <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
@@ -455,28 +573,34 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             </>
                         )}
                     </div>
-                    <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
-                        <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted flex flex-wrap gap-x-3 gap-y-1">
+                    <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})} action={<CopyLineup text={lineupText} />}>
+                        <ul className="md:hidden flex flex-col">
+                            {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                        </ul>
+                        <p className="hidden md:flex px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted flex-wrap gap-x-3 gap-y-1">
                             <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.good)}> </span>{t('legendGood')}</span>
                             <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.worst)}> </span>{t('legendBad')}</span>
                             <span>{t('legendHint')}</span>
                         </p>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
-                                <Head withIndex={false} />
+                                <Head />
                                 <tbody>
-                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                                    {advice.starters.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>
                     </Panel>
                     <Panel title={t('benchTitle', {count: advice.bench.length})}>
                         <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted">{t('benchHint')}</p>
-                        <div className="overflow-x-auto">
+                        <ul className="md:hidden flex flex-col">
+                            {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                        </ul>
+                        <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
-                                <Head withIndex />
+                                <Head />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -526,8 +650,12 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             })}
                         </ul>
                     </Panel>
-                    <Panel title={t('howTitle')}>
-                        <ul className="px-3 py-2 flex flex-col gap-1.5 text-[11px] font-semibold text-muted-foreground list-disc pl-7">
+                    <details className="bb-surface overflow-hidden group">
+                        <summary className="flex items-center justify-between gap-2 px-3 h-9 bg-card cursor-pointer list-none text-[13px] font-extrabold uppercase tracking-wide">
+                            {t('howTitle')}
+                            <span className="text-[11px] font-bold text-muted-foreground normal-case tracking-normal group-open:hidden">{t('howOpen')}</span>
+                        </summary>
+                        <ul className="px-3 py-2 flex flex-col gap-1.5 text-[11px] font-semibold text-muted-foreground list-disc pl-7 border-t-2 border-foreground">
                             <li>{t('how1')}</li>
                             <li>{t('how2')}</li>
                             <li>{t('how3')}</li>
@@ -537,7 +665,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             <li>{t('how7')}</li>
                             <li>{t('how8')}</li>
                         </ul>
-                    </Panel>
+                    </details>
                 </div>
             </div>
         </div>

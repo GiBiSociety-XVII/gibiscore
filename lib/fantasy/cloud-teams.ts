@@ -25,7 +25,7 @@ const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((id): id is n
 function parseLock(raw: unknown): LineupLock | null {
     const l = raw as Partial<LineupLock> | null;
     if (!l || typeof l.round !== 'string' || typeof l.deadline !== 'string' || !Array.isArray(l.forecasts)) return null;
-    return {round: l.round, deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: ids(l.pinned), outs: ids(l.outs)};
+    return {round: l.round, ...(typeof l.model === 'number' ? {model: l.model} : {}), deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: ids(l.pinned), outs: ids(l.outs)};
 }
 
 export async function listAccountTeams(): Promise<AccountTeam[]> {

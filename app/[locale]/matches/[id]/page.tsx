@@ -24,7 +24,8 @@ import {getMatchPage} from "@/lib/football/data/matches";
 import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
 
-export const revalidate = 20;
+// Refreshed by the live sync whenever the match moves (see sync-live); the timer only catches the rest.
+export const revalidate = 600;
 
 function parseId(raw: string): number | null {
     const n = Number(raw);
@@ -35,7 +36,8 @@ export async function generateMetadata({params}: PageProps<"/[locale]/matches/[i
     const {id} = await params;
     const t = await getTranslations('Pages.match');
     const numeric = parseId(id);
-    const page = numeric ? await getMatchPage(numeric) : null;
+    // The metadata never fails the page: a read that errors here leaves a plain title.
+    const page = numeric ? await getMatchPage(numeric).catch(() => null) : null;
     if (!page) return {title: t('notFound')};
     const {fixture} = page;
     return {

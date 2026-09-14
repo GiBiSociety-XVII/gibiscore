@@ -16,7 +16,8 @@ import {StandingsTable} from "@/components/football/standings-table";
 import {getStandingsBySlug} from "@/lib/football/data/competitions";
 import {getTeamPage} from "@/lib/football/data/teams";
 
-export const revalidate = 120;
+// Refreshed by the live sync while the club plays; the timer catches the rest.
+export const revalidate = 600;
 
 export async function generateMetadata({params}: PageProps<"/[locale]/teams/[slug]">): Promise<Metadata> {
     const {slug} = await params;

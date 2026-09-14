@@ -7,6 +7,7 @@ import {notFound} from "next/navigation";
 import {Analytics} from "@vercel/analytics/react";
 import {SpeedInsights} from "@vercel/speed-insights/react";
 import {routing} from "@/i18n/routing";
+import {AccountFavoritesSync} from "@/components/shell/account-favorites-sync";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -73,6 +74,7 @@ export default async function LocaleLayout({children, params}: LayoutProps<"/[lo
             <body className="min-h-full flex flex-col bg-background text-foreground">
                 <NextIntlClientProvider messages={messages}>
                     {children}
+                    <AccountFavoritesSync />
                 </NextIntlClientProvider>
                 <Analytics />
                 <SpeedInsights />

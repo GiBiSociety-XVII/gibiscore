@@ -14,7 +14,7 @@ import {AbsenceLine} from "@/components/football/absences";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
 
-export const revalidate = 300;
+export const revalidate = 1800;
 
 function parseSeason(raw: string[] | undefined): number | undefined {
     const value = raw?.[0];

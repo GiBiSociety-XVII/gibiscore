@@ -1,4 +1,5 @@
 import 'server-only';
+import {isBuildPhase} from '@/lib/db/phase';
 import {unstable_cache} from 'next/cache';
 import {fetchAll} from '@/lib/db/paginate';
 import {normalizePosition} from '@/lib/football/data/matches';
@@ -13,6 +14,7 @@ import {matchListone, parseListone, type ListoneMatch, type ListoneRow} from './
 import {lastWindowClose, resolveClub, type ClubEvidence} from './membership';
 import {deriveRole, findRivals, isContested, type Availability, type SlotStart, type SlotUse} from './roles';
 import {scorePlayer, type FantaRole, type FantaScores, type SeasonLine} from './scores';
+import {getTypedCalibration} from './calibration-data';
 
 /**
  * Player pool of a fantasy auction: every player in the current squads
@@ -44,6 +46,8 @@ export interface AuctionPlayer {
     listQuote: number | null;
     /** The official list's market value (FVM), when it gives one. */
     listFvm: number | null;
+    /** The list's own code ("Cod."), the key Leghe Fantacalcio exports rosters by. */
+    listCode: number | null;
     /** Mantra roles from the official list ("E;W"), when it gives them. */
     mantraRoles: string | null;
     /** Starts and benches at the current club, this season counting three times. */
@@ -191,6 +195,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             .map((l) => ({league: l, season: l.seasons.filter((s) => s.is_current).sort((a, b) => b.year - a.year)[0] ?? null}))
             .filter((x): x is {league: (typeof leagues)[number]; season: {id: number; year: number; is_current: boolean}} => x.season !== null);
         if (seasons.length === 0) throw new Error(`no current season for ${league}`);
+        // The vote scale learnt from the votes typed in: the fantasy averages of the list follow it.
+        const calibration = await getTypedCalibration(league);
         const year = Math.max(...seasons.map((s) => s.season.year));
         const currentIds = seasons.map((s) => s.season.id);
         const previousIds = leagues.flatMap((l) => l.seasons.filter((s) => s.year === year - 1).map((s) => s.id));
@@ -516,8 +522,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 clubConcededPer90: clubConcededOf(team.id),
                 clubStrength: clubStrengthOf(team.id),
             };
-            const scores = scorePlayer(inputBase);
-            const scoresLeagueOnly = scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)});
+            const scores = scorePlayer(inputBase, calibration);
+            const scoresLeagueOnly = scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)}, calibration);
             players.push({
                 id: player.id,
                 name: player.name,
@@ -538,6 +544,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 roleBreakdown: call?.breakdown ?? {},
                 listQuote: listed?.quote ?? null,
                 listFvm: listed && listed.fvm > 0 ? listed.fvm : null,
+                listCode: listed?.code ?? null,
                 mantraRoles: listed && listed.mantra ? listed.mantra : null,
                 availability: availabilityOf.get(player.id) ?? {starts: 0, benches: 0},
                 contested: isContested(availabilityOf.get(player.id) ?? {starts: 0, benches: 0}, 9),
@@ -592,20 +599,26 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
 // own pool instead of serving, for up to an hour, the one the previous deploy cached.
 const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 3600, tags: ['fantasy-pool']});
 
+/** The last pool each league produced in this process: what a failed rebuild falls back to. */
+const lastGoodPool = new Map<AuctionLeague, AuctionPool>();
+
 /**
  * The auction pool for a league, cached for an hour once built. A build
- * that fails (a statement timeout while the database is busy, a sync in
- * progress) is retried once and then reported as null without being
- * cached, so the next request builds it again instead of serving an
- * empty list for an hour.
+ * that fails (a statement cut short while the database is busy, a sync
+ * in progress) is retried, then the last pool this process built is
+ * served, and only with nothing at all the page says so; nothing empty
+ * is ever cached, so the next request builds it again.
  */
 export async function getAuctionPool(league: AuctionLeague): Promise<AuctionPool | null> {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    const attempts = isBuildPhase() ? 1 : 3;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {
-            return await cachedPool(league);
+            const pool = await cachedPool(league);
+            if (pool) lastGoodPool.set(league, pool);
+            return pool;
         } catch (error) {
             logReadError(`getAuctionPool(${league}) attempt ${attempt + 1}`, error);
         }
     }
-    return null;
+    return lastGoodPool.get(league) ?? null;
 }

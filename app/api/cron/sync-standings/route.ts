@@ -1,3 +1,4 @@
+import {revalidateTag} from 'next/cache';
 import type {NextRequest} from 'next/server';
 import {cronRoute} from '@/lib/football/sync/run-job';
 import {syncStandings} from '@/lib/football/sync/standings';
@@ -13,5 +14,10 @@ export const maxDuration = 300;
  */
 export async function GET(request: NextRequest) {
     const scope = request.nextUrl.searchParams.get('scope') === 'all' ? 'all' : 'featured';
-    return cronRoute(() => syncStandings(scope))(request);
+    return cronRoute(async () => {
+        const run = await syncStandings(scope);
+        // Tables are cached across pages: fresh on the next request.
+        revalidateTag('standings', 'max');
+        return run;
+    })(request);
 }

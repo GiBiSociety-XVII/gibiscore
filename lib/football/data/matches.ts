@@ -1,4 +1,5 @@
 import 'server-only';
+import {withRetry} from '@/lib/db/retry';
 import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
 import type {FormEntry, StandingGroup} from '../types';
 import {loadTeamSidelined} from './sidelined';
@@ -77,7 +78,8 @@ function toTeamStats(r: TeamStatRow | undefined): TeamMatchStats | null {
 export async function getMatchPage(id: number): Promise<MatchPage | null> {
     try {
         const db = footballDb();
-        const {data, error} = await db
+        const data = await withRetry(async () => {
+            const {data, error} = await db
             .from('fixtures')
             .select(
                 `${FIXTURE_SELECT},season_id,venue_name,referee,home_score_ht,away_score_ht,` +
@@ -90,7 +92,9 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
             )
             .eq('id', id)
             .maybeSingle();
-        if (error) throw error;
+            if (error) throw error;
+            return data;
+        });
         if (!data) return null;
 
         const row = data as unknown as FixtureRow & {
@@ -220,8 +224,9 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
             players: {home, away},
         };
     } catch (error) {
+        // Thrown, not turned into "not found": the page keeps its last good copy (ISR) or offers a retry.
         logReadError(`getMatchPage(${id})`, error);
-        return null;
+        throw error;
     }
 }
 

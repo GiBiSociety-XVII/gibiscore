@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {suggestPrices, type FantaRole} from './scores';
-import {bestLineup, defenceOption, FORMATIONS, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
+import {bestLineup, customFrom, defenceOption, FORMATIONS, newCustomId, optimizedStrategy, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
+import {normalizeCustomStrategy} from './config';
 
 function pool(): PoolPlayer[] {
     const out: PoolPlayer[] = [];
@@ -118,7 +119,9 @@ describe('rankStrategies', () => {
         const players = pool();
         const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
         const ranked = rankStrategies(players, prices, config);
-        expect(ranked).toHaveLength(STRATEGIES.length);
+        // The built-in ones plus the split searched on the pool.
+        expect(ranked).toHaveLength(STRATEGIES.length + 1);
+        expect(ranked.some((p) => p.key === 'optimized')).toBe(true);
         expect(ranked[ranked.length - 1].key).toBe('defenceBlock');
         expect(ranked[ranked.length - 1].available).toBe(false);
         expect(rankStrategies(players, prices, {...config, modifiers: {...config.modifiers, defence: true}}).every((p) => p.available)).toBe(true);
@@ -375,5 +378,65 @@ describe('what the review fixed', () => {
         // Three attackers at 50%: 3 × 3.5 fielded, and the substitute plays when at least one is out (1 − 0.5³ = 0.875).
         const attack = 3 * 3.5 + 0.875 * 6.0;
         expect(value).toBeCloseTo(5.5 + 4 * 6.2 + 3 * 6.4 + attack, 0);
+    });
+});
+
+describe('strategies of my own', () => {
+    const custom = {id: 's1', name: 'Mia', base: 'balanced', share: {P: 0.05, D: 0.1, C: 0.2, A: 0.65}, focus: {P: 0.6, D: 0.3, C: 0.4, A: 0.8}, formations: ['3-4-3'], prefer: 'none' as const, want: [] as number[]};
+
+    it('is planned and ranked with the built-in ones under its own key and name', () => {
+        const players = pool();
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        const ranked = rankStrategies(players, prices, config, new Set(), [], {}, [custom]);
+        const mine = ranked.find((p) => p.key === 'custom:s1');
+        expect(mine).toBeDefined();
+        expect(mine!.name).toBe('Mia');
+        expect(mine!.budget.A).toBeGreaterThan(mine!.budget.C + mine!.budget.D);
+        expect(mine!.strategy.prefer).toBe('none');
+    });
+
+    it('plans the players it wants in, whatever the marks say, without touching the other strategies', () => {
+        const players = pool();
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        // The worst attacker of the pool.
+        const worst = players.filter((p) => p.role === 'A').sort((a, b) => a.scores.overall - b.scores.overall)[0];
+        const ranked = rankStrategies(players, prices, config, new Set(), [], {}, [{...custom, want: [worst.id]}]);
+        const mine = ranked.find((p) => p.key === 'custom:s1')!;
+        expect(mine.picks.A.some((p) => p.id === worst.id && p.pinned)).toBe(true);
+        expect(ranked.find((p) => p.key === 'balanced')!.picks.A.some((p) => p.id === worst.id)).toBe(false);
+    });
+
+    it('can be copied from a built-in strategy to edit', () => {
+        const copy = customFrom(STRATEGIES.find((s) => s.key === 'penaltyTakers')!, 's2', 'Rigoristi (mia)');
+        expect(copy.base).toBe('penaltyTakers');
+        expect(copy.prefer).toBe('penalty');
+        expect(copy.share).toEqual(STRATEGIES.find((s) => s.key === 'penaltyTakers')!.share);
+        expect(newCustomId([custom, copy])).toBe('s3');
+    });
+
+    it('is made whole when loaded: shares renormalized, junk dropped', () => {
+        const loaded = normalizeCustomStrategy({id: 's9', name: '  Test  ', share: {P: 10, D: 20, C: 30, A: 40}, focus: {P: 2, D: -1}, formations: ['4-3-3', 'nope', '4-3-3'], prefer: 'weird'});
+        expect(loaded).not.toBeNull();
+        expect(loaded!.name).toBe('Test');
+        expect(loaded!.share.A).toBeCloseTo(0.4);
+        expect(loaded!.focus).toEqual({P: 1, D: 0, C: 0.45, A: 0.45});
+        expect(loaded!.formations).toEqual(['4-3-3']);
+        expect(loaded!.prefer).toBe('none');
+        expect(normalizeCustomStrategy({id: 'bad id', share: custom.share})).toBeNull();
+        expect(normalizeCustomStrategy({id: 's1', share: {P: 0, D: 0, C: 0, A: 0}})).toBeNull();
+    });
+});
+
+describe('the optimized strategy', () => {
+    it('searches a split on the pool that is at least as good as the balanced one, adding up to one', () => {
+        const players = pool();
+        const prices = suggestPrices(players, {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+        const opt = optimizedStrategy(players, prices, config);
+        expect(opt.key).toBe('optimized');
+        expect(Object.values(opt.share).reduce((s, v) => s + v, 0)).toBeCloseTo(1, 2);
+        const ranked = rankStrategies(players, prices, config);
+        const best = ranked.find((p) => p.key === 'optimized')!;
+        const balanced = ranked.find((p) => p.key === 'balanced')!;
+        expect(best.lineupValue).toBeGreaterThanOrEqual(balanced.lineupValue - 0.05);
     });
 });

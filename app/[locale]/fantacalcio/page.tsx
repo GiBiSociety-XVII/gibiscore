@@ -1,37 +1,29 @@
 import type {Metadata} from "next";
 import {getTranslations, setRequestLocale} from "next-intl/server";
-import {Link} from "@/i18n/navigation";
-import {SiteShell, Panel} from "@/components/shell/site-shell";
+import {SiteShell} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
+import {FantasyHome, type NextRound} from "@/components/fantasy/fantasy-home";
+import {getMatchday} from "@/lib/fantasy/matchday-data";
 
-export const revalidate = 3600;
+// The round ahead moves once a week; the rest of the page is the device's own.
+export const revalidate = 300;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Fantasy.home');
     return {title: t('metaTitle'), description: t('metaDescription')};
 }
 
-export default async function FantasyHome({params}: PageProps<"/[locale]/fantacalcio">) {
+export default async function FantasyHomePage({params}: PageProps<"/[locale]/fantacalcio">) {
     const {locale} = await params;
     setRequestLocale(locale);
     const t = await getTranslations('Fantasy.home');
+    const matchday = await getMatchday('serie-a');
+    const info = matchday?.rounds.find((r) => r.round === matchday.round) ?? null;
+    const round: NextRound | null = info ? {round: info.round, from: info.from, state: info.state} : null;
     return (
         <SiteShell wide sidebar={false}>
             <PageHeader title={t('title')} meta={t('intro')} />
-            <div className="grid gap-3 grid-cols-1 md:grid-cols-2 items-start">
-                <Panel title={t('auctionTitle')}>
-                    <div className="px-3 py-3 flex flex-col gap-3">
-                        <p className="text-[13px] font-semibold">{t('auctionText')}</p>
-                        <Link href="/fantacalcio/asta" className="bb-btn bg-accent px-4 h-10 inline-flex items-center self-start text-[13px] font-extrabold">{t('auctionCta')}</Link>
-                    </div>
-                </Panel>
-                <Panel title={t('lineupTitle')}>
-                    <div className="px-3 py-3 flex flex-col gap-3">
-                        <p className="text-[13px] font-semibold">{t('lineupText')}</p>
-                        <Link href="/fantacalcio/formazione" className="bb-btn bg-accent px-4 h-10 inline-flex items-center self-start text-[13px] font-extrabold">{t('lineupCta')}</Link>
-                    </div>
-                </Panel>
-            </div>
+            <FantasyHome round={round} />
         </SiteShell>
     );
 }

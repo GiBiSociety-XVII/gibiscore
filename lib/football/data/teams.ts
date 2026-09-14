@@ -1,4 +1,5 @@
 import 'server-only';
+import {unstable_cache} from 'next/cache';
 import {LIVE_STATES, type FixtureSummary, type SquadPlayer, type TeamPage, type TeamPlayerSeason, type TeamSeasonStats, type TeamStandingLine, type TeamSummary} from '../types';
 import {normalizePosition} from './matches';
 import {loadTeamSidelined} from './sidelined';
@@ -22,32 +23,20 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
         const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, seasonStats, players, calendarRes] = await Promise.all([
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).lte('starting_at', now).order('starting_at', {ascending: false}).limit(8),
             db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).gt('starting_at', now).order('starting_at', {ascending: true}).limit(6),
-            db.from('standings').select(`${STANDING_SELECT},season:seasons!inner(id,name,year,is_current,league:leagues(${LEAGUE_SELECT}))`).eq('team_id', team.id).eq('seasons.is_current', true),
-            db.from('squad_members').select('jersey_number,season:seasons!inner(is_current),player:players(id,name,slug,position,age,image_url)').eq('team_id', team.id).eq('seasons.is_current', true),
+            cachedTeamStandings(team.id),
+            cachedSquad(team.id),
             loadTeamSidelined(db, [team.id]),
-            loadSeasonStats(db, team.id),
-            loadPlayers(db, team.id),
+            cachedSeasonStats(team.id),
+            cachedPlayers(team.id),
             db.from('fixtures').select(`${FIXTURE_SELECT},season:seasons!inner(is_current)`).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).eq('seasons.is_current', true).order('starting_at', {ascending: true}).limit(120),
         ]);
-        for (const res of [pastRes, futureRes, standingsRes, squadRes, calendarRes]) if (res.error) throw res.error;
+        for (const res of [pastRes, futureRes, calendarRes]) if (res.error) throw res.error;
 
         const past = toFixtures(pastRes.data);
         const live = past.filter((f) => LIVE_STATES.includes(f.state));
         const recent = past.filter((f) => !LIVE_STATES.includes(f.state)).slice(0, 5);
 
-        // Standing line needs the size of the table: one extra count per season.
-        const standings: TeamStandingLine[] = [];
-        for (const r of (standingsRes.data ?? []) as unknown as Array<StandingQueryRow & {season: {id: number; name: string; year: number; league: LeagueRow | null}}>) {
-            const row = toStandingRow(r);
-            if (!row || !r.season?.league || r.group !== '') continue;
-            const {count} = await db.from('standings').select('team_id', {count: 'exact', head: true}).eq('season_id', r.season.id).eq('group', '');
-            standings.push({
-                competition: toCompetition(r.season.league),
-                season: {id: r.season.id, name: r.season.name, year: r.season.year},
-                row,
-                totalTeams: count ?? row.position,
-            });
-        }
+        const standings = standingsRes;
 
         const toSquadPlayer = (p: {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null}, number: number | null): SquadPlayer => ({
             id: p.id,
@@ -62,7 +51,7 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
         // The squad is stored once per current competition the team plays
         // (league, cup, Europe): one line per player, whatever the source.
         const byPlayer = new Map<number, ReturnType<typeof toSquadPlayer>>();
-        for (const m of (squadRes.data ?? []) as unknown as Array<{jersey_number: number | null; player: Parameters<typeof toSquadPlayer>[0] | null}>) {
+        for (const m of (squadRes ?? []) as unknown as Array<{jersey_number: number | null; player: Parameters<typeof toSquadPlayer>[0] | null}>) {
             if (!m.player) continue;
             const existing = byPlayer.get(m.player.id);
             if (!existing || (existing.number === null && m.jersey_number !== null)) byPlayer.set(m.player.id, toSquadPlayer(m.player, m.jersey_number));
@@ -249,3 +238,39 @@ export async function getTeamBrief(slug: string): Promise<TeamBrief | null> {
         return null;
     }
 }
+
+/** The standing lines of a club this season (one per competition, with the size of each table); shared, refreshed with the standings sync. */
+const cachedTeamStandings = unstable_cache(
+    async (teamId: number): Promise<TeamStandingLine[]> => {
+        const db = footballDb();
+        const {data, error} = await db.from('standings').select(`${STANDING_SELECT},season:seasons!inner(id,name,year,is_current,league:leagues(${LEAGUE_SELECT}))`).eq('team_id', teamId).eq('seasons.is_current', true);
+        if (error) throw error;
+        const standings: TeamStandingLine[] = [];
+        for (const r of (data ?? []) as unknown as Array<StandingQueryRow & {season: {id: number; name: string; year: number; league: LeagueRow | null}}>) {
+            const row = toStandingRow(r);
+            if (!row || !r.season?.league || r.group !== '') continue;
+            // Standing line needs the size of the table: one extra count per season.
+            const {count} = await db.from('standings').select('team_id', {count: 'exact', head: true}).eq('season_id', r.season.id).eq('group', '');
+            standings.push({competition: toCompetition(r.season.league), season: {id: r.season.id, name: r.season.name, year: r.season.year}, row, totalTeams: count ?? row.position});
+        }
+        return standings;
+    },
+    ['team-standings'],
+    {revalidate: 600, tags: ['standings']},
+);
+
+type SquadRowRaw = {jersey_number: number | null; player: {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null} | null};
+
+/** This season's squad of a club; shared, refreshed with the squad sync. */
+const cachedSquad = unstable_cache(
+    async (teamId: number): Promise<SquadRowRaw[]> => {
+        const {data, error} = await footballDb().from('squad_members').select('jersey_number,season:seasons!inner(is_current),player:players(id,name,slug,position,age,image_url)').eq('team_id', teamId).eq('seasons.is_current', true);
+        if (error) throw error;
+        return (data ?? []) as unknown as SquadRowRaw[];
+    },
+    ['team-squad'],
+    {revalidate: 3600, tags: ['squads']},
+);
+
+const cachedSeasonStats = unstable_cache((teamId: number) => loadSeasonStats(footballDb(), teamId), ['team-season-stats'], {revalidate: 900});
+const cachedPlayers = unstable_cache((teamId: number) => loadPlayers(footballDb(), teamId), ['team-players'], {revalidate: 3600, tags: ['player-seasons']});

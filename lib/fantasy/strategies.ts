@@ -1,4 +1,4 @@
-import {DEFAULT_DEFENCE_BONUS, DEFENCE_THRESHOLDS, type AuctionConfig, type DefenceBonus} from './config';
+import {customStrategyKey, DEFAULT_DEFENCE_BONUS, DEFENCE_THRESHOLDS, type AuctionConfig, type CustomStrategy, type DefenceBonus, type PreferKey} from './config';
 import type {FantaRole, FantaScores} from './scores';
 
 /**
@@ -11,7 +11,9 @@ import type {FantaRole, FantaScores} from './scores';
  * would produce.
  */
 
-export type StrategyKey = 'balanced' | 'topPerRole' | 'threeStars' | 'strongMidfield' | 'topAttack' | 'defenceBlock' | 'penaltyTakers' | 'safeStarters' | 'youngUpside';
+export type BuiltinKey = 'optimized' | 'balanced' | 'topPerRole' | 'threeStars' | 'strongMidfield' | 'topAttack' | 'defenceBlock' | 'penaltyTakers' | 'safeStarters' | 'youngUpside';
+/** A built-in key, or `custom:<id>` for a strategy of the user's own. */
+export type StrategyKey = string;
 
 export type FormationKey = '3-4-3' | '3-5-2' | '4-3-3' | '4-4-2' | '4-5-1' | '5-3-2' | '5-4-1';
 
@@ -44,21 +46,47 @@ export interface PoolPlayer {
 
 export interface Strategy {
     key: StrategyKey;
+    /** The user's name for a strategy of his own; the built-in ones are named by the translations. */
+    name?: string;
     share: Record<FantaRole, number>;
     /** 0 flat spending inside the role .. 1 one star and fillers. */
     focus: Record<FantaRole, number>;
     /** Only worth it with the defence modifier on. */
     needsDefenceModifier?: boolean;
-    /** Bonus added to the overall mark when ordering candidates: what the strategy looks for. */
-    prefer?: (p: PoolPlayer, context: {chosen: PoolPlayer[]}) => number;
+    /** What the strategy looks for beyond the marks: a bonus on the overall mark when ordering candidates. */
+    prefer?: PreferKey;
     /** Explicit slot split of a role's budget (used when the league has that many slots), otherwise the geometric split from focus. */
     fractions?: Partial<Record<FantaRole, number[]>>;
     /** The formations the strategy is built for: they win when the values are within a hair. */
     formations?: FormationKey[];
+    /** Players the strategy plans in whatever the marks say, on top of the plan's own wanted list. */
+    want?: number[];
 }
 
 const starterBonus = (p: PoolPlayer) => (p.scores.starter >= 75 ? 8 : p.scores.starter >= 60 ? 3 : p.scores.starter < 40 ? -12 : 0);
 
+/** The preferences a strategy can have, as bonuses on the overall mark. */
+export const PREFERS: Record<Exclude<PreferKey, 'none'>, (p: PoolPlayer, context: {chosen: PoolPlayer[]}) => number> = {
+    // Penalty takers and stable bonus makers, whatever the name.
+    penalty: (p) => (p.role === 'P' ? 0 : (p.penaltyTaker ? 10 : 0) + ((p.scores.bonus ?? 50) - 50) / 8),
+    // Sure starters with a good physical record.
+    starters: (p) => starterBonus(p) + ((p.scores.fitness ?? 60) - 60) / 6,
+    // Young starters with room to grow; veterans cost.
+    young: (p) => (p.age !== null && p.age !== undefined ? (p.age <= 22 ? 9 : p.age <= 25 ? 5 : p.age >= 32 ? -8 : 0) : 0) + (p.scores.starter >= 60 ? 2 : 0),
+    // Keeper and defenders of clubs that concede little, ideally the same club as the keeper.
+    defence: (p, {chosen}) => {
+        if (p.role !== 'P' && p.role !== 'D') return 0;
+        const club = ((p.scores.team ?? 50) - 50) / 4;
+        const keeper = chosen.find((c) => c.role === 'P');
+        const sameClub = p.role === 'D' && keeper && keeper.team.id !== undefined && keeper.team.id === p.team.id ? 6 : 0;
+        return club + sameClub;
+    },
+};
+
+/** The bonus a strategy gives a candidate, if it looks for anything. */
+const preferenceOf = (strategy: Strategy, p: PoolPlayer, context: {chosen: PoolPlayer[]}) => (strategy.prefer && strategy.prefer !== 'none' ? PREFERS[strategy.prefer](p, context) : 0);
+
+/** The built-in strategies with a fixed split. "optimized" is drawn on the pool by `optimizedStrategy`. */
 export const STRATEGIES: Strategy[] = [
     {key: 'balanced', share: {P: 0.07, D: 0.17, C: 0.28, A: 0.48}, focus: {P: 0.6, D: 0.4, C: 0.45, A: 0.45}, formations: ['4-3-3', '3-4-3', '4-4-2']},
     {key: 'topPerRole', share: {P: 0.08, D: 0.18, C: 0.28, A: 0.46}, focus: {P: 0.8, D: 0.7, C: 0.7, A: 0.75}, formations: ['3-4-3', '4-3-3']},
@@ -78,34 +106,45 @@ export const STRATEGIES: Strategy[] = [
         focus: {P: 0.8, D: 0.35, C: 0.4, A: 0.5},
         formations: ['5-3-2', '4-4-2', '5-4-1'],
         needsDefenceModifier: true,
-        // Keeper and defenders of clubs that concede little, ideally the same club as the keeper.
-        prefer: (p, {chosen}) => {
-            if (p.role !== 'P' && p.role !== 'D') return 0;
-            const club = ((p.scores.team ?? 50) - 50) / 4;
-            const keeper = chosen.find((c) => c.role === 'P');
-            const sameClub = p.role === 'D' && keeper && keeper.team.id !== undefined && keeper.team.id === p.team.id ? 6 : 0;
-            return club + sameClub;
-        },
+        prefer: 'defence',
     },
     {
         key: 'penaltyTakers',
         share: {P: 0.06, D: 0.16, C: 0.3, A: 0.48},
         focus: {P: 0.6, D: 0.4, C: 0.5, A: 0.5},
-        prefer: (p) => (p.role === 'P' ? 0 : (p.penaltyTaker ? 10 : 0) + ((p.scores.bonus ?? 50) - 50) / 8),
+        prefer: 'penalty',
     },
     {
         key: 'safeStarters',
         share: {P: 0.06, D: 0.17, C: 0.3, A: 0.47},
         focus: {P: 0.4, D: 0.2, C: 0.2, A: 0.25},
-        prefer: (p) => starterBonus(p) + ((p.scores.fitness ?? 60) - 60) / 6,
+        prefer: 'starters',
     },
     {
         key: 'youngUpside',
         share: {P: 0.06, D: 0.16, C: 0.3, A: 0.48},
         focus: {P: 0.6, D: 0.35, C: 0.35, A: 0.45},
-        prefer: (p) => (p.age !== null && p.age !== undefined ? (p.age <= 22 ? 9 : p.age <= 25 ? 5 : p.age >= 32 ? -8 : 0) : 0) + (p.scores.starter >= 60 ? 2 : 0),
+        prefer: 'young',
     },
 ];
+
+/** A strategy of the user's own, as the planner runs it. */
+export function toStrategy(custom: CustomStrategy): Strategy {
+    const formations = custom.formations.filter((f): f is FormationKey => FORMATIONS.some((k) => k.key === f));
+    return {key: customStrategyKey(custom.id), name: custom.name, share: custom.share, focus: custom.focus, prefer: custom.prefer, formations: formations.length > 0 ? formations : undefined, want: custom.want.length > 0 ? custom.want : undefined};
+}
+
+/** The editable copy of a strategy (a built-in one or a plan's), to start a strategy of the user's own from. */
+export function customFrom(strategy: Strategy, id: string, name: string): CustomStrategy {
+    return {id, name, base: strategy.key.startsWith('custom:') ? null : strategy.key, share: {...strategy.share}, focus: {...strategy.focus}, formations: [...(strategy.formations ?? [])], prefer: strategy.prefer ?? 'none', want: [...(strategy.want ?? [])]};
+}
+
+/** A fresh id for a custom strategy, unlike the ones taken. */
+export function newCustomId(taken: CustomStrategy[]): string {
+    let n = taken.length + 1;
+    while (taken.some((c) => c.id === `s${n}`)) n += 1;
+    return `s${n}`;
+}
 
 export interface StrategyPick {
     id: number;
@@ -135,6 +174,10 @@ export interface PlanPrefs {
 
 export interface StrategyPlan {
     key: StrategyKey;
+    /** The user's name, for a strategy of his own. */
+    name?: string;
+    /** The definition the plan was drawn with, to plan it again (a preview, a copy to edit). */
+    strategy: Strategy;
     share: Record<FantaRole, number>;
     /** Credits per role. */
     budget: Record<FantaRole, number>;
@@ -286,8 +329,9 @@ export function bestLineup(players: LineupPlayer[], options: LineupOptions = {})
 
 /** Simulates one strategy on the pool: fills every slot with the best player (by mark plus what the strategy prefers) affordable for that slot's budget. */
 export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots'> & Partial<Pick<AuctionConfig, 'modifiers' | 'formation' | 'defenceBonus'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan {
-    const want = prefs.want ?? new Set<number>();
-    const avoid = prefs.avoid ?? new Set<number>();
+    // Wanted by the user for every plan, or by this strategy alone; a wanted player is never ignored.
+    const want = new Set<number>([...(prefs.want ?? []), ...(strategy.want ?? [])]);
+    const avoid = new Set<number>([...(prefs.avoid ?? [])].filter((id) => !want.has(id)));
     // A fixed formation bends the split towards the roles it fields more of and pays its starters first.
     const forced = FORMATIONS.find((f) => f.key === config.formation) ?? null;
     const share = shareFor(strategy.share, forced);
@@ -372,7 +416,7 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
             // Not even a credit per slot left: the plan cannot buy here any more.
             if (left < slotsLeft) return;
             // The strategy's preferences shift the order (a penalty taker, a starter, a youngster...).
-            const rank = (p: PoolPlayer) => p.scores.overall + (strategy.prefer?.(p, {chosen}) ?? 0);
+            const rank = (p: PoolPlayer) => p.scores.overall + preferenceOf(strategy, p, {chosen});
             const pool = candidates.filter((p) => !used.has(p.id)).sort((a, b) => rank(b) - rank(a) || (b.scores.fantaAvg ?? 0) - (a.scores.fantaAvg ?? 0));
             // What this slot may cost: its share of the role budget, never more than what leaves enough
             // for the remaining slots at the cheapest prices still on the market.
@@ -432,12 +476,47 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
     }
     // Ranked on the best the roster can field; the preferred shape is for the display (a forced one is the value asked for).
     const lineupValue = forced ? lineup.value : Math.max(...lineup.formations.map((f) => f.value));
-    return {key: strategy.key, share, budget, picks, spent, lineupValue, formation: lineup.formation, formations: lineup.formations, depth, available: true};
+    return {key: strategy.key, name: strategy.name, strategy, share, budget, picks, spent, lineupValue, formation: lineup.formation, formations: lineup.formations, depth, available: true};
+}
+
+/** The splits the optimized strategy tries: a coarse grid over the shares, then a step around the best. */
+const OPTIMIZED_GRID = {P: [0.06, 0.1], D: [0.14, 0.2, 0.26], C: [0.22, 0.28, 0.34]};
+const OPTIMIZED_FOCUS: Record<FantaRole, number> = {P: 0.6, D: 0.4, C: 0.6, A: 0.5};
+
+/**
+ * The split that buys the best eleven on this pool at these prices,
+ * from what I own: every strategy above has its split fixed in advance,
+ * this one searches it. A coarse grid over the shares, then a finer
+ * step around the best; the attack takes what the other roles leave.
+ */
+export function optimizedStrategy(players: PoolPlayer[], prices: Map<number, number>, config: Parameters<typeof planStrategy>[3], taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): Strategy {
+    const candidate = (P: number, D: number, C: number): Strategy | null => {
+        const A = 1 - P - D - C;
+        if (A < 0.25 || A > 0.7) return null;
+        return {key: 'optimized', share: {P, D, C, A}, focus: OPTIMIZED_FOCUS};
+    };
+    let best: Strategy = {key: 'optimized', share: STRATEGIES[0].share, focus: OPTIMIZED_FOCUS};
+    let bestValue = -Infinity;
+    const consider = (s: Strategy | null) => {
+        if (!s) return;
+        const v = planStrategy(s, players, prices, config, taken, mine, prefs).lineupValue;
+        if (v > bestValue + 1e-9) {
+            best = s;
+            bestValue = v;
+        }
+    };
+    for (const P of OPTIMIZED_GRID.P) for (const D of OPTIMIZED_GRID.D) for (const C of OPTIMIZED_GRID.C) consider(candidate(P, D, C));
+    const {P, D, C} = best.share;
+    for (const dD of [-0.03, 0, 0.03]) for (const dC of [-0.03, 0, 0.03]) if (dD !== 0 || dC !== 0) consider(candidate(P, Math.max(0.05, D + dD), Math.max(0.1, C + dC)));
+    const share = {} as Record<FantaRole, number>;
+    for (const role of ROLES) share[role] = Math.round(best.share[role] * 100) / 100;
+    return {...best, share};
 }
 
 /** Every strategy planned on the pool, best lineup first; strategies that need a modifier the league lacks are marked unavailable. */
-export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'> & Partial<Pick<AuctionConfig, 'formation' | 'defenceBonus'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}): StrategyPlan[] {
-    return STRATEGIES.map((s) => ({...planStrategy(s, players, prices, config, taken, mine, prefs), available: !s.needsDefenceModifier || defenceOption(config) !== false})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
+export function rankStrategies(players: PoolPlayer[], prices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'slots' | 'modifiers'> & Partial<Pick<AuctionConfig, 'formation' | 'defenceBonus'>>, taken: Set<number> = new Set(), mine: OwnPurchase[] = [], prefs: PlanPrefs = {}, customs: CustomStrategy[] = []): StrategyPlan[] {
+    const all: Strategy[] = [optimizedStrategy(players, prices, config, taken, mine, prefs), ...STRATEGIES, ...customs.map(toStrategy)];
+    return all.map((s) => ({...planStrategy(s, players, prices, config, taken, mine, prefs), available: !s.needsDefenceModifier || defenceOption(config) !== false})).sort((a, b) => Number(b.available) - Number(a.available) || b.lineupValue - a.lineupValue || b.depth - a.depth);
 }
 
 export type HealthStatus = 'ok' | 'warn' | 'switch';
