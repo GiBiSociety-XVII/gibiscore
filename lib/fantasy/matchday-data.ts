@@ -12,6 +12,7 @@ import {roundNumber, roundStates, type MatchdayFixture, type PlayerContext, type
 import type {FantaRole} from './scores';
 import {DEFAULT_CALIBRATION, fitCalibration, type VotoCalibration, type VotoPair} from './voto';
 import {matchVoti, parseVoti, type VotoEntry, type VotoRow} from './voti';
+import type {RoundResults, RoundStat} from './recap';
 
 /** The official votes on disk, by league (core/fantasy/voti). */
 const OFFICIAL_VOTES: Partial<Record<AuctionLeague, Array<{round: number; rows: VotoRow[]}>>> = {'serie-a': SERIE_A_VOTI};
@@ -52,6 +53,8 @@ export interface MatchdayContext {
     calibration: VotoCalibration;
     /** Rounds whose official votes are in, and how many players they matched. */
     votes: Array<{round: number; matched: number; total: number}>;
+    /** The last round played: what every player who was in a squad did, for the recap. Null before the first. */
+    results: RoundResults | null;
     generatedAt: string;
 }
 
@@ -66,6 +69,8 @@ interface FixtureRow {
     state: string;
     home_team_id: number;
     away_team_id: number;
+    home_score: number | null;
+    away_score: number | null;
     home: {id: number; name: string} | null;
     away: {id: number; name: string} | null;
 }
@@ -82,7 +87,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     if (!leagueRow || !season) return null;
 
     const rows = (await fetchAll(
-        (a, b) => db.from('fixtures').select('id,round,starting_at,state,home_team_id,away_team_id,home:teams!fixtures_home_team_id_fkey(id,name),away:teams!fixtures_away_team_id_fkey(id,name)').eq('season_id', season.id).order('starting_at').order('id').range(a, b),
+        (a, b) => db.from('fixtures').select('id,round,starting_at,state,home_team_id,away_team_id,home_score,away_score,home:teams!fixtures_home_team_id_fkey(id,name),away:teams!fixtures_away_team_id_fkey(id,name)').eq('season_id', season.id).order('starting_at').order('id').range(a, b),
         {max: 1000},
     )) as unknown as FixtureRow[];
     const fixtures = rows.filter((r) => r.round && r.home && r.away);
@@ -132,7 +137,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
             ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', recentIds).eq('is_expected', false).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
             : Promise.resolve([]),
         recentIds.length > 0
-            ? (fetchAll((a, b) => db.from('fixture_player_stats').select('fixture_id,player_id,minutes_played,rating,goals,assists').in('fixture_id', recentIds).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; player_id: number; minutes_played: number | null; rating: number | string | null; goals: number; assists: number}>>)
+            ? (fetchAll((a, b) => db.from('fixture_player_stats').select('fixture_id,player_id,minutes_played,rating,goals,assists,yellow_cards,red_cards').in('fixture_id', recentIds).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; player_id: number; minutes_played: number | null; rating: number | string | null; goals: number; assists: number; yellow_cards: number | null; red_cards: number | null}>>)
             : Promise.resolve([]),
         roundFixtures.length > 0
             ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', roundFixtures.map((f) => f.id)).eq('is_expected', true).order('fixture_id').order('player_id').range(a, b), {max: 2000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
@@ -218,7 +223,37 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     }
     const teamRecent: MatchdayContext['teamRecent'] = {};
     for (const [teamId, list] of recentOf) teamRecent[teamId] = list.map((f) => f.id);
-    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], calibration, votes, generatedAt: new Date().toISOString()};
+    // The last round played, for the recap: everyone in a squad, with the official votes when in
+    // (a player the votes did not match keeps the provider's data), else the provider's numbers.
+    const lastPlayed = [...rounds].reverse().find((r) => r.state === 'played') ?? null;
+    let results: RoundResults | null = null;
+    if (lastPlayed) {
+        const officialRound = votesByRound.has(roundNumber(lastPlayed.round) ?? -1);
+        const statsOf: Record<number, RoundStat> = {};
+        for (const f of (byRound.get(lastPlayed.round) ?? []).filter((x) => FINISHED.has(x.state))) {
+            for (const l of lineupRows) {
+                if (l.fixture_id !== f.id) continue;
+                const stat = stats.get(`${f.id}:${l.player_id}`);
+                const entry = votoOf.get(`${f.id}:${l.player_id}`);
+                const against = l.team_id === f.home_team_id ? f.away_score : f.home_score;
+                statsOf[l.player_id] = {
+                    minutes: stat?.minutes_played ?? 0,
+                    rating: stat?.rating !== null && stat?.rating !== undefined ? Number(stat.rating) : null,
+                    ...(officialRound && entry ? {voto: entry.voto} : {}),
+                    goals: entry?.goals ?? stat?.goals ?? 0,
+                    assists: entry?.assists ?? stat?.assists ?? 0,
+                    yellow: entry?.yellow ?? stat?.yellow_cards ?? 0,
+                    red: entry?.red ?? stat?.red_cards ?? 0,
+                    conceded: entry?.conceded ?? against ?? 0,
+                    penaltiesSaved: entry?.penaltiesSaved ?? 0,
+                    penaltiesMissed: entry?.penaltiesMissed ?? 0,
+                    ownGoals: entry?.ownGoals ?? 0,
+                };
+            }
+        }
+        results = {round: lastPlayed.round, official: officialRound, stats: statsOf};
+    }
+    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], calibration, votes, results, generatedAt: new Date().toISOString()};
 }
 
 const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 120, tags: ['fantasy-matchday']});

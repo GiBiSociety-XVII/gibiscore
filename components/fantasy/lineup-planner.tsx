@@ -13,12 +13,13 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
-import {locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLock} from "@/lib/fantasy/store";
+import {HISTORY_ROUNDS, historyStore, locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLock} from "@/lib/fantasy/store";
 import type {MatchdayRound} from "@/lib/fantasy/matchday-data";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 import {hashOf} from "@/lib/fantasy/hash";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
+import {RoundRecap} from "./round-recap";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
@@ -460,6 +461,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     const allPins = pinsStore.useValue();
     const allOuts = outsStore.useValue();
     const locks = locksStore.useValue();
+    const history = historyStore.useValue();
     const [forced, setForced] = useState<FormationKey | null>(null);
     // The clock, so the page locks itself at kick-off while open.
     const [now, setNow] = useState(() => Date.now());
@@ -497,12 +499,17 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
         if (!hasRound) return;
         const known = locks[current.id];
         const valid = known?.round === context.round && known.model === LINEUP_MODEL;
+        // A lock of a round now over is kept aside before it is overwritten: the recap reads it back.
+        if (known && known.round !== context.round) {
+            const kept = history[current.id] ?? [];
+            if (!kept.some((l) => l.round === known.round)) historyStore.write({...history, [current.id]: [...kept, known].slice(-HISTORY_ROUNDS)});
+        }
         // Frozen: nothing more to write. Open: keep the last view; just kicked off without a view before: freeze now.
         if (locked && valid) return;
         if (valid && known.fingerprint === fingerprint) return;
         const snapshot = JSON.parse(serialized) as Omit<LineupLock, 'fingerprint' | 'savedAt'>;
         locksStore.write({...locks, [current.id]: {...snapshot, fingerprint, savedAt: new Date().toISOString()}});
-    }, [hasRound, locked, locks, current.id, context.round, fingerprint, serialized]);
+    }, [hasRound, locked, locks, history, current.id, context.round, fingerprint, serialized]);
     const forecasts = frozen ? (frozen.forecasts as PlayerForecast[]) : liveForecasts;
     const pinned = frozen ? new Set(frozen.pinned) : livePinned;
     const outs = frozen ? new Set(frozen.outs) : liveOuts;
@@ -518,6 +525,9 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     const fixturesOfRoster = context.fixtures.filter((f) => rosterTeams.includes(f.home.id) || rosterTeams.includes(f.away.id));
     const missingCount = ROLES.reduce((s, r) => s + Math.max(0, (FORMATIONS.find((f) => f.key === advice.formation)?.need[r] ?? 0) - forecasts.filter((f) => f.player.role === r).length), 0);
     const when = (iso: string) => format.dateTime(new Date(iso), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME});
+    // The round just played: its lock, still in place or already kept aside.
+    const results = context.results;
+    const past = results ? (stored?.round === results.round ? stored : (history[current.id] ?? []).find((l) => l.round === results.round) ?? null) : null;
     const lineupText = [
         `${current.name} · ${t('roundLabel', {round: context.round})} · ${advice.formation}`,
         ...ROLES.map((r) => `${r}: ${advice.starters.filter((f) => f.player.role === r).map((f) => f.player.name).join(', ')}`),
@@ -542,6 +552,8 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                     <span><span className="font-extrabold">{t('locked.title')}</span> {frozenFresh ? t('locked.fresh', {deadline: when(frozen.deadline)}) : t('locked.text', {deadline: when(frozen.deadline), savedAt: when(frozen.savedAt)})}</span>
                 </div>
             )}
+
+            {results && <RoundRecap team={current} results={results} roster={roster} byId={byId} past={past} calibration={context.calibration} />}
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">

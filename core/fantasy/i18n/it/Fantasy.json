@@ -250,7 +250,7 @@
     "rivalTakenBadge": "Rivale preso",
     "bargain": {
       "badge": "Affare",
-      "hint": "Affare: quotazione Fantacalcio.it {quote}, per il sito varrebbe {equiv}. Al tavolo si paga di solito sulla quotazione: puoi prenderlo a meno di quanto vale."
+      "hint": "Affare: costa poco e rende molto. Quotazione Fantacalcio.it {quote}, ma per il sito è il {rank}º {role} del listone: chi sta lì nel listone Fantacalcio.it è quotato {equiv}. Al tavolo si paga di solito intorno alla quotazione."
     },
     "rivalTakenHint": "Chi si gioca il posto con lui è già stato comprato: {names}",
     "undoLast": "Annulla ultimo",
@@ -845,7 +845,51 @@
     "roundLabel": "Giornata {round}",
     "why": "Perché",
     "whyHint": "Perché: tutte le ragioni dietro ai numeri di questo giocatore",
-    "whyClose": "Chiudi"
+    "whyClose": "Chiudi",
+    "recap": {
+      "title": "Consuntivo giornata {round}",
+      "official": "voti ufficiali",
+      "officialHint": "Voti e bonus/malus ufficiali del Fantacalcio per questa giornata.",
+      "estimated": "stima",
+      "estimatedHint": "I voti ufficiali di questa giornata non sono ancora caricati: il voto è il rating del provider riportato sulla scala dei voti, con gol, assist e cartellini del provider. Rigori parati o sbagliati e autogol non entrano nella stima.",
+      "advised": "punti della consigliata",
+      "advisedHint": "La formazione consigliata come era al blocco (spilli e KO compresi), calcolata con le sostituzioni automatiche della lega: fino a {subs} dalla panchina, stesso ruolo, in ordine di panchina.",
+      "best": "miglior undici possibile",
+      "bestHint": "Col senno di poi: l'undici della rosa che avrebbe fatto più punti, in qualsiasi modulo.",
+      "gap": "{gap} dal massimo",
+      "noBest": "Non abbastanza giocatori con voto per un modulo intero.",
+      "subs": "{count, plural, =0 {nessuna sostituzione} one {# sostituzione} other {# sostituzioni}}",
+      "holes": "{count, plural, one {# titolare senza voto e senza riserva} other {# titolari senza voto e senza riserva}}",
+      "defence": "modificatore difesa +{points}",
+      "noPast": "La consigliata di questa giornata non è stata salvata: non avevi aperto la pagina prima del fischio d'inizio. Qui sotto i punti di tutta la rosa e l'undici migliore col senno di poi.",
+      "surprises": "Sorprese",
+      "surprisesHint": "Punti reali meno punti attesi da titolare, per chi ha preso il voto: le differenze più grandi.",
+      "details": "Dettagli",
+      "close": "Chiudi",
+      "colPlayer": "Giocatore",
+      "colVoto": "Voto",
+      "colEvents": "Bonus / malus",
+      "colPoints": "FV",
+      "colExpected": "Atteso",
+      "colDelta": "Diff.",
+      "noVote": "s.v.",
+      "cameIn": "entrato per {name}",
+      "replaced": "sostituito da {name}",
+      "hole": "senza voto",
+      "benchLabel": "panchina",
+      "inBest": "miglior XI",
+      "events": {
+        "goals": "{count} gol",
+        "assists": "{count} assist",
+        "conceded": "{count} subiti",
+        "cleanSheet": "porta inviolata",
+        "penaltySaved": "rigore parato",
+        "penaltyMissed": "rigore sbagliato",
+        "ownGoal": "autogol",
+        "yellow": "amm.",
+        "red": "esp."
+      }
+    }
   },
   "import": {
     "title": "Importa le rose da Leghe Fantacalcio",
