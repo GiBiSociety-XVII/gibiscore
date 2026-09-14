@@ -54,7 +54,7 @@ function Status({p, rivals, rivalsTaken = [], deal}: {p: AuctionPlayer; rivals: 
     const t = useTranslations('Fantasy.board');
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
-            {deal?.bargain && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-emerald-700 border-emerald-700" title={t('bargain.hint', {quote: deal.quote, equiv: deal.equivQuote})}>{t('bargain.badge')}</Badge>}
+            {deal?.bargain && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-emerald-700 border-emerald-700" title={t('bargain.hint', {quote: deal.quote, equiv: deal.equivQuote, rank: deal.rank, role: p.role})}>{t('bargain.badge')}</Badge>}
             {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
             {p.injury && (() => {
                 const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
@@ -194,8 +194,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!board) return new Map<number, number>();
         return suggestPrices(board.players, {credits: board.config.credits, participants: board.config.participants, slots: board.config.slots, roleShare: ROLE_SHARE, level: board.config.priceLevel / 100});
     }, [board]);
-    // Players the site values well above their Fantacalcio.it quotation, on the list prices: the auction does not move them.
-    const deals = useMemo(() => (board ? bargains(board.players, listPrices) : new Map<number, Bargain>()), [board, listPrices]);
+    // Cheap on Fantacalcio.it, worth much more to the site: ranked on the list prices, so the auction does not move them.
+    const deals = useMemo(() => (board ? bargains(board.players.map((p) => ({id: p.id, role: p.role, listQuote: p.listQuote, value: p.scores.overall})), listPrices) : new Map<number, Bargain>()), [board, listPrices]);
     // Live prices follow the purchases: the plans below hang on them, so they are drawn once per purchase.
     const prices = useMemo(() => (board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices), [board, listPrices]);
     const market = board ? marketState(board.players, listPrices, board.config, board.purchases) : null;
@@ -218,7 +218,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
         const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (tier === 'all' || tiers.get(p.id) === tier) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || playerMatches(p, needle)));
-        const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'bargain' ? (deals.get(p.id)?.index ?? 0) : sort === 'name' ? p.name : p.scores[sort]);
+        const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'bargain' ? (deals.has(p.id) ? (deals.get(p.id)!.bargain ? 100 : 0) + deals.get(p.id)!.index : 0) : sort === 'name' ? p.name : p.scores[sort]);
         return list.sort((a, b) => {
             const va = value(a);
             const vb = value(b);
