@@ -53,14 +53,29 @@ export interface MatchdayContext {
     calibration: VotoCalibration;
     /** Rounds whose official votes are in, and how many players they matched. */
     votes: Array<{round: number; matched: number; total: number}>;
-    /** The last round played: what every player who was in a squad did, for the recap. Null before the first. */
-    results: RoundResults | null;
+    /** The last round played and, while one is being played, the matches of it already over: what every player in a squad did, for the recap. */
+    results: RoundResults[];
     generatedAt: string;
 }
 
 /** How many of the club's last league matches say how a player is used. */
 const RECENT_MATCHES = 8;
 const FINISHED = new Set(['finished']);
+
+interface TypedVoteRow {
+    round: string;
+    player_id: number;
+    team_id: number;
+    voto: number | string | null;
+    goals: number;
+    assists: number;
+    yellow: number;
+    red: number;
+    conceded: number;
+    penalties_saved: number;
+    penalties_missed: number;
+    own_goals: number;
+}
 
 interface FixtureRow {
     id: number;
@@ -132,12 +147,22 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     const recentOf = new Map<number, FixtureRow[]>();
     for (const teamId of teamIds) recentOf.set(teamId, played.filter((f) => f.home_team_id === teamId || f.away_team_id === teamId).slice(0, RECENT_MATCHES));
     const recentIds = [...new Set([...recentOf.values()].flat().map((f) => f.id))];
+    // The votes users typed in, the latest per player and round: each on its club's match of that round.
+    const {data: typedRows} = await db.rpc('fantasy_round_votes', {p_season: season.id});
+    const typed = new Map<string, VotoEntry>();
+    for (const r of (typedRows ?? []) as TypedVoteRow[]) {
+        const f = (byRound.get(r.round) ?? []).find((x) => x.home_team_id === r.team_id || x.away_team_id === r.team_id);
+        if (!f) continue;
+        typed.set(`${f.id}:${r.player_id}`, {team: '', role: 'C', name: '', voto: r.voto === null ? null : Number(r.voto), goals: r.goals, conceded: r.conceded, penaltiesScored: 0, penaltiesSaved: r.penalties_saved, penaltiesMissed: r.penalties_missed, ownGoals: r.own_goals, yellow: r.yellow, red: r.red, assists: r.assists});
+    }
+    const typedFixtureIds = [...new Set([...typed.keys()].map((k) => Number(k.split(':')[0])))];
+    const statIds = [...new Set([...recentIds, ...typedFixtureIds])];
     const [lineupRows, statRows, officialRows, sidelined] = await Promise.all([
         recentIds.length > 0
             ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', recentIds).eq('is_expected', false).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
             : Promise.resolve([]),
-        recentIds.length > 0
-            ? (fetchAll((a, b) => db.from('fixture_player_stats').select('fixture_id,player_id,minutes_played,rating,goals,assists,yellow_cards,red_cards').in('fixture_id', recentIds).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; player_id: number; minutes_played: number | null; rating: number | string | null; goals: number; assists: number; yellow_cards: number | null; red_cards: number | null}>>)
+        statIds.length > 0
+            ? (fetchAll((a, b) => db.from('fixture_player_stats').select('fixture_id,player_id,minutes_played,rating,goals,assists,yellow_cards,red_cards').in('fixture_id', statIds).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; player_id: number; minutes_played: number | null; rating: number | string | null; goals: number; assists: number; yellow_cards: number | null; red_cards: number | null}>>)
             : Promise.resolve([]),
         roundFixtures.length > 0
             ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', roundFixtures.map((f) => f.id)).eq('is_expected', true).order('fixture_id').order('player_id').range(a, b), {max: 2000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
@@ -169,14 +194,16 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     const votoOf = new Map<string, VotoEntry>();
     const votes: MatchdayContext['votes'] = [];
     const pairs: VotoPair[] = [];
-    if (votedRounds.length > 0 && teamOf.size > 0) {
-        const ids = [...teamOf.keys()];
+    const typedPlayerIds = [...new Set([...typed.keys()].map((k) => Number(k.split(':')[1])))];
+    const roleOf = new Map<number, FantaRole | null>();
+    if ((votedRounds.length > 0 && teamOf.size > 0) || typedPlayerIds.length > 0) {
+        const ids = [...new Set([...(votedRounds.length > 0 ? teamOf.keys() : []), ...typedPlayerIds])];
         const named: Array<{id: number; name: string; position: string | null}> = [];
         for (let i = 0; i < ids.length; i += 300) {
             const {data} = await db.from('players').select('id,name,position').in('id', ids.slice(i, i + 300));
             named.push(...((data ?? []) as Array<{id: number; name: string; position: string | null}>));
         }
-        const roleOf = new Map(named.map((p) => [p.id, ROLE_OF_POSITION[p.position ?? ''] ?? null]));
+        for (const p of named) roleOf.set(p.id, ROLE_OF_POSITION[p.position ?? ''] ?? null);
         const matchable = named.map((p) => ({id: p.id, name: p.name, team: teamName.get(teamOf.get(p.id)?.team ?? -1) ?? ''}));
         for (const n of votedRounds) {
             const entries = votesByRound.get(n)!;
@@ -193,6 +220,14 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
                 }
             }
         }
+    }
+    // Typed votes fill in where no official workbook covers the match, and tune the scale like the official ones.
+    for (const [key, entry] of typed) {
+        if (votoOf.has(key)) continue;
+        votoOf.set(key, entry);
+        const stat = stats.get(key);
+        const role = roleOf.get(Number(key.split(':')[1]));
+        if (entry.voto !== null && stat?.rating !== null && stat?.rating !== undefined && role) pairs.push({rating: Number(stat.rating), voto: entry.voto, role});
     }
     const calibration = pairs.length > 0 ? fitCalibration(pairs) : DEFAULT_CALIBRATION;
     const players: MatchdayContext['players'] = {};
@@ -223,23 +258,34 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     }
     const teamRecent: MatchdayContext['teamRecent'] = {};
     for (const [teamId, list] of recentOf) teamRecent[teamId] = list.map((f) => f.id);
-    // The last round played, for the recap: everyone in a squad, with the official votes when in
-    // (a player the votes did not match keeps the provider's data), else the provider's numbers.
+    // The recap: the last round played and, while one is on, its matches already over. Everyone in a
+    // squad, with the official vote when the workbook is in, else the vote typed in, else the provider's
+    // numbers (a player typed in without a squad row counts too).
+    const results: RoundResults[] = [];
     const lastPlayed = [...rounds].reverse().find((r) => r.state === 'played') ?? null;
-    let results: RoundResults | null = null;
-    if (lastPlayed) {
-        const officialRound = votesByRound.has(roundNumber(lastPlayed.round) ?? -1);
+    const live = rounds.find((r) => r.state === 'live') ?? null;
+    for (const [info, state] of [[live, 'live'], [lastPlayed, 'played']] as Array<[MatchdayRound | null, RoundResults['state']]>) {
+        if (!info) continue;
+        const officialRound = votesByRound.has(roundNumber(info.round) ?? -1);
         const statsOf: Record<number, RoundStat> = {};
-        for (const f of (byRound.get(lastPlayed.round) ?? []).filter((x) => FINISHED.has(x.state))) {
-            for (const l of lineupRows) {
-                if (l.fixture_id !== f.id) continue;
-                const stat = stats.get(`${f.id}:${l.player_id}`);
-                const entry = votoOf.get(`${f.id}:${l.player_id}`);
-                const against = l.team_id === f.home_team_id ? f.away_score : f.home_score;
-                statsOf[l.player_id] = {
-                    minutes: stat?.minutes_played ?? 0,
+        const finishedTeams: number[] = [];
+        for (const f of (byRound.get(info.round) ?? []).filter((x) => FINISHED.has(x.state))) {
+            finishedTeams.push(f.home_team_id, f.away_team_id);
+            const inSquad = lineupRows.filter((l) => l.fixture_id === f.id);
+            const typedHere = [...typed.keys()].filter((k) => k.startsWith(`${f.id}:`)).map((k) => Number(k.split(':')[1]));
+            const ids = [...new Set([...inSquad.map((l) => l.player_id), ...typedHere])];
+            for (const playerId of ids) {
+                const l = inSquad.find((x) => x.player_id === playerId);
+                const stat = stats.get(`${f.id}:${playerId}`);
+                const entry = votoOf.get(`${f.id}:${playerId}`);
+                const source: RoundStat['source'] | undefined = entry ? (officialRound && !typed.has(`${f.id}:${playerId}`) ? 'official' : 'manual') : undefined;
+                const teamId = l?.team_id ?? teamOf.get(playerId)?.team ?? null;
+                const against = teamId === f.home_team_id ? f.away_score : teamId === f.away_team_id ? f.home_score : null;
+                const minutes = stat?.minutes_played ?? (entry && entry.voto !== null ? 90 : 0);
+                statsOf[playerId] = {
+                    minutes,
                     rating: stat?.rating !== null && stat?.rating !== undefined ? Number(stat.rating) : null,
-                    ...(officialRound && entry ? {voto: entry.voto} : {}),
+                    ...(entry ? {voto: entry.voto, source} : {}),
                     goals: entry?.goals ?? stat?.goals ?? 0,
                     assists: entry?.assists ?? stat?.assists ?? 0,
                     yellow: entry?.yellow ?? stat?.yellow_cards ?? 0,
@@ -251,7 +297,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
                 };
             }
         }
-        results = {round: lastPlayed.round, official: officialRound, stats: statsOf};
+        results.push({round: info.round, state, official: officialRound, finishedTeams, stats: statsOf});
     }
     return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], calibration, votes, results, generatedAt: new Date().toISOString()};
 }

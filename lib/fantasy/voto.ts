@@ -41,18 +41,28 @@ export interface VotoPair {
 
 /** Pairs a role needs before its own line replaces the default. */
 export const FIT_MIN_PAIRS = 120;
+/** With fewer pairs only the level moves: the mean gap to the fallback's line, weighted n ÷ (n + this). */
+export const SHRINK_PAIRS = 10;
 
 /**
  * The line through the official votes against the provider's ratings,
- * per role, by least squares; a role with too few pairs, or a line too
- * flat or too steep to be a scale, keeps the fallback.
+ * per role, by least squares; a role with too few pairs only moves the
+ * fallback's level (see SHRINK_PAIRS), a line too flat or too steep to
+ * be a scale keeps the fallback whole.
  */
 export function fitCalibration(pairs: VotoPair[], fallback: VotoCalibration = DEFAULT_CALIBRATION, min = FIT_MIN_PAIRS): VotoCalibration {
     const out = {...fallback};
     for (const role of ['P', 'D', 'C', 'A'] as FantaRole[]) {
         const own = pairs.filter((p) => p.role === role);
-        if (own.length < min) continue;
         const n = own.length;
+        if (n === 0) continue;
+        if (n < min) {
+            // A handful of votes (typed in by hand, say) cannot fit a line, but they say whether the
+            // fallback runs high or low: its level moves by the mean gap, shrunk towards zero.
+            const gap = own.reduce((s, p) => s + (p.voto - (fallback[role].intercept + fallback[role].slope * p.rating)), 0) / n;
+            out[role] = {slope: fallback[role].slope, intercept: Math.round((fallback[role].intercept + gap * (n / (n + SHRINK_PAIRS))) * 1000) / 1000};
+            continue;
+        }
         const mx = own.reduce((s, p) => s + p.rating, 0) / n;
         const my = own.reduce((s, p) => s + p.voto, 0) / n;
         const sxx = own.reduce((s, p) => s + (p.rating - mx) ** 2, 0);

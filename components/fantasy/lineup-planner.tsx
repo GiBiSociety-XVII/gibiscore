@@ -450,12 +450,13 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
 
-    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} toolbar={toolbar} roundInfo={roundInfo} />;
+    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} toolbar={toolbar} roundInfo={roundInfo} signedIn={account.user !== null} />;
 }
 
 /** The advice for one team: forecasts, pins and outs, the formation, the tables; frozen once the round has kicked off. */
-function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null}) {
+function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signedIn}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null; signedIn: boolean}) {
     const t = useTranslations('Fantasy.lineup');
+    const router = useRouter();
     const format = useFormatter();
     const reasonText = useReasonText();
     const allPins = pinsStore.useValue();
@@ -525,9 +526,8 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     const fixturesOfRoster = context.fixtures.filter((f) => rosterTeams.includes(f.home.id) || rosterTeams.includes(f.away.id));
     const missingCount = ROLES.reduce((s, r) => s + Math.max(0, (FORMATIONS.find((f) => f.key === advice.formation)?.need[r] ?? 0) - forecasts.filter((f) => f.player.role === r).length), 0);
     const when = (iso: string) => format.dateTime(new Date(iso), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME});
-    // The round just played: its lock, still in place or already kept aside.
-    const results = context.results;
-    const past = results ? (stored?.round === results.round ? stored : (history[current.id] ?? []).find((l) => l.round === results.round) ?? null) : null;
+    // The rounds of the recap: each with its lock, still in place or already kept aside.
+    const lockOf = (round: string) => (stored?.round === round ? stored : (history[current.id] ?? []).find((l) => l.round === round) ?? null);
     const lineupText = [
         `${current.name} · ${t('roundLabel', {round: context.round})} · ${advice.formation}`,
         ...ROLES.map((r) => `${r}: ${advice.starters.filter((f) => f.player.role === r).map((f) => f.player.name).join(', ')}`),
@@ -553,7 +553,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                 </div>
             )}
 
-            {results && <RoundRecap team={current} results={results} roster={roster} byId={byId} past={past} calibration={context.calibration} />}
+            {context.results.map((results) => <RoundRecap key={results.round} team={current} results={results} seasonId={context.seasonId} roster={roster} byId={byId} past={lockOf(results.round)} calibration={context.calibration} signedIn={signedIn} onSaved={() => router.refresh()} />)}
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">

@@ -1,7 +1,8 @@
 'use client';
 
+import {parseManualVote, type ManualVote} from './recap';
 import {useSyncExternalStore} from 'react';
-import {CLOUD_KEY, HISTORY_KEY, LOCKS_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
+import {CLOUD_KEY, HISTORY_KEY, LOCKS_KEY, VOTES_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -142,6 +143,25 @@ function parseHistory(raw: unknown): LineupHistory {
     return out;
 }
 export const historyStore = createJsonStore<LineupHistory>(HISTORY_KEY, parseHistory, {});
+
+/** Votes typed on this device: per "season:round", per player id. Shown at once; the account keeps them too. */
+export type ManualVotes = Record<string, Record<number, ManualVote>>;
+export const votesKey = (seasonId: number, round: string) => `${seasonId}:${round}`;
+function parseVotes(raw: unknown): ManualVotes {
+    if (!raw || typeof raw !== 'object') return {};
+    const out: ManualVotes = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (!v || typeof v !== 'object') continue;
+        const votes: Record<number, ManualVote> = {};
+        for (const [id, m] of Object.entries(v as Record<string, unknown>)) {
+            const vote = parseManualVote(m);
+            if (vote && Number.isInteger(Number(id))) votes[Number(id)] = vote;
+        }
+        if (Object.keys(votes).length > 0) out[k] = votes;
+    }
+    return out;
+}
+export const votesStore = createJsonStore<ManualVotes>(VOTES_KEY, parseVotes, {});
 
 const noop = () => () => {};
 /** False during server render and hydration, true afterwards: lets the page wait for localStorage before choosing what to show. */

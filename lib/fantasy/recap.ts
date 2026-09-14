@@ -24,8 +24,9 @@ export interface RoundStat {
     minutes: number;
     /** The provider's rating, its own scale; null when he had none. */
     rating: number | null;
-    /** The official vote when the round's votes are in (null = no vote); absent otherwise. */
+    /** The vote when known, official or typed in (null = no vote); absent when only the estimate is there. */
     voto?: number | null;
+    source?: 'official' | 'manual';
     goals: number;
     assists: number;
     yellow: number;
@@ -39,9 +40,52 @@ export interface RoundStat {
 
 export interface RoundResults {
     round: string;
+    /** Played: over. Live: only the matches already finished are in. */
+    state: 'played' | 'live';
     /** True when the official votes of the round are in. */
     official: boolean;
+    /** Clubs whose match of the round is over: their players can be voted. */
+    finishedTeams: number[];
     stats: Record<number, RoundStat>;
+}
+
+/** A vote typed in by hand for a player of a round, with the events; kept on the device and in the account. */
+export interface ManualVote {
+    teamId: number;
+    voto: number | null;
+    goals: number;
+    assists: number;
+    yellow: number;
+    red: number;
+    conceded: number;
+    penaltiesSaved: number;
+    penaltiesMissed: number;
+    ownGoals: number;
+    at: string;
+}
+
+const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
+/** A typed vote as stored or posted: the vote in quarters between 1 and 10 (else "no vote"), the events as counts. */
+export function parseManualVote(raw: unknown): ManualVote | null {
+    const m = raw as Partial<ManualVote> | null;
+    if (!m || typeof m !== 'object' || typeof m.teamId !== 'number') return null;
+    const voto = typeof m.voto === 'number' && Number.isFinite(m.voto) && m.voto >= 1 && m.voto <= 10 ? Math.round(m.voto * 4) / 4 : null;
+    return {teamId: m.teamId, voto, goals: count(m.goals), assists: count(m.assists), yellow: count(m.yellow), red: count(m.red), conceded: count(m.conceded), penaltiesSaved: count(m.penaltiesSaved), penaltiesMissed: count(m.penaltiesMissed), ownGoals: count(m.ownGoals), at: typeof m.at === 'string' ? m.at : ''};
+}
+
+export const EMPTY_STAT: RoundStat = {minutes: 0, rating: null, goals: 0, assists: 0, yellow: 0, red: 0, conceded: 0, penaltiesSaved: 0, penaltiesMissed: 0, ownGoals: 0};
+
+/** The results with the votes typed on this device laid over: an official vote stays, a typed one fills the rest. */
+export function withManualVotes(results: RoundResults, manual: Record<number, ManualVote> | undefined): RoundResults {
+    if (!manual || Object.keys(manual).length === 0) return results;
+    const stats = {...results.stats};
+    for (const [key, m] of Object.entries(manual)) {
+        const id = Number(key);
+        const base = stats[id] ?? EMPTY_STAT;
+        if (base.source === 'official') continue;
+        stats[id] = {...base, minutes: base.minutes > 0 ? base.minutes : m.voto !== null ? 90 : 0, voto: m.voto, source: 'manual', goals: m.goals, assists: m.assists, yellow: m.yellow, red: m.red, conceded: m.conceded, penaltiesSaved: m.penaltiesSaved, penaltiesMissed: m.penaltiesMissed, ownGoals: m.ownGoals};
+    }
+    return {...results, stats};
 }
 
 export interface LineupPlayer {
@@ -49,17 +93,23 @@ export interface LineupPlayer {
     role: FantaRole;
 }
 
-/** The newspaper vote: official when in, else the rating on the vote scale; null when he had no vote. */
-export function votoOf(stat: RoundStat | undefined, role: FantaRole, official: boolean, calibration: VotoCalibration): number | null {
+/** The provider's rating on the vote scale, whatever vote is known: the placeholder of an empty field. */
+export function toVotoEstimate(stat: RoundStat, role: FantaRole, calibration: VotoCalibration): number | null {
+    if (stat.rating === null || stat.minutes < VOTE_MINUTES) return null;
+    return toVoto(stat.rating, role, calibration);
+}
+
+/** The newspaper vote: the known one when in, else the rating on the vote scale; null when he had no vote. */
+export function votoOf(stat: RoundStat | undefined, role: FantaRole, calibration: VotoCalibration): number | null {
     if (!stat) return null;
-    if (official && stat.voto !== undefined) return stat.voto;
+    if (stat.voto !== undefined) return stat.voto;
     if (stat.rating === null || stat.minutes < VOTE_MINUTES) return null;
     return toVoto(stat.rating, role, calibration);
 }
 
 /** The fantasy points of the vote and the events under the league's rules; null without a vote. */
-export function roundPoints(stat: RoundStat | undefined, role: FantaRole, rules: FantaRules, official: boolean, calibration: VotoCalibration): number | null {
-    const voto = votoOf(stat, role, official, calibration);
+export function roundPoints(stat: RoundStat | undefined, role: FantaRole, rules: FantaRules, calibration: VotoCalibration): number | null {
+    const voto = votoOf(stat, role, calibration);
     if (voto === null || !stat) return null;
     const keeper = role === 'P' ? stat.conceded * rules.goalConceded + stat.penaltiesSaved * rules.penaltySaved + (stat.conceded === 0 ? rules.cleanSheet : 0) : 0;
     const value = voto + stat.goals * rules.goal + stat.assists * rules.assist + stat.yellow * rules.yellow + stat.red * rules.red + stat.penaltiesMissed * rules.penaltyMissed + stat.ownGoals * OWN_GOAL + keeper;
@@ -108,7 +158,7 @@ export function defenceModifierOf(keeperVoto: number | null, defenderVotos: numb
  * role with a vote, in bench order, up to the substitutions allowed.
  */
 export function playLineup(starters: LineupPlayer[], bench: LineupPlayer[], results: RoundResults, rules: FantaRules, calibration: VotoCalibration, defence: DefenceBonus | false, maxSubs = MAX_SUBS): PlayedLineup {
-    const slot = (p: LineupPlayer): PlayedSlot => ({id: p.id, role: p.role, voto: votoOf(results.stats[p.id], p.role, results.official, calibration), points: roundPoints(results.stats[p.id], p.role, rules, results.official, calibration)});
+    const slot = (p: LineupPlayer): PlayedSlot => ({id: p.id, role: p.role, voto: votoOf(results.stats[p.id], p.role, calibration), points: roundPoints(results.stats[p.id], p.role, rules, calibration)});
     const eleven = starters.map(slot);
     const reserves = bench.map(slot);
     const cameIn: PlayedSlot[] = [];
@@ -138,7 +188,7 @@ export interface Hindsight {
 
 /** The best eleven the roster could have fielded, knowing the votes: the top of each role for every formation. */
 export function bestHindsight(roster: LineupPlayer[], results: RoundResults, rules: FantaRules, calibration: VotoCalibration, defence: DefenceBonus | false): Hindsight | null {
-    const scored = roster.map((p) => ({...p, voto: votoOf(results.stats[p.id], p.role, results.official, calibration), points: roundPoints(results.stats[p.id], p.role, rules, results.official, calibration)})).filter((p) => p.points !== null);
+    const scored = roster.map((p) => ({...p, voto: votoOf(results.stats[p.id], p.role, calibration), points: roundPoints(results.stats[p.id], p.role, rules, calibration)})).filter((p) => p.points !== null);
     let best: Hindsight | null = null;
     for (const f of FORMATIONS) {
         const chosen: typeof scored = [];
@@ -167,7 +217,7 @@ export interface Surprise {
 export function surprises(forecasts: Array<{id: number; role: FantaRole; points: number}>, results: RoundResults, rules: FantaRules, calibration: VotoCalibration): Surprise[] {
     const out: Surprise[] = [];
     for (const f of forecasts) {
-        const actual = roundPoints(results.stats[f.id], f.role, rules, results.official, calibration);
+        const actual = roundPoints(results.stats[f.id], f.role, rules, calibration);
         if (actual === null) continue;
         out.push({id: f.id, expected: f.points, actual, delta: Math.round((actual - f.points) * 100) / 100});
     }
