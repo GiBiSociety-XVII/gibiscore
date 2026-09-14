@@ -1,6 +1,7 @@
 import {DEFAULT_DEFENCE_BONUS, DEFENCE_THRESHOLDS, type DefenceBonus} from './config';
 import type {FantaEvents, FantaRole, FantaRules} from './scores';
 import {FORMATIONS, type FormationKey} from './strategies';
+import {DEFAULT_CALIBRATION, toVoto, type VotoCalibration} from './voto';
 
 /**
  * The lineup for a matchday: who of a roster to field, in which
@@ -22,7 +23,10 @@ export interface RecentMatch {
     /** How he was used: started, came on, sat the whole match, not in the squad. */
     status: UsageStatus;
     minutes: number;
+    /** The provider's match rating (its own scale), null when he had none. */
     rating: number | null;
+    /** The official fantasy vote, when the round's votes are in (null there too when he had no vote). */
+    voto?: number | null;
     goals: number;
     assists: number;
 }
@@ -54,7 +58,7 @@ const LIVE_STATES = new Set(['live', 'half_time', 'extra_time', 'penalties']);
 const OPEN_STATES = new Set(['scheduled', ...LIVE_STATES]);
 
 /** "Regular Season - 10" sorts as 10; other labels by their first kick-off. */
-function roundNumber(round: string): number | null {
+export function roundNumber(round: string): number | null {
     const m = /(\d+)\s*$/.exec(round);
     return m ? Number(m[1]) : null;
 }
@@ -306,18 +310,20 @@ function playChance(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: Match
 }
 
 /** Expected rating and fantasy points when he plays, moved by the match ahead. */
-function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: MatchdayFixture | null, home: boolean | null, rules: FantaRules, reasons: ForecastReason[]): {rating: number; points: number; subPoints: number} {
+function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: MatchdayFixture | null, home: boolean | null, rules: FantaRules, reasons: ForecastReason[], calibration: VotoCalibration): {rating: number; points: number; subPoints: number} {
     const ev = p.scores.events;
     const baseRating = ev?.rating ?? p.scores.fantaAvg ?? ROLE_RATING[p.role];
     let rating = baseRating;
-    // His own recent votes: a player on a run (or in a hole) moves from his season average, more the more votes there are.
-    const voted = (ctx?.recent ?? []).filter((m) => m.rating !== null && m.status !== 'bench' && m.status !== 'out').slice(0, PLAYER_FORM_MATCHES);
+    // His own recent votes: the official ones when the round's are in, else the provider's rating on the vote scale.
+    // A player on a run (or in a hole) moves from his season average, more the more votes there are.
+    const voteOf = (m: RecentMatch): number | null => (m.voto !== undefined && m.voto !== null ? m.voto : m.voto === null && m.rating === null ? null : m.rating !== null ? toVoto(m.rating, p.role, calibration) : null);
+    const voted = (ctx?.recent ?? []).filter((m) => voteOf(m) !== null && m.status !== 'bench' && m.status !== 'out').slice(0, PLAYER_FORM_MATCHES);
     if (voted.length > 0) {
         let sum = 0;
         let weight = 0;
         voted.forEach((m, i) => {
             const w = RECENCY ** i;
-            sum += m.rating! * w;
+            sum += voteOf(m)! * w;
             weight += w;
         });
         const avg = sum / weight;
@@ -392,13 +398,13 @@ function expectedPoints(p: MatchdayPlayer, ctx: PlayerContext | null, fixture: M
 }
 
 /** One player's outlook for the round. */
-export function forecastPlayer(p: MatchdayPlayer, ctx: PlayerContext | null, fixtures: MatchdayFixture[], rules: FantaRules): PlayerForecast {
+export function forecastPlayer(p: MatchdayPlayer, ctx: PlayerContext | null, fixtures: MatchdayFixture[], rules: FantaRules, calibration: VotoCalibration = DEFAULT_CALIBRATION): PlayerForecast {
     const fixture = fixtures.find((f) => f.home.id === p.team.id || f.away.id === p.team.id) ?? null;
     const home = fixture ? fixture.home.id === p.team.id : null;
     const opponent = fixture ? (home ? fixture.away : fixture.home) : null;
     const reasons: ForecastReason[] = [];
     const chance = playChance(p, ctx, fixture, reasons);
-    const {rating, points, subPoints} = expectedPoints(p, ctx, fixture, home, rules, reasons);
+    const {rating, points, subPoints} = expectedPoints(p, ctx, fixture, home, rules, reasons, calibration);
     const plays = Math.round((chance.start + chance.sub) * 1000) / 1000;
     const starts = Math.round(chance.start * 1000) / 1000;
     return {player: p, fixture, home, opponent, plays, starts, rating: Math.round(rating * 100) / 100, points, subPoints, value: Math.round((chance.start * points + chance.sub * subPoints) * 100) / 100, reasons};

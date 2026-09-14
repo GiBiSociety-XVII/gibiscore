@@ -171,16 +171,20 @@ describe('recommendLineup', () => {
         expect(ghost.reasons.some((r) => r.kind === 'usage' && r.started === 0)).toBe(true);
     });
 
-    it('his own recent votes pull the expected rating', () => {
-        const voted = (ratings: number[]): RecentMatch[] => ratings.map((rating, i) => ({fixtureId: 200 + i, status: 'started', minutes: 90, rating, goals: 0, assists: 0}));
+    it('his own recent votes pull the expected rating: the official ones as they are, the provider ratings on the vote scale', () => {
+        const official = (votes: number[]): RecentMatch[] => votes.map((voto, i) => ({fixtureId: 200 + i, status: 'started', minutes: 90, rating: 7.0, voto, goals: 0, assists: 0}));
+        const rated = (ratings: number[]): RecentMatch[] => ratings.map((rating, i) => ({fixtureId: 200 + i, status: 'started', minutes: 90, rating, goals: 0, assists: 0}));
         const base = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: recent(['started', 'started', 'started']), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
-        const hot = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: voted([7.4, 7.2, 7.5]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
-        const cold = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: voted([5.8, 5.9, 6.0]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        const hot = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: official([7, 7, 7.5]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        const cold = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: rated([6.0, 6.1, 6.2]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
         expect(hot.rating).toBeGreaterThan(base.rating + 0.1);
         expect(cold.rating).toBeLessThan(base.rating - 0.1);
         // Three votes: half of the full pull, a bit less.
-        expect(hot.rating - base.rating).toBeLessThan(0.4 * 0.5 * (7.4 - 6.4) + 0.01);
+        expect(hot.rating - base.rating).toBeLessThan(0.4 * 0.5 * (7.5 - 6.4) + 0.01);
         expect(hot.reasons.some((r) => r.kind === 'playerForm' && r.matches === 3)).toBe(true);
+        // A provider rating of 6.9 is an ordinary vote, not a good one: it does not lift him.
+        const plain = forecastPlayer(player(1, 'C', 10, 90), {teamId: 10, recent: rated([6.9, 6.9, 6.9]), official: null, sidelined: null}, [fixture], CLASSIC_RULES);
+        expect(Math.abs(plain.rating - base.rating)).toBeLessThan(0.1);
     });
 });
 

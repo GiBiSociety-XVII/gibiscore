@@ -5,8 +5,17 @@ import {footballDb, logReadError} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getPriorStudy, getSeasonStudy} from '@/lib/football/data/study';
 import {attackBaseline, predictMatch} from '@/lib/football/prediction';
+import {VOTI as SERIE_A_VOTI} from '@/core/fantasy/voti/serie-a';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
-import {roundStates, type MatchdayFixture, type PlayerContext, type RecentMatch, type RoundState} from './matchday';
+import {roundNumber, roundStates, type MatchdayFixture, type PlayerContext, type RecentMatch, type RoundState} from './matchday';
+import type {FantaRole} from './scores';
+import {DEFAULT_CALIBRATION, fitCalibration, type VotoCalibration, type VotoPair} from './voto';
+import {matchVoti, parseVoti, type VotoEntry, type VotoRow} from './voti';
+
+/** The official votes on disk, by league (core/fantasy/voti). */
+const OFFICIAL_VOTES: Partial<Record<AuctionLeague, Array<{round: number; rows: VotoRow[]}>>> = {'serie-a': SERIE_A_VOTI};
+
+const ROLE_OF_POSITION: Record<string, FantaRole> = {goalkeeper: 'P', defender: 'D', midfielder: 'C', attacker: 'A'};
 
 /**
  * What a matchday looks like, for the lineup advice: the rounds of the
@@ -38,6 +47,10 @@ export interface MatchdayContext {
     /** Official lineups of the round, per player id, and the clubs that have published one. */
     official: Record<number, 'starter' | 'bench'>;
     officialTeams: number[];
+    /** How the provider's ratings map to fantasy votes: fitted on the official votes when enough are in, else the defaults. */
+    calibration: VotoCalibration;
+    /** Rounds whose official votes are in, and how many players they matched. */
+    votes: Array<{round: number; matched: number; total: number}>;
     generatedAt: string;
 }
 
@@ -136,6 +149,46 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         const known = teamOf.get(l.player_id);
         if (!known || at > known.at) teamOf.set(l.player_id, {team: l.team_id, at});
     }
+    // The official votes of the recent rounds, matched to the players by club and surname; with enough
+    // of them, the provider's ratings are put on the vote scale by the line through the pairs.
+    const votesByRound = new Map<number, VotoEntry[]>();
+    for (const {round: n, rows: votesRows} of OFFICIAL_VOTES[league] ?? []) votesByRound.set(n, parseVoti(votesRows));
+    const teamName = new Map<number, string>();
+    for (const f of fixtures) {
+        teamName.set(f.home_team_id, f.home!.name);
+        teamName.set(f.away_team_id, f.away!.name);
+    }
+    const roundOfFixture = new Map(fixtures.map((f) => [f.id, roundNumber(f.round ?? '')]));
+    const votedRounds = [...new Set(recentIds.map((id) => roundOfFixture.get(id)).filter((n): n is number => typeof n === 'number' && votesByRound.has(n)))];
+    const votoOf = new Map<string, VotoEntry>();
+    const votes: MatchdayContext['votes'] = [];
+    const pairs: VotoPair[] = [];
+    if (votedRounds.length > 0 && teamOf.size > 0) {
+        const ids = [...teamOf.keys()];
+        const named: Array<{id: number; name: string; position: string | null}> = [];
+        for (let i = 0; i < ids.length; i += 300) {
+            const {data} = await db.from('players').select('id,name,position').in('id', ids.slice(i, i + 300));
+            named.push(...((data ?? []) as Array<{id: number; name: string; position: string | null}>));
+        }
+        const roleOf = new Map(named.map((p) => [p.id, ROLE_OF_POSITION[p.position ?? ''] ?? null]));
+        const matchable = named.map((p) => ({id: p.id, name: p.name, team: teamName.get(teamOf.get(p.id)?.team ?? -1) ?? ''}));
+        for (const n of votedRounds) {
+            const entries = votesByRound.get(n)!;
+            const {byPlayer} = matchVoti(entries, matchable);
+            votes.push({round: n, matched: byPlayer.size, total: entries.length});
+            for (const f of fixtures.filter((x) => roundOfFixture.get(x.id) === n)) {
+                for (const [playerId, entry] of byPlayer) {
+                    const team = teamOf.get(playerId)?.team;
+                    if (team !== f.home_team_id && team !== f.away_team_id) continue;
+                    votoOf.set(`${f.id}:${playerId}`, entry);
+                    const stat = stats.get(`${f.id}:${playerId}`);
+                    const role = roleOf.get(playerId);
+                    if (entry.voto !== null && stat?.rating !== null && stat?.rating !== undefined && role) pairs.push({rating: Number(stat.rating), voto: entry.voto, role});
+                }
+            }
+        }
+    }
+    const calibration = pairs.length > 0 ? fitCalibration(pairs) : DEFAULT_CALIBRATION;
     const players: MatchdayContext['players'] = {};
     for (const [playerId, {team}] of teamOf) {
         const recent: RecentMatch[] = (recentOf.get(team) ?? []).map((f) => {
@@ -143,7 +196,8 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
             const stat = stats.get(`${f.id}:${playerId}`);
             const minutes = stat?.minutes_played ?? 0;
             const status: RecentMatch['status'] = !row ? 'out' : row.starter ? 'started' : minutes > 0 ? 'sub' : 'bench';
-            return {fixtureId: f.id, status, minutes, rating: stat?.rating !== null && stat?.rating !== undefined ? Number(stat.rating) : null, goals: stat?.goals ?? 0, assists: stat?.assists ?? 0};
+            const official = votoOf.get(`${f.id}:${playerId}`);
+            return {fixtureId: f.id, status, minutes, rating: stat?.rating !== null && stat?.rating !== undefined ? Number(stat.rating) : null, ...(official ? {voto: official.voto} : {}), goals: stat?.goals ?? 0, assists: stat?.assists ?? 0};
         });
         players[playerId] = {teamId: team, recent, sidelined: null};
     }
@@ -163,7 +217,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     }
     const teamRecent: MatchdayContext['teamRecent'] = {};
     for (const [teamId, list] of recentOf) teamRecent[teamId] = list.map((f) => f.id);
-    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], generatedAt: new Date().toISOString()};
+    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], calibration, votes, generatedAt: new Date().toISOString()};
 }
 
 const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 120, tags: ['fantasy-matchday']});

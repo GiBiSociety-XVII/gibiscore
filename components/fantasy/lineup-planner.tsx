@@ -472,7 +472,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
         const next = liveOuts.has(id) ? [...liveOuts].filter((x) => x !== id) : [...liveOuts, id];
         outsStore.write({...allOuts, [current.id]: next});
     };
-    const liveForecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context, liveOuts.has(p.id)), context.fixtures, current.rules));
+    const liveForecasts = roster.map((p) => forecastPlayer(toMatchdayPlayer(p), contextOf(p, context, liveOuts.has(p.id)), context.fixtures, current.rules, context.calibration));
     // Starters pinned by hand for this team: the lineup is built around them.
     const livePinned = new Set((allPins[current.id] ?? []).filter((id) => rosterIds.has(id)));
     const togglePin = (id: number) => {
