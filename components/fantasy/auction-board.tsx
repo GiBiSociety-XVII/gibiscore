@@ -20,13 +20,13 @@ import {TargetsPanel} from "./targets-panel";
 import {useAccountTeams} from "./account-teams";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {keeperBlocks} from "@/lib/fantasy/block";
-import {DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig} from "@/lib/fantasy/config";
+import {customStrategyKey, DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
-import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, STRATEGIES, type StrategyKey} from "@/lib/fantasy/strategies";
+import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
@@ -128,7 +128,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const ts = useTranslations('Fantasy.setup');
     const tst = useTranslations('Fantasy.strategies');
     const tt = useTranslations('Fantasy.tiers');
-    const healthReason = useHealthReason();
     const router = useRouter();
     const hydrated = useHydrated();
     // The planning team follows the signed-in user's account, for the lineup page on every device.
@@ -184,8 +183,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!board) return new Map<number, number>();
         return suggestPrices(board.players, {credits: board.config.credits, participants: board.config.participants, slots: board.config.slots, roleShare: ROLE_SHARE, level: board.config.priceLevel / 100});
     }, [board]);
-    // Cheap enough to redo on every render: a few hundred players, a handful of purchases.
-    const prices = board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices;
+    // Live prices follow the purchases: the plans below hang on them, so they are drawn once per purchase.
+    const prices = useMemo(() => (board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices), [board, listPrices]);
     const market = board ? marketState(board.players, listPrices, board.config, board.purchases) : null;
     const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
     const tierInfos = useMemo(() => (pool && config ? explainTiers(pool.players, config) : new Map<number, TierInfo>()), [pool, config]);
@@ -196,10 +195,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const byId = new Map(board.players.map((p) => [p.id, p]));
         const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
         const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-        return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)});
+        return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
     }, [board, prices]);
+    // A warning in words; a custom strategy has no translation, so it is named from the plans.
+    const healthReason = useHealthReason((key) => plans.find((p) => p.key === key)?.name ?? tst(`${key}.name`));
     // The same strategies on the full list at list prices: what each was worth when the auction started.
-    const baseline = useMemo(() => (board ? rankStrategies(board.players, listPrices, board.config, new Set(), [], {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}) : []), [board, listPrices]);
+    const baseline = useMemo(() => (board ? rankStrategies(board.players, listPrices, board.config, new Set(), [], {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies) : []), [board, listPrices]);
     const players = useMemo(() => {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
@@ -367,6 +368,11 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     };
     const strategy = plans.find((p) => p.key === config.strategy) ?? null;
     const selectStrategy = (key: StrategyKey | null) => configStore.write({...config, strategy: key});
+    /** A strategy's name: the user's own for his, the translation for the built-in ones. */
+    const strategyName = (plan: {key: string; name?: string}) => plan.name ?? tst(`${plan.key}.name`);
+    // The user's own strategies: saved into the auction (so they travel with it), the saved one is put in use.
+    const saveCustom = (custom: CustomStrategy) => configStore.write({...config, strategies: [...config.strategies.filter((c) => c.id !== custom.id), custom], strategy: customStrategyKey(custom.id)});
+    const deleteCustom = (id: string) => configStore.write({...config, strategies: config.strategies.filter((c) => c.id !== id), strategy: config.strategy === customStrategyKey(id) ? null : config.strategy});
     // The user's say on the targets: a wanted player is planned in, an ignored one never suggested. One or the other.
     const wanted = new Set(config.want);
     const avoided = new Set(config.avoid);
@@ -403,12 +409,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (manager !== me) return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup: null, plan: null, over: 0, already};
         const rosterAfter = [...others.map((p) => byId.get(p.playerId)!), player];
         const lineup = rosterAfter.length >= 11 ? bestLineup(rosterAfter, {defenceModifier: defenceOption(config)}) : null;
-        const def = strategy ? STRATEGIES.find((s) => s.key === strategy.key) : null;
+        const def = strategy?.strategy ?? null;
         const plan = def && strategy
             ? planStrategy(def, marketPlayers, prices, marketConfig, takenByOthers, [...others.filter((p) => !blocks?.backups.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price})), {playerId: player.id, role: player.role, price}], {want: wanted, avoid: avoided})
             : null;
         const max = maxBidOf(player.id);
-        return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup, plan: plan && strategy ? {value: plan.lineupValue, delta: plan.lineupValue - strategy.lineupValue, name: tst(`${strategy.key}.name`)} : null, over: max !== null ? Math.max(0, price - max) : 0, already, missing: Math.max(0, 11 - rosterAfter.length)};
+        return {leftAfter, slotsAfter, roleSpent, roleBudget, lineup, plan: plan && strategy ? {value: plan.lineupValue, delta: plan.lineupValue - strategy.lineupValue, name: strategyName(strategy)} : null, over: max !== null ? Math.max(0, price - max) : 0, already, missing: Math.max(0, 11 - rosterAfter.length)};
     };
     const priceCell = (id: number) => {
         if (blocks?.backups.has(id)) {
@@ -515,13 +521,13 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         )}
                         <button type="button" onClick={() => setShowStrategies(true)} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", strategy ? "bg-accent" : "bg-card")}>
                             <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
-                            {strategy ? tst(`${strategy.key}.name`) : ta('strategies')}
+                            {strategy ? strategyName(strategy) : ta('strategies')}
                         </button>
                         {health && (
                             <button type="button" onClick={() => setShowStrategies(true)} title={health.reasons.length > 0 ? health.reasons.map(healthReason).join('\n') : tst('health.fine')} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", HEALTH_CLASS[health.status])}>
                                 <Activity className="w-3.5 h-3.5" aria-hidden="true" />
                                 {tst(`health.${health.status}`)}
-                                {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: tst(`${health.best.key}.name`)})}</span>}
+                                {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: strategyName(health.best)})}</span>}
                             </button>
                         )}
                     </span>
@@ -834,7 +840,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button type="button" onClick={() => setShowStrategies(false)} aria-label={ts('cancel')} className="inline-flex items-center justify-center w-9 h-9 rounded-md border-2 border-foreground bg-background"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="bg-background rounded-xl">
-                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} wanted={config.want.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} avoided={config.avoid.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} onWant={toggleWant} onAvoid={toggleAvoid} />
+                            <StrategyPanel plans={plans} selected={strategy?.key ?? null} onSelect={(key) => { selectStrategy(key); if (key) setShowStrategies(false); }} credits={config.credits} customs={config.strategies} onSaveCustom={saveCustom} onDeleteCustom={deleteCustom} health={health} formation={config.formation} onFormation={(key) => configStore.write({...config, formation: key})} wanted={config.want.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} avoided={config.avoid.map((id) => byId.get(id)).filter((p): p is AuctionPlayer => !!p).map((p) => ({id: p.id, name: p.name}))} onWant={toggleWant} onAvoid={toggleAvoid} />
                         </div>
                     </div>
                 </div>

@@ -459,7 +459,68 @@
     "formationPick": "Modulo",
     "formationAuto": "Auto",
     "formationAutoHint": "Auto: ogni strategia sceglie il modulo che rende di più con la rosa che compra. Scegli un modulo e i piani comprano i titolari di quel modulo, spostando i crediti verso i reparti con più titolari.",
-    "formationFixed": "Modulo {formation}: i piani pagano i titolari di questo modulo più una riserva per reparto, gli altri posti a un credito. Il valore XI è calcolato in questo modulo."
+    "formationFixed": "Modulo {formation}: i piani pagano i titolari di questo modulo più una riserva per reparto, gli altri posti a un credito. Il valore XI è calcolato in questo modulo.",
+    "optimized": {
+      "name": "Ottimizzata sul listone",
+      "tagline": "La divisione dei crediti che compra l'undici migliore su questo listone",
+      "description": "Le altre strategie hanno la divisione dei crediti decisa a priori; questa la cerca sul listone reale ai prezzi di adesso: prova decine di divisioni tra i ruoli e tiene quella che compra la formazione che vale di più, ripartendo da quello che hai già in rosa. Cambia durante l'asta insieme ai prezzi. Nessuna preferenza sui profili: contano solo i numeri."
+    },
+    "custom": {
+      "name": "Strategia personalizzata",
+      "badge": "Mia",
+      "tagline": "Costruita da te",
+      "taglineFrom": "Da «{name}», modificata da te",
+      "copyName": "{name} (mia)",
+      "create": "Crea la tua strategia",
+      "createHint": "Divisione dei crediti, concentrazione della spesa, moduli e profili a modo tuo. Viene simulata e classificata come le altre.",
+      "customize": "Personalizza",
+      "customizeHint": "Crea una copia di questa strategia da modificare: budget per ruolo, concentrazione, moduli, preferenze",
+      "edit": "Modifica",
+      "description": "Divisione {split}. Preferenza: {prefer}. Moduli: {formations}.",
+      "anyFormation": "quello che rende di più"
+    },
+    "editor": {
+      "titleNew": "Nuova strategia",
+      "titleEdit": "Modifica strategia",
+      "intro": "Simulata sul listone appena la salvi",
+      "name": "Nome",
+      "namePlaceholder": "Es. Difesa forte e due top",
+      "split": "Budget per ruolo",
+      "splitHint": "Muovi un ruolo e gli altri si adattano in proporzione: il totale è sempre il 100% dei crediti.",
+      "focus": "Come spendere dentro al ruolo",
+      "focusStep": {
+        "flat": "Piatta",
+        "mid": "Media",
+        "star": "Un top",
+        "superstar": "Una stella"
+      },
+      "focusHint": {
+        "flat": "Tutti i posti del ruolo costano più o meno uguale: titolari affidabili, nessun top",
+        "mid": "Un giocatore caro, gli altri di fascia media",
+        "star": "Metà del budget del ruolo su un solo giocatore, il resto riempitivi titolari",
+        "superstar": "Quasi tutto su una stella, gli altri a un credito"
+      },
+      "focusHintAll": "Piatta = tanti titolari uguali; Una stella = quasi tutto il budget del ruolo su un nome.",
+      "formations": "Moduli preferiti",
+      "formationsHint": "Nessuno = il modulo che rende di più. Con uno o più moduli scelti, a parità di valore (entro il 2%) vince uno di questi.",
+      "prefer": "Cosa cercare oltre ai voti",
+      "preferKey": {
+        "none": "Solo i numeri",
+        "penalty": "Rigoristi e bonus",
+        "starters": "Titolari sicuri",
+        "young": "Giovani in crescita",
+        "defence": "Difesa e portiere da voto"
+      },
+      "preferHint": {
+        "none": "I candidati sono ordinati solo per voto totale.",
+        "penalty": "Un rigorista e chi fa bonus stabili passano avanti a un pari voto.",
+        "starters": "Titolari fissi con buona affidabilità fisica passano avanti; chi gioca poco scende.",
+        "young": "Under 25 titolari passano avanti, gli over 32 scendono.",
+        "defence": "Portiere e difensori delle squadre che subiscono poco, meglio se dello stesso club del portiere."
+      },
+      "delete": "Elimina",
+      "save": "Salva e usa"
+    }
   },
   "tiers": {
     "title": "Fasce",
