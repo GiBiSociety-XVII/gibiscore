@@ -2,6 +2,7 @@ import 'server-only';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionFixtures, type FixtureSummary} from '../types';
 import {fetchAll} from '@/lib/db/paginate';
+import {withRetry} from '@/lib/db/retry';
 import {FIXTURE_LIST_SELECT, footballDb, logReadError, toFixtures} from './shared';
 
 const ROME = 'Europe/Rome';
@@ -103,9 +104,11 @@ export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: st
         const db = footballDb();
         let rows: unknown;
         if (mode === 'live') {
-            const {data, error} = await db.from('fixtures').select(FIXTURE_LIST_SELECT).in('state', [...LIVE_STATES]).order('starting_at').limit(500);
-            if (error) throw error;
-            rows = data;
+            rows = await withRetry(async () => {
+                const {data, error} = await db.from('fixtures').select(FIXTURE_LIST_SELECT).in('state', [...LIVE_STATES]).order('starting_at').limit(500);
+                if (error) throw error;
+                return data;
+            });
         } else {
             const {from, to} = romeDayBounds(day);
             // A busy Saturday has well over 1000 matches worldwide: page through them.

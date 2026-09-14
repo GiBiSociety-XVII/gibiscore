@@ -1,3 +1,4 @@
+import {withRetry} from './retry';
 /**
  * PostgREST (Supabase Data API) returns at most 1000 rows per request,
  * whatever `.limit()` asks for. Walk the result in ranges until a short
@@ -11,8 +12,12 @@ export async function fetchAll<T>(
     const max = options.max ?? 20000;
     const out: T[] = [];
     for (let from = 0; from < max; from += size) {
-        const {data, error} = await page(from, Math.min(from + size, max) - 1);
-        if (error) throw error;
+        const to = Math.min(from + size, max) - 1;
+        const data = await withRetry(async () => {
+            const {data, error} = await page(from, to);
+            if (error) throw error;
+            return data;
+        });
         const rows = data ?? [];
         out.push(...rows);
         if (rows.length < size) break;

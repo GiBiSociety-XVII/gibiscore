@@ -168,11 +168,18 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
 
 const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 120, tags: ['fantasy-matchday']});
 
+/** The last matchday each league produced in this process: what a failed rebuild falls back to. */
+const lastGoodMatchday = new Map<AuctionLeague, MatchdayContext>();
+
 export async function getMatchday(league: AuctionLeague): Promise<MatchdayContext | null> {
-    try {
-        return await cachedMatchday(league);
-    } catch (error) {
-        logReadError(`getMatchday(${league})`, error);
-        return null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+            const context = await cachedMatchday(league);
+            if (context) lastGoodMatchday.set(league, context);
+            return context;
+        } catch (error) {
+            logReadError(`getMatchday(${league}) attempt ${attempt + 1}`, error);
+        }
     }
+    return lastGoodMatchday.get(league) ?? null;
 }

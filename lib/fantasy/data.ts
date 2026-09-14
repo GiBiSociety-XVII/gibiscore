@@ -592,20 +592,25 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
 // own pool instead of serving, for up to an hour, the one the previous deploy cached.
 const cachedPool = unstable_cache(buildPool, ['fantasy-auction-pool', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 3600, tags: ['fantasy-pool']});
 
+/** The last pool each league produced in this process: what a failed rebuild falls back to. */
+const lastGoodPool = new Map<AuctionLeague, AuctionPool>();
+
 /**
  * The auction pool for a league, cached for an hour once built. A build
- * that fails (a statement timeout while the database is busy, a sync in
- * progress) is retried once and then reported as null without being
- * cached, so the next request builds it again instead of serving an
- * empty list for an hour.
+ * that fails (a statement cut short while the database is busy, a sync
+ * in progress) is retried, then the last pool this process built is
+ * served, and only with nothing at all the page says so; nothing empty
+ * is ever cached, so the next request builds it again.
  */
 export async function getAuctionPool(league: AuctionLeague): Promise<AuctionPool | null> {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-            return await cachedPool(league);
+            const pool = await cachedPool(league);
+            if (pool) lastGoodPool.set(league, pool);
+            return pool;
         } catch (error) {
             logReadError(`getAuctionPool(${league}) attempt ${attempt + 1}`, error);
         }
     }
-    return null;
+    return lastGoodPool.get(league) ?? null;
 }
