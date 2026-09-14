@@ -662,12 +662,13 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             </tr>
                         </thead>
                         <tbody>
-                            {shown.map((p) => {
+                            {shown.map((p, i) => {
                                 const purchase = bought.get(p.id);
                                 const expanded = open === p.id;
+                                const plain = !purchase && !compare.includes(p.id);
                                 return (
                                     <FragmentRow key={p.id}>
-                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", purchase && (purchase.manager === me ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
+                                        <tr id={`auction-row-${p.id}`} onClick={() => setCursor(p.id)} className={cn("border-t border-muted", plain && (i % 2 === 1 ? "bg-muted/60 hover:bg-accent/15" : "hover:bg-accent/15"), purchase && (purchase.manager === me ? "bg-accent/15" : "opacity-60"), cursor === p.id && "outline outline-2 -outline-offset-2 outline-accent", compare.includes(p.id) && "bg-sky-100/60")}>
                                             <td className="px-2 py-1 min-w-0">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/40 bg-card shrink-0">

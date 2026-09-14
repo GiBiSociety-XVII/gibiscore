@@ -722,7 +722,7 @@
     "cleanSheetShort": "PI {pct}%",
     "legendGood": "a favore",
     "legendBad": "contro",
-    "legendHint": "Passa sopra a un numero per la spiegazione; \"Perché\" apre tutte le ragioni.",
+    "legendHint": "Passa sopra a un numero per la spiegazione; il bottone \"?\" accanto al nome apre tutte le ragioni.",
     "status": {
       "manual": "KO",
       "official": {
@@ -762,7 +762,7 @@
     "copyBench": "Panchina",
     "roundLabel": "Giornata {round}",
     "why": "Perché",
-    "whyHint": "Tutte le ragioni dietro ai numeri di questo giocatore",
+    "whyHint": "Perché: tutte le ragioni dietro ai numeri di questo giocatore",
     "whyClose": "Chiudi"
   }
 }

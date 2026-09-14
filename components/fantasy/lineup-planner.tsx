@@ -141,7 +141,7 @@ function facts(f: PlayerForecast) {
     return {usage: by('usage'), form: by('form'), playerForm: by('playerForm'), match: by('match'), attack: by('attack'), cleanSheet: by('cleanSheet'), official: by('official'), sidelined: by('sidelined'), doubtful: by('doubtful'), manual: by('manual'), noMatch: by('noMatch'), noUsage: by('noUsage')};
 }
 
-function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
+function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; /** Every other row, so the eye follows one across the columns. */ stripe?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const [why, setWhy] = useState(false);
@@ -160,34 +160,35 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
     if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad', reason: x.doubtful});
     if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst', reason: x.noMatch});
     const usageRate = x.usage ? (x.usage.started + 0.5 * x.usage.came) / Math.max(1, x.usage.total) : null;
-    const td = "px-1 py-1.5 text-right";
+    const td = "px-1 py-1.5 text-center";
+    const bg = pinned ? "bg-accent/20" : out ? "bg-red-100/60" : stripe ? "bg-muted/60" : "";
     return (
         <>
-        <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+        <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", bg)}>
             <td className="px-1 py-1.5">
                 <span className="flex items-center gap-0.5">
-                    <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={locked ? t('lockedNoChange') : pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>
+                    <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={locked ? t('lockedNoChange') : pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>
                         {pinned ? <PinOff className="w-3 h-3" aria-hidden="true" /> : <Pin className="w-3 h-3" aria-hidden="true" />}
                     </button>
-                    <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={locked ? t('lockedNoChange') : out ? t('unout') : t('out')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}>
+                    <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={locked ? t('lockedNoChange') : out ? t('unout') : t('out')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}>
                         <Ban className="w-3 h-3" aria-hidden="true" />
+                    </button>
+                    <button type="button" onClick={() => setWhy((v) => !v)} aria-expanded={why} aria-label={t('why')} title={t('whyHint')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center", why ? "bg-foreground text-background" : "bg-card")}>
+                        <HelpCircle className="w-3 h-3" aria-hidden="true" />
                     </button>
                 </span>
             </td>
             <td className="px-1 py-1.5">
-                <span className="inline-flex items-center gap-1">
-                    {index !== null && <span className="font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground w-4 text-right">{index}</span>}
+                <span className="inline-flex items-center gap-0.5">
+                    {index !== null && <span className="font-mono text-[10px] font-extrabold tabular-nums text-muted-foreground w-3.5 text-right">{index}</span>}
                     <RoleBadge role={f.player.role} />
                 </span>
             </td>
-            <td className="px-2 py-1.5 w-full max-w-0">
+            <td className="px-2 py-1.5 w-full max-w-0 lg:min-w-[8rem]">
                 <span className="flex items-center gap-1.5 min-w-0">
                     {p && <TeamCrest team={p.team} size={18} />}
                     <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
                     {f.player.penaltyTaker && f.player.role !== 'P' && <span className="bb-badge bg-accent text-[9px] h-4 px-1" title={t('reasons.penalty')}>R</span>}
-                    <button type="button" onClick={() => setWhy((v) => !v)} aria-expanded={why} title={t('whyHint')} className={cn("inline-flex items-center gap-0.5 h-5 px-1 rounded border border-foreground/40 text-[10px] font-extrabold shrink-0", why ? "bg-foreground text-background" : "bg-card hover:bg-accent")}>
-                        <HelpCircle className="w-3 h-3" aria-hidden="true" />{t('why')}
-                    </button>
                 </span>
                 {status.length > 0 && (
                     <span className="flex flex-wrap gap-1 mt-0.5">
@@ -195,11 +196,11 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                     </span>
                 )}
             </td>
-            <td className="px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap">
+            <td className="px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap max-w-[8.75rem]">
                 {fixture && opponent ? (
-                    <span className="flex flex-col">
-                        <span className="font-extrabold">{f.home ? t('vsHome', {team: opponent.name}) : t('vsAway', {team: opponent.name})}</span>
-                        <span className="text-muted-foreground">{kickoff}{state && <span className="ml-1 uppercase">· {state}</span>}</span>
+                    <span className="flex flex-col min-w-0">
+                        <span className="font-extrabold truncate" title={opponent.name}>{f.home ? t('vsHome', {team: opponent.name}) : t('vsAway', {team: opponent.name})}</span>
+                        <span className="text-muted-foreground truncate">{kickoff}{state && <span className="ml-1 uppercase">· {state}</span>}</span>
                     </span>
                 ) : (
                     <span className="text-muted-foreground">{t('noFixture')}</span>
@@ -212,7 +213,7 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                     <Cell tone="bad" title={reasonText(x.noUsage)}>–</Cell>
                 ) : null}
             </td>
-            <td className={td}>
+            <td className={cn(td, "hidden lg:table-cell")}>
                 {x.playerForm && <Cell tone={toneOf(x.playerForm.avg - x.playerForm.base, [-0.5, -0.25, 0.25, 0.5])} title={reasonText(x.playerForm)}>{x.playerForm.avg.toFixed(1)}<span className="opacity-60 text-[9px]">×{x.playerForm.matches}</span></Cell>}
             </td>
             <td className={td}>
@@ -238,12 +239,12 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                 ) : null}
             </td>
             <td className={td}><Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</Cell></td>
-            <td className={cn(td, "hidden lg:table-cell")}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
-            <td className={cn(td, "hidden lg:table-cell")}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
+            <td className={cn(td, "hidden lg:max-xl:table-cell min-[1360px]:table-cell")}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
+            <td className={cn(td, "hidden lg:max-xl:table-cell min-[1360px]:table-cell")}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
             <td className={td}><Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])} title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</Cell></td>
         </tr>
         {why && (
-            <tr className={cn("align-top", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+            <tr className={cn("align-top", bg)}>
                 <td colSpan={14} className="px-3 pb-2 pt-0">
                     <div className="rounded-lg border-2 border-foreground bg-card px-3 py-2 flex flex-col gap-1">
                         <span className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wide">
@@ -337,7 +338,7 @@ function CopyLineup({text}: {text: string}) {
 
 function Head() {
     const t = useTranslations('Fantasy.lineup');
-    const th = "px-1 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-right whitespace-nowrap";
+    const th = "px-1 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-center whitespace-nowrap";
     return (
         <thead className="bg-card">
             <tr>
@@ -345,16 +346,16 @@ function Head() {
                 <th className={cn(th, "px-1")} aria-label={t('colRole')} />
                 <th className={cn(th, "text-left px-2")}>{t('colPlayer')}</th>
                 <th className={cn(th, "text-left px-2")}>{t('colMatch')}</th>
-                <th className={th} title={t('colUsageHint')}>{t('colUsage')}</th>
-                <th className={th} title={t('colRecentHint')}>{t('colRecent')}</th>
-                <th className={th} title={t('colFormHint')}>{t('colForm')}</th>
-                <th className={th} title={t('colWinHint')}>{t('colWin')}</th>
-                <th className={th} title={t('colGoalsHint')}>{t('colGoals')}</th>
-                <th className={th} title={t('colFactorHint')}>{t('colFactor')}</th>
-                <th className={th} title={t('colPlaysHint')}>{t('colPlays')}</th>
-                <th className={cn(th, "hidden lg:table-cell")} title={t('colRatingHint')}>{t('colRating')}</th>
-                <th className={cn(th, "hidden lg:table-cell")} title={t('colPointsHint')}>{t('colPoints')}</th>
-                <th className={th} title={t('colValueHint')}>{t('colValue')}</th>
+                <th className={cn(th, "min-w-[3.75rem]")} title={t('colUsageHint')}>{t('colUsage')}</th>
+                <th className={cn(th, "min-w-[3.75rem] hidden lg:table-cell")} title={t('colRecentHint')}>{t('colRecent')}</th>
+                <th className={cn(th, "min-w-[3rem]")} title={t('colFormHint')}>{t('colForm')}</th>
+                <th className={cn(th, "min-w-[3rem]")} title={t('colWinHint')}>{t('colWin')}</th>
+                <th className={cn(th, "min-w-[3.75rem]")} title={t('colGoalsHint')}>{t('colGoals')}</th>
+                <th className={cn(th, "min-w-[3.5rem]")} title={t('colFactorHint')}>{t('colFactor')}</th>
+                <th className={cn(th, "min-w-[3rem]")} title={t('colPlaysHint')}>{t('colPlays')}</th>
+                <th className={cn(th, "min-w-[3.25rem] hidden lg:max-xl:table-cell min-[1360px]:table-cell")} title={t('colRatingHint')}>{t('colRating')}</th>
+                <th className={cn(th, "min-w-[3.25rem] hidden lg:max-xl:table-cell min-[1360px]:table-cell")} title={t('colPointsHint')}>{t('colPoints')}</th>
+                <th className={cn(th, "min-w-[3.25rem]")} title={t('colValueHint')}>{t('colValue')}</th>
             </tr>
         </thead>
     );
@@ -568,7 +569,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             <table className="w-full text-[12px]">
                                 <Head />
                                 <tbody>
-                                    {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                                    {advice.starters.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>
@@ -582,7 +583,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             <table className="w-full text-[12px]">
                                 <Head />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>
