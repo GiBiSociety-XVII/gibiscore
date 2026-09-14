@@ -9,7 +9,7 @@ import {RoleBadge} from "./role-badge";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import type {AuctionPlayer} from "@/lib/fantasy/data";
 import {recommendLineup, type PlayerForecast} from "@/lib/fantasy/matchday";
-import {bestHindsight, EMPTY_STAT, playLineup, roundPoints, surprises, toVotoEstimate, votoOf, withManualVotes, MAX_SUBS, type ManualVote, type PlayedSlot, type RoundResults, type RoundStat} from "@/lib/fantasy/recap";
+import {bestHindsight, EMPTY_STAT, matchLabel, playLineup, roundPoints, surprises, toVotoEstimate, votoOf, withManualVotes, MAX_SUBS, type ManualVote, type PlayedSlot, type RoundResults, type RoundStat} from "@/lib/fantasy/recap";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import {votesKey, votesStore, type LineupLock} from "@/lib/fantasy/store";
 import {defenceOption, type FormationKey} from "@/lib/fantasy/strategies";
@@ -27,7 +27,7 @@ const KEEPER_ONLY = new Set<EventKey>(['penaltiesSaved', 'conceded']);
 /** The events the game paid, in words. */
 function Events({stat, role}: {stat: RoundStat | undefined; role: FantaRole}) {
     const t = useTranslations('Fantasy.lineup.recap.events');
-    if (!stat) return null;
+    if (!stat || (stat.minutes === 0 && stat.voto === undefined)) return null;
     const parts: string[] = [];
     if (stat.goals > 0) parts.push(t('goals', {count: stat.goals}));
     if (stat.assists > 0) parts.push(t('assists', {count: stat.assists}));
@@ -283,7 +283,7 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
                                     <th className="px-2 py-1.5 text-left w-8">R</th>
                                     <th className="px-2 py-1.5 text-left">{t('colPlayer')}</th>
                                     <th className="px-2 py-1.5 text-right">{t('colVoto')}</th>
-                                    <th className="px-2 py-1.5 text-left">{t('colEvents')}</th>
+                                    <th className="px-2 py-1.5 text-left" title={t('colEventsHint')}>{t('colEvents')}</th>
                                     <th className="px-2 py-1.5 text-right">{t('colPoints')}</th>
                                     {played && <th className="px-2 py-1.5 text-right">{t('colExpected')}</th>}
                                     {played && <th className="px-2 py-1.5 text-right">{t('colDelta')}</th>}
@@ -304,8 +304,8 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
                                                     {r.inBest && <span className="bb-badge bg-accent text-[9px] h-4 px-1" title={t('bestHint')}>{t('inBest')}</span>}
                                                     {stat?.source && <span className={cn("bb-badge text-[9px] h-4 px-1", stat.source === 'official' ? "bg-emerald-200" : "bg-card")}>{t(`source.${stat.source}`)}</span>}
                                                     {r.note && <span className="text-[10px] font-semibold text-muted-foreground">{r.note}</span>}
-                                                    {!canVote && <span className="text-[10px] font-semibold text-muted-foreground">{t('notFinished')}</span>}
                                                 </span>
+                                                <span className="block text-[10px] font-semibold text-muted-foreground truncate">{matchLabel(shown, r.teamId) ?? t('notFinished')}</span>
                                             </td>
                                             <td className="px-2 py-1 text-right">
                                                 {canVote && stat?.source !== 'official' ? (

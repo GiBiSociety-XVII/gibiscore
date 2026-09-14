@@ -46,7 +46,22 @@ export interface RoundResults {
     official: boolean;
     /** Clubs whose match of the round is over: their players can be voted. */
     finishedTeams: number[];
+    /** The matches of the round already over, with their score: what every line of the recap is about. */
+    matches: RoundMatch[];
     stats: Record<number, RoundStat>;
+}
+
+export interface RoundMatch {
+    home: {id: number; name: string};
+    away: {id: number; name: string};
+    score: [number, number] | null;
+}
+
+/** The match a club played in the round, as "Inter 2-1 Roma"; null when it is not over. */
+export function matchLabel(results: RoundResults, teamId: number): string | null {
+    const m = results.matches.find((x) => x.home.id === teamId || x.away.id === teamId);
+    if (!m) return null;
+    return `${m.home.name} ${m.score ? `${m.score[0]}-${m.score[1]}` : '–'} ${m.away.name}`;
 }
 
 /** A vote typed in by hand for a player of a round, with the events; kept on the device and in the account. */

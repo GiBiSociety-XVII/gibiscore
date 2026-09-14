@@ -269,8 +269,10 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         const officialRound = votesByRound.has(roundNumber(info.round) ?? -1);
         const statsOf: Record<number, RoundStat> = {};
         const finishedTeams: number[] = [];
+        const matches: RoundResults['matches'] = [];
         for (const f of (byRound.get(info.round) ?? []).filter((x) => FINISHED.has(x.state))) {
             finishedTeams.push(f.home_team_id, f.away_team_id);
+            matches.push({home: {id: f.home!.id, name: f.home!.name}, away: {id: f.away!.id, name: f.away!.name}, score: f.home_score !== null && f.away_score !== null ? [f.home_score, f.away_score] : null});
             const inSquad = lineupRows.filter((l) => l.fixture_id === f.id);
             const typedHere = [...typed.keys()].filter((k) => k.startsWith(`${f.id}:`)).map((k) => Number(k.split(':')[1]));
             const ids = [...new Set([...inSquad.map((l) => l.player_id), ...typedHere])];
@@ -297,7 +299,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
                 };
             }
         }
-        results.push({round: info.round, state, official: officialRound, finishedTeams, stats: statsOf});
+        results.push({round: info.round, state, official: officialRound, finishedTeams, matches, stats: statsOf});
     }
     return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], calibration, votes, results, generatedAt: new Date().toISOString()};
 }

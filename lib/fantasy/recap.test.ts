@@ -5,7 +5,7 @@ import {DEFAULT_CALIBRATION} from './voto';
 import {DEFAULT_DEFENCE_BONUS} from './config';
 
 const stat = (over: Partial<RoundStat> = {}): RoundStat => ({minutes: 90, rating: null, goals: 0, assists: 0, yellow: 0, red: 0, conceded: 0, penaltiesSaved: 0, penaltiesMissed: 0, ownGoals: 0, ...over});
-const official = (stats: Record<number, RoundStat>): RoundResults => ({round: 'Regular Season - 3', state: 'played', official: true, finishedTeams: [], stats});
+const official = (stats: Record<number, RoundStat>): RoundResults => ({round: 'Regular Season - 3', state: 'played', official: true, finishedTeams: [], matches: [], stats});
 
 describe('votoOf', () => {
     it('takes the known vote when there is one, the rating on the vote scale otherwise', () => {
