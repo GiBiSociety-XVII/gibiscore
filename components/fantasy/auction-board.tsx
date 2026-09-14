@@ -11,7 +11,7 @@ import {TeamCrest} from "@/components/football/team-crest";
 import {AuctionSetup} from "./auction-setup";
 import {CloudMenu, CloudPanel} from "./cloud-panel";
 import {CompareDialog} from "./compare-dialog";
-import {RoleBadge} from "./role-badge";
+import {RoleBadge, ROLE_CLASS} from "./role-badge";
 import {TeamRecap} from "./team-report";
 import {TeamsDialog, type TeamsTab} from "./teams-dialog";
 import {HEALTH_CLASS, StrategyPanel, useHealthReason} from "./strategy-panel";
@@ -145,6 +145,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const [view, setView] = useState<'list' | 'tiers'>('list');
     const [teamId, setTeamId] = useState<number | 'all'>('all');
     const [hideBought, setHideBought] = useState(false);
+    /** The seven marks behind the total, hidden by default: the list reads faster with the total, the average and the price. */
+    const [showScores, setShowScores] = useState(false);
     const [sort, setSort] = useState<SortKey>('overall');
     const [limit, setLimit] = useState(PAGE);
     const [open, setOpen] = useState<number | null>(null);
@@ -436,6 +438,31 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         );
     };
 
+    /** The detail row of a player: his notes (absence, rivals, role fix, plan) and his last seasons. */
+    const details = (p: AuctionPlayer) => (
+        <>
+                    <Notes p={p} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} onRole={(r) => { const next = {...config.roleOverrides}; if (r === null) delete next[String(p.id)]; else next[String(p.id)] = r; configStore.write({...config, roleOverrides: next}); }} />
+                    {p.seasons.length === 0 ? (
+                        <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
+                    ) : (
+                        <table className="text-[12px]">
+                            <thead><tr className="text-[10px] font-bold uppercase text-muted-foreground">{(['season', 'team', 'league', 'apps', 'lineups', 'minutes', 'goals', 'assists', 'rating'] as const).map((c) => <th key={c} className={cn("px-2 py-0.5", c === 'season' || c === 'team' || c === 'league' ? "text-left" : "text-right font-mono")}>{t(`seasonCols.${c}`)}</th>)}</tr></thead>
+                            <tbody>
+                                {p.seasons.map((s, i) => (
+                                    <tr key={i} className="font-semibold">
+                                        <td className="px-2 py-0.5 font-mono">{s.year}/{String(s.year + 1).slice(2)}</td>
+                                        <td className="px-2 py-0.5">{s.team}</td>
+                                        <td className="px-2 py-0.5 text-muted-foreground">{s.league}</td>
+                                        {[s.apps, s.lineups, s.minutes, s.goals, s.assists].map((v, j) => <td key={j} className="px-2 py-0.5 text-right font-mono tabular-nums">{v}</td>)}
+                                        <td className="px-2 py-0.5 text-right font-mono tabular-nums">{s.rating?.toFixed(2) ?? '–'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+        </>
+    );
+
     const shown = players.slice(0, limit);
     const selectClass = "bb-input h-8 px-2 text-[12px] font-bold";
 
@@ -446,6 +473,38 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
                     <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)}</span>
                     <span className="text-[11px] font-semibold text-muted-foreground">· {ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr.</span>
+                    <span className="ml-auto flex flex-wrap items-center gap-1.5">
+                        <Link href="/fantacalcio/formazione" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" aria-hidden="true" />{t('lineup')}</Link>
+                        <CloudMenu config={config} purchases={purchases} />
+                        <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
+                        <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
+                    </span>
+                </div>
+
+                {/* Always on screen while the list scrolls: my credits, my slots, the formation, the strategy, the last purchase */}
+                <div className="sticky top-0 z-20 bb-surface bg-background px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <span className="flex items-baseline gap-1.5">
+                        <span className={cn("font-mono text-2xl font-extrabold tabular-nums leading-none", left < 0 && "text-red-700")}>{left}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground leading-none">{tr('credits')} {tr('left')}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                        {ROLES.map((r) => {
+                            const filled = mineByRole(r).length;
+                            const full = filled >= config.slots[r];
+                            return (
+                                <span key={r} title={`${ts(`roles.${r}`)} · ~${Math.round(config.credits * roleShare[r])} cr.`} className={cn("inline-flex items-center gap-1 h-7 pl-1 pr-1.5 rounded-md border-2 font-mono text-[12px] font-extrabold tabular-nums", full ? "border-foreground bg-foreground text-background" : "border-foreground/30 bg-card")}>
+                                    <span className={cn("inline-flex items-center justify-center w-4 h-4 rounded text-[9px] text-foreground", ROLE_CLASS[r])}>{r}</span>
+                                    {filled}/{config.slots[r]}
+                                </span>
+                            );
+                        })}
+                    </span>
+                    {freeSlots > 0 && <span className="text-[11px] font-semibold text-muted-foreground hidden sm:inline">{tr('perSlot', {credits: Math.max(0, Math.floor(left / freeSlots))})}</span>}
+                    {(rosterLineup || guide) && (
+                        <span className="text-[11px] font-bold hidden md:inline" title={tr('formationHint')}>
+                            {rosterLineup ? tr('formationNow', {formation: rosterLineup.formation}) : config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide!.formation})}
+                        </span>
+                    )}
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
                         {lastPurchase && byId.has(lastPurchase.playerId) && (
                             <button type="button" onClick={undoLast} title={t('undoLastHint', {name: byId.get(lastPurchase.playerId)!.name, manager: managers[lastPurchase.manager] ?? t('me'), price: lastPurchase.price})} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5">
@@ -465,10 +524,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 {health.status !== 'ok' && health.best.key !== health.current.key && health.gapPct >= 0.02 && <span className="hidden sm:inline text-[11px] font-bold">· {tst('health.switchTo', {name: tst(`${health.best.key}.name`)})}</span>}
                             </button>
                         )}
-                        <Link href="/fantacalcio/formazione" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" aria-hidden="true" />{t('lineup')}</Link>
-                        <CloudMenu config={config} purchases={purchases} />
-                        <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
-                        <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
                 </div>
 
@@ -516,6 +571,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         <input type="checkbox" checked={hideBought} onChange={(e) => setHideBought(e.target.checked)} className="w-4 h-4" />
                         {t('hideBought')}
                     </label>
+                    <button type="button" onClick={() => setShowScores((v) => !v)} aria-pressed={showScores} title={t('showScoresHint')} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold hidden md:inline-flex", showScores ? "bg-foreground text-background" : "bg-card")}>{t('showScores')}</button>
                     <div role="radiogroup" aria-label={t('view')} className="flex gap-1 ml-auto">
                         {(['list', 'tiers'] as const).map((v) => (
                             <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", view === v ? "bg-foreground text-background" : "bg-card")}>{v === 'list' ? t('viewList') : t('viewTiers')}</button>
@@ -546,14 +602,56 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
                 {/* List */}
                 <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="text-[11px] font-semibold text-muted-foreground">{ta('updated')}</span>}>
-                    <div className="overflow-x-auto">
+                    {/* Phones: one card per player, the numbers that decide and a Buy button; no sideways scrolling */}
+                    <ul className="md:hidden flex flex-col">
+                        {shown.map((p) => {
+                            const purchase = bought.get(p.id);
+                            const expanded = open === p.id;
+                            return (
+                                <li key={p.id} id={`auction-card-${p.id}`} className={cn("px-2.5 py-2 flex flex-col gap-1.5 border-t border-muted first:border-t-0", purchase && (purchase.manager === me ? "bg-accent/15" : "opacity-60"), compare.includes(p.id) && "bg-sky-100/60")}>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <RoleBadge role={p.role} />
+                                        <TeamCrest team={p.team} size={18} />
+                                        <span className="flex flex-col leading-tight min-w-0">
+                                            <span className="inline-flex items-center gap-1 min-w-0">
+                                                <Link href={`/players/${p.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[14px] truncate">{p.name}</Link>
+                                                {targets.has(p.id) && !purchase && <span className={cn("bb-badge text-[9px] h-4 px-1 shrink-0", wanted.has(p.id) ? "bg-foreground text-background" : "bg-accent")}>★</span>}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground truncate"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{p.team.name}{p.age !== null ? ` · ${p.age}` : ''}</span>
+                                        </span>
+                                        <span className="ml-auto inline-flex items-center justify-center w-10 h-7 rounded bg-foreground text-background font-mono text-[13px] font-extrabold tabular-nums shrink-0">{p.scores.overall}</span>
+                                    </div>
+                                    <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] font-semibold text-muted-foreground">
+                                        <span>{t('columns.fantaAvg')} <span className="font-mono font-extrabold text-foreground tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</span></span>
+                                        <span>{t('columns.price')} <span className="text-foreground">{priceCell(p.id)}</span></span>
+                                        {strategy && maxBidOf(p.id) !== null && <span>{t('columns.maxBid')} <span className="font-mono font-extrabold text-accent-text tabular-nums">{maxBidOf(p.id)}</span></span>}
+                                        <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                        <span className="ml-auto inline-flex items-center gap-1">
+                                            <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground/40 bg-card">{expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>
+                                            {purchase ? (
+                                                <>
+                                                    <span className="text-[11px] font-bold text-foreground">{t('boughtBy', {manager: managers[purchase.manager] ?? t('me'), price: purchase.price})}</span>
+                                                    <button type="button" onClick={() => openEdit(p)} aria-label={t('edit')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground bg-card"><Pencil className="w-3.5 h-3.5" /></button>
+                                                    <button type="button" onClick={() => release(p.id)} aria-label={t('release')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground bg-card"><X className="w-3.5 h-3.5" /></button>
+                                                </>
+                                            ) : (
+                                                <button type="button" onClick={() => openBuy(p)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold">{blocks?.backups.has(p.id) ? t('block.buy') : t('buy')}</button>
+                                            )}
+                                        </span>
+                                    </div>
+                                    {expanded && <div className="rounded-md bg-muted/30 px-2 py-2 overflow-x-auto">{details(p)}</div>}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className="overflow-x-auto hidden md:block">
                     <table className="w-full text-[12px] whitespace-nowrap">
                         <thead>
                             <tr className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground border-b-2 border-foreground">
                                 <th className="px-2 py-1.5 text-left w-full">{t('columns.player')}</th>
                                 <th className="px-1 py-1.5 text-center">{t('columns.role')}</th>
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.tier')}>{t('columns.tier')}</th>
-                                {SCORE_KEYS.map((k) => <th key={k} className="px-1 py-1.5 text-center" title={t(`columnHints.${k === 'team' ? 'team_' : k}`)}>{t(`columns.${k === 'team' ? 'team_' : k}`)}</th>)}
+                                {showScores && SCORE_KEYS.map((k) => <th key={k} className="px-1 py-1.5 text-center" title={t(`columnHints.${k === 'team' ? 'team_' : k}`)}>{t(`columns.${k === 'team' ? 'team_' : k}`)}</th>)}
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.overall')}>{t('columns.overall')}</th>
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.price')}>{t('columns.price')}</th>
@@ -586,7 +684,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             </td>
                                             <td className="px-1 py-1 text-center"><RoleBadge role={p.role} /></td>
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center gap-1"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{tierInfos.get(p.id) && <TierWhy player={p} info={tierInfos.get(p.id)!} />}</span></td>
-                                            {SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
+                                            {showScores && SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
                                             <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>
                                             <td className="px-1 py-1 text-right">{priceCell(p.id)}</td>
@@ -609,26 +707,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={14} className="px-3 py-2">
-                                                    <Notes p={p} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} onRole={(r) => { const next = {...config.roleOverrides}; if (r === null) delete next[String(p.id)]; else next[String(p.id)] = r; configStore.write({...config, roleOverrides: next}); }} />
-                                                    {p.seasons.length === 0 ? (
-                                                        <span className="text-[12px] font-semibold text-muted-foreground">{t('noSeasons')}</span>
-                                                    ) : (
-                                                        <table className="text-[12px]">
-                                                            <thead><tr className="text-[10px] font-bold uppercase text-muted-foreground">{(['season', 'team', 'league', 'apps', 'lineups', 'minutes', 'goals', 'assists', 'rating'] as const).map((c) => <th key={c} className={cn("px-2 py-0.5", c === 'season' || c === 'team' || c === 'league' ? "text-left" : "text-right font-mono")}>{t(`seasonCols.${c}`)}</th>)}</tr></thead>
-                                                            <tbody>
-                                                                {p.seasons.map((s, i) => (
-                                                                    <tr key={i} className="font-semibold">
-                                                                        <td className="px-2 py-0.5 font-mono">{s.year}/{String(s.year + 1).slice(2)}</td>
-                                                                        <td className="px-2 py-0.5">{s.team}</td>
-                                                                        <td className="px-2 py-0.5 text-muted-foreground">{s.league}</td>
-                                                                        {[s.apps, s.lineups, s.minutes, s.goals, s.assists].map((v, j) => <td key={j} className="px-2 py-0.5 text-right font-mono tabular-nums">{v}</td>)}
-                                                                        <td className="px-2 py-0.5 text-right font-mono tabular-nums">{s.rating?.toFixed(2) ?? '–'}</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    )}
+                                                <td colSpan={showScores ? 14 : 7} className="px-3 py-2">
+                                                    {details(p)}
                                                 </td>
                                             </tr>
                                         )}

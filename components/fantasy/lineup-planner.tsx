@@ -236,6 +236,58 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
     );
 }
 
+/** A player's forecast as a card, for phones: the numbers that decide, the status and the pin and out buttons, the reasons on request. */
+function ForecastCard({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; locked: boolean}) {
+    const t = useTranslations('Fantasy.lineup');
+    const format = useFormatter();
+    const [more, setMore] = useState(false);
+    const p = byId.get(f.player.id);
+    const x = facts(f);
+    const fixture = f.fixture;
+    const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
+    const status: Array<{key: string; label: string; tone: Tone}> = [];
+    if (x.manual) status.push({key: 'manual', label: t('status.manual'), tone: 'worst'});
+    if (x.official) status.push({key: 'official', label: t(`status.official.${x.official.status}`), tone: x.official.status === 'starter' ? 'good' : x.official.status === 'bench' ? 'bad' : 'worst'});
+    if (x.sidelined) status.push({key: 'sidelined', label: t(x.sidelined.category === 'injury' ? 'status.injury' : x.sidelined.category === 'suspension' ? 'status.suspension' : 'status.absent'), tone: 'worst'});
+    if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad'});
+    if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst'});
+    return (
+        <li className={cn("px-2.5 py-2 flex flex-col gap-1.5 border-t border-muted first:border-t-0", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+            <div className="flex items-center gap-2 min-w-0">
+                {index !== null && <span className="font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground w-4">{index}</span>}
+                <RoleBadge role={f.player.role} />
+                {p && <TeamCrest team={p.team} size={18} />}
+                <span className="flex flex-col leading-tight min-w-0">
+                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[14px] truncate">{f.player.name}</Link>
+                    <span className="text-[10px] font-semibold text-muted-foreground truncate">{fixture && f.opponent ? `${f.home ? t('vsHome', {team: f.opponent.name}) : t('vsAway', {team: f.opponent.name})} · ${kickoff}` : t('noFixture')}</span>
+                </span>
+                <span className="ml-auto flex items-center gap-1 shrink-0">
+                    <Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'}>{pct(f.plays)}</Cell>
+                    <Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])}>{(slot ?? f.value).toFixed(1)}</Cell>
+                </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+                {status.map((b) => <span key={b.key} className={cn("bb-badge text-[9px] h-4 px-1 uppercase", TONE_CLASS[b.tone])}>{b.label}</span>)}
+                {x.form && <Cell tone={toneOf(x.form.own - x.form.opp, [-5, -3, 3, 5])}>{t('cardForm')} {x.form.own}·{x.form.opp}</Cell>}
+                {x.match && <Cell tone={toneOf(x.match.win, [25, 35, 50, 60])}>{t('cardWin')} {Math.round(x.match.win)}%</Cell>}
+                {x.attack && <Cell tone={toneOf(x.attack.factor, [0.7, 0.85, 1.15, 1.3])}>{t('cardGoals')} {x.attack.factor >= 1 ? '+' : '−'}{Math.round(Math.abs(x.attack.factor - 1) * 100)}%</Cell>}
+                {x.cleanSheet && <Cell tone={toneOf(x.cleanSheet.pct, [15, 22, 35, 45])}>{t('cleanSheetShort', {pct: x.cleanSheet.pct})}</Cell>}
+                <span className="ml-auto inline-flex items-center gap-1">
+                    <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} className="bb-btn h-7 px-2 text-[11px] font-extrabold bg-card">{more ? t('cardLess') : t('cardMore')}</button>
+                    <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>{pinned ? <PinOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Pin className="w-3.5 h-3.5" aria-hidden="true" />}</button>
+                    <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={out ? t('unout') : t('out')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}><Ban className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                </span>
+            </div>
+            {more && (
+                <div className="text-[11px] font-semibold text-muted-foreground flex flex-col gap-0.5">
+                    <span>{t('colRating')} {f.rating.toFixed(2)} · {t('colPoints')} {f.points.toFixed(2)} · {t('colValue')} {(slot ?? f.value).toFixed(2)}</span>
+                    <span>{f.reasons.map(reasonText).join(' · ')}</span>
+                </div>
+            )}
+        </li>
+    );
+}
+
 function Head({withIndex}: {withIndex: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const th = "px-1.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-right whitespace-nowrap";
@@ -418,17 +470,14 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     return (
         <div className="flex flex-col gap-3">
             {toolbar}
-            <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold">
-                {roundInfo && <span className="font-extrabold">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
+            <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] font-semibold">
+                <span className={cn("inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border-2 border-foreground font-extrabold", frozen ? "bg-amber-200" : "bg-emerald-200")}>
+                    <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                    {frozen ? t('status.locked') : roundInfo ? t('status.open', {when: when(roundInfo.from)}) : t('status.openNoDate')}
+                </span>
+                {roundInfo && <span className="text-muted-foreground">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
                 <span className={cn("bb-badge text-[10px] h-5 px-1.5", withOfficial > 0 ? "bg-emerald-200" : "bg-card")}>{t('officialCount', {have: withOfficial, total: rosterTeams.length})}</span>
-                {frozen ? (
-                    <span className="text-muted-foreground">{t('frozenAt', {when: when(frozen.savedAt)})}</span>
-                ) : (
-                    <>
-                        <span className="text-muted-foreground">{t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
-                        {roundInfo && <span className="inline-flex items-center gap-1 text-muted-foreground"><Lock className="w-3 h-3" aria-hidden="true" />{t('locksAt', {when: when(roundInfo.from)})}</span>}
-                    </>
-                )}
+                <span className="text-muted-foreground ml-auto">{frozen ? t('frozenAt', {when: when(frozen.savedAt)}) : t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
             </div>
             {frozen && (
                 <div className="bb-surface px-3 py-2 flex items-start gap-2 text-[12px] font-semibold bg-amber-100">
@@ -456,12 +505,15 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                         )}
                     </div>
                     <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
-                        <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted flex flex-wrap gap-x-3 gap-y-1">
+                        <ul className="md:hidden flex flex-col">
+                            {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                        </ul>
+                        <p className="hidden md:flex px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted flex-wrap gap-x-3 gap-y-1">
                             <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.good)}> </span>{t('legendGood')}</span>
                             <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.worst)}> </span>{t('legendBad')}</span>
                             <span>{t('legendHint')}</span>
                         </p>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
                                 <Head withIndex={false} />
                                 <tbody>
@@ -472,7 +524,10 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                     </Panel>
                     <Panel title={t('benchTitle', {count: advice.bench.length})}>
                         <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted">{t('benchHint')}</p>
-                        <div className="overflow-x-auto">
+                        <ul className="md:hidden flex flex-col">
+                            {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                        </ul>
+                        <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
                                 <Head withIndex />
                                 <tbody>
@@ -526,8 +581,12 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             })}
                         </ul>
                     </Panel>
-                    <Panel title={t('howTitle')}>
-                        <ul className="px-3 py-2 flex flex-col gap-1.5 text-[11px] font-semibold text-muted-foreground list-disc pl-7">
+                    <details className="bb-surface overflow-hidden group">
+                        <summary className="flex items-center justify-between gap-2 px-3 h-9 bg-card cursor-pointer list-none text-[13px] font-extrabold uppercase tracking-wide">
+                            {t('howTitle')}
+                            <span className="text-[11px] font-bold text-muted-foreground normal-case tracking-normal group-open:hidden">{t('howOpen')}</span>
+                        </summary>
+                        <ul className="px-3 py-2 flex flex-col gap-1.5 text-[11px] font-semibold text-muted-foreground list-disc pl-7 border-t-2 border-foreground">
                             <li>{t('how1')}</li>
                             <li>{t('how2')}</li>
                             <li>{t('how3')}</li>
@@ -537,7 +596,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             <li>{t('how7')}</li>
                             <li>{t('how8')}</li>
                         </ul>
-                    </Panel>
+                    </details>
                 </div>
             </div>
         </div>

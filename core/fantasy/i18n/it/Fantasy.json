@@ -4,13 +4,34 @@
     "title": "Fantacalcio",
     "metaTitle": "Fantacalcio",
     "metaDescription": "Strumenti per il fantacalcio: asta guidata con voti da 1 a 100 su titolarità, bonus, rendimento, malus, affidabilità fisica e squadra, calcolati su tre stagioni.",
-    "intro": "Gli strumenti GiBiScore per il fantacalcio. Si parte dall'asta: si configura la lega e ogni giocatore riceve i voti da 1 a 100 sui punti che contano.",
+    "intro": "Asta guidata e formazione consigliata ogni settimana. Configuri la lega, registri gli acquisti, e da lì il sito lavora per te.",
     "auctionTitle": "Asta",
     "auctionText": "Configura crediti, partecipanti, rosa Classic o Mantra, regole e modificatori. Poi il listone con voti, fantamedia stimata, crediti consigliati e il tabellone degli acquisti.",
     "auctionCta": "Apri l'asta",
     "lineupTitle": "Formazione",
     "lineupText": "Ogni settimana, la formazione consigliata per ognuna delle tue squadre: modulo, undici e panchina ordinata, calcolati su titolarità reale, infortuni, formazioni ufficiali e previsione della partita. Le rose arrivano da sole dalle aste.",
-    "lineupCta": "Apri la formazione"
+    "lineupCta": "Apri la formazione",
+    "dash": {
+      "defaultTeam": "Squadra 1",
+      "creditsLeft": "crediti rimasti",
+      "rosterFilled": "giocatori in rosa",
+      "continueAuction": "Continua l'asta",
+      "openAuction": "Apri l'asta",
+      "setupAuction": "Configura l'asta",
+      "round": "Giornata {round}",
+      "locked": "Bloccata",
+      "locksAt": "Si blocca {when}",
+      "noTeams": "Nessuna squadra ancora: registra gli acquisti nell'asta e la tua rosa compare qui, pronta per la formazione.",
+      "players": "{count} giocatori",
+      "openLineup": "Formazione",
+      "howTitle": "Come funziona",
+      "step1Title": "Configura l'asta",
+      "step1Text": "Crediti, partecipanti, regole della lega e le squadre al tavolo. Un minuto.",
+      "step2Title": "Registra gli acquisti",
+      "step2Text": "Durante l'asta segni chi compra chi e a quanto: prezzi vivi, strategie e offerte massime si aggiornano da soli.",
+      "step3Title": "Ogni settimana la formazione",
+      "step3Text": "Modulo, undici e panchina consigliati con formazioni ufficiali, infortuni e previsione della partita. Si blocca al fischio d'inizio."
+    }
   },
   "auction": {
     "title": "Asta",
@@ -240,7 +261,9 @@
       "planWorse": "Strategia {name}: {value} pt. ({delta}), il piano perde qualcosa",
       "over": "Sopra il massimo consigliato di {over} cr."
     },
-    "lineup": "Formazione"
+    "lineup": "Formazione",
+    "showScores": "Voti",
+    "showScoresHint": "Mostra i sette voti dietro al totale (titolarità, bonus, rendimento, malus, fisico, club, partenza)"
   },
   "targets": {
     "title": "Obiettivi e piani B",
@@ -710,7 +733,10 @@
       "suspension": "squalificato",
       "absent": "assente",
       "doubtful": "in dubbio",
-      "noMatch": "non gioca"
+      "noMatch": "non gioca",
+      "locked": "Formazione bloccata",
+      "open": "Aperta · si blocca {when}",
+      "openNoDate": "Aperta"
     },
     "colRecent": "Ult.",
     "colRecentHint": "Media dei suoi ultimi voti (fino a cinque partite giocate) e quante sono: verde sopra la sua media stagionale, rosso sotto. Sposta il voto atteso fino a un 40%, di più con più partite.",
@@ -722,6 +748,12 @@
       "text": "La giornata è iniziata {deadline}: da quel momento in nessuna lega si può più cambiare. Questa è la consigliata come era alle {savedAt}, l'ultima vista prima del fischio d'inizio. Si sblocca con la prossima giornata.",
       "fresh": "La giornata è iniziata {deadline} e non avevi aperto la pagina prima: la consigliata è stata calcolata ora, con i dati di adesso, e resta questa fino alla prossima giornata."
     },
-    "how8": "Blocco: al primo calcio d'inizio della giornata la formazione consigliata si congela così com'era all'ultima apertura della pagina prima del fischio (spilli e KO compresi) e non cambia più fino alla giornata successiva. Apri la pagina poco prima dell'inizio per avere le ultime notizie dentro."
+    "how8": "Blocco: al primo calcio d'inizio della giornata la formazione consigliata si congela così com'era all'ultima apertura della pagina prima del fischio (spilli e KO compresi) e non cambia più fino alla giornata successiva. Apri la pagina poco prima dell'inizio per avere le ultime notizie dentro.",
+    "howOpen": "apri",
+    "cardForm": "forma",
+    "cardWin": "vitt.",
+    "cardGoals": "gol",
+    "cardMore": "dettagli",
+    "cardLess": "chiudi"
   }
 }
