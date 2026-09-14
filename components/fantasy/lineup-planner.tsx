@@ -1,6 +1,6 @@
 'use client';
 
-import {Ban, Check, Copy, Lock, Pin, PinOff, Settings2, Trash2} from "lucide-react";
+import {Ban, Check, Copy, HelpCircle, Lock, Pin, PinOff, Settings2, Trash2, X} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -144,6 +144,7 @@ function facts(f: PlayerForecast) {
 function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
+    const [why, setWhy] = useState(false);
     const p = byId.get(f.player.id);
     const fixture = f.fixture;
     const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
@@ -161,6 +162,7 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
     const usageRate = x.usage ? (x.usage.started + 0.5 * x.usage.came) / Math.max(1, x.usage.total) : null;
     const td = "px-1 py-1.5 text-right";
     return (
+        <>
         <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
             <td className="px-1 py-1.5">
                 <span className="flex items-center gap-0.5">
@@ -183,6 +185,9 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                     {p && <TeamCrest team={p.team} size={18} />}
                     <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
                     {f.player.penaltyTaker && f.player.role !== 'P' && <span className="bb-badge bg-accent text-[9px] h-4 px-1" title={t('reasons.penalty')}>R</span>}
+                    <button type="button" onClick={() => setWhy((v) => !v)} aria-expanded={why} title={t('whyHint')} className={cn("inline-flex items-center gap-0.5 h-5 px-1 rounded border border-foreground/40 text-[10px] font-extrabold shrink-0", why ? "bg-foreground text-background" : "bg-card hover:bg-accent")}>
+                        <HelpCircle className="w-3 h-3" aria-hidden="true" />{t('why')}
+                    </button>
                 </span>
                 {status.length > 0 && (
                     <span className="flex flex-wrap gap-1 mt-0.5">
@@ -237,6 +242,23 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
             <td className={cn(td, "hidden lg:table-cell")}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
             <td className={td}><Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])} title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</Cell></td>
         </tr>
+        {why && (
+            <tr className={cn("align-top", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+                <td colSpan={14} className="px-3 pb-2 pt-0">
+                    <div className="rounded-lg border-2 border-foreground bg-card px-3 py-2 flex flex-col gap-1">
+                        <span className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wide">
+                            {f.player.name}
+                            <span className="font-mono normal-case tracking-normal text-muted-foreground">{t('colRating')} {f.rating.toFixed(2)} · {t('colPoints')} {f.points.toFixed(2)} · {t('colValue')} {(slot ?? f.value).toFixed(2)}</span>
+                            <button type="button" onClick={() => setWhy(false)} aria-label={t('whyClose')} className="ml-auto inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/50 bg-background hover:bg-accent"><X className="w-3 h-3" aria-hidden="true" /></button>
+                        </span>
+                        <ul className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2 text-[11px] font-semibold list-disc pl-4">
+                            {f.reasons.map((r, i) => <li key={i}>{reasonText(r)}</li>)}
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        )}
+        </>
     );
 }
 

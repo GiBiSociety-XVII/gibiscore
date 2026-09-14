@@ -367,7 +367,8 @@
       "colPrice": "Pagato",
       "playerInjured": "Infortunato a lungo",
       "playerContested": "Posto conteso"
-    }
+    },
+    "spentLine": "Spesi {spent} su {total} cr."
   },
   "strategies": {
     "title": "Strategie consigliate",
@@ -721,7 +722,7 @@
     "cleanSheetShort": "PI {pct}%",
     "legendGood": "a favore",
     "legendBad": "contro",
-    "legendHint": "Passa sopra a un numero per la spiegazione; sul nome per tutte le ragioni.",
+    "legendHint": "Passa sopra a un numero per la spiegazione; \"Perché\" apre tutte le ragioni.",
     "status": {
       "manual": "KO",
       "official": {
@@ -759,6 +760,9 @@
     "copied": "Copiata",
     "copyTitle": "Copia undici e panchina come testo, da incollare nell'app della lega",
     "copyBench": "Panchina",
-    "roundLabel": "Giornata {round}"
+    "roundLabel": "Giornata {round}",
+    "why": "Perché",
+    "whyHint": "Tutte le ragioni dietro ai numeri di questo giocatore",
+    "whyClose": "Chiudi"
   }
 }

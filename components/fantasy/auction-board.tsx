@@ -748,23 +748,19 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </select>
                     </label>
                 ) : undefined}>
-                    <div className="grid grid-cols-2 divide-x divide-muted border-b border-muted">
-                        <div className="px-3 py-2 flex flex-col"><span className={cn("font-mono text-xl font-extrabold tabular-nums", left < 0 && "text-red-700")}>{left}</span><span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tr('credits')} {tr('left')}</span></div>
-                        <div className="px-3 py-2 flex flex-col"><span className="font-mono text-xl font-extrabold tabular-nums">{spent}</span><span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tr('credits')} {tr('spent')}</span></div>
-                    </div>
+                    {/* Credits left, slots, average and strategy live in the bar above the table: here only what it does not say. */}
+                    <p className="px-3 pt-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('roleBudget')}</p>
                     <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
                         {ROLES.map((r) => (
                             <div key={r} className="px-2 py-1.5 flex flex-col items-center gap-0.5">
                                 <RoleBadge role={r} />
-                                <span className="font-mono text-[12px] font-extrabold tabular-nums">{tr('slots', {filled: mineByRole(r).length, total: config.slots[r]})}</span>
-                                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">~{Math.round(config.credits * roleShare[r])} cr.</span>
+                                <span className="font-mono text-[11px] font-extrabold tabular-nums whitespace-nowrap">~{Math.round(config.credits * roleShare[r])} cr.</span>
                             </div>
                         ))}
                     </div>
                     <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                        {tr('perSlot', {credits: freeSlots > 0 ? Math.max(0, Math.floor(left / freeSlots)) : 0})}
+                        {tr('spentLine', {spent, total: config.credits})}
                         {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, null))})}</span>}
-                        {strategy && <span className="block text-foreground">{tr('strategy', {name: tst(`${strategy.key}.name`)})}</span>}
                         {guide && (
                             <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
                                 {config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide.formation})}
