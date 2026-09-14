@@ -44,7 +44,7 @@ function StatusCell({fixture}: {fixture: FixtureSummary}) {
  * `showDate` adds the day before the time (team and player pages);
  * `showCompetition` adds the competition under the time (team pages).
  */
-export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean}) {
+export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false, favorite = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean; /** One of the user's favourite teams plays: the row is marked. */ favorite?: boolean}) {
     const format = useFormatter();
     const state = rowState(fixture);
     const isLive = state === 'live';
@@ -74,6 +74,7 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
         <div
             data-row={state}
             data-teams={`${fixture.home.slug ?? ''}|${fixture.away.slug ?? ''}`}
+            data-fav={favorite ? '1' : undefined}
             className={cn(
                 "relative grid items-center gap-1.5 px-2 min-h-8 border-t border-muted first:border-t-0 hover:bg-muted/70 transition-colors",
                 showDate || showCompetition

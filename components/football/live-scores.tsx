@@ -5,8 +5,8 @@ import {useTranslations} from "next-intl";
 import {useRouter} from "@/i18n/navigation";
 import type {ScoresPage} from "@/lib/football/data/scores";
 import {LIVE_STATES, type FixtureState, type FixtureSummary} from "@/lib/football/types";
+import {useFavoriteTeams, useFavorites} from "@/lib/favorites";
 import {CompetitionBlock} from "./competition-block";
-import {FavoritesFirst} from "./favorites-first";
 import {ScoreFilters, type ScoreFilter} from "./score-filters";
 
 /** How often the page asks for the live state of its rows, while visible. */
@@ -41,6 +41,9 @@ function apply(f: FixtureSummary, u: Update | undefined): FixtureSummary {
 export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: ScoresPage; labels: Record<ScoreFilter, string>; emptyText: string; favoritesLabel: string}) {
     const t = useTranslations('Pages.scores');
     const router = useRouter();
+    const {favorites: favoriteCompetitions} = useFavorites();
+    const {favorites: favoriteTeamSlugs} = useFavoriteTeams();
+    const favoriteTeams = new Set(favoriteTeamSlugs);
     const [updates, setUpdates] = useState<Map<number, Update>>(() => new Map());
     const live = page.mode === 'live';
     // Only while something can still change: a live list, or today with matches open or in play.
@@ -96,9 +99,13 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
     }, [active, live, page, router]);
 
     const patch = (fixtures: FixtureSummary[]) => fixtures.map((f) => apply(f, updates.get(f.id)));
-    const pinned = page.pinned.map((g) => ({...g, fixtures: patch(g.fixtures)}));
-    const countries = page.countries.map((c) => ({...c, competitions: c.competitions.map((g) => ({...g, fixtures: patch(g.fixtures)}))}));
-    const all = [...pinned, ...countries.flatMap((c) => c.competitions)].flatMap((g) => g.fixtures);
+    // The starred competitions come first, in a group of their own, in the order they were starred.
+    const isFavorite = (slug: string) => favoriteCompetitions.includes(slug);
+    const everyGroup = [...page.pinned, ...page.countries.flatMap((c) => c.competitions)];
+    const favorites = favoriteCompetitions.map((slug) => everyGroup.find((g) => g.competition.slug === slug)).filter((g): g is (typeof everyGroup)[number] => !!g).map((g) => ({...g, fixtures: patch(g.fixtures)}));
+    const pinned = page.pinned.filter((g) => !isFavorite(g.competition.slug)).map((g) => ({...g, fixtures: patch(g.fixtures)}));
+    const countries = page.countries.map((c) => ({...c, competitions: c.competitions.filter((g) => !isFavorite(g.competition.slug)).map((g) => ({...g, fixtures: patch(g.fixtures)}))})).filter((c) => c.competitions.length > 0);
+    const all = [...favorites, ...pinned, ...countries.flatMap((c) => c.competitions)].flatMap((g) => g.fixtures);
     const counts = {
         all: all.length,
         live: all.filter((f) => isLive(f.state)).length,
@@ -110,15 +117,23 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
         <p className="px-2 py-6 text-center text-[13px] font-semibold text-muted-foreground">{emptyText}</p>
     ) : (
         <div className="flex flex-col gap-2">
-            <FavoritesFirst label={favoritesLabel} />
+            {favorites.length > 0 && (
+                <div data-group className="border-2 border-foreground rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-1.5 px-2 h-7 bg-foreground text-background text-[11px] font-extrabold uppercase tracking-wide">
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-hidden="true" />
+                        {favoritesLabel}
+                    </div>
+                    {favorites.map((g) => <CompetitionBlock key={g.competition.slug} group={g} favoriteTeams={favoriteTeams} />)}
+                </div>
+            )}
             {pinned.length > 0 && (
                 <div data-group className="border-2 border-foreground rounded-lg overflow-hidden">
-                    {pinned.map((g) => <CompetitionBlock key={g.competition.slug} group={g} />)}
+                    {pinned.map((g) => <CompetitionBlock key={g.competition.slug} group={g} favoriteTeams={favoriteTeams} />)}
                 </div>
             )}
             {countries.map((c) => (
                 <div key={c.country} data-group className="border-2 border-foreground/30 rounded-lg overflow-hidden">
-                    {c.competitions.map((g) => <CompetitionBlock key={g.competition.slug} group={g} />)}
+                    {c.competitions.map((g) => <CompetitionBlock key={g.competition.slug} group={g} favoriteTeams={favoriteTeams} />)}
                 </div>
             ))}
             <p data-empty className="hidden px-2 py-6 text-center text-[13px] font-semibold text-muted-foreground">{emptyText}</p>
