@@ -9,10 +9,11 @@ import type {FantaRole} from './scores';
  */
 
 /**
- * [role, name, team, quotation, mantra roles, market value, gone] as exported by
- * scripts/fantacalcio-xlsx-to-json.mjs (the last three optional: the CSV export has four).
+ * [role, name, team, quotation, mantra roles, market value, gone, code] as exported by
+ * scripts/fantacalcio-xlsx-to-json.mjs (the last four optional: the CSV export has four).
+ * The code is the list's own id ("Cod."), the key Leghe Fantacalcio exports rosters by.
  */
-export type ListoneRow = [string, string, string, number, string?, number?, boolean?];
+export type ListoneRow = [string, string, string, number, string?, number?, boolean?, number?];
 
 export interface ListoneEntry {
     role: FantaRole;
@@ -29,6 +30,8 @@ export interface ListoneEntry {
     fvm: number;
     /** Listed among the players who left the league. */
     gone: boolean;
+    /** The list's code, null when the export had none. */
+    code: number | null;
 }
 
 export interface MatchablePlayer {
@@ -47,6 +50,7 @@ export interface ListoneMatch {
     gone: boolean;
     /** The list's name, for the record. */
     name: string;
+    code: number | null;
 }
 
 /** Lower case, no accents, apostrophes unified, HTML entities gone. */
@@ -72,11 +76,11 @@ const ROLES = new Set(['P', 'D', 'C', 'A']);
 
 export function parseListone(rows: ListoneRow[]): ListoneEntry[] {
     const out: ListoneEntry[] = [];
-    for (const [role, name, team, quote, mantra, fvm, gone] of rows) {
+    for (const [role, name, team, quote, mantra, fvm, gone, code] of rows) {
         if (!ROLES.has(role)) continue;
         // "Martinez J." / "Rossi Fr.": the trailing token with a dot is the initial.
         const m = name.match(/^(.*?)\s+([A-Za-z]{1,3})\.$/);
-        out.push({role: role as FantaRole, name, surname: normalizeName(m ? m[1] : name), initial: m ? m[2].toLowerCase() : null, team: normalizeName(team), quote, mantra: mantra ?? '', fvm: fvm ?? 0, gone: gone === true});
+        out.push({role: role as FantaRole, name, surname: normalizeName(m ? m[1] : name), initial: m ? m[2].toLowerCase() : null, team: normalizeName(team), quote, mantra: mantra ?? '', fvm: fvm ?? 0, gone: gone === true, code: typeof code === 'number' && Number.isFinite(code) ? code : null});
     }
     return out;
 }
@@ -144,7 +148,7 @@ export function matchListone(entries: ListoneEntry[], players: MatchablePlayer[]
     const assign = (entry: ListoneEntry, ids: number[]) => {
         for (const id of ids) {
             used.add(id);
-            byPlayer.set(id, {role: entry.role, quote: entry.quote, mantra: entry.mantra, fvm: entry.fvm, gone: entry.gone, name: entry.name});
+            byPlayer.set(id, {role: entry.role, quote: entry.quote, mantra: entry.mantra, fvm: entry.fvm, gone: entry.gone, name: entry.name, code: entry.code});
         }
     };
     // Entries with an initial first: they are the ambiguous surnames, and must not be stolen by the plain ones.

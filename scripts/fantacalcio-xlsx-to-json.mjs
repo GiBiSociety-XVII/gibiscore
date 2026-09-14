@@ -1,5 +1,5 @@
 // Converts the Fantacalcio.it quotations workbook (Quotazioni_Fantacalcio_Stagione_*.xlsx)
-// into the JSON the server imports: [role, name, team, quote, mantra, fvm, gone].
+// into the JSON the server imports: [role, name, team, quote, mantra, fvm, gone, code].
 // The first sheet lists every player, the "Calciatori Ceduti" sheet the ones who left.
 // Usage: node scripts/fantacalcio-xlsx-to-json.mjs core/fantasy/listone/serie-a-fantacalcio.xlsx core/fantasy/listone/serie-a.json
 import {readFileSync, writeFileSync} from 'node:fs';
@@ -19,7 +19,8 @@ const read = (sheetName, gone) => {
         if (!id || !/^\d+$/.test(String(id)) || !role || !name) continue;
         if (seen.has(String(id))) continue;
         seen.add(String(id));
-        entries.push([String(role).trim(), String(name).trim(), String(team ?? '').trim(), Number(quote) || 0, String(mantra ?? '').trim(), Number(fvm) || 0, gone]);
+        // The list's own code ("Cod."): what Leghe Fantacalcio exports rosters by.
+        entries.push([String(role).trim(), String(name).trim(), String(team ?? '').trim(), Number(quote) || 0, String(mantra ?? '').trim(), Number(fvm) || 0, gone, Number(id)]);
     }
 };
 read(sheetNames[0]?.name, false);

@@ -45,6 +45,8 @@ export interface AuctionPlayer {
     listQuote: number | null;
     /** The official list's market value (FVM), when it gives one. */
     listFvm: number | null;
+    /** The list's own code ("Cod."), the key Leghe Fantacalcio exports rosters by. */
+    listCode: number | null;
     /** Mantra roles from the official list ("E;W"), when it gives them. */
     mantraRoles: string | null;
     /** Starts and benches at the current club, this season counting three times. */
@@ -539,6 +541,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 roleBreakdown: call?.breakdown ?? {},
                 listQuote: listed?.quote ?? null,
                 listFvm: listed && listed.fvm > 0 ? listed.fvm : null,
+                listCode: listed?.code ?? null,
                 mantraRoles: listed && listed.mantra ? listed.mantra : null,
                 availability: availabilityOf.get(player.id) ?? {starts: 0, benches: 0},
                 contested: isContested(availabilityOf.get(player.id) ?? {starts: 0, benches: 0}, 9),

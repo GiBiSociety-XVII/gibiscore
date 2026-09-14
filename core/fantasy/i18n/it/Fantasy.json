@@ -839,5 +839,28 @@
     "why": "Perché",
     "whyHint": "Perché: tutte le ragioni dietro ai numeri di questo giocatore",
     "whyClose": "Chiudi"
+  },
+  "import": {
+    "title": "Importa le rose da Leghe Fantacalcio",
+    "button": "Importa da Leghe",
+    "cardTitle": "Hai già fatto l'asta su Leghe Fantacalcio?",
+    "cardText": "Esporta le rose dalla lega (Esporta rose, file CSV) e caricale qui: tutte le squadre entrano in un minuto, la tua è pronta per la formazione consigliata.",
+    "intro": "Su Leghe Fantacalcio: Rose → Esporta rose. Scegli il file scaricato oppure incolla il suo contenuto. I giocatori vengono riconosciuti dal codice del listone Fantacalcio.it.",
+    "file": "Scegli il file esportato",
+    "paste": "Oppure incolla il testo del file",
+    "team": "Squadra",
+    "players": "Giocatori",
+    "spent": "Spesi",
+    "yourTeam": "La tua squadra",
+    "yourTeamHint": "Seleziona la tua squadra: la formazione consigliata parte da questa. Le altre servono per prezzi, obiettivi e strategie.",
+    "leagueName": "Nome della lega",
+    "defaultName": "Lega Fantacalcio",
+    "credits": "Crediti per squadra",
+    "creditsHint": "Quelli della tua lega: servono per calcolare i crediti rimasti. Proposti in base a quanto ha speso la squadra che ha speso di più.",
+    "unmatchedHint": "{count, plural, =1 {1 giocatore non è nel listone del sito} other {# giocatori non sono nel listone del sito}} (ceduto all'estero o codice non in lista): resta fuori dalla rosa, puoi aggiungerlo a mano dall'asta.",
+    "replaceConfirm": "Sul dispositivo c'è già un'asta: l'importazione la sostituisce (quella salvata nel cloud resta). Continuare?",
+    "confirm": "Importa le rose",
+    "cancel": "Annulla",
+    "error": "Non riesco a leggere il file: dev'essere l'export di Leghe Fantacalcio (blocchi $,$,$ con squadra, codice e prezzo)."
   }
 }

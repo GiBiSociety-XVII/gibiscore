@@ -20,12 +20,13 @@ import {TargetsPanel} from "./targets-panel";
 import {useAccountTeams} from "./account-teams";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {keeperBlocks} from "@/lib/fantasy/block";
-import {customStrategyKey, DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy} from "@/lib/fantasy/config";
+import {customStrategyKey, DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
-import {configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
+import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
+import {LegheImport} from "./leghe-import";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
@@ -241,10 +242,21 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         setEditing(false);
         if (!pool || next.league !== pool.league) router.push(`/fantacalcio/asta?league=${next.league}`);
     };
+    // Rosters exported by Leghe Fantacalcio: a whole league in, the cloud link dropped (it was another auction's).
+    const importable = (pool?.players ?? []).map((p) => ({id: p.id, role: p.role, listCode: p.listCode}));
+    const importLeghe = (next: AuctionConfig, rows: Purchase[]) => {
+        purchasesStore.write(rows);
+        configStore.write(next);
+        cloudStore.write(null);
+        setEditing(false);
+        setOpen(null);
+        router.push('/fantacalcio/asta');
+    };
     if (!config) {
         return (
             <div className="flex flex-col gap-3">
                 <CloudPanel purchases={purchases} />
+                <LegheImport players={importable} hasAuction={false} onImport={importLeghe} />
                 <AuctionSetup initial={null} onSave={save} />
             </div>
         );
@@ -496,6 +508,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
                         <Link href="/fantacalcio/formazione" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" aria-hidden="true" />{t('lineup')}</Link>
                         <CloudMenu config={config} purchases={purchases} />
+                        <LegheImport players={importable} hasAuction={purchases.length > 0} onImport={importLeghe} variant="button" />
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
                     </span>
                 </div>
