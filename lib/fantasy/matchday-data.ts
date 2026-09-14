@@ -262,13 +262,15 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     }
     const teamRecent: MatchdayContext['teamRecent'] = {};
     for (const [teamId, list] of recentOf) teamRecent[teamId] = list.map((f) => f.id);
-    // The recap: the round being played (its matches already over) or, between rounds, the last one
+    // The recap: the round begun (its matches already over) or, before the next one starts, the last one
     // played. Everyone in a squad, with the official vote when the workbook is in, else the vote typed in,
     // else the provider's numbers (a player typed in without a squad row counts too).
     const results: RoundResults[] = [];
     const lastPlayed = [...rounds].reverse().find((r) => r.state === 'played') ?? null;
-    const live = rounds.find((r) => r.state === 'live') ?? null;
-    const recap: Array<[MatchdayRound | null, RoundResults['state']]> = live ? [[live, 'live']] : [[lastPlayed, 'played']];
+    // The current round counts as begun from its first match over, whether or not one is on the pitch right now.
+    const current = rounds.find((r) => r.state === 'live' || r.state === 'next') ?? null;
+    const begun = current !== null && (byRound.get(current.round) ?? []).some((f) => FINISHED.has(f.state));
+    const recap: Array<[MatchdayRound | null, RoundResults['state']]> = begun ? [[current, 'live']] : [[lastPlayed, 'played']];
     for (const [info, state] of recap) {
         if (!info) continue;
         const officialRound = votesByRound.has(roundNumber(info.round) ?? -1);
