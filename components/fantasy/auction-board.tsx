@@ -29,11 +29,12 @@ import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "
 import {LegheImport} from "./leghe-import";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
+import {bargains, type Bargain} from "@/lib/fantasy/bargains";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
-type SortKey = 'overall' | 'price' | 'fantaAvg' | (typeof SCORE_KEYS)[number] | 'name';
+type SortKey = 'overall' | 'price' | 'fantaAvg' | 'bargain' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
 
 
@@ -49,10 +50,11 @@ function ScoreCell({value}: {value: number}) {
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 /** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
-function Status({p, rivals, rivalsTaken = []}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]}) {
+function Status({p, rivals, rivalsTaken = [], deal}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]; deal?: Bargain}) {
     const t = useTranslations('Fantasy.board');
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
+            {deal?.bargain && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-emerald-700 border-emerald-700" title={t('bargain.hint', {quote: deal.quote, equiv: deal.equivQuote})}>{t('bargain.badge')}</Badge>}
             {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
             {p.injury && (() => {
                 const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
@@ -192,6 +194,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!board) return new Map<number, number>();
         return suggestPrices(board.players, {credits: board.config.credits, participants: board.config.participants, slots: board.config.slots, roleShare: ROLE_SHARE, level: board.config.priceLevel / 100});
     }, [board]);
+    // Players the site values well above their Fantacalcio.it quotation, on the list prices: the auction does not move them.
+    const deals = useMemo(() => (board ? bargains(board.players, listPrices) : new Map<number, Bargain>()), [board, listPrices]);
     // Live prices follow the purchases: the plans below hang on them, so they are drawn once per purchase.
     const prices = useMemo(() => (board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices), [board, listPrices]);
     const market = board ? marketState(board.players, listPrices, board.config, board.purchases) : null;
@@ -214,14 +218,14 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (!pool) return [];
         const needle = q.trim().toLowerCase();
         const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (tier === 'all' || tiers.get(p.id) === tier) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || playerMatches(p, needle)));
-        const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'name' ? p.name : p.scores[sort]);
+        const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'bargain' ? (deals.get(p.id)?.index ?? 0) : sort === 'name' ? p.name : p.scores[sort]);
         return list.sort((a, b) => {
             const va = value(a);
             const vb = value(b);
             if (typeof va === 'string' && typeof vb === 'string') return va.localeCompare(vb);
             return (vb as number) - (va as number) || b.scores.overall - a.scores.overall;
         });
-    }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices]);
+    }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices, deals]);
 
     // The planning team is kept for the lineup page: every purchase of mine, and the league's settings, as they change.
     useEffect(() => {
@@ -597,7 +601,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         {TIERS.map((k) => <option key={k} value={k}>{tt(`${k}.name`)}</option>)}
                     </select>
                     <select className={selectClass} value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={t('sort')}>
-                        {(['overall', 'price', 'fantaAvg', ...SCORE_KEYS, 'name'] as SortKey[]).map((k) => <option key={k} value={k}>{t('sort')}: {k === 'name' ? t('columns.player') : t(`columns.${k === 'team' ? 'team_' : k}`)}</option>)}
+                        {(['overall', 'price', 'fantaAvg', 'bargain', ...SCORE_KEYS, 'name'] as SortKey[]).map((k) => <option key={k} value={k}>{t('sort')}: {k === 'name' ? t('columns.player') : t(`columns.${k === 'team' ? 'team_' : k}`)}</option>)}
                     </select>
                     <label className="flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap">
                         <input type="checkbox" checked={hideBought} onChange={(e) => setHideBought(e.target.checked)} className="w-4 h-4" />
@@ -658,7 +662,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         <span>{t('columns.fantaAvg')} <span className="font-mono font-extrabold text-foreground tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</span></span>
                                         <span>{t('columns.price')} <span className="text-foreground">{priceCell(p.id)}</span></span>
                                         {strategy && maxBidOf(p.id) !== null && <span>{t('columns.maxBid')} <span className="font-mono font-extrabold text-accent-text tabular-nums">{maxBidOf(p.id)}</span></span>}
-                                        <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                        <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                         <span className="ml-auto inline-flex items-center gap-1">
                                             <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground/40 bg-card">{expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>
                                             {!purchase && <PlanStar size={7} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onClick={() => cyclePlan(p.id)} />}
@@ -725,7 +729,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                                    <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                                     <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">

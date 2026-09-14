@@ -144,7 +144,8 @@
       "status": "Stato",
       "tier": "Fascia",
       "form": "Partenza",
-      "maxBid": "Max"
+      "maxBid": "Max",
+      "bargain": "Affare"
     },
     "columnHints": {
       "starter": "Titolarità: quanto spesso parte titolare e quanti minuti gioca",
@@ -247,6 +248,10 @@
       "note": "Portieri a blocco: con {name} prendi anche {others}, a questo prezzo. Il blocco riempie gli slot portiere."
     },
     "rivalTakenBadge": "Rivale preso",
+    "bargain": {
+      "badge": "Affare",
+      "hint": "Affare: quotazione Fantacalcio.it {quote}, per il sito varrebbe {equiv}. Al tavolo si paga di solito sulla quotazione: puoi prenderlo a meno di quanto vale."
+    },
     "rivalTakenHint": "Chi si gioca il posto con lui è già stato comprato: {names}",
     "undoLast": "Annulla ultimo",
     "undoLastHint": "Annulla l'ultimo acquisto registrato: {name} a {manager} per {price} cr. (Ctrl+Z)",
