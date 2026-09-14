@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     return cronRoute(async () => {
         const run = await syncSquads({limit, force});
         // The auction list reads squads: fresh on the next request.
+        revalidateTag('squads', 'max');
         revalidateTag('fantasy-pool', 'max');
         return run;
     })(request);

@@ -11,7 +11,10 @@ export async function GET(request: NextRequest) {
     return cronRoute(async () => {
         const run = await syncInjuries();
         // The fantasy matchday reads the absences: fresh on the next request.
-        if ((run.counters.sidelined ?? 0) > 0) revalidateTag('fantasy-matchday', 'max');
+        if ((run.counters.sidelined ?? 0) > 0) {
+            revalidateTag('sidelined', 'max');
+            revalidateTag('fantasy-matchday', 'max');
+        }
         return run;
     })(request);
 }

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     return cronRoute(async () => {
         const run = await syncPlayerSeasons({scope, year: Number.isFinite(year) ? year : undefined, leagues, budget});
         // The auction list reads squads and season statistics: fresh on the next request.
+        revalidateTag('player-seasons', 'max');
         revalidateTag('fantasy-pool', 'max');
         return run;
     })(request);

@@ -1,4 +1,5 @@
 import 'server-only';
+import {unstable_cache} from 'next/cache';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionPage, type CompetitionSummary, type FixtureSummary, type RankedPlayer, type RoundFixtures, type StandingGroup, type TeamSummary} from '../types';
 import {
@@ -133,7 +134,7 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
         }
 
         const [standingsRes, fixturesRes, rankings, statSeasons] = await Promise.all([
-            db.from('standings').select(STANDING_SELECT).eq('season_id', current.id).order('group').order('position'),
+            cachedSeasonStandings(current.id),
             db.from('fixtures').select(FIXTURE_LIST_SELECT).eq('season_id', current.id).order('starting_at', {ascending: true}).limit(1000),
             getRankings(competition.id, current.year).catch((error) => {
                 logReadError(`getRankings(${slug})`, error);
@@ -213,8 +214,7 @@ export async function getStandingsBySlug(slug: string): Promise<{competition: Co
         const league = leagueRow as unknown as LeagueRow & {seasons: Array<{id: number}>};
         const seasonId = league.seasons?.[0]?.id;
         if (!seasonId) return null;
-        const {data, error: standingsError} = await db.from('standings').select(STANDING_SELECT).eq('season_id', seasonId).order('group').order('position').limit(120);
-        if (standingsError) throw standingsError;
+        const {data} = await cachedSeasonStandings(seasonId);
         const groups = new Map<string, StandingGroup>();
         for (const r of (data ?? []) as unknown as StandingQueryRow[]) {
             const row = toStandingRow(r);
@@ -249,3 +249,14 @@ export async function getStatSeasons(leagueId: number): Promise<StatSeason[]> {
         return [];
     }
 }
+
+/** A season's table; shared by the competition page and the standings API, refreshed with the standings sync. */
+const cachedSeasonStandings = unstable_cache(
+    async (seasonId: number): Promise<{data: StandingQueryRow[]; error: null}> => {
+        const {data, error} = await footballDb().from('standings').select(STANDING_SELECT).eq('season_id', seasonId).order('group').order('position').limit(200);
+        if (error) throw error;
+        return {data: (data ?? []) as unknown as StandingQueryRow[], error: null};
+    },
+    ['season-standings'],
+    {revalidate: 300, tags: ['standings']},
+);

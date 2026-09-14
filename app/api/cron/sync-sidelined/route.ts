@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     return cronRoute(async () => {
         const run = await syncPlayerSidelined();
         // The fantasy matchday reads the absences: fresh on the next request.
+        revalidateTag('sidelined', 'max');
         revalidateTag('fantasy-matchday', 'max');
         return run;
     })(request);

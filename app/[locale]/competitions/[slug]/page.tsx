@@ -18,7 +18,7 @@ import {getCompetitionPage} from "@/lib/football/data/competitions";
 import {getSeasonStudy} from "@/lib/football/data/study";
 import {roundLabel} from "@/lib/football/data/shared";
 
-export const revalidate = 120;
+export const revalidate = 300;
 
 export async function generateMetadata({params}: PageProps<"/[locale]/competitions/[slug]">): Promise<Metadata> {
     const {slug} = await params;

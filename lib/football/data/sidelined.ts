@@ -1,4 +1,5 @@
 import 'server-only';
+import {unstable_cache} from 'next/cache';
 import {fetchAll} from '@/lib/db/paginate';
 import {buildSpells, daysBetween, estimateReturn, type SidelinedRow, type Spell} from '../spells';
 import type {SidelinedEntry} from '../types';
@@ -76,11 +77,28 @@ export function sortEntries(entries: SidelinedEntry[]): SidelinedEntry[] {
 }
 
 /** Active spells of the given teams in their current seasons, keyed by team. */
+/**
+ * The active absences of some clubs, by club. Cached and shared by every
+ * page that shows them (team, match, player, the fantasy matchday and
+ * auction): one read per set of clubs every fifteen minutes, or sooner
+ * when an absence sync brings something new (tag `sidelined`).
+ */
 export async function loadTeamSidelined(db: ReturnType<typeof footballDb>, teamIds: number[]): Promise<Map<number, SidelinedEntry[]>> {
+    if (teamIds.length === 0) return new Map();
+    const ids = [...new Set(teamIds)].sort((a, b) => a - b);
+    const entries = await cachedTeamSidelined(ids.join(','), romeDate(new Date()));
+    return new Map(entries);
+}
+
+const cachedTeamSidelined = unstable_cache(
+    async (key: string, today: string): Promise<Array<[number, SidelinedEntry[]]>> => [...(await computeTeamSidelined(footballDb(), key.split(',').map(Number), today))],
+    ['team-sidelined'],
+    {revalidate: 900, tags: ['sidelined']},
+);
+
+async function computeTeamSidelined(db: ReturnType<typeof footballDb>, teamIds: number[], today: string): Promise<Map<number, SidelinedEntry[]>> {
     const result = new Map<number, SidelinedEntry[]>();
-    if (teamIds.length === 0) return result;
     try {
-        const today = romeDate(new Date());
         const [rows, dates] = await Promise.all([
             fetchAll(
                 (a, b) =>
