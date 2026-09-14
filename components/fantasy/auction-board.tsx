@@ -572,15 +572,16 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         {t('hideBought')}
                     </label>
                     <button type="button" onClick={() => setShowScores((v) => !v)} aria-pressed={showScores} title={t('showScoresHint')} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold hidden md:inline-flex", showScores ? "bg-foreground text-background" : "bg-card")}>{t('showScores')}</button>
-                    <div role="radiogroup" aria-label={t('view')} className="flex gap-1 ml-auto">
+                </div>
+
+                {/* View tabs, then the teams on one row, crests only: one at a time, the active one again to clear it */}
+                <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:thin] pb-1 -mb-1">
+                    <div role="radiogroup" aria-label={t('view')} className="flex gap-1 shrink-0 pr-2 mr-1 border-r-2 border-foreground/30">
                         {(['list', 'tiers'] as const).map((v) => (
                             <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", view === v ? "bg-foreground text-background" : "bg-card")}>{v === 'list' ? t('viewList') : t('viewTiers')}</button>
                         ))}
                     </div>
-                </div>
-
-                {/* Teams on one row, crests only: one at a time, the active one again to clear it */}
-                <div role="radiogroup" aria-label={t('allTeams')} className="flex items-center gap-1 overflow-x-auto [scrollbar-width:thin] pb-1 -mb-1">
+                    <div role="radiogroup" aria-label={t('allTeams')} className="contents">
                     <button type="button" role="radio" aria-checked={teamId === 'all'} onClick={() => { setTeamId('all'); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold shrink-0", teamId === 'all' ? "bg-foreground text-background" : "bg-card")}>{t('allTeams')}</button>
                     {pool.teams.map((tm) => {
                         const active = teamId === tm.id;
@@ -590,6 +591,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             </button>
                         );
                     })}
+                    </div>
                 </div>
 
                 {view === 'tiers' && (

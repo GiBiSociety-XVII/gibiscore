@@ -1,6 +1,6 @@
 'use client';
 
-import {Ban, Lock, Pin, PinOff, Settings2, Trash2} from "lucide-react";
+import {Ban, Check, Copy, Lock, Pin, PinOff, Settings2, Trash2} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -132,7 +132,7 @@ function toneOf(v: number, [worst, bad, fine, good]: [number, number, number, nu
 const lowerIsBetter = (v: number, [good, fine, bad, worst]: [number, number, number, number]): Tone => (v <= good ? 'good' : v <= fine ? 'fine' : v >= worst ? 'worst' : v >= bad ? 'bad' : 'none');
 
 function Cell({tone, title, children, strong = false}: {tone: Tone; title?: string; children: React.ReactNode; strong?: boolean}) {
-    return <span className={cn("bb-badge font-mono tabular-nums h-5 px-1.5 whitespace-nowrap", strong ? "text-[12px] font-extrabold" : "text-[11px] font-bold", TONE_CLASS[tone])} title={title}>{children}</span>;
+    return <span className={cn("bb-badge font-mono tabular-nums h-5 px-1 whitespace-nowrap", strong ? "text-[12px] font-extrabold" : "text-[11px] font-bold", TONE_CLASS[tone])} title={title}>{children}</span>;
 }
 
 /** The forecast's reasons, one field each, for the columns. */
@@ -146,7 +146,7 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
     const format = useFormatter();
     const p = byId.get(f.player.id);
     const fixture = f.fixture;
-    const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
+    const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
     const opponent = p && fixture ? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null} : null;
     const state = fixture ? (fixture.state === 'finished' ? t('played') : ['live', 'half_time', 'extra_time', 'penalties'].includes(fixture.state) ? t('live') : fixture.state === 'postponed' || fixture.state === 'cancelled' ? t('postponed') : null) : null;
     const x = facts(f);
@@ -159,7 +159,7 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
     if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad', reason: x.doubtful});
     if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst', reason: x.noMatch});
     const usageRate = x.usage ? (x.usage.started + 0.5 * x.usage.came) / Math.max(1, x.usage.total) : null;
-    const td = "px-1.5 py-1.5 text-right";
+    const td = "px-1 py-1.5 text-right";
     return (
         <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
             <td className="px-1 py-1.5">
@@ -172,9 +172,13 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                     </button>
                 </span>
             </td>
-            {index !== null && <td className="px-2 py-1.5 font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground">{index}</td>}
-            <td className="px-1 py-1.5"><RoleBadge role={f.player.role} /></td>
-            <td className="px-2 py-1.5 min-w-0">
+            <td className="px-1 py-1.5">
+                <span className="inline-flex items-center gap-1">
+                    {index !== null && <span className="font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground w-4 text-right">{index}</span>}
+                    <RoleBadge role={f.player.role} />
+                </span>
+            </td>
+            <td className="px-2 py-1.5 w-full max-w-0">
                 <span className="flex items-center gap-1.5 min-w-0">
                     {p && <TeamCrest team={p.team} size={18} />}
                     <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
@@ -229,8 +233,8 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, pinned, o
                 ) : null}
             </td>
             <td className={td}><Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</Cell></td>
-            <td className={td}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
-            <td className={td}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
+            <td className={cn(td, "hidden lg:table-cell")}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
+            <td className={cn(td, "hidden lg:table-cell")}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
             <td className={td}><Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])} title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</Cell></td>
         </tr>
     );
@@ -288,14 +292,34 @@ function ForecastCard({f, slot, index, byId, reasonText, muted = false, pinned, 
     );
 }
 
-function Head({withIndex}: {withIndex: boolean}) {
+/** Copies the eleven and the bench as plain text, ready to paste in the league's app. */
+function CopyLineup({text}: {text: string}) {
     const t = useTranslations('Fantasy.lineup');
-    const th = "px-1.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-right whitespace-nowrap";
+    const [copied, setCopied] = useState(false);
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+        } catch {
+            window.prompt(t('copyTitle'), text);
+        }
+    };
+    return (
+        <button type="button" onClick={copy} title={t('copyTitle')} className={cn("bb-btn h-7 px-2 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0", copied ? "bg-emerald-200" : "bg-accent")}>
+            {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+            {copied ? t('copied') : t('copy')}
+        </button>
+    );
+}
+
+function Head() {
+    const t = useTranslations('Fantasy.lineup');
+    const th = "px-1 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-right whitespace-nowrap";
     return (
         <thead className="bg-card">
             <tr>
                 <th className={cn(th, "px-1")} aria-label={t('colPin')} />
-                {withIndex && <th className={cn(th, "text-left px-2")}>#</th>}
                 <th className={cn(th, "px-1")} aria-label={t('colRole')} />
                 <th className={cn(th, "text-left px-2")}>{t('colPlayer')}</th>
                 <th className={cn(th, "text-left px-2")}>{t('colMatch')}</th>
@@ -306,8 +330,8 @@ function Head({withIndex}: {withIndex: boolean}) {
                 <th className={th} title={t('colGoalsHint')}>{t('colGoals')}</th>
                 <th className={th} title={t('colFactorHint')}>{t('colFactor')}</th>
                 <th className={th} title={t('colPlaysHint')}>{t('colPlays')}</th>
-                <th className={th} title={t('colRatingHint')}>{t('colRating')}</th>
-                <th className={th} title={t('colPointsHint')}>{t('colPoints')}</th>
+                <th className={cn(th, "hidden lg:table-cell")} title={t('colRatingHint')}>{t('colRating')}</th>
+                <th className={cn(th, "hidden lg:table-cell")} title={t('colPointsHint')}>{t('colPoints')}</th>
                 <th className={th} title={t('colValueHint')}>{t('colValue')}</th>
             </tr>
         </thead>
@@ -466,6 +490,11 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     const fixturesOfRoster = context.fixtures.filter((f) => rosterTeams.includes(f.home.id) || rosterTeams.includes(f.away.id));
     const missingCount = ROLES.reduce((s, r) => s + Math.max(0, (FORMATIONS.find((f) => f.key === advice.formation)?.need[r] ?? 0) - forecasts.filter((f) => f.player.role === r).length), 0);
     const when = (iso: string) => format.dateTime(new Date(iso), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME});
+    const lineupText = [
+        `${current.name} · ${t('roundLabel', {round: context.round})} · ${advice.formation}`,
+        ...ROLES.map((r) => `${r}: ${advice.starters.filter((f) => f.player.role === r).map((f) => f.player.name).join(', ')}`),
+        `${t('copyBench')}: ${advice.bench.map((f, i) => `${i + 1}. ${f.player.name} (${f.player.role})`).join(', ')}`,
+    ].join('\n');
 
     return (
         <div className="flex flex-col gap-3">
@@ -486,8 +515,8 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                 </div>
             )}
 
-            <div className="grid gap-3 grid-cols-1 lg:grid-cols-3 items-start">
-                <div className="lg:col-span-2 flex flex-col gap-3 min-w-0">
+            <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
+                <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">
                     <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} pinned={pinned} />
                     {missingCount > 0 && <p className="bb-surface px-3 py-2 text-[12px] font-semibold text-red-700">{t('short', {count: missingCount})}</p>}
                     <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
@@ -504,7 +533,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                             </>
                         )}
                     </div>
-                    <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
+                    <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})} action={<CopyLineup text={lineupText} />}>
                         <ul className="md:hidden flex flex-col">
                             {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                         </ul>
@@ -515,7 +544,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                         </p>
                         <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
-                                <Head withIndex={false} />
+                                <Head />
                                 <tbody>
                                     {advice.starters.map((f) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
@@ -529,7 +558,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
                         </ul>
                         <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
-                                <Head withIndex />
+                                <Head />
                                 <tbody>
                                     {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
