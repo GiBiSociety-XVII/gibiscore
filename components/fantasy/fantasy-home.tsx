@@ -1,13 +1,14 @@
 'use client';
 
-import {ArrowRight, ClipboardList, Gavel, Lock, Users} from "lucide-react";
-import {useState} from "react";
+import {ArrowRight, ClipboardList, Cloud, Gavel, Lock, Plus, Smartphone, Users} from "lucide-react";
+import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
-import {Link} from "@/i18n/navigation";
+import {Link, useRouter} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {totalSlots} from "@/lib/fantasy/config";
-import {configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
+import {listAuctions, loadAuction, type CloudAuction} from "@/lib/fantasy/cloud";
+import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 
 const ROME = 'Europe/Rome';
@@ -28,12 +29,50 @@ const roundName = (round: string) => (/^Regular Season - \d+$/.test(round) ? rou
 export function FantasyHome({round}: {round: NextRound | null}) {
     const t = useTranslations('Fantasy.home');
     const ts = useTranslations('Fantasy.setup');
+    const ta = useTranslations('Fantasy.auction');
+    const tc = useTranslations('Fantasy.cloud');
     const format = useFormatter();
+    const router = useRouter();
     const hydrated = useHydrated();
     const config = configStore.useValue();
     const purchases = purchasesStore.useValue();
+    const link = cloudStore.useValue();
     const saved = teamsStore.useValue();
     const account = useAccountTeams();
+    // The auctions saved in the account, newest first; the one open on this device is marked.
+    const [cloud, setCloud] = useState<CloudAuction[] | null>(null);
+    const [busy, setBusy] = useState<string | null>(null);
+    const userId = account.user?.id ?? null;
+    useEffect(() => {
+        if (!userId) return;
+        let alive = true;
+        listAuctions().then((rows) => { if (alive) setCloud(rows); }).catch(() => { if (alive) setCloud([]); });
+        return () => { alive = false; };
+    }, [userId]);
+    /** Opens a saved auction on this device (asking first when the one here is not in the cloud), then the board. */
+    const openCloud = async (row: CloudAuction) => {
+        if (link?.id === row.id) { router.push('/fantacalcio/asta'); return; }
+        if (config && !link && purchases.length > 0 && !window.confirm(tc('loadConfirm'))) return;
+        setBusy(row.id);
+        try {
+            const data = await loadAuction(row.id);
+            if (!data) { setCloud((rows) => (rows ?? []).filter((r) => r.id !== row.id)); return; }
+            configStore.write(data.config);
+            purchasesStore.write(data.purchases);
+            cloudStore.write({id: row.id, savedAt: row.updatedAt});
+            router.push('/fantacalcio/asta');
+        } finally {
+            setBusy(null);
+        }
+    };
+    /** A new auction: the one here is kept in the cloud when linked, asked about when not, then the setup opens. */
+    const newAuction = () => {
+        if (config && !link && !window.confirm(ta('resetConfirm'))) return;
+        purchasesStore.write([]);
+        configStore.write(null);
+        cloudStore.write(null);
+        router.push('/fantacalcio/asta');
+    };
     // The clock as of this render: enough to say whether the round has kicked off.
     const [now] = useState(() => Date.now());
     const when = (iso: string) => format.dateTime(new Date(iso), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME});
@@ -51,35 +90,50 @@ export function FantasyHome({round}: {round: NextRound | null}) {
     return (
         <div className="flex flex-col gap-3">
             <div className="grid gap-3 grid-cols-1 md:grid-cols-2 items-stretch">
-                {/* The auction on this device */}
+                {/* Every auction of mine: the ones in the account and the one on this device */}
                 <section className={tile}>
                     <h2 className="flex items-center gap-2 text-[13px] font-extrabold uppercase tracking-wide"><Gavel className="w-4 h-4" aria-hidden="true" />{t('auctionTitle')}</h2>
                     {!hydrated ? (
                         <p className="text-[13px] font-semibold text-muted-foreground">…</p>
-                    ) : config ? (
-                        <>
-                            <div className="flex flex-col gap-0.5">
-                                <span className="text-[17px] font-extrabold leading-tight">{config.name || ts(`leagues.${config.league}`)}</span>
-                                <span className="text-[12px] font-semibold text-muted-foreground">{ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr. · {managers[me]}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="rounded-lg border-2 border-foreground/20 bg-card px-3 py-2 flex flex-col">
-                                    <span className={cn("font-mono text-2xl font-extrabold tabular-nums leading-none", config.credits - spent < 0 && "text-red-700")}>{config.credits - spent}</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{t('dash.creditsLeft')}</span>
-                                </div>
-                                <div className="rounded-lg border-2 border-foreground/20 bg-card px-3 py-2 flex flex-col">
-                                    <span className="font-mono text-2xl font-extrabold tabular-nums leading-none">{mine.length}<span className="text-base text-muted-foreground">/{slots}</span></span>
-                                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{t('dash.rosterFilled')}</span>
-                                </div>
-                            </div>
-                            <Link href="/fantacalcio/asta" className={cn(cta, "mt-auto")}>{mine.length >= slots ? t('dash.openAuction') : t('dash.continueAuction')}<ArrowRight className="w-4 h-4" aria-hidden="true" /></Link>
-                        </>
+                    ) : !config && (cloud ?? []).length === 0 ? (
+                        <p className="text-[13px] font-semibold text-muted-foreground">{userId ? t('dash.noAuctions') : t('auctionText')}</p>
                     ) : (
-                        <>
-                            <p className="text-[13px] font-semibold">{t('auctionText')}</p>
-                            <Link href="/fantacalcio/asta" className={cn(cta, "mt-auto")}>{t('dash.setupAuction')}<ArrowRight className="w-4 h-4" aria-hidden="true" /></Link>
-                        </>
+                        <ul className="flex flex-col divide-y divide-muted rounded-lg border-2 border-foreground/20 bg-card overflow-hidden">
+                            {config && !link && (
+                                <li>
+                                    <Link href="/fantacalcio/asta" className="flex items-center gap-2 px-3 h-12 hover:bg-muted bg-accent/15">
+                                        <Smartphone className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
+                                        <span className="flex flex-col leading-tight min-w-0">
+                                            <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)} <span className="bb-badge bg-accent text-[9px] h-4 px-1 align-middle">{t('dash.currentAuction')}</span></span>
+                                            <span className="text-[10px] font-semibold text-muted-foreground truncate">{t('dash.onDevice')} · {ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr. · {t('dash.rosterOf', {filled: mine.length, total: slots, credits: config.credits - spent})}</span>
+                                        </span>
+                                        <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-extrabold shrink-0">{t('dash.continueAuction')}<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                                    </Link>
+                                </li>
+                            )}
+                            {(cloud ?? []).map((row) => {
+                                const current = link?.id === row.id;
+                                return (
+                                    <li key={row.id}>
+                                        <button type="button" onClick={() => void openCloud(row)} disabled={busy !== null} className={cn("w-full flex items-center gap-2 px-3 h-12 text-left hover:bg-muted disabled:opacity-60", current && "bg-accent/15")}>
+                                            <Cloud className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
+                                            <span className="flex flex-col leading-tight min-w-0">
+                                                <span className="text-[13px] font-extrabold truncate">{row.name} {current && <span className="bb-badge bg-accent text-[9px] h-4 px-1 align-middle">{t('dash.currentAuction')}</span>}</span>
+                                                <span className="text-[10px] font-semibold text-muted-foreground truncate">
+                                                    {current && config ? `${ts(`modes.${config.mode}`)} · ${config.participants} × ${config.credits} cr. · ${t('dash.rosterOf', {filled: mine.length, total: slots, credits: config.credits - spent})}` : `${ts(`leagues.${row.league}`)} · ${t('dash.purchases', {count: row.purchasesCount})} · ${format.dateTime(new Date(row.updatedAt), {day: 'numeric', month: 'short', timeZone: ROME})}`}
+                                                </span>
+                                            </span>
+                                            <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-extrabold shrink-0">{busy === row.id ? '…' : current ? t('dash.continueAuction') : t('dash.openAuction')}<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     )}
+                    <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">
+                        <AccountTeamsBadge status={account.status} next="/fantacalcio" />
+                        <button type="button" onClick={newAuction} className={cta}><Plus className="w-4 h-4" aria-hidden="true" />{t('dash.newAuction')}</button>
+                    </div>
                 </section>
 
                 {/* The round ahead and every team of mine */}

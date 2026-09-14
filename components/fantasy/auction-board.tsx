@@ -25,7 +25,7 @@ import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
-import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
+import {configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
@@ -279,13 +279,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const slotsTotal = totalSlots(config.slots);
     const freeSlots = Math.max(0, slotsTotal - mine.length);
     const mineByRole = (r: FantaRole) => mine.filter((p) => byId.get(p.playerId)?.role === r);
-    const reset = () => {
-        if (window.confirm(ta('resetConfirm'))) {
-            purchasesStore.write([]);
-            configStore.write(null);
-            cloudStore.write(null);
-        }
-    };
     // Roster limits per manager: slots of the role, and credits that must leave 1 per open slot.
     const rosterOf = (manager: number) => purchases.filter((p) => p.manager === manager && byId.has(p.playerId));
     const roleCount = (manager: number, r: FantaRole) => rosterOf(manager).filter((p) => byId.get(p.playerId)!.role === r).length;
@@ -504,7 +497,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         <Link href="/fantacalcio/formazione" className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" aria-hidden="true" />{t('lineup')}</Link>
                         <CloudMenu config={config} purchases={purchases} />
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
-                        <button type="button" onClick={reset} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold">{ta('reset')}</button>
                     </span>
                 </div>
 

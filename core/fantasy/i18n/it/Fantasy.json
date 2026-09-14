@@ -30,7 +30,13 @@
       "step2Title": "Registra gli acquisti",
       "step2Text": "Durante l'asta segni chi compra chi e a quanto: prezzi vivi, strategie e offerte massime si aggiornano da soli.",
       "step3Title": "Ogni settimana la formazione",
-      "step3Text": "Modulo, undici e panchina consigliati con formazioni ufficiali, infortuni e previsione della partita. Si blocca al fischio d'inizio."
+      "step3Text": "Modulo, undici e panchina consigliati con formazioni ufficiali, infortuni e previsione della partita. Si blocca al fischio d'inizio.",
+      "newAuction": "Nuova asta",
+      "noAuctions": "Nessuna asta ancora: creane una, ci vuole un minuto.",
+      "currentAuction": "Aperta",
+      "onDevice": "Su questo dispositivo",
+      "purchases": "{count, plural, =0 {nessun acquisto} =1 {1 acquisto} other {# acquisti}}",
+      "rosterOf": "{filled}/{total} in rosa · {credits} cr."
     }
   },
   "auction": {
@@ -41,7 +47,6 @@
     "empty": "Listone non disponibile in questo momento: il database sta rispondendo lentamente o le rose non sono ancora state importate. Riprova tra qualche minuto.",
     "settings": "Impostazioni",
     "changeSettings": "Modifica impostazioni",
-    "reset": "Nuova asta",
     "resetConfirm": "Cancellare impostazioni e acquisti di questa asta?",
     "updated": "Dati aggiornati ogni ora",
     "strategies": "Strategie"

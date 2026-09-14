@@ -27,12 +27,18 @@ export function AccountButton() {
     const box = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const supabase = createClient();
         const read = (user: {email?: string; user_metadata?: Record<string, unknown>} | null | undefined) => {
             if (!user) return null;
             const name = user.user_metadata?.username;
             return {email: user.email ?? null, name: typeof name === 'string' && name.trim() ? name.trim() : null};
         };
+        // Without the project's keys (a build, a preview) there is no session: the icon just goes to sign in.
+        let supabase: ReturnType<typeof createClient>;
+        try {
+            supabase = createClient();
+        } catch {
+            return;
+        }
         supabase.auth.getSession().then(({data}) => setWho(read(data.session?.user))).catch(() => undefined);
         const {data} = supabase.auth.onAuthStateChange((_event, session) => setWho(read(session?.user)));
         return () => data.subscription.unsubscribe();
