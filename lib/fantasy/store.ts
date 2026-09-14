@@ -102,6 +102,8 @@ export const outsStore = createJsonStore<LineupPins>(OUTS_KEY, parsePins, {});
  */
 export interface LineupLock {
     round: string;
+    /** The forecast model the snapshot was drawn with: an older one is drawn again rather than kept frozen. */
+    model?: number;
     /** First kick-off of the round, ISO. */
     deadline: string;
     savedAt: string;

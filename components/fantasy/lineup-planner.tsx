@@ -22,6 +22,8 @@ import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
+/** Bumped when the forecast changes scale or meaning: a frozen snapshot from before is drawn again. 2: votes on the fantasy scale. */
+const LINEUP_MODEL = 2;
 
 /** The pool's players as the league sees them: roles corrected by hand, cups in or out, the league's own rules. */
 function leaguePlayers(pool: AuctionPool, config: Pick<AuctionConfig, 'roleOverrides' | 'cupsCount' | 'rules'>): AuctionPlayer[] {
@@ -486,14 +488,15 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo}: {curr
     const deadline = roundInfo ? Date.parse(roundInfo.from) : NaN;
     const locked = !!roundInfo && (roundInfo.state === 'live' || roundInfo.state === 'played' || (Number.isFinite(deadline) && now >= deadline));
     const stored = locks[current.id];
-    const frozen: LineupLock | null = locked && stored && stored.round === context.round ? stored : null;
-    const serialized = JSON.stringify({round: context.round, deadline: roundInfo?.from ?? '', forecasts: liveForecasts, forced, pinned: [...livePinned], outs: [...liveOuts]});
+    // A snapshot from an older model is not worth keeping: the round is drawn again with the current one.
+    const frozen: LineupLock | null = locked && stored && stored.round === context.round && stored.model === LINEUP_MODEL ? stored : null;
+    const serialized = JSON.stringify({round: context.round, model: LINEUP_MODEL, deadline: roundInfo?.from ?? '', forecasts: liveForecasts, forced, pinned: [...livePinned], outs: [...liveOuts]});
     const fingerprint = hashOf(serialized);
     const hasRound = roundInfo !== null;
     useEffect(() => {
         if (!hasRound) return;
         const known = locks[current.id];
-        const valid = known?.round === context.round;
+        const valid = known?.round === context.round && known.model === LINEUP_MODEL;
         // Frozen: nothing more to write. Open: keep the last view; just kicked off without a view before: freeze now.
         if (locked && valid) return;
         if (valid && known.fingerprint === fingerprint) return;
