@@ -1,11 +1,12 @@
 'use client';
 
-import {BarChart3, CalendarDays, Trophy, Sparkles, UserRound} from "lucide-react";
+import {BarChart3, CalendarDays, Trophy, Sparkles} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {Link, usePathname} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {BrandIcon, BrandLockup} from "@/components/shared/layout/logo";
 import {NavMegaMenu} from "./nav-mega-menu";
+import {AccountButton} from "./account-button";
 import {SearchBox} from "./search-box";
 
 function romeDay(offset: number): string {
@@ -145,18 +146,7 @@ export default function AppBar() {
                     </nav>
 
                     <SearchBox />
-                    <Link
-                        href="/account"
-                        aria-label={t('login')}
-                        title={t('login')}
-                        aria-current={path.startsWith('/account') || path.startsWith('/sign') ? 'page' : undefined}
-                        className={cn(
-                            "inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg border-2 transition-colors",
-                            path.startsWith('/account') || path.startsWith('/sign') ? "border-foreground bg-accent/40" : "border-transparent text-foreground/70 hover:text-foreground hover:bg-muted",
-                        )}
-                    >
-                        <UserRound className="w-5 h-5" aria-hidden="true" />
-                    </Link>
+                    <AccountButton />
                 </div>
             </div>
         </header>
