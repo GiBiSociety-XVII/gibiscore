@@ -106,16 +106,25 @@ function Notes({p}: {p: AuctionPlayer}) {
     );
 }
 
-/** The two buttons of the plan on a player's row: wanted (the strategies plan him in) and ignored (they never propose him). */
-function PlanButtons({wanted, avoided, target, onWant, onAvoid, size = 5}: {wanted: boolean; avoided: boolean; target: boolean; onWant: () => void; onAvoid: () => void; size?: 5 | 7}) {
+/**
+ * One star for the plan on a player's row. Grey: nobody proposes him, a
+ * click makes him a wanted target the strategies plan in whatever the
+ * marks say. Blue: the strategy in use proposes him, a click excludes him
+ * so no strategy proposes him again. Black (wanted) or crossed (excluded):
+ * a click clears it.
+ */
+function PlanStar({wanted, avoided, target, onClick, size = 5}: {wanted: boolean; avoided: boolean; target: boolean; onClick: () => void; size?: 5 | 7}) {
     const t = useTranslations('Fantasy.board');
-    const tst = useTranslations('Fantasy.strategies');
     const box = size === 7 ? "w-7 h-7 text-[13px]" : "w-5 h-5 text-[11px]";
+    const state = wanted ? 'wanted' : avoided ? 'avoided' : target ? 'target' : 'none';
+    const look = {
+        wanted: "border-foreground bg-foreground text-background",
+        avoided: "border-foreground/40 bg-muted text-muted-foreground",
+        target: "border-foreground bg-accent text-foreground",
+        none: "border-foreground/40 bg-card text-muted-foreground hover:text-foreground",
+    }[state];
     return (
-        <>
-            <button type="button" onClick={onWant} aria-pressed={wanted} title={wanted ? tst('pinned') : target ? tst('target') : t('info.wantHint')} className={cn("inline-flex items-center justify-center rounded border shrink-0 font-extrabold leading-none", box, wanted ? "border-foreground bg-foreground text-background" : target ? "border-foreground bg-accent" : "border-foreground/40 bg-card text-muted-foreground hover:text-foreground")}>★</button>
-            <button type="button" onClick={onAvoid} aria-pressed={avoided} title={avoided ? tst('ignored') : t('info.avoidHint')} className={cn("inline-flex items-center justify-center rounded border shrink-0 font-extrabold leading-none", box, avoided ? "border-foreground bg-foreground text-background" : "border-foreground/40 bg-card text-muted-foreground hover:text-foreground")}>✕</button>
-        </>
+        <button type="button" onClick={onClick} aria-pressed={wanted || avoided} title={t(`plan.${state}`)} className={cn("inline-flex items-center justify-center rounded border shrink-0 font-extrabold leading-none", box, look)}>{state === 'avoided' ? '✕' : '★'}</button>
     );
 }
 
@@ -390,6 +399,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const reportOf = (manager: number) => teamReport(rosterOf(manager).map((pu) => byId.get(pu.playerId)).filter((p): p is AuctionPlayer => !!p), purchases.filter((pu) => pu.manager === manager), config.slots, {defenceModifier: defenceOption(config)});
     const myReport = reportOf(me);
     const targets = new Set(strategy ? ROLES.flatMap((r) => strategy.picks[r].filter((p) => !bought.has(p.id)).map((p) => p.id)) : []);
+    /** The star's click: wanted or excluded clears; a strategy's target is excluded; anyone else becomes wanted. */
+    const cyclePlan = (id: number) => {
+        if (wanted.has(id) || avoided.has(id)) configStore.write({...config, want: config.want.filter((x) => x !== id), avoid: config.avoid.filter((x) => x !== id)});
+        else if (targets.has(id)) toggleAvoid(id);
+        else toggleWant(id);
+    };
     // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
     // never more than what leaves me enough to finish the roster with the cheapest players left.
     const maxBidOf = (id: number): number | null => {
@@ -641,7 +656,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         <Status p={p} rivals={p.rivals} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                         <span className="ml-auto inline-flex items-center gap-1">
                                             <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground/40 bg-card">{expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>
-                                            {!purchase && <PlanButtons size={7} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} />}
+                                            {!purchase && <PlanStar size={7} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onClick={() => cyclePlan(p.id)} />}
                                             {purchase ? (
                                                 <>
                                                     <span className="text-[11px] font-bold text-foreground">{t('boughtBy', {manager: managers[purchase.manager] ?? t('me'), price: purchase.price})}</span>
@@ -686,7 +701,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                     <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-5 h-5 items-center justify-center rounded border border-foreground/40 bg-card shrink-0">
                                                         {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                                                     </button>
-                                                    {!purchase && <PlanButtons wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onWant={() => toggleWant(p.id)} onAvoid={() => toggleAvoid(p.id)} />}
+                                                    {!purchase && <PlanStar wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onClick={() => cyclePlan(p.id)} />}
                                                     <TeamCrest team={p.team} size={16} />
                                                     <span className="flex flex-col leading-tight min-w-0">
                                                         <span className="inline-flex items-center gap-1 min-w-0">

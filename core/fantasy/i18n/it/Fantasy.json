@@ -226,9 +226,7 @@
       "want": "Voglio",
       "avoid": "Ignora",
       "fvm": "FVM {fvm}",
-      "mantra": "Mantra: {roles}",
-      "wantHint": "Voglio: le strategie lo pianificano comunque e riadattano il resto",
-      "avoidHint": "Ignora: le strategie non lo propongono mai"
+      "mantra": "Mantra: {roles}"
     },
     "close": "Chiudi",
     "paidVsList": "Listino {list} · pagato {paid} ({gap})",
@@ -260,7 +258,13 @@
     },
     "lineup": "Formazione",
     "showScores": "Voti",
-    "showScoresHint": "Mostra i sette voti dietro al totale (titolarità, bonus, rendimento, malus, fisico, club, partenza)"
+    "showScoresHint": "Mostra i sette voti dietro al totale (titolarità, bonus, rendimento, malus, fisico, club, partenza)",
+    "plan": {
+      "none": "Nessuna strategia lo propone. Clicca: lo voglio, le strategie lo pianificano comunque",
+      "target": "Obiettivo della strategia in uso. Clicca: escludilo, nessuna strategia lo proporrà più",
+      "wanted": "Lo vuoi: entra in ogni piano al prezzo attuale. Clicca per togliere il vincolo",
+      "avoided": "Escluso: nessuna strategia lo propone. Clicca per togliere il vincolo"
+    }
   },
   "targets": {
     "title": "Obiettivi e piani B",
