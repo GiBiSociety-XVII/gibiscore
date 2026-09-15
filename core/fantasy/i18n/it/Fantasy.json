@@ -250,6 +250,16 @@
       "note": "Portieri a blocco: con {name} prendi anche {others}, a questo prezzo. Il blocco riempie gli slot portiere."
     },
     "rivalTakenBadge": "Rivale preso",
+    "verdict": {
+      "great": "Prendilo",
+      "greatHint": "La strategia pagherebbe almeno il 15% in più del prezzo vivo (o il sito lo mette molto più in alto del listino).",
+      "ok": "Prezzo giusto",
+      "okHint": "Il prezzo vivo è vicino a quanto la strategia pagherebbe.",
+      "pricey": "Caro",
+      "priceyHint": "Il prezzo vivo supera del 5-25% quanto la strategia pagherebbe (o il listino lo valuta più del sito).",
+      "avoid": "Lascia",
+      "avoidHint": "Il prezzo vivo supera di oltre il 25% quanto la strategia pagherebbe per questo posto."
+    },
     "bargain": {
       "badge": "Affare",
       "hint": "Affare: costa poco e rende molto. Quotazione Fantacalcio.it {quote}, ma per il sito è il {rank}º {role} del listone: chi sta lì nel listone Fantacalcio.it è quotato {equiv}. Al tavolo si paga di solito intorno alla quotazione."
@@ -825,6 +835,20 @@
       "open": "Aperta · si blocca {when}",
       "openNoDate": "Aperta"
     },
+    "colSignals": "Segnali",
+    "colSignalsHint": "Solo quello che conta: verde a favore, rosso contro. Passa sopra a un segnale per i numeri, il \"?\" apre tutte le ragioni.",
+    "signals": {
+      "usageLow": "Rischio panchina",
+      "usageMid": "Non sempre titolare",
+      "usageNone": "Mai visto in campo",
+      "formUp": "In forma",
+      "formDown": "In calo",
+      "defenceEasy": "Difesa favorita",
+      "defenceHard": "Difesa sotto pressione",
+      "attackEasy": "Attacco favorito",
+      "attackHard": "Pochi gol attesi",
+      "penalty": "Rigorista"
+    },
     "colRecent": "Ult.",
     "colRecentHint": "Media dei suoi ultimi voti (fino a cinque partite giocate) e quante sono: i voti ufficiali del Fantacalcio quando sono caricati, altrimenti i rating del provider riportati sulla scala dei voti. Verde sopra la sua media stagionale, rosso sotto. Sposta il voto atteso fino a un 40%, di più con più partite.",
     "locksAt": "Si blocca {when}",
@@ -873,6 +897,7 @@
       "noLock": "non salvata",
       "noLockHint": "Non avevi aperto la pagina prima del fischio d'inizio di questa giornata: la consigliata non è stata salvata.",
       "modelLink": "Quanto ci azzecca il modello →",
+      "hintShort": "Solo la rosa attuale; i voti inseriti valgono anche qui.",
       "hint": "Le giornate precedenti arrivano dal server per la sola rosa attuale: chi non è più in rosa non entra nei conti. I voti inseriti valgono anche qui; senza voti, il voto è la stima dal rating del provider."
     },
     "recap": {
@@ -913,6 +938,7 @@
       "inBest": "miglior XI",
       "typedCount": "{count, plural, one {# voto inserito} other {# voti inseriti}}",
       "voteHint": "Tutto quello che vedi qui è della sola partita di questa giornata (sotto ogni nome c'è quale). Scrivi il voto in pagella (non il fantavoto) per chi ha già finito la partita: bonus e malus li aggiunge il sito con le regole della tua lega. Senza voto: scrivi sv (o 0). Campo vuoto: torna alla stima del sito. Con la matita correggi gol, assist, cartellini, rigori e autogol. I voti inseriti tarano la scala dei voti e le ultime prestazioni usate per i consigli.",
+      "voteShort": "Scrivi il voto in pagella di chi ha finito; sv = senza voto; vuoto = stima del sito.",
       "voteLabel": "Voto di {name}",
       "reset": "Annulla gli inserimenti",
       "resetConfirm": "Cancellare tutti i voti e le correzioni inserite per questa giornata, su questo dispositivo e nell'account?",
@@ -1030,6 +1056,8 @@
       "ledger": "Movimenti"
     },
     "tradeHint": "Scegli le due squadre e spunta i giocatori che ognuna cede. I giocatori passano al costo che avevano; il conguaglio in crediti si registra nei movimenti. Lo scambio va a buon fine solo se entrambe le rose restano nei posti per ruolo e con almeno un credito per ogni posto libero.",
+    "tradeShort": "Spunta chi cede ognuna; i giocatori passano al loro costo, il conguaglio va nei movimenti.",
+    "releaseShort": "Scegli giocatore e rimborso: torna sul listone, la differenza resta tra gli spesi.",
     "sideA": "Squadra A",
     "sideB": "Squadra B",
     "emptyRoster": "Rosa vuota.",

@@ -1,6 +1,6 @@
 'use client';
 
-import {ChevronDown, ChevronUp, History} from "lucide-react";
+import {ChevronDown, ChevronUp, HelpCircle, History} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
@@ -138,7 +138,7 @@ export function RecapHistory({team, roster, current, locks, seasonId, calibratio
                             })}
                         </tbody>
                     </table>
-                    <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('hint')} <Link href="/fantacalcio/modello" className="text-foreground font-extrabold hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('modelLink')}</Link></p>
+                    <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted"><span title={t('hint')} className="inline-flex items-center gap-1 mr-2"><HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />{t('hintShort')}</span><Link href="/fantacalcio/modello" className="text-foreground font-extrabold hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('modelLink')}</Link></p>
                 </div>
             )}
         </Panel>

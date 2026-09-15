@@ -53,10 +53,28 @@ function ScoreCell({value}: {value: number}) {
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 /** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
-function Status({p, rivals, rivalsTaken = [], deal}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]; deal?: Bargain}) {
+type Verdict = 'great' | 'ok' | 'pricey' | 'avoid';
+const VERDICT_CLASS: Record<Verdict, string> = {great: "bg-emerald-200 border-emerald-700", ok: "bg-emerald-100 border-emerald-700/60", pricey: "bg-amber-200 border-amber-700", avoid: "bg-red-200 border-red-700"};
+
+/**
+ * One word on whether to buy him at the live price: with a strategy, the
+ * ceiling it would pay against the price; without, where the site ranks
+ * him against where the list does.
+ */
+function verdictOf(price: number, maxBid: number | null, deal: Bargain | undefined): Verdict | null {
+    if (maxBid !== null) {
+        const ratio = maxBid / Math.max(1, price);
+        return ratio >= 1.15 ? 'great' : ratio >= 0.95 ? 'ok' : ratio >= 0.75 ? 'pricey' : 'avoid';
+    }
+    if (!deal) return null;
+    return deal.index >= 1.3 ? 'great' : deal.index <= 0.75 ? 'pricey' : null;
+}
+
+function Status({p, rivals, rivalsTaken = [], deal, verdict}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]; deal?: Bargain; verdict?: Verdict | null}) {
     const t = useTranslations('Fantasy.board');
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
+            {verdict && <Badge variant="outline" className={cn("text-[9px] h-4 px-1 font-extrabold", VERDICT_CLASS[verdict])} title={t(`verdict.${verdict}Hint`)}>{t(`verdict.${verdict}`)}</Badge>}
             {deal?.bargain && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-emerald-700 border-emerald-700" title={t('bargain.hint', {quote: deal.quote, equiv: deal.equivQuote, rank: deal.rank, role: p.role})}>{t('bargain.badge')}</Badge>}
             {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
             {p.injury && (() => {
@@ -656,7 +674,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 {view === 'tiers' && (
                     <>
                         <TierList players={players} infos={tierInfos} prices={prices} bought={bought} targets={targets} onBuy={openBuy} />
-                        <p className="text-[11px] font-semibold text-muted-foreground">{tt('hint')}</p>
+
                     </>
                 )}
                 {view === 'list' && (<>
@@ -684,8 +702,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                     <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] font-semibold text-muted-foreground">
                                         <span>{t('columns.fantaAvg')} <span className="font-mono font-extrabold text-foreground tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</span></span>
                                         <span>{t('columns.price')} <span className="text-foreground">{priceCell(p.id)}</span></span>
-                                        {strategy && maxBidOf(p.id) !== null && <span>{t('columns.maxBid')} <span className="font-mono font-extrabold text-accent-text tabular-nums">{maxBidOf(p.id)}</span></span>}
-                                        <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                        {strategy && maxBidOf(p.id) !== null && <span>{t('columns.maxBid')} <span className={cn("font-mono font-extrabold tabular-nums px-1 rounded border", (() => { const v = purchase ? null : verdictOf(prices.get(p.id) ?? 1, maxBidOf(p.id), deals.get(p.id)); return v ? VERDICT_CLASS[v] : "border-transparent text-accent-text"; })())}>{maxBidOf(p.id)}</span></span>}
+                                        <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} verdict={purchase ? null : verdictOf(prices.get(p.id) ?? 1, strategy ? maxBidOf(p.id) : null, deals.get(p.id))} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                         <span className="ml-auto inline-flex items-center gap-1">
                                             <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground/40 bg-card">{expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>
                                             {!purchase && <PlanStar size={7} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onClick={() => cyclePlan(p.id)} />}
@@ -754,10 +772,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
                                             <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>
                                             <td className="px-1 py-1 text-right">{priceCell(p.id)}</td>
-                                            {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
+                                            {strategy && <td className="px-1 py-1 text-right">{(() => { const max = maxBidOf(p.id); const v = purchase || max === null ? null : verdictOf(prices.get(p.id) ?? 1, max, deals.get(p.id)); return <span className={cn("inline-flex items-center justify-center min-w-[2.25rem] h-6 px-1 rounded border font-mono text-[12px] font-extrabold tabular-nums", v ? VERDICT_CLASS[v] : "border-transparent text-accent-text")}>{max ?? '–'}</span>; })()}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                                    <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} verdict={purchase ? null : verdictOf(prices.get(p.id) ?? 1, strategy ? maxBidOf(p.id) : null, deals.get(p.id))} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                                     <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">

@@ -134,8 +134,6 @@ function toneOf(v: number, [worst, bad, fine, good]: [number, number, number, nu
     if (v <= bad) return 'bad';
     return 'none';
 }
-/** The same, for a number where lower is better. */
-const lowerIsBetter = (v: number, [good, fine, bad, worst]: [number, number, number, number]): Tone => (v <= good ? 'good' : v <= fine ? 'fine' : v >= worst ? 'worst' : v >= bad ? 'bad' : 'none');
 
 function Cell({tone, title, children, strong = false}: {tone: Tone; title?: string; children: React.ReactNode; strong?: boolean}) {
     return <span className={cn("bb-badge font-mono tabular-nums h-5 px-1 whitespace-nowrap", strong ? "text-[12px] font-extrabold" : "text-[11px] font-bold", TONE_CLASS[tone])} title={title}>{children}</span>;
@@ -145,6 +143,46 @@ function Cell({tone, title, children, strong = false}: {tone: Tone; title?: stri
 function facts(f: PlayerForecast) {
     const by = <K extends ForecastReason['kind']>(kind: K) => f.reasons.find((r): r is Extract<ForecastReason, {kind: K}> => r.kind === kind);
     return {usage: by('usage'), form: by('form'), playerForm: by('playerForm'), match: by('match'), attack: by('attack'), cleanSheet: by('cleanSheet'), official: by('official'), sidelined: by('sidelined'), doubtful: by('doubtful'), manual: by('manual'), noMatch: by('noMatch'), noUsage: by('noUsage')};
+}
+
+interface Signal {
+    key: string;
+    label: string;
+    tone: Tone;
+    title: string;
+}
+
+/**
+ * What decides the forecast, as a handful of coloured chips: only what is
+ * notable (a starter at risk, a hot or cold streak, an easy or hard
+ * match, a likely clean sheet, the penalties). The numbers behind every
+ * chip sit in its tooltip and in the "why" panel.
+ */
+function signalsOf(f: PlayerForecast, x: ReturnType<typeof facts>, t: ReturnType<typeof useTranslations<'Fantasy.lineup'>>, reasonText: (r: ForecastReason) => string): Signal[] {
+    const out: Signal[] = [];
+    const defensive = f.player.role === 'P' || f.player.role === 'D';
+    if (x.usage) {
+        const rate = (x.usage.started + 0.5 * x.usage.came) / Math.max(1, x.usage.total);
+        if (rate < 0.5) out.push({key: 'usage', label: t('signals.usageLow'), tone: 'worst', title: reasonText(x.usage)});
+        else if (rate < 0.8) out.push({key: 'usage', label: t('signals.usageMid'), tone: 'bad', title: reasonText(x.usage)});
+    } else if (x.noUsage) out.push({key: 'usage', label: t('signals.usageNone'), tone: 'worst', title: reasonText(x.noUsage)});
+    if (x.playerForm) {
+        const gap = x.playerForm.avg - x.playerForm.base;
+        if (gap >= 0.25) out.push({key: 'form', label: t('signals.formUp'), tone: 'good', title: reasonText(x.playerForm)});
+        else if (gap <= -0.25) out.push({key: 'form', label: t('signals.formDown'), tone: 'bad', title: reasonText(x.playerForm)});
+    }
+    if (x.match) {
+        const title = x.cleanSheet ? `${reasonText(x.match)} · ${reasonText(x.cleanSheet)}` : reasonText(x.match);
+        if (defensive) {
+            if (x.match.lambdaAgainst <= 1.0) out.push({key: 'match', label: t('signals.defenceEasy'), tone: 'good', title});
+            else if (x.match.lambdaAgainst >= 1.6) out.push({key: 'match', label: t('signals.defenceHard'), tone: 'bad', title});
+        } else {
+            if (x.match.lambdaFor >= 1.6) out.push({key: 'match', label: t('signals.attackEasy'), tone: 'good', title});
+            else if (x.match.lambdaFor <= 0.9) out.push({key: 'match', label: t('signals.attackHard'), tone: 'bad', title});
+        }
+    }
+    if (f.player.penaltyTaker && f.player.role !== 'P') out.push({key: 'penalty', label: t('signals.penalty'), tone: 'good', title: t('reasons.penalty')});
+    return out.slice(0, 3);
 }
 
 function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; /** Every other row, so the eye follows one across the columns. */ stripe?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
@@ -157,7 +195,6 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = 
     const opponent = p && fixture ? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null} : null;
     const state = fixture ? (fixture.state === 'finished' ? t('played') : ['live', 'half_time', 'extra_time', 'penalties'].includes(fixture.state) ? t('live') : fixture.state === 'postponed' || fixture.state === 'cancelled' ? t('postponed') : null) : null;
     const x = facts(f);
-    const defensive = f.player.role === 'P' || f.player.role === 'D';
     // Status badges: what settles his chance before the numbers.
     const status: Array<{key: string; label: string; tone: Tone; reason: ForecastReason}> = [];
     if (x.manual) status.push({key: 'manual', label: t('status.manual'), tone: 'worst', reason: x.manual});
@@ -165,7 +202,6 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = 
     if (x.sidelined) status.push({key: 'sidelined', label: t(x.sidelined.category === 'injury' ? 'status.injury' : x.sidelined.category === 'suspension' ? 'status.suspension' : 'status.absent'), tone: 'worst', reason: x.sidelined});
     if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad', reason: x.doubtful});
     if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst', reason: x.noMatch});
-    const usageRate = x.usage ? (x.usage.started + 0.5 * x.usage.came) / Math.max(1, x.usage.total) : null;
     const td = "px-1 py-1.5 text-center";
     const bg = pinned ? "bg-accent/20" : out ? "bg-red-100/60" : stripe ? "bg-muted/60" : "";
     return (
@@ -194,7 +230,6 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = 
                 <span className="flex items-center gap-1.5 min-w-0">
                     {p && <TeamCrest team={p.team} size={18} />}
                     <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
-                    {f.player.penaltyTaker && f.player.role !== 'P' && <span className="bb-badge bg-accent text-[9px] h-4 px-1" title={t('reasons.penalty')}>R</span>}
                 </span>
                 {status.length > 0 && (
                     <span className="flex flex-wrap gap-1 mt-0.5">
@@ -212,46 +247,17 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = 
                     <span className="text-muted-foreground">{t('noFixture')}</span>
                 )}
             </td>
-            <td className={td}>
-                {x.usage && usageRate !== null ? (
-                    <Cell tone={toneOf(usageRate, [0.3, 0.5, 0.75, 0.9])} title={reasonText(x.usage)}>{x.usage.started}/{x.usage.total}{x.usage.came > 0 && <span className="opacity-70"> +{x.usage.came}</span>}</Cell>
-                ) : x.noUsage ? (
-                    <Cell tone="bad" title={reasonText(x.noUsage)}>–</Cell>
-                ) : null}
-            </td>
-            <td className={cn(td, "hidden lg:table-cell")}>
-                {x.playerForm && <Cell tone={toneOf(x.playerForm.avg - x.playerForm.base, [-0.5, -0.25, 0.25, 0.5])} title={reasonText(x.playerForm)}>{x.playerForm.avg.toFixed(1)}<span className="opacity-60 text-[9px]">×{x.playerForm.matches}</span></Cell>}
-            </td>
-            <td className={td}>
-                {x.form && <Cell tone={toneOf(x.form.own - x.form.opp, [-5, -3, 3, 5])} title={reasonText(x.form)}>{x.form.own}<span className="opacity-60">·</span>{x.form.opp}</Cell>}
-            </td>
-            <td className={td}>
-                {x.match && <Cell tone={toneOf(x.match.win, [25, 35, 50, 60])} title={reasonText(x.match)}>{Math.round(x.match.win)}%</Cell>}
-            </td>
-            <td className={td}>
-                {x.match && (
-                    <Cell tone={defensive ? lowerIsBetter(x.match.lambdaAgainst, [0.9, 1.1, 1.5, 1.9]) : toneOf(x.match.lambdaFor, [0.9, 1.1, 1.6, 2.0])} title={x.cleanSheet ? `${reasonText(x.match)} · ${reasonText(x.cleanSheet)}` : reasonText(x.match)}>
-                        {x.match.lambdaFor.toFixed(1)}<span className="opacity-60">-</span>{x.match.lambdaAgainst.toFixed(1)}
-                    </Cell>
-                )}
-            </td>
-            <td className={td}>
-                {x.attack ? (
-                    <Cell tone={toneOf(x.attack.factor, [0.7, 0.85, 1.15, 1.3])} title={reasonText(x.attack)}>{x.attack.factor >= 1 ? '+' : '−'}{Math.round(Math.abs(x.attack.factor - 1) * 100)}%</Cell>
-                ) : x.cleanSheet ? (
-                    <Cell tone={toneOf(x.cleanSheet.pct, [15, 22, 35, 45])} title={reasonText(x.cleanSheet)}>{t('cleanSheetShort', {pct: x.cleanSheet.pct})}</Cell>
-                ) : x.match && f.player.role !== 'P' ? (
-                    <Cell tone="none">=</Cell>
-                ) : null}
-            </td>
             <td className={td}><Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</Cell></td>
-            <td className={cn(td, "hidden lg:max-xl:table-cell min-[1360px]:table-cell")}><Cell tone={toneOf(f.rating, [6.0, 6.3, 6.7, 7.0])}>{f.rating.toFixed(2)}</Cell></td>
-            <td className={cn(td, "hidden lg:max-xl:table-cell min-[1360px]:table-cell")}><Cell tone={toneOf(f.points, [6.2, 6.6, 7.2, 7.8])}>{f.points.toFixed(2)}</Cell></td>
+            <td className="px-2 py-1.5">
+                <span className="flex flex-wrap gap-1">
+                    {signalsOf(f, x, t, reasonText).map((sg) => <span key={sg.key} className={cn("bb-badge text-[10px] h-5 px-1.5 whitespace-nowrap", TONE_CLASS[sg.tone])} title={sg.title}>{sg.label}</span>)}
+                </span>
+            </td>
             <td className={td}><Cell strong tone={toneOf(slot ?? f.value, [5.8, 6.4, 7.0, 7.5])} title={t('slotOf', {value: f.value.toFixed(2)})}>{(slot ?? f.value).toFixed(2)}</Cell></td>
         </tr>
         {why && (
             <tr className={cn("align-top", bg)}>
-                <td colSpan={14} className="px-3 pb-2 pt-0">
+                <td colSpan={7} className="px-3 pb-2 pt-0">
                     <div className="rounded-lg border-2 border-foreground bg-card px-3 py-2 flex flex-col gap-1">
                         <span className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wide">
                             {f.player.name}
@@ -301,10 +307,7 @@ function ForecastCard({f, slot, index, byId, reasonText, muted = false, pinned, 
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
                 {status.map((b) => <span key={b.key} className={cn("bb-badge text-[9px] h-4 px-1 uppercase", TONE_CLASS[b.tone])}>{b.label}</span>)}
-                {x.form && <Cell tone={toneOf(x.form.own - x.form.opp, [-5, -3, 3, 5])}>{t('cardForm')} {x.form.own}·{x.form.opp}</Cell>}
-                {x.match && <Cell tone={toneOf(x.match.win, [25, 35, 50, 60])}>{t('cardWin')} {Math.round(x.match.win)}%</Cell>}
-                {x.attack && <Cell tone={toneOf(x.attack.factor, [0.7, 0.85, 1.15, 1.3])}>{t('cardGoals')} {x.attack.factor >= 1 ? '+' : '−'}{Math.round(Math.abs(x.attack.factor - 1) * 100)}%</Cell>}
-                {x.cleanSheet && <Cell tone={toneOf(x.cleanSheet.pct, [15, 22, 35, 45])}>{t('cleanSheetShort', {pct: x.cleanSheet.pct})}</Cell>}
+                {signalsOf(f, x, t, reasonText).map((sg) => <span key={sg.key} className={cn("bb-badge text-[10px] h-5 px-1.5 whitespace-nowrap", TONE_CLASS[sg.tone])} title={sg.title}>{sg.label}</span>)}
                 <span className="ml-auto inline-flex items-center gap-1">
                     <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} className="bb-btn h-7 px-2 text-[11px] font-extrabold bg-card">{more ? t('cardLess') : t('cardMore')}</button>
                     <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>{pinned ? <PinOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Pin className="w-3.5 h-3.5" aria-hidden="true" />}</button>
@@ -352,15 +355,8 @@ function Head() {
                 <th className={cn(th, "px-1")} aria-label={t('colRole')} />
                 <th className={cn(th, "text-left px-2")}>{t('colPlayer')}</th>
                 <th className={cn(th, "text-left px-2")}>{t('colMatch')}</th>
-                <th className={cn(th, "min-w-[3.75rem]")} title={t('colUsageHint')}>{t('colUsage')}</th>
-                <th className={cn(th, "min-w-[3.75rem] hidden lg:table-cell")} title={t('colRecentHint')}>{t('colRecent')}</th>
-                <th className={cn(th, "min-w-[3rem]")} title={t('colFormHint')}>{t('colForm')}</th>
-                <th className={cn(th, "min-w-[3rem]")} title={t('colWinHint')}>{t('colWin')}</th>
-                <th className={cn(th, "min-w-[3.75rem]")} title={t('colGoalsHint')}>{t('colGoals')}</th>
-                <th className={cn(th, "min-w-[3.5rem]")} title={t('colFactorHint')}>{t('colFactor')}</th>
                 <th className={cn(th, "min-w-[3rem]")} title={t('colPlaysHint')}>{t('colPlays')}</th>
-                <th className={cn(th, "min-w-[3.25rem] hidden lg:max-xl:table-cell min-[1360px]:table-cell")} title={t('colRatingHint')}>{t('colRating')}</th>
-                <th className={cn(th, "min-w-[3.25rem] hidden lg:max-xl:table-cell min-[1360px]:table-cell")} title={t('colPointsHint')}>{t('colPoints')}</th>
+                <th className={cn(th, "text-left px-2")} title={t('colSignalsHint')}>{t('colSignals')}</th>
                 <th className={cn(th, "min-w-[3.25rem]")} title={t('colValueHint')}>{t('colValue')}</th>
             </tr>
         </thead>
@@ -599,11 +595,6 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
                         <ul className="md:hidden flex flex-col">
                             {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                         </ul>
-                        <p className="hidden md:flex px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted flex-wrap gap-x-3 gap-y-1">
-                            <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.good)}> </span>{t('legendGood')}</span>
-                            <span><span className={cn("bb-badge h-4 px-1 mr-1", TONE_CLASS.worst)}> </span>{t('legendBad')}</span>
-                            <span>{t('legendHint')}</span>
-                        </p>
                         <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
                                 <Head />
@@ -613,8 +604,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
                             </table>
                         </div>
                     </Panel>
-                    <Panel title={t('benchTitle', {count: advice.bench.length})}>
-                        <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted">{t('benchHint')}</p>
+                    <Panel title={<span title={t('benchHint')} className="inline-flex items-center gap-1.5">{t('benchTitle', {count: advice.bench.length})}<HelpCircle className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /></span>}>
                         <ul className="md:hidden flex flex-col">
                             {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                         </ul>
@@ -630,7 +620,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
                 </div>
 
                 <div className="flex flex-col gap-3 min-w-0">
-                    <Panel title={t('formationsTitle')}>
+                    <Panel title={<span title={t('formationsHint')} className="inline-flex items-center gap-1.5">{t('formationsTitle')}<HelpCircle className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /></span>}>
                         <ul className="flex flex-col divide-y divide-muted">
                             {advice.formations.map((f, i) => (
                                 <li key={f.key}>
@@ -645,7 +635,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
                                 </li>
                             ))}
                         </ul>
-                        <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('formationsHint')}</p>
+
                     </Panel>
                     <details className="bb-surface overflow-hidden group">
                         <summary className="flex items-center justify-between gap-2 px-3 h-9 bg-card cursor-pointer list-none text-[13px] font-extrabold uppercase tracking-wide">

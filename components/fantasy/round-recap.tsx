@@ -1,6 +1,6 @@
 'use client';
 
-import {ChevronDown, ChevronUp, ClipboardCheck, Pencil, RotateCcw} from "lucide-react";
+import {ChevronDown, ChevronUp, ClipboardCheck, HelpCircle, Pencil, RotateCcw} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
@@ -293,7 +293,7 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
             {open && (
                 <div className="border-t-2 border-foreground">
                     <p className="px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                        <span>{t('voteHint')}</span>
+                        <span className="inline-flex items-center gap-1.5" title={t('voteHint')}>{t('voteShort')}<HelpCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /><span className="sr-only">{t('voteHint')}</span></span>
                         <span className={cn("ml-auto font-bold", save === 'error' && "text-red-700")}>{!signedIn ? t('signInToSave') : save === 'saving' ? t('saving') : save === 'saved' ? t('saved') : save === 'error' ? t('saveError') : t('autoSave')}</span>
                         {typedCount > 0 && <button type="button" onClick={reset} className="bb-btn bg-card h-6 px-2 text-[10px] font-extrabold inline-flex items-center gap-1"><RotateCcw className="w-3 h-3" aria-hidden="true" />{t('reset')}</button>}
                     </p>
