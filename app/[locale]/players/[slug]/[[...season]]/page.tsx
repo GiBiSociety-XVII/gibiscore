@@ -2,7 +2,7 @@ import type {Metadata} from "next";
 import Image from "next/image";
 import {ArrowLeftRight} from "lucide-react";
 import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
-import {Link} from "@/i18n/navigation";
+import {Link, redirect} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
@@ -56,6 +56,9 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                 <NotFoundBox message={t('notFound')} backHref="/competitions" backLabel="Competizioni" />
             </SiteShell>
         );
+    }
+    if (page.player.slug !== slug) {
+        redirect({href: `/players/${page.player.slug}${season && season.length > 0 ? `/${season.join('/')}` : ''}`, locale});
     }
 
     const {player, team, totals} = page;
