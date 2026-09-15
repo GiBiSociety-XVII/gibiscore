@@ -29,6 +29,7 @@ import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "
 import {LegheImport} from "./leghe-import";
 import {MarketDialog} from "./market-dialog";
 import {Help} from "./help";
+import {auctionPath} from "@/lib/fantasy/routes";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {bargains, type Bargain} from "@/lib/fantasy/bargains";
@@ -277,7 +278,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const save = (next: AuctionConfig) => {
         configStore.write(next);
         setEditing(false);
-        if (!pool || next.league !== pool.league) router.push(`/fantacalcio/asta?league=${next.league}`);
+        if (!pool || next.league !== pool.league) router.push(auctionPath(next.league));
     };
     // Rosters exported by Leghe Fantacalcio: a whole league in, the cloud link dropped (it was another auction's).
     const importable = (pool?.players ?? []).map((p) => ({id: p.id, role: p.role, listCode: p.listCode}));
@@ -300,7 +301,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     }
     if (editing) return <AuctionSetup initial={config} onSave={save} onCancel={() => setEditing(false)} />;
     if (pool && pool.league !== config.league) {
-        router.replace(`/fantacalcio/asta?league=${config.league}`);
+        router.replace(auctionPath(config.league));
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     }
     if (!pool || !board) return <p className="text-sm font-semibold text-muted-foreground">{ta('empty')}</p>;

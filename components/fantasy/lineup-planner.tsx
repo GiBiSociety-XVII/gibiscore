@@ -20,6 +20,7 @@ import type {SavedTeam} from "@/lib/fantasy/config";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 import {hashOf} from "@/lib/fantasy/hash";
 import {keepSpots, sameSpots, type Spot} from "@/lib/fantasy/spots";
+import {lineupPath} from "@/lib/fantasy/routes";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 import {RoundRecap} from "./round-recap";
 import {RecapHistory} from "./recap-history";
@@ -485,7 +486,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
     if (pool && pool.league !== current.league) {
-        router.replace(`/fantacalcio/formazione?league=${current.league}`);
+        router.replace(lineupPath(current.league));
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     }
     if (!pool) return <p className="bb-surface px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('noPool')}</p>;

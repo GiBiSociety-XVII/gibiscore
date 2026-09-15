@@ -525,7 +525,8 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 clubStrength: clubStrengthOf(team.id),
             };
             const scores = scorePlayer(inputBase, calibration);
-            const scoresLeagueOnly = scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)}, calibration);
+            // Without cup lines the two marks are the same object: serialised once, not twice.
+            const scoresLeagueOnly = lines.some((l) => l.cup) ? scorePlayer({...inputBase, seasons: lines.filter((l) => !l.cup)}, calibration) : scores;
             players.push({
                 id: player.id,
                 name: player.name,
@@ -543,12 +544,12 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
                 })(),
                 europe: europeByTeam.get(team.id) ?? null,
                 roleSource: listed ? 'listone' : call?.source === 'lineups' ? 'lineups' : 'profile',
-                roleBreakdown: call?.breakdown ?? {},
+                roleBreakdown: Object.fromEntries(Object.entries(call?.breakdown ?? {}).map(([k, v]) => [k, Math.round(v * 100) / 100])),
                 listQuote: listed?.quote ?? null,
                 listFvm: listed && listed.fvm > 0 ? listed.fvm : null,
                 listCode: listed?.code ?? null,
                 mantraRoles: listed && listed.mantra ? listed.mantra : null,
-                availability: availabilityOf.get(player.id) ?? {starts: 0, benches: 0},
+                availability: (({starts, benches}) => ({starts: Math.round(starts * 100) / 100, benches: Math.round(benches * 100) / 100}))(availabilityOf.get(player.id) ?? {starts: 0, benches: 0}),
                 contested: isContested(availabilityOf.get(player.id) ?? {starts: 0, benches: 0}, 9),
                 rivals: [],
                 penaltyTaker: lines.some((l) => l.year >= year - 1 && l.penaltiesScored >= 2),
