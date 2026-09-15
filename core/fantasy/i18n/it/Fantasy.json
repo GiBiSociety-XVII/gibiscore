@@ -802,6 +802,7 @@
     "dropHere": "Lascia qui un panchinaro per farlo entrare al posto di {name}",
     "unbench": "Rimettilo in gioco: torna a decidere il modello",
     "benchedBadge": "Fuori per tua scelta",
+    "benchedShort": "fuori",
     "benchedCount": "{count, plural, one {# in panchina per tua scelta} other {# in panchina per tua scelta}}",
     "dragHint": "Trascina un giocatore sul campo: su un titolare lo scambi, sull'erba entra al posto migliore.",
     "dragShort": "Trascina sul campo",

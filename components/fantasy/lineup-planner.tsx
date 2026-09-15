@@ -124,6 +124,49 @@ function PitchDot({f, byId, pinned, picking, onReceive}: {f: PlayerForecast; byI
     return <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={t('dropHere', {name: f.player.name})} className={cls} {...drop}>{body}</Link>;
 }
 
+/**
+ * The bench next to the pitch, as short rows that can be dragged onto it
+ * (or placed with the ⇄ button): the list scrolls on its own while the
+ * pitch stays put, so a substitute is always a short drag away.
+ */
+function BenchStrip({bench, slots, byId, pinned, benched, outs, picking, locked, onPlace, onUnbench}: {bench: PlayerForecast[]; slots: Map<number, number>; byId: Map<number, AuctionPlayer>; pinned: ReadonlySet<number>; benched: ReadonlySet<number>; outs: ReadonlySet<number>; picking: number | null; locked: boolean; onPlace: (id: number) => void; onUnbench: (id: number) => void}) {
+    const t = useTranslations('Fantasy.lineup');
+    return (
+        <div className="bb-surface flex flex-col min-h-0 md:relative md:h-full">
+            <div className="flex items-center gap-1.5 px-3 h-9 border-b-2 border-foreground bg-card rounded-t-[calc(var(--radius-lg)-2px)] text-[12px] font-extrabold uppercase tracking-wide shrink-0">
+                {t('benchTitle', {count: bench.length})}
+                <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground normal-case tracking-normal" title={t('dragHint')}><ArrowLeftRight className="w-3 h-3" aria-hidden="true" />{t('dragShort')}</span>
+            </div>
+            <ul className="flex flex-col max-h-72 md:max-h-none md:absolute md:inset-x-0 md:top-9 md:bottom-0 overflow-y-auto [scrollbar-width:thin]">
+                {bench.map((f) => {
+                    const p = byId.get(f.player.id);
+                    const isPicking = picking === f.player.id;
+                    const isBenched = benched.has(f.player.id);
+                    const out = outs.has(f.player.id);
+                    const surname = f.player.name.split(' ').slice(-1)[0] ?? f.player.name;
+                    return (
+                        <li key={f.player.id} className={cn("flex items-center gap-1.5 px-2 h-9 border-t border-muted first:border-t-0 text-[12px]", !locked && "cursor-grab active:cursor-grabbing", isPicking ? "bg-accent/40" : isBenched ? "bg-red-100/60" : out || f.plays < 0.2 ? "opacity-60" : "", pinned.has(f.player.id) && "bg-accent/20")} title={`${f.player.name} · ${pct(f.plays)} · ${(slots.get(f.player.id) ?? f.value).toFixed(2)}`} {...dragProps(f.player.id, locked)}>
+                            <RoleBadge role={f.player.role} />
+                            {p && <TeamCrest team={p.team} size={18} />}
+                            <span className="font-extrabold truncate min-w-0">{surname}</span>
+                            {isBenched && <span className="bb-badge text-[8px] h-3.5 px-1 uppercase bg-red-200 shrink-0">{t('benchedShort')}</span>}
+                            <span className="ml-auto flex items-center gap-1 shrink-0">
+                                <span className={cn("font-mono text-[10px] font-extrabold tabular-nums px-1 rounded border border-foreground/40 leading-[16px]", chanceClass(f.plays))}>{pct(f.plays)}</span>
+                                <span className="font-mono text-[11px] font-extrabold tabular-nums w-8 text-right">{(slots.get(f.player.id) ?? f.value).toFixed(1)}</span>
+                                {isBenched ? (
+                                    <button type="button" onClick={() => onUnbench(f.player.id)} disabled={locked} title={locked ? t('lockedNoChange') : t('unbench')} className="bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40 bg-red-700 text-background"><RotateCcw className="w-3 h-3" aria-hidden="true" /></button>
+                                ) : (
+                                    <button type="button" onClick={() => onPlace(f.player.id)} disabled={locked} aria-pressed={isPicking} title={locked ? t('lockedNoChange') : t('place')} className={cn("bb-btn h-6 w-6 inline-flex items-center justify-center disabled:opacity-40", isPicking ? "bg-accent" : "bg-card")}><ArrowLeftRight className="w-3 h-3" aria-hidden="true" /></button>
+                                )}
+                            </span>
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+}
+
 /** The eleven on a pitch: attackers at the top, the keeper at the bottom. */
 function FantasyPitch({starters, formation, byId, pinned, picking, onSwap, onPlace}: {starters: PlayerForecast[]; formation: FormationKey; byId: Map<number, AuctionPlayer>; pinned: ReadonlySet<number>; /** The substitute being placed by hand, if any. */ picking: number | null; onSwap: (inId: number, outId: number) => void; onPlace: (inId: number) => void}) {
     const rows = [...ROLES].reverse().map((role) => starters.filter((f) => f.player.role === role));
@@ -632,6 +675,8 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                             })}
                         </ul>
                     )}
+                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] lg:grid-cols-[minmax(0,1fr)_280px] gap-3 items-stretch">
+                    <div className="flex flex-col gap-3 min-w-0">
                     <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} pinned={pinned} picking={frozen ? null : picking} onSwap={swap} onPlace={(id) => swap(id, null)} />
                     {missingCount > 0 && <p className="bb-surface px-3 py-2 text-[12px] font-semibold text-red-700">{t('short', {count: missingCount})}</p>}
                     {pickingPlayer && !frozen ? (
@@ -660,6 +705,9 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                         )}
                     </div>
                     )}
+                    </div>
+                    <BenchStrip bench={advice.bench} slots={advice.slots} byId={byId} pinned={pinned} benched={benched} outs={outs} picking={frozen ? null : picking} locked={!!frozen} onPlace={(id) => setPicking(picking === id ? null : id)} onUnbench={unbench} />
+                    </div>
                     <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
                         <ul className="md:hidden flex flex-col">
                             {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} teamById={teamById} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
