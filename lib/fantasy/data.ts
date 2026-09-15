@@ -397,7 +397,9 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
             }
         }
         const injuryOf = new Map<number, SidelinedEntry>();
-        for (const entries of sidelined.values()) for (const e of entries) injuryOf.set(e.player.id, e);
+        const leagueIds = new Set(leagues.map((l) => l.id));
+        // A suspension in another competition (Europe, the cup) does not keep him out of the league.
+        for (const entries of sidelined.values()) for (const e of entries) if (!(e.category === 'suspension' && e.competition && !leagueIds.has(e.competition.id))) injuryOf.set(e.player.id, e);
 
         const byPlayer = new Map<number, StatRow[]>();
         for (const r of stats) {

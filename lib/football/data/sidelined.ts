@@ -29,6 +29,8 @@ interface StoredRow {
     end_date: string | null;
     source: string | null;
     player: SidelinedPlayerRow | null;
+    /** The match the listing was made for (source "fixture"): its competition scopes a suspension. */
+    fixture: {league: {id: number; name: string} | null} | null;
 }
 
 /** Days of finished fixtures to look at when deciding whether a listing is stale. */
@@ -58,11 +60,12 @@ export function playedAfter(dates: Map<number, string[]>): (teamId: number, date
     return (teamId, date) => (dates.get(teamId) ?? []).some((d) => d > date);
 }
 
-export function toEntry(spell: Spell, player: SidelinedPlayerRow, today: string): SidelinedEntry {
+export function toEntry(spell: Spell, player: SidelinedPlayerRow, today: string, competition: {id: number; name: string} | null = null): SidelinedEntry {
     return {
         player: {id: player.id, name: player.name, slug: player.slug, imageUrl: player.image_url, position: player.position},
         category: spell.category,
-        description: spell.description,
+        description: competition ? (spell.description ? `${spell.description} · ${competition.name}` : competition.name) : spell.description,
+        ...(competition ? {competition} : {}),
         since: spell.since,
         daysOut: Math.max(0, daysBetween(spell.since, today)),
         missed: spell.missed,
@@ -104,7 +107,7 @@ async function computeTeamSidelined(db: ReturnType<typeof footballDb>, teamIds: 
                 (a, b) =>
                     db
                         .from('sidelined')
-                        .select('player_id,team_id,category,description,start_date,end_date,source,player:players(id,name,slug,image_url,position),season:seasons!inner(is_current)')
+                        .select('player_id,team_id,category,description,start_date,end_date,source,player:players(id,name,slug,image_url,position),season:seasons!inner(is_current),fixture:fixtures(league:leagues(id,name))')
                         .in('team_id', teamIds)
                         .eq('seasons.is_current', true)
                         .order('id')
@@ -114,10 +117,13 @@ async function computeTeamSidelined(db: ReturnType<typeof footballDb>, teamIds: 
             loadRecentFixtureDates(db, teamIds, today),
         ]);
         const players = new Map<number, SidelinedPlayerRow>();
+        // A suspension listed for one match holds in that match's competition only.
+        const suspendedIn = new Map<number, {id: number; name: string}>();
         const input: SidelinedRow[] = [];
         for (const r of rows) {
             if (!r.player || r.team_id === null || !r.start_date) continue;
             players.set(r.player_id, r.player);
+            if (r.category === 'suspension' && r.source === 'fixture' && r.fixture?.league) suspendedIn.set(r.player_id, r.fixture.league);
             input.push({playerId: r.player_id, teamId: r.team_id, date: r.start_date, category: r.category, description: r.description, ...(r.source === 'player' ? {until: r.end_date} : {})});
         }
         for (const spell of buildSpells(input, {today, teamPlayedAfter: playedAfter(dates)})) {
@@ -125,7 +131,7 @@ async function computeTeamSidelined(db: ReturnType<typeof footballDb>, teamIds: 
             const player = players.get(spell.playerId);
             if (!player) continue;
             if (!result.has(spell.teamId)) result.set(spell.teamId, []);
-            result.get(spell.teamId)!.push(toEntry(spell, player, today));
+            result.get(spell.teamId)!.push(toEntry(spell, player, today, spell.category === 'suspension' ? suspendedIn.get(spell.playerId) ?? null : null));
         }
         for (const [id, entries] of result) result.set(id, sortEntries(entries));
         return result;

@@ -287,6 +287,8 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     }
     for (const entries of sidelined.values()) {
         for (const e of entries) {
+            // Suspended in another competition (a red card in Europe): free to play here.
+            if (e.category === 'suspension' && e.competition && e.competition.id !== leagueRow.id) continue;
             const current = players[e.player.id];
             const note = {category: e.category, description: e.description, longTerm: e.longTerm};
             if (current) current.sidelined = note;
