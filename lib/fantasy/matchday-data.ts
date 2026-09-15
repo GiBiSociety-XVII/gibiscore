@@ -63,6 +63,37 @@ export interface MatchdayContext {
 const RECENT_MATCHES = 8;
 const FINISHED = new Set(['finished']);
 
+interface StatRow {
+    fixture_id: number;
+    player_id: number;
+    minutes_played: number | null;
+    rating: number | string | null;
+    goals: number;
+    assists: number;
+    yellow_cards: number | null;
+    red_cards: number | null;
+    /** From the provider's json: penalties he saved (keepers) or missed, goals conceded while he was on. */
+    penalty_saved: number | null;
+    penalty_missed: number | null;
+    goals_conceded: number | null;
+}
+
+const STAT_SELECT = 'fixture_id,player_id,minutes_played,rating,goals,assists,yellow_cards,red_cards';
+const STAT_JSON = 'penalty_saved:stats->>penalty_saved,penalty_missed:stats->>penalty_missed,goals_conceded:stats->>goals_conceded';
+
+/** The players' lines of some fixtures, the penalties and goals conceded read out of the provider's json; without them if that read fails. */
+async function loadStats(db: ReturnType<typeof footballDb>, fixtureIds: number[]): Promise<StatRow[]> {
+    const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
+    try {
+        const rows = (await fetchAll((a, b) => db.from('fixture_player_stats').select(`${STAT_SELECT},${STAT_JSON}`).in('fixture_id', fixtureIds).order('fixture_id').order('player_id').range(a, b), {max: 20000})) as unknown as Array<Record<string, unknown>>;
+        return rows.map((r) => ({...(r as unknown as StatRow), penalty_saved: num(r.penalty_saved), penalty_missed: num(r.penalty_missed), goals_conceded: num(r.goals_conceded)}));
+    } catch (error) {
+        logReadError('fixture stats with penalties', error);
+        const rows = (await fetchAll((a, b) => db.from('fixture_player_stats').select(STAT_SELECT).in('fixture_id', fixtureIds).order('fixture_id').order('player_id').range(a, b), {max: 20000})) as unknown as Array<Omit<StatRow, 'penalty_saved' | 'penalty_missed' | 'goals_conceded'>>;
+        return rows.map((r) => ({...r, penalty_saved: null, penalty_missed: null, goals_conceded: null}));
+    }
+}
+
 interface TypedVoteRow {
     round: string;
     player_id: number;
@@ -166,15 +197,19 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         recentIds.length > 0
             ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', recentIds).eq('is_expected', false).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
             : Promise.resolve([]),
-        statIds.length > 0
-            ? (fetchAll((a, b) => db.from('fixture_player_stats').select('fixture_id,player_id,minutes_played,rating,goals,assists,yellow_cards,red_cards').in('fixture_id', statIds).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; player_id: number; minutes_played: number | null; rating: number | string | null; goals: number; assists: number; yellow_cards: number | null; red_cards: number | null}>>)
-            : Promise.resolve([]),
+        statIds.length > 0 ? loadStats(db, statIds) : Promise.resolve([]),
         roundFixtures.length > 0
             ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', roundFixtures.map((f) => f.id)).eq('is_expected', true).order('fixture_id').order('player_id').range(a, b), {max: 2000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
             : Promise.resolve([]),
         loadTeamSidelined(db, teamIds),
     ]);
     const stats = new Map(statRows.map((s) => [`${s.fixture_id}:${s.player_id}`, s]));
+    // Own goals are events, not statistics.
+    const ownGoals = new Map<string, number>();
+    if (statIds.length > 0) {
+        const {data: ownRows} = await db.from('fixture_events').select('fixture_id,player_id').eq('type', 'own_goal').in('fixture_id', statIds).limit(2000);
+        for (const e of (ownRows ?? []) as Array<{fixture_id: number; player_id: number | null}>) if (e.player_id !== null) ownGoals.set(`${e.fixture_id}:${e.player_id}`, (ownGoals.get(`${e.fixture_id}:${e.player_id}`) ?? 0) + 1);
+    }
     // A player's club this season: the team of his most recent lineup row.
     const inLineup = new Map<string, {team: number; starter: boolean}>();
     const teamOf = new Map<number, {team: number; at: string}>();
@@ -300,10 +335,10 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
                     assists: entry?.assists ?? stat?.assists ?? 0,
                     yellow: entry?.yellow ?? stat?.yellow_cards ?? 0,
                     red: entry?.red ?? stat?.red_cards ?? 0,
-                    conceded: entry?.conceded ?? against ?? 0,
-                    penaltiesSaved: entry?.penaltiesSaved ?? 0,
-                    penaltiesMissed: entry?.penaltiesMissed ?? 0,
-                    ownGoals: entry?.ownGoals ?? 0,
+                    conceded: entry?.conceded ?? stat?.goals_conceded ?? against ?? 0,
+                    penaltiesSaved: entry?.penaltiesSaved ?? stat?.penalty_saved ?? 0,
+                    penaltiesMissed: entry?.penaltiesMissed ?? stat?.penalty_missed ?? 0,
+                    ownGoals: entry?.ownGoals ?? ownGoals.get(key) ?? 0,
                 };
             }
         }
