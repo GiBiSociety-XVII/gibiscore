@@ -3,6 +3,7 @@
 import {ChevronDown, ChevronUp, History} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useTranslations} from "next-intl";
+import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {SavedTeam} from "@/lib/fantasy/config";
@@ -137,7 +138,7 @@ export function RecapHistory({team, roster, current, locks, seasonId, calibratio
                             })}
                         </tbody>
                     </table>
-                    <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('hint')}</p>
+                    <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('hint')} <Link href="/fantacalcio/modello" className="text-foreground font-extrabold hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('modelLink')}</Link></p>
                 </div>
             )}
         </Panel>

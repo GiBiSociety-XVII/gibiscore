@@ -46,7 +46,7 @@ export function EventsTimeline({events, title}: {events: MatchEvent[]; title: st
                         const minute = e.minute !== null ? `${e.minute}${e.extraMinute ? `+${e.extraMinute}` : ''}'` : '';
                         const detail =
                             e.type === 'substitution'
-                                ? [e.player.name ? t('subIn', {name: e.player.name}) : null, e.related.name ? t('subOut', {name: e.related.name}) : null].filter(Boolean).join(' · ')
+                                ? [e.related.name ? t('subIn', {name: e.related.name}) : null, e.player.name ? t('subOut', {name: e.player.name}) : null].filter(Boolean).join(' · ')
                                 : (e.type === 'goal' || e.type === 'penalty') && e.related.name
                                   ? t('assist', {name: e.related.name})
                                   : e.info ?? '';

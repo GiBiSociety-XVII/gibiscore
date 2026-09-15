@@ -872,6 +872,7 @@
       "live": "in corso",
       "noLock": "non salvata",
       "noLockHint": "Non avevi aperto la pagina prima del fischio d'inizio di questa giornata: la consigliata non è stata salvata.",
+      "modelLink": "Quanto ci azzecca il modello →",
       "hint": "Le giornate precedenti arrivano dal server per la sola rosa attuale: chi non è più in rosa non entra nei conti. I voti inseriti valgono anche qui; senza voti, il voto è la stima dal rating del provider."
     },
     "recap": {
@@ -950,6 +951,43 @@
         "red": "esp."
       }
     }
+  },
+  "model": {
+    "title": "Quanto ci azzecca il modello",
+    "metaTitle": "Quanto ci azzecca il modello",
+    "metaDescription": "I voti inseriti dagli utenti contro la stima del sito dal rating del provider: scarto medio per ruolo e per fascia di rating.",
+    "intro": "Ogni voto inserito nel consuntivo diventa un confronto tra il voto reale e quello che il sito avrebbe stimato dal rating del provider. Qui vedi dove la stima è alta o bassa, per ruolo e per fascia di rating, su tutti i giocatori votati da tutti gli utenti.",
+    "toLineup": "Formazione",
+    "empty": "Nessun voto inserito ancora: apri il consuntivo di una giornata e scrivi i voti in pagella.",
+    "totals": "Tutti i voti inseriti",
+    "pairs": "Confronti",
+    "avgReal": "Media reale",
+    "avgEstimate": "Media stimata",
+    "bias": "Scarto medio",
+    "mae": "Errore medio",
+    "within": "Entro ±0,5",
+    "maeFitted": "Errore tarato",
+    "totalsHint": "Scarto medio = voto reale meno stima con la scala di partenza (positivo: il sito stima basso). Errore medio = differenza in valore assoluto. Errore tarato = lo stesso con la scala imparata dai voti, quella usata oggi dai consigli.",
+    "byRole": "Per ruolo",
+    "colRole": "Ruolo",
+    "colPairs": "N",
+    "colReal": "Reale",
+    "colEstimate": "Stima",
+    "colBias": "Scarto",
+    "colMae": "Err.",
+    "colScale": "Scala in uso",
+    "scaleFitted": "retta tarata: {slope} × rating + {intercept}",
+    "scaleShifted": "di partenza, livello {shift}",
+    "scaleDefault": "di partenza",
+    "byRoleHint": "Con meno di {min} confronti per ruolo la scala sposta solo il livello (verde entro ±0,10, giallo entro ±0,25); da {min} in su si ricalcola l'intera retta.",
+    "byBand": "Per fascia di rating",
+    "colBand": "Rating provider",
+    "colWithin": "Entro ±0,5",
+    "byBandHint": "Se lo scarto cambia segno tra le fasce, la pendenza della scala è sbagliata, non solo il livello: succede quando i voti in pagella comprimono i rating alti o bassi.",
+    "howTitle": "Come leggere questi numeri",
+    "how1": "Il modello non prevede il voto dal nulla: traduce il rating del provider (scala 1-10, media 6,9 per un titolare) sulla scala dei voti in pagella (media circa 6). Questa pagina misura quella traduzione.",
+    "how2": "I bonus e malus (gol, assist, cartellini) non entrano qui: vengono dal provider e sono corretti quando lo sono i suoi dati.",
+    "how3": "Più voti inserisci, più la scala si avvicina alle pagelle vere. Servono almeno 120 confronti per ruolo perché il sito ricalcoli la retta intera: prima si muove solo il livello, con cautela."
   },
   "player": {
     "title": "Fantacalcio",
