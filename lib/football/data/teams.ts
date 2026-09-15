@@ -19,16 +19,17 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
         if (!teamRow) return null;
         const team = teamRow as unknown as TeamRow & {country: string | null; venue_name: string | null; founded: number | null};
 
-        const now = new Date().toISOString();
+        // The clock rounded to the hour: the same key for every render within it, so the reads below are shared.
+        const now = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString();
         const [pastRes, futureRes, standingsRes, squadRes, sidelinedRes, seasonStats, players, calendarRes] = await Promise.all([
-            db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).lte('starting_at', now).order('starting_at', {ascending: false}).limit(8),
-            db.from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).gt('starting_at', now).order('starting_at', {ascending: true}).limit(6),
+            cachedTeamFixtures(team.id, 'past', now),
+            cachedTeamFixtures(team.id, 'future', now),
             cachedTeamStandings(team.id),
             cachedSquad(team.id),
             loadTeamSidelined(db, [team.id]),
             cachedSeasonStats(team.id),
             cachedPlayers(team.id),
-            db.from('fixtures').select(`${FIXTURE_SELECT},season:seasons!inner(is_current)`).or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`).eq('seasons.is_current', true).order('starting_at', {ascending: true}).limit(120),
+            cachedTeamCalendar(team.id),
         ]);
         for (const res of [pastRes, futureRes, calendarRes]) if (res.error) throw res.error;
 
@@ -272,5 +273,29 @@ const cachedSquad = unstable_cache(
     {revalidate: 3600, tags: ['squads']},
 );
 
+/**
+ * The team's last and next fixtures around a given hour, and its calendar of the season: the
+ * costliest reads of its page, shared by every render within the hour. A live match still moves:
+ * the live sync renders the page again and the cache is short.
+ */
+const cachedTeamFixtures = unstable_cache(
+    async (teamId: number, side: 'past' | 'future', nowIso: string): Promise<{data: unknown[] | null; error: null}> => {
+        const q = footballDb().from('fixtures').select(FIXTURE_SELECT).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`);
+        const {data, error} = side === 'past' ? await q.lte('starting_at', nowIso).order('starting_at', {ascending: false}).limit(8) : await q.gt('starting_at', nowIso).order('starting_at', {ascending: true}).limit(6);
+        if (error) throw error;
+        return {data: (data ?? []) as unknown[], error: null};
+    },
+    ['team-fixtures'],
+    {revalidate: 120},
+);
+const cachedTeamCalendar = unstable_cache(
+    async (teamId: number): Promise<{data: unknown[] | null; error: null}> => {
+        const {data, error} = await footballDb().from('fixtures').select(`${FIXTURE_SELECT},season:seasons!inner(is_current)`).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`).eq('seasons.is_current', true).order('starting_at', {ascending: true}).limit(120);
+        if (error) throw error;
+        return {data: (data ?? []) as unknown[], error: null};
+    },
+    ['team-calendar'],
+    {revalidate: 300},
+);
 const cachedSeasonStats = unstable_cache((teamId: number) => loadSeasonStats(footballDb(), teamId), ['team-season-stats'], {revalidate: 900});
 const cachedPlayers = unstable_cache((teamId: number) => loadPlayers(footballDb(), teamId), ['team-players'], {revalidate: 3600, tags: ['player-seasons']});

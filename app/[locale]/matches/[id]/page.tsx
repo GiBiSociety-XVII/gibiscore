@@ -25,7 +25,8 @@ import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
 
 // Refreshed by the live sync whenever the match moves (see sync-live); the timer only catches the rest.
-export const revalidate = 600;
+// The live sync renders the page again whenever the match moves; the timer only catches the rest.
+export const revalidate = 1800;
 
 function parseId(raw: string): number | null {
     const n = Number(raw);

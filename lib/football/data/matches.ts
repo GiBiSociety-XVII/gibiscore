@@ -1,3 +1,4 @@
+import {cachedSeasonStandings} from './competitions';
 import 'server-only';
 import {withRetry} from '@/lib/db/retry';
 import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
@@ -253,7 +254,7 @@ export {LEAGUE_SELECT, TEAM_SELECT};
 
 async function loadStandings(db: ReturnType<typeof footballDb>, seasonId: number, homeId: number, awayId: number): Promise<StandingGroup[]> {
     try {
-        const {data, error} = await db.from('standings').select(STANDING_SELECT).eq('season_id', seasonId).order('group').order('position').limit(200);
+        const {data, error} = await cachedSeasonStandings(seasonId);
         if (error) throw error;
         const groups = new Map<string, StandingGroup>();
         for (const r of (data ?? []) as unknown as StandingQueryRow[]) {
