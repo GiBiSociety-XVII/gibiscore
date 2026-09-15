@@ -156,6 +156,8 @@ export interface PlayedLineup {
     subs: number;
     /** Starters left without a vote and nobody to replace them: zero points each. */
     holes: number;
+    /** Starters whose match is still to play (a live round): not counted, not replaced. */
+    pending: number;
 }
 
 /** The defence modifier on the real votes: keeper and the three best-voted defenders on the pitch. */
@@ -175,7 +177,7 @@ export function defenceModifierOf(keeperVoto: number | null, defenderVotos: numb
  * a starter without one is replaced by the first bench player of his
  * role with a vote, in bench order, up to the substitutions allowed.
  */
-export function playLineup(starters: LineupPlayer[], bench: LineupPlayer[], results: RoundResults, rules: FantaRules, calibration: VotoCalibration, defence: DefenceBonus | false, maxSubs = MAX_SUBS): PlayedLineup {
+export function playLineup(starters: LineupPlayer[], bench: LineupPlayer[], results: RoundResults, rules: FantaRules, calibration: VotoCalibration, defence: DefenceBonus | false, maxSubs = MAX_SUBS, pending: ReadonlySet<number> = new Set()): PlayedLineup {
     const slot = (p: LineupPlayer): PlayedSlot => ({id: p.id, role: p.role, voto: votoOf(results.stats[p.id], p.role, calibration), points: roundPoints(results.stats[p.id], p.role, rules, calibration)});
     const eleven = starters.map(slot);
     const reserves = bench.map(slot);
@@ -183,7 +185,7 @@ export function playLineup(starters: LineupPlayer[], bench: LineupPlayer[], resu
     const left: PlayedSlot[] = [];
     let subs = 0;
     for (const r of reserves) {
-        const hole = r.points !== null && subs < maxSubs ? eleven.find((s) => s.role === r.role && s.points === null && s.replacedBy === undefined) : undefined;
+        const hole = r.points !== null && !pending.has(r.id) && subs < maxSubs ? eleven.find((s) => s.role === r.role && s.points === null && !pending.has(s.id) && s.replacedBy === undefined) : undefined;
         if (hole) {
             hole.replacedBy = r.id;
             cameIn.push({...r, replaces: hole.id});
@@ -194,8 +196,9 @@ export function playLineup(starters: LineupPlayer[], bench: LineupPlayer[], resu
     const points = Math.round(onPitch.reduce((s, x) => s + (x.points ?? 0), 0) * 100) / 100;
     const keeper = onPitch.find((s) => s.role === 'P');
     const defenceBonus = defenceModifierOf(keeper?.voto ?? null, onPitch.filter((s) => s.role === 'D' && s.voto !== null).map((s) => s.voto!), defence);
-    const holes = eleven.filter((s) => s.points === null && s.replacedBy === undefined).length;
-    return {slots: [...eleven, ...cameIn], bench: left, points, defence: defenceBonus, total: Math.round((points + defenceBonus) * 100) / 100, subs, holes};
+    const holes = eleven.filter((s) => s.points === null && s.replacedBy === undefined && !pending.has(s.id)).length;
+    const stillToPlay = eleven.filter((s) => pending.has(s.id)).length;
+    return {slots: [...eleven, ...cameIn], bench: left, points, defence: defenceBonus, total: Math.round((points + defenceBonus) * 100) / 100, subs, holes, pending: stillToPlay};
 }
 
 export interface Hindsight {

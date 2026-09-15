@@ -7,7 +7,7 @@ import {Link, useRouter} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
-import {RoleBadge, ROLE_CLASS} from "./role-badge";
+import {RoleBadge} from "./role-badge";
 import {DEFAULT_RULES, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
@@ -557,6 +557,26 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">
+                    {fixturesOfRoster.length > 0 && (
+                        <ul aria-label={t('fixturesTitle')} className="bb-surface px-2 py-1.5 flex gap-1.5 overflow-x-auto [scrollbar-width:thin]">
+                            {fixturesOfRoster.map((f) => {
+                                const mine = roster.filter((p) => p.team.id === f.home.id || p.team.id === f.away.id);
+                                const official = context.officialTeams.includes(f.home.id) || context.officialTeams.includes(f.away.id);
+                                const starting = mine.filter((p) => advice.starters.some((s) => s.player.id === p.id)).length;
+                                return (
+                                    <li key={f.id} title={`${when(f.startingAt)}${f.prediction ? ` · ${Math.round(f.prediction.home)}% · ${Math.round(f.prediction.draw)}% · ${Math.round(f.prediction.away)}% · xG ${f.prediction.lambdaHome.toFixed(1)}-${f.prediction.lambdaAway.toFixed(1)}` : ''}\n${mine.map((p) => p.name).join(', ')}`} className="shrink-0 inline-flex flex-col gap-0.5 px-2 py-1 rounded-md border border-foreground/40 bg-card text-[11px] font-bold leading-tight">
+                                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                            <span className={cn(rosterTeams.includes(f.home.id) && "underline decoration-accent decoration-2 underline-offset-2")}>{f.home.name}</span>
+                                            <span className="text-muted-foreground">–</span>
+                                            <span className={cn(rosterTeams.includes(f.away.id) && "underline decoration-accent decoration-2 underline-offset-2")}>{f.away.name}</span>
+                                            {official && <span className="bb-badge bg-emerald-200 text-[9px] h-4 px-1">{t('officialBadge')}</span>}
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-muted-foreground whitespace-nowrap">{when(f.startingAt)} · {t('fixtureMine', {count: mine.length, starting})}</span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
                     <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} pinned={pinned} />
                     {missingCount > 0 && <p className="bb-surface px-3 py-2 text-[12px] font-semibold text-red-700">{t('short', {count: missingCount})}</p>}
                     <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
@@ -624,31 +644,6 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
                             ))}
                         </ul>
                         <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('formationsHint')}</p>
-                    </Panel>
-                    <Panel title={t('fixturesTitle')}>
-                        <ul className="flex flex-col divide-y divide-muted">
-                            {fixturesOfRoster.map((f) => {
-                                const mine = roster.filter((p) => p.team.id === f.home.id || p.team.id === f.away.id);
-                                const official = context.officialTeams.includes(f.home.id) || context.officialTeams.includes(f.away.id);
-                                return (
-                                    <li key={f.id} className="px-3 py-1.5 flex flex-col gap-0.5">
-                                        <span className="flex items-center gap-2 text-[12px] font-extrabold">
-                                            <span className={cn("truncate", rosterTeams.includes(f.home.id) && "underline decoration-accent decoration-2 underline-offset-2")}>{f.home.name}</span>
-                                            <span className="text-muted-foreground">–</span>
-                                            <span className={cn("truncate", rosterTeams.includes(f.away.id) && "underline decoration-accent decoration-2 underline-offset-2")}>{f.away.name}</span>
-                                            {official && <span className="bb-badge bg-emerald-200 text-[9px] h-4 px-1 ml-auto shrink-0">{t('officialBadge')}</span>}
-                                        </span>
-                                        <span className="text-[10px] font-semibold text-muted-foreground">
-                                            {when(f.startingAt)}
-                                            {f.prediction && ` · ${Math.round(f.prediction.home)}% · ${Math.round(f.prediction.draw)}% · ${Math.round(f.prediction.away)}% · xG ${f.prediction.lambdaHome.toFixed(1)}-${f.prediction.lambdaAway.toFixed(1)}`}
-                                        </span>
-                                        <span className="flex flex-wrap gap-1">
-                                            {mine.map((p) => <span key={p.id} className={cn("inline-flex items-center gap-1 h-5 px-1.5 rounded border border-foreground/40 text-[10px] font-bold", rosterIds.has(p.id) && advice.starters.some((s) => s.player.id === p.id) ? ROLE_CLASS[p.role] : "bg-card")}>{p.name}</span>)}
-                                        </span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
                     </Panel>
                     <details className="bb-surface overflow-hidden group">
                         <summary className="flex items-center justify-between gap-2 px-3 h-9 bg-card cursor-pointer list-none text-[13px] font-extrabold uppercase tracking-wide">

@@ -145,7 +145,7 @@ interface Row {
  */
 export function RoundRecap({team, results, seasonId, roster, byId, past, calibration, signedIn, onSaved}: {team: SavedTeam; results: RoundResults; seasonId: number; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; past: LineupLock | null; calibration: VotoCalibration; signedIn: boolean; /** Called after a save reaches the account, so the page can pull the recalibrated context. */ onSaved?: () => void}) {
     const t = useTranslations('Fantasy.lineup.recap');
-    const [open, setOpen] = useState(results.state === 'live');
+    const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<number | null>(null);
     const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
     const allVotes = votesStore.useValue();
@@ -163,7 +163,9 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
     // The advice as it stood at the lock, replayed with its pins and forced formation, then scored.
     const forecasts = past ? (past.forecasts as PlayerForecast[]).filter((f) => byId.has(f.player.id)) : [];
     const advice = past ? recommendLineup(forecasts, {rules: team.rules, defenceModifier: defence, prefer: team.formation as FormationKey | null, force: past.forced as FormationKey | null, pinned: new Set(past.pinned)}) : null;
-    const played = advice ? playLineup(advice.starters.map((f) => lp(f.player)), advice.bench.map((f) => lp(f.player)), shown, team.rules, calibration, defence) : null;
+    // Live: whoever still has to play is neither a hole nor a substitute yet.
+    const toPlay = new Set(roster.filter((p) => !finished.has(p.team.id)).map((p) => p.id));
+    const played = advice ? playLineup(advice.starters.map((f) => lp(f.player)), advice.bench.map((f) => lp(f.player)), shown, team.rules, calibration, defence, MAX_SUBS, toPlay) : null;
     const expectedOf = new Map(forecasts.map((f) => [f.player.id, f.points]));
     const gaps = surprises(forecasts.map((f) => ({id: f.player.id, role: f.player.role, points: f.points})), shown, team.rules, calibration).slice(0, 4);
     const typedCount = roster.filter((p) => shown.stats[p.id]?.source !== undefined).length;
@@ -277,6 +279,7 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
                     <span className="text-muted-foreground">
                         {t('subs', {count: played.subs})}
                         {played.holes > 0 && <span className="text-red-700"> · {t('holes', {count: played.holes})}</span>}
+                        {played.pending > 0 && ` · ${t('pending', {count: played.pending})}`}
                         {played.defence > 0 && ` · ${t('defence', {points: fmt(played.defence)})}`}
                     </span>
                 )}

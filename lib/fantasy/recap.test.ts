@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {bestHindsight, defenceModifierOf, playLineup, roundPoints, surprises, votoOf, withManualVotes, type RoundResults, type RoundStat} from './recap';
+import {bestHindsight, defenceModifierOf, MAX_SUBS as MAX_SUBS_TEST, playLineup, roundPoints, surprises, votoOf, withManualVotes, type RoundResults, type RoundStat} from './recap';
 import {CLASSIC_RULES} from './scores';
 import {DEFAULT_CALIBRATION} from './voto';
 import {DEFAULT_DEFENCE_BONUS} from './config';
@@ -82,6 +82,15 @@ describe('playLineup', () => {
         // Ten sixes and the keeper's clean sheet.
         expect(played.points).toBe(61);
         expect(played.total).toBe(61);
+    });
+
+    it('leaves a starter still to play alone: no hole, no substitute', () => {
+        const stats: Record<number, RoundStat> = {};
+        for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14, 15]) stats[id] = stat({voto: 6});
+        const played = playLineup(starters, bench, official(stats), CLASSIC_RULES, DEFAULT_CALIBRATION, false, MAX_SUBS_TEST, new Set([9, 10, 11, 14]));
+        expect(played.subs).toBe(0);
+        expect(played.holes).toBe(0);
+        expect(played.pending).toBe(3);
     });
 
     it('never uses more than the substitutions allowed', () => {
