@@ -1,6 +1,6 @@
 'use client';
 
-import {Ban, HelpCircle, Lock, Pin, PinOff, Settings2, Trash2, X} from "lucide-react";
+import {ArrowLeftRight, Ban, HelpCircle, Lock, Pin, PinOff, RotateCcw, Settings2, Sparkles, Trash2, X} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -14,7 +14,7 @@ import type {TeamSummary} from "@/lib/football/types";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
-import {HISTORY_ROUNDS, historyStore, locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLock} from "@/lib/fantasy/store";
+import {benchedStore, HISTORY_ROUNDS, historyStore, locksStore, outsStore, pinsStore, teamsStore, useHydrated, type LineupLock} from "@/lib/fantasy/store";
 import type {MatchdayRound} from "@/lib/fantasy/matchday-data";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
@@ -88,29 +88,51 @@ function chanceClass(plays: number): string {
     return "bg-red-200";
 }
 
-function PitchDot({f, byId, pinned}: {f: PlayerForecast; byId: Map<number, AuctionPlayer>; pinned: boolean}) {
+/** What travels with a dragged player: his id, as plain text so the browser does the rest. */
+const DRAG_TYPE = 'text/plain';
+function draggedId(e: React.DragEvent): number | null {
+    const id = Number(e.dataTransfer.getData(DRAG_TYPE));
+    return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function PitchDot({f, byId, pinned, picking, onReceive}: {f: PlayerForecast; byId: Map<number, AuctionPlayer>; pinned: boolean; /** A substitute is being placed by hand: this starter can be the one who leaves. */ picking: boolean; /** A substitute (by id) takes this starter's place; null while picking means the one being placed. */ onReceive: (inId: number | null) => void}) {
+    const t = useTranslations('Fantasy.lineup');
     const p = byId.get(f.player.id);
+    const [over, setOver] = useState(false);
     const surname = f.player.name.split(' ').slice(-1)[0] ?? f.player.name;
-    return (
-        <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" className="group flex flex-col items-center gap-0.5 min-w-0 w-[64px] md:w-[80px]">
+    const body = (
+        <>
             <span className="relative">
-                <span className={cn("inline-flex w-9 h-9 md:w-10 md:h-10 items-center justify-center rounded-full border-[2.5px] border-foreground bg-card group-hover:ring-2 ring-accent overflow-hidden")}>
+                <span className={cn("inline-flex w-9 h-9 md:w-10 md:h-10 items-center justify-center rounded-full border-[2.5px] border-foreground bg-card group-hover:ring-2 ring-accent overflow-hidden transition-transform", (over || picking) && "ring-4 ring-accent", over && "scale-110")}>
                     {p ? <TeamCrest team={p.team} size={26} /> : <RoleBadge role={f.player.role} />}
                 </span>
                 <span className={cn("absolute -top-1.5 -right-3 font-mono text-[9px] font-extrabold tabular-nums px-1 rounded border border-foreground leading-[14px] text-foreground", chanceClass(f.plays))}>{pct(f.plays)}</span>
                 {pinned && <span className="absolute -top-1.5 -left-2 inline-flex items-center justify-center w-4 h-4 rounded-full border border-foreground bg-foreground text-background"><Pin className="w-2.5 h-2.5" aria-hidden="true" /></span>}
+                {picking && <span className="absolute -bottom-1 -right-2 inline-flex items-center justify-center w-4 h-4 rounded-full border border-foreground bg-accent text-foreground"><ArrowLeftRight className="w-2.5 h-2.5" aria-hidden="true" /></span>}
             </span>
             <span className="text-[10px] md:text-[11px] font-bold leading-tight text-center truncate max-w-full text-background [text-shadow:0_1px_2px_rgba(0,0,0,.6)] group-hover:underline decoration-accent decoration-2 underline-offset-2">{surname}</span>
             <span className="font-mono text-[10px] font-extrabold tabular-nums leading-none text-background [text-shadow:0_1px_2px_rgba(0,0,0,.6)]">{f.points.toFixed(1)}</span>
-        </Link>
+        </>
     );
+    const cls = "group flex flex-col items-center gap-0.5 min-w-0 w-[64px] md:w-[80px]";
+    const drop = {
+        onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!over) setOver(true); },
+        onDragLeave: () => setOver(false),
+        onDrop: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setOver(false); const id = draggedId(e); if (id !== null && id !== f.player.id) onReceive(id); },
+    };
+    if (picking) return <button type="button" onClick={() => onReceive(null)} title={t('swapOut', {name: f.player.name})} className={cls} {...drop}>{body}</button>;
+    return <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={t('dropHere', {name: f.player.name})} className={cls} {...drop}>{body}</Link>;
 }
 
 /** The eleven on a pitch: attackers at the top, the keeper at the bottom. */
-function FantasyPitch({starters, formation, byId, pinned}: {starters: PlayerForecast[]; formation: FormationKey; byId: Map<number, AuctionPlayer>; pinned: ReadonlySet<number>}) {
+function FantasyPitch({starters, formation, byId, pinned, picking, onSwap, onPlace}: {starters: PlayerForecast[]; formation: FormationKey; byId: Map<number, AuctionPlayer>; pinned: ReadonlySet<number>; /** The substitute being placed by hand, if any. */ picking: number | null; onSwap: (inId: number, outId: number) => void; onPlace: (inId: number) => void}) {
     const rows = [...ROLES].reverse().map((role) => starters.filter((f) => f.player.role === role));
     return (
-        <div className="relative rounded-xl border-[2.5px] border-foreground overflow-hidden bg-[#3f8f3a] text-background">
+        <div
+            className={cn("relative rounded-xl border-[2.5px] border-foreground overflow-hidden bg-[#3f8f3a] text-background", picking !== null && "ring-4 ring-accent")}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+            onDrop={(e) => { e.preventDefault(); const id = draggedId(e); if (id !== null) onPlace(id); }}
+        >
             <div className="absolute inset-2 border-2 border-white/60 rounded-sm pointer-events-none" aria-hidden="true" />
             <div className="absolute left-1/2 top-2 w-[44%] h-[13%] -ml-[22%] border-2 border-t-0 border-white/60 pointer-events-none" aria-hidden="true" />
             <div className="absolute left-1/2 bottom-2 w-[44%] h-[13%] -ml-[22%] border-2 border-b-0 border-white/60 pointer-events-none" aria-hidden="true" />
@@ -118,7 +140,7 @@ function FantasyPitch({starters, formation, byId, pinned}: {starters: PlayerFore
             <div className="relative flex flex-col gap-2 md:gap-3 px-2 py-3">
                 <div className="flex items-center justify-end px-1 text-[11px] font-extrabold uppercase tracking-wide"><span className="font-mono">{formation}</span></div>
                 {rows.map((line, i) => (
-                    <div key={i} className="flex justify-around">{line.map((f) => <PitchDot key={f.player.id} f={f} byId={byId} pinned={pinned.has(f.player.id)} />)}</div>
+                    <div key={i} className="flex justify-around">{line.map((f) => <PitchDot key={f.player.id} f={f} byId={byId} pinned={pinned.has(f.player.id)} picking={picking !== null} onReceive={(inId) => onSwap(inId ?? picking!, f.player.id)} />)}</div>
                 ))}
             </div>
         </div>
@@ -186,7 +208,22 @@ function signalsOf(f: PlayerForecast, x: ReturnType<typeof facts>, t: ReturnType
     return out.slice(0, 3);
 }
 
-function ForecastRow({f, slot, index, byId, teamById, reasonText, muted = false, stripe = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; teamById: Map<number, TeamSummary>; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; /** Every other row, so the eye follows one across the columns. */ stripe?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
+/** How a substitute gets into the eleven by hand: dragged onto a starter, or placed with a tap; and the way back when he was sent out by hand. */
+interface SwapControls {
+    /** Sent to the bench by hand: someone else took his place. */
+    benched: boolean;
+    onUnbench: () => void;
+    /** Start placing him: the starters become the choice of who leaves. */
+    onPlace: () => void;
+    picking: boolean;
+}
+/** The drag handlers of a substitute: his id travels with the pointer. */
+function dragProps(id: number, locked: boolean) {
+    if (locked) return {};
+    return {draggable: true, onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData(DRAG_TYPE, String(id)); e.dataTransfer.effectAllowed = 'move'; }};
+}
+
+function ForecastRow({f, slot, index, byId, teamById, reasonText, muted = false, stripe = false, pinned, onPin, out, onOut, locked, swap}: {f: PlayerForecast; teamById: Map<number, TeamSummary>; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; /** Every other row, so the eye follows one across the columns. */ stripe?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean; /** On the bench: how he gets in. */ swap?: SwapControls}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const [why, setWhy] = useState(false);
@@ -204,12 +241,21 @@ function ForecastRow({f, slot, index, byId, teamById, reasonText, muted = false,
     if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad', reason: x.doubtful});
     if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst', reason: x.noMatch});
     const td = "px-1 py-1.5 text-center";
-    const bg = pinned ? "bg-accent/20" : out ? "bg-red-100/60" : stripe ? "bg-muted/60" : "";
+    const bg = pinned ? "bg-accent/20" : swap?.picking ? "bg-accent/40" : out ? "bg-red-100/60" : swap?.benched ? "bg-muted" : stripe ? "bg-muted/60" : "";
     return (
         <>
-        <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", bg)}>
+        <tr className={cn("border-t border-muted align-middle", muted && !pinned && "opacity-70", bg, swap && !locked && "cursor-grab active:cursor-grabbing")} {...(swap ? dragProps(f.player.id, locked) : {})}>
             <td className="px-1 py-1.5">
                 <span className="flex items-center gap-0.5">
+                    {swap && (swap.benched ? (
+                        <button type="button" onClick={swap.onUnbench} disabled={locked} title={locked ? t('lockedNoChange') : t('unbench')} className="bb-btn h-6 w-5 inline-flex items-center justify-center disabled:opacity-40 bg-red-700 text-background">
+                            <RotateCcw className="w-3 h-3" aria-hidden="true" />
+                        </button>
+                    ) : (
+                        <button type="button" onClick={swap.onPlace} disabled={locked} aria-pressed={swap.picking} title={locked ? t('lockedNoChange') : t('place')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center disabled:opacity-40", swap.picking ? "bg-accent" : "bg-card")}>
+                            <ArrowLeftRight className="w-3 h-3" aria-hidden="true" />
+                        </button>
+                    ))}
                     <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={locked ? t('lockedNoChange') : pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-6 w-5 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>
                         {pinned ? <PinOff className="w-3 h-3" aria-hidden="true" /> : <Pin className="w-3 h-3" aria-hidden="true" />}
                     </button>
@@ -230,10 +276,11 @@ function ForecastRow({f, slot, index, byId, teamById, reasonText, muted = false,
             <td className="px-2 py-1.5">
                 <span className="flex items-center gap-1.5 min-w-0 whitespace-nowrap">
                     {p && <TeamCrest team={p.team} size={18} />}
-                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
+                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" draggable={false} title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
                 </span>
-                {status.length > 0 && (
+                {(status.length > 0 || swap?.benched) && (
                     <span className="flex flex-wrap gap-1 mt-0.5">
+                        {swap?.benched && <span className="bb-badge text-[9px] h-4 px-1 uppercase bg-red-200">{t('benchedBadge')}</span>}
                         {status.map((b) => <span key={b.key} className={cn("bb-badge text-[9px] h-4 px-1 uppercase", TONE_CLASS[b.tone])} title={reasonText(b.reason)}>{b.label}</span>)}
                     </span>
                 )}
@@ -278,7 +325,7 @@ function ForecastRow({f, slot, index, byId, teamById, reasonText, muted = false,
 }
 
 /** A player's forecast as a card, for phones: the numbers that decide, the status and the pin and out buttons, the reasons on request. */
-function ForecastCard({f, slot, index, byId, teamById, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; teamById: Map<number, TeamSummary>; slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; locked: boolean}) {
+function ForecastCard({f, slot, index, byId, teamById, reasonText, muted = false, pinned, onPin, out, onOut, locked, swap}: {f: PlayerForecast; teamById: Map<number, TeamSummary>; slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; locked: boolean; swap?: SwapControls}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const [more, setMore] = useState(false);
@@ -293,13 +340,13 @@ function ForecastCard({f, slot, index, byId, teamById, reasonText, muted = false
     if (x.doubtful) status.push({key: 'doubtful', label: t('status.doubtful'), tone: 'bad'});
     if (x.noMatch) status.push({key: 'noMatch', label: t('status.noMatch'), tone: 'worst'});
     return (
-        <li className={cn("px-2.5 py-2 flex flex-col gap-1.5 border-t border-muted first:border-t-0", muted && !pinned && "opacity-70", pinned && "bg-accent/20", out && "bg-red-100/60")}>
+        <li className={cn("px-2.5 py-2 flex flex-col gap-1.5 border-t border-muted first:border-t-0", muted && !pinned && "opacity-70", pinned && "bg-accent/20", swap?.picking && "bg-accent/40", out && "bg-red-100/60", swap?.benched && !out && "bg-muted")} {...(swap ? dragProps(f.player.id, locked) : {})}>
             <div className="flex items-center gap-2 min-w-0">
                 {index !== null && <span className="font-mono text-[11px] font-extrabold tabular-nums text-muted-foreground w-4">{index}</span>}
                 <RoleBadge role={f.player.role} />
                 {p && <TeamCrest team={p.team} size={18} />}
                 <span className="flex flex-col leading-tight min-w-0">
-                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[14px] truncate">{f.player.name}</Link>
+                    <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" draggable={false} className="font-extrabold text-[14px] truncate">{f.player.name}</Link>
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground truncate">
                         {fixture && f.opponent ? (
                             <>
@@ -316,10 +363,16 @@ function ForecastCard({f, slot, index, byId, teamById, reasonText, muted = false
                 </span>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
+                {swap?.benched && <span className="bb-badge text-[9px] h-4 px-1 uppercase bg-red-200">{t('benchedBadge')}</span>}
                 {status.map((b) => <span key={b.key} className={cn("bb-badge text-[9px] h-4 px-1 uppercase", TONE_CLASS[b.tone])}>{b.label}</span>)}
                 {signalsOf(f, x, t, reasonText).map((sg) => <span key={sg.key} className={cn("bb-badge text-[10px] h-5 px-1.5 whitespace-nowrap", TONE_CLASS[sg.tone])} title={sg.title}>{sg.label}</span>)}
                 <span className="ml-auto inline-flex items-center gap-1">
                     <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} className="bb-btn h-7 px-2 text-[11px] font-extrabold bg-card">{more ? t('cardLess') : t('cardMore')}</button>
+                    {swap && (swap.benched ? (
+                        <button type="button" onClick={swap.onUnbench} disabled={locked} title={t('unbench')} className="bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40 bg-red-700 text-background"><RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                    ) : (
+                        <button type="button" onClick={swap.onPlace} disabled={locked} aria-pressed={swap.picking} title={t('place')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", swap.picking ? "bg-accent" : "bg-card")}><ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                    ))}
                     <button type="button" onClick={onPin} disabled={locked} aria-pressed={pinned} title={pinned ? t('unpin') : t('pin')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", pinned ? "bg-foreground text-background" : "bg-card")}>{pinned ? <PinOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Pin className="w-3.5 h-3.5" aria-hidden="true" />}</button>
                     <button type="button" onClick={onOut} disabled={locked} aria-pressed={out} title={out ? t('unout') : t('out')} className={cn("bb-btn h-7 w-7 inline-flex items-center justify-center disabled:opacity-40", out ? "bg-red-700 text-background" : "bg-card")}><Ban className="w-3.5 h-3.5" aria-hidden="true" /></button>
                 </span>
@@ -448,9 +501,12 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
     const reasonText = useReasonText();
     const allPins = pinsStore.useValue();
     const allOuts = outsStore.useValue();
+    const allBenched = benchedStore.useValue();
     const locks = locksStore.useValue();
     const history = historyStore.useValue();
     const [forced, setForced] = useState<FormationKey | null>(null);
+    // The substitute being placed by hand: the next tap on a starter is the one who leaves.
+    const [picking, setPicking] = useState<number | null>(null);
     // The clock, so the page locks itself at kick-off while open.
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
@@ -471,7 +527,21 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
         const next = livePinned.has(id) ? [...livePinned].filter((x) => x !== id) : [...livePinned, id];
         pinsStore.write({...allPins, [current.id]: next});
     };
-    const clearPins = () => pinsStore.write({...allPins, [current.id]: []});
+    // Substitutes sent to the bench by hand: someone else took their place.
+    const liveBenched = new Set((allBenched[current.id] ?? []).filter((id) => rosterIds.has(id)));
+    const unbench = (id: number) => benchedStore.write({...allBenched, [current.id]: [...liveBenched].filter((x) => x !== id)});
+    /** `inId` takes the place of `outId`: the first is pinned, the second sent to the bench. With no `outId` the numbers pick who leaves. */
+    const swap = (inId: number, outId: number | null) => {
+        if (inId === outId) return;
+        pinsStore.write({...allPins, [current.id]: [...[...livePinned].filter((x) => x !== outId), ...(livePinned.has(inId) ? [] : [inId])]});
+        benchedStore.write({...allBenched, [current.id]: [...[...liveBenched].filter((x) => x !== inId), ...(outId !== null && !liveBenched.has(outId) ? [outId] : [])]});
+        setPicking(null);
+    };
+    const clearPins = () => {
+        pinsStore.write({...allPins, [current.id]: []});
+        benchedStore.write({...allBenched, [current.id]: []});
+        setPicking(null);
+    };
 
     // The deadline: the round's first kick-off. From then on the lineup cannot be changed in any league,
     // so the advice freezes as it stood at the last view before it, and stays until the next round.
@@ -480,7 +550,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
     const stored = locks[current.id];
     // A snapshot from an older model is not worth keeping: the round is drawn again with the current one.
     const frozen: LineupLock | null = locked && stored && stored.round === context.round && stored.model === LINEUP_MODEL ? stored : null;
-    const serialized = JSON.stringify({round: context.round, model: LINEUP_MODEL, deadline: roundInfo?.from ?? '', forecasts: liveForecasts, forced, pinned: [...livePinned], outs: [...liveOuts]});
+    const serialized = JSON.stringify({round: context.round, model: LINEUP_MODEL, deadline: roundInfo?.from ?? '', forecasts: liveForecasts, forced, pinned: [...livePinned], outs: [...liveOuts], benched: [...liveBenched]});
     const fingerprint = hashOf(serialized);
     const hasRound = roundInfo !== null;
     useEffect(() => {
@@ -501,12 +571,14 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
     const forecasts = frozen ? (frozen.forecasts as PlayerForecast[]) : liveForecasts;
     const pinned = frozen ? new Set(frozen.pinned) : livePinned;
     const outs = frozen ? new Set(frozen.outs) : liveOuts;
+    const benched = frozen ? new Set(frozen.benched ?? []) : liveBenched;
     const forcedNow = frozen ? (frozen.forced as FormationKey | null) : forced;
     const frozenFresh = frozen ? Date.parse(frozen.savedAt) >= Date.parse(frozen.deadline) : false;
     const options = {rules: current.rules, defenceModifier: defenceOption(current), prefer: current.formation as FormationKey | null};
-    const advice = recommendLineup(forecasts, {...options, force: forcedNow, pinned});
+    const advice = recommendLineup(forecasts, {...options, force: forcedNow, pinned, benched});
     // What the pins cost: the same roster left to the numbers alone.
-    const free = pinned.size > 0 ? recommendLineup(forecasts, options) : advice;
+    const free = pinned.size > 0 || benched.size > 0 ? recommendLineup(forecasts, options) : advice;
+    const pickingPlayer = picking !== null ? byId.get(picking) ?? null : null;
     const pinCost = Math.round((free.total - advice.total) * 10) / 10;
     const rosterTeams = [...new Set(roster.map((p) => p.team.id))];
     const withOfficial = rosterTeams.filter((id) => context.officialTeams.includes(id)).length;
@@ -560,22 +632,34 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                             })}
                         </ul>
                     )}
-                    <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} pinned={pinned} />
+                    <FantasyPitch starters={advice.starters} formation={advice.formation} byId={byId} pinned={pinned} picking={frozen ? null : picking} onSwap={swap} onPlace={(id) => swap(id, null)} />
                     {missingCount > 0 && <p className="bb-surface px-3 py-2 text-[12px] font-semibold text-red-700">{t('short', {count: missingCount})}</p>}
+                    {pickingPlayer && !frozen ? (
+                        <div className="bb-surface bg-accent/30 px-3 py-2 flex flex-wrap items-center gap-2 text-[12px] font-semibold">
+                            <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            <span className="font-extrabold">{t('pickingBanner', {name: pickingPlayer.name})}</span>
+                            <span className="ml-auto flex items-center gap-1.5">
+                                <button type="button" onClick={() => swap(pickingPlayer.id, null)} className="bb-btn bg-foreground text-background h-7 px-2.5 text-[11px] font-extrabold inline-flex items-center gap-1"><Sparkles className="w-3 h-3" aria-hidden="true" />{t('placeBest')}</button>
+                                <button type="button" onClick={() => setPicking(null)} className="bb-btn bg-card h-7 px-2.5 text-[11px] font-extrabold">{t('placeCancel')}</button>
+                            </span>
+                        </div>
+                    ) : (
                     <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
                         <Pin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         {outs.size > 0 && <span className="text-red-700 font-extrabold">{t('outsCount', {count: outs.size})}</span>}
-                        {pinned.size === 0 ? (
+                        {pinned.size === 0 && benched.size === 0 ? (
                             <span className="text-muted-foreground">{t('pinsHint')}</span>
                         ) : (
                             <>
-                                <span className="font-extrabold">{t('pinsCount', {count: pinned.size})}</span>
+                                {pinned.size > 0 && <span className="font-extrabold">{t('pinsCount', {count: pinned.size})}</span>}
+                                {benched.size > 0 && <span className="font-extrabold text-red-700">{t('benchedCount', {count: benched.size})}</span>}
                                 <span className={cn(pinCost > 0 ? "text-red-700" : "text-muted-foreground")}>{pinCost > 0 ? t('pinsCost', {cost: pinCost.toFixed(1), formation: free.formation}) : t('pinsFree')}</span>
                                 {!advice.formations[0].feasible && <span className="text-red-700">{t('pinsNoRoom')}</span>}
                                 {!frozen && <button type="button" onClick={clearPins} className="bb-btn bg-card h-6 px-2 text-[11px] font-extrabold ml-auto">{t('clearPins')}</button>}
                             </>
                         )}
                     </div>
+                    )}
                     <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
                         <ul className="md:hidden flex flex-col">
                             {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} teamById={teamById} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
@@ -589,15 +673,15 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                             </table>
                         </div>
                     </Panel>
-                    <Panel title={<span title={t('benchHint')} className="inline-flex items-center gap-1.5">{t('benchTitle', {count: advice.bench.length})}<HelpCircle className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /></span>}>
+                    <Panel title={<span title={`${t('benchHint')}\n${t('dragHint')}`} className="inline-flex items-center gap-1.5">{t('benchTitle', {count: advice.bench.length})}<HelpCircle className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /></span>} action={<span className="hidden md:inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"><ArrowLeftRight className="w-3 h-3" aria-hidden="true" />{t('dragShort')}</span>}>
                         <ul className="md:hidden flex flex-col">
-                            {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                            {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} swap={{benched: benched.has(f.player.id), onUnbench: () => unbench(f.player.id), onPlace: () => setPicking(picking === f.player.id ? null : f.player.id), picking: picking === f.player.id}} />)}
                         </ul>
                         <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
                                 <Head />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} swap={{benched: benched.has(f.player.id), onUnbench: () => unbench(f.player.id), onPlace: () => setPicking(picking === f.player.id ? null : f.player.id), picking: picking === f.player.id}} />)}
                                 </tbody>
                             </table>
                         </div>

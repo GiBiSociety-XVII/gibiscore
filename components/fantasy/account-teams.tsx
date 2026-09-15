@@ -8,14 +8,14 @@ import {cn} from "@/components/shared/ui/cn";
 import {cloudUser, type CloudUser} from "@/lib/fantasy/cloud";
 import {deleteAccountTeam, listAccountTeams, saveAccountTeam} from "@/lib/fantasy/cloud-teams";
 import {hashOf} from "@/lib/fantasy/hash";
-import {HISTORY_ROUNDS, historyStore, locksStore, outsStore, pinsStore, teamsStore, type LineupLock} from "@/lib/fantasy/store";
+import {benchedStore, HISTORY_ROUNDS, historyStore, locksStore, outsStore, pinsStore, teamsStore, type LineupLock} from "@/lib/fantasy/store";
 
 /** A change on the device is written to the account this long after the last one. */
 const PUSH_MS = 2_000;
 
 export type AccountStatus = 'checking' | 'anonymous' | 'pulling' | 'synced' | 'error';
 
-const fingerprint = (team: unknown, pins: number[], outs: number[], lock: LineupLock | null, locks: LineupLock[]) => hashOf(JSON.stringify({team, pins, outs, lock, locks: locks.map((l) => `${l.round}@${l.savedAt}`)}));
+const fingerprint = (team: unknown, pins: number[], outs: number[], benched: number[], lock: LineupLock | null, locks: LineupLock[]) => hashOf(JSON.stringify({team, pins, outs, benched, lock, locks: locks.map((l) => `${l.round}@${l.savedAt}`)}));
 
 /** The device's and the account's kept lineups together: one per round, the later save wins, the last few rounds only. */
 function mergeLocks(a: LineupLock[], b: LineupLock[]): LineupLock[] {
@@ -41,6 +41,7 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
     const saved = teamsStore.useValue();
     const pins = pinsStore.useValue();
     const outs = outsStore.useValue();
+    const benched = benchedStore.useValue();
     const locks = locksStore.useValue();
     const history = historyStore.useValue();
     /** Per team id, the content the account holds (as pushed or pulled): only what differs is written. */
@@ -78,11 +79,13 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
                 const localTeams = teamsStore.read();
                 const localPins = pinsStore.read();
                 const localOuts = outsStore.read();
+                const localBenched = benchedStore.read();
                 const localLocks = locksStore.read();
                 const localHistory = historyStore.read();
                 const byId = new Map(localTeams.teams.map((t) => [t.id, t]));
                 const nextPins = {...localPins};
                 const nextOuts = {...localOuts};
+                const nextBenched = {...localBenched};
                 const nextLocks = {...localLocks};
                 const nextHistory = {...localHistory};
                 for (const row of rows) {
@@ -90,15 +93,17 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
                     if (!mine || mine.savedAt < row.team.savedAt) byId.set(row.id, row.team);
                     nextPins[row.id] = row.pins;
                     nextOuts[row.id] = row.outs;
+                    nextBenched[row.id] = row.benched;
                     const local = localLocks[row.id];
                     if (row.lock && (!local || local.round !== row.lock.round || local.savedAt < row.lock.savedAt)) nextLocks[row.id] = row.lock;
                     const merged = mergeLocks(localHistory[row.id] ?? [], row.locks);
                     if (merged.length > 0) nextHistory[row.id] = merged;
-                    known.current.set(row.id, fingerprint(row.team, row.pins, row.outs, row.lock, merged));
+                    known.current.set(row.id, fingerprint(row.team, row.pins, row.outs, row.benched, row.lock, merged));
                 }
                 teamsStore.write({...localTeams, teams: [...byId.values()]});
                 pinsStore.write(nextPins);
                 outsStore.write(nextOuts);
+                benchedStore.write(nextBenched);
                 locksStore.write(nextLocks);
                 historyStore.write(nextHistory);
                 setStatus('synced');
@@ -119,8 +124,8 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
             try {
                 const present = new Set(saved.teams.map((t) => t.id));
                 for (const team of saved.teams) {
-                    const row = {id: team.id, team, pins: pins[team.id] ?? [], outs: outs[team.id] ?? [], lock: locks[team.id]?.round ? locks[team.id] : null, locks: history[team.id] ?? []};
-                    const fp = fingerprint(row.team, row.pins, row.outs, row.lock, row.locks);
+                    const row = {id: team.id, team, pins: pins[team.id] ?? [], outs: outs[team.id] ?? [], benched: benched[team.id] ?? [], lock: locks[team.id]?.round ? locks[team.id] : null, locks: history[team.id] ?? []};
+                    const fp = fingerprint(row.team, row.pins, row.outs, row.benched, row.lock, row.locks);
                     if (known.current.get(team.id) === fp) continue;
                     await saveAccountTeam(user.id, row);
                     known.current.set(team.id, fp);
@@ -136,7 +141,7 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
             }
         }, PUSH_MS);
         return () => window.clearTimeout(timer);
-    }, [user, status, saved, pins, outs, locks, history]);
+    }, [user, status, saved, pins, outs, benched, locks, history]);
 
     return {user: user ?? null, status};
 }

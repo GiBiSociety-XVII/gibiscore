@@ -16,6 +16,7 @@ export interface AccountTeam {
     team: SavedTeam;
     pins: number[];
     outs: number[];
+    benched: number[];
     lock: LineupLock | null;
     /** The lineups frozen at the kick-off of the rounds gone by, oldest first: the recaps score them. */
     locks: LineupLock[];
@@ -27,23 +28,23 @@ const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((id): id is n
 function parseLock(raw: unknown): LineupLock | null {
     const l = raw as Partial<LineupLock> | null;
     if (!l || typeof l.round !== 'string' || typeof l.deadline !== 'string' || !Array.isArray(l.forecasts)) return null;
-    return {round: l.round, ...(typeof l.model === 'number' ? {model: l.model} : {}), deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: ids(l.pinned), outs: ids(l.outs)};
+    return {round: l.round, ...(typeof l.model === 'number' ? {model: l.model} : {}), deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: ids(l.pinned), outs: ids(l.outs), benched: ids(l.benched)};
 }
 
 export async function listAccountTeams(): Promise<AccountTeam[]> {
-    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,lock,locks,updated_at').order('updated_at', {ascending: false}).limit(50);
+    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,benched,lock,locks,updated_at').order('updated_at', {ascending: false}).limit(50);
     if (error) throw error;
     const rows: AccountTeam[] = [];
     for (const r of data ?? []) {
         const team = normalizeSavedTeam(r.team);
         if (!team) continue;
-        rows.push({id: r.id as string, team, pins: ids(r.pins), outs: ids(r.outs), lock: parseLock(r.lock), locks: (Array.isArray(r.locks) ? r.locks : []).map(parseLock).filter((l): l is LineupLock => l !== null), updatedAt: r.updated_at as string});
+        rows.push({id: r.id as string, team, pins: ids(r.pins), outs: ids(r.outs), benched: ids(r.benched), lock: parseLock(r.lock), locks: (Array.isArray(r.locks) ? r.locks : []).map(parseLock).filter((l): l is LineupLock => l !== null), updatedAt: r.updated_at as string});
     }
     return rows;
 }
 
 export async function saveAccountTeam(userId: string, row: Omit<AccountTeam, 'updatedAt'>): Promise<void> {
-    const {error} = await createClient().from('fantasy_teams').upsert({user_id: userId, id: row.id, team: row.team, pins: row.pins, outs: row.outs, lock: row.lock, locks: row.locks}, {onConflict: 'user_id,id'});
+    const {error} = await createClient().from('fantasy_teams').upsert({user_id: userId, id: row.id, team: row.team, pins: row.pins, outs: row.outs, benched: row.benched, lock: row.lock, locks: row.locks}, {onConflict: 'user_id,id'});
     if (error) throw error;
 }
 

@@ -198,6 +198,8 @@ export interface MatchdayOptions {
     force?: FormationKey | null;
     /** Players (ids) that must start, whatever the numbers say: the lineup is built around them. */
     pinned?: ReadonlySet<number>;
+    /** Players (ids) sent to the bench by hand: fielded only when the role has nobody else. */
+    benched?: ReadonlySet<number>;
 }
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -435,11 +437,13 @@ function defenceBonusOf(keeper: PlayerForecast | undefined, defenders: PlayerFor
 export function recommendLineup(forecasts: PlayerForecast[], options: MatchdayOptions): LineupAdvice {
     const bonus = options.defenceModifier === true ? DEFAULT_DEFENCE_BONUS : options.defenceModifier || null;
     const pinned = options.pinned ?? new Set<number>();
-    const isPinned = (f: PlayerForecast) => (pinned.has(f.player.id) ? 1 : 0);
+    const benched = options.benched ?? new Set<number>();
+    // Pinned first, benched last, the numbers in between.
+    const isPinned = (f: PlayerForecast) => (pinned.has(f.player.id) ? 1 : 0) - (benched.has(f.player.id) && !pinned.has(f.player.id) ? 1 : 0);
     const byRole = {} as Record<FantaRole, PlayerForecast[]>;
     for (const role of ROLES) byRole[role] = forecasts.filter((f) => f.player.role === role).sort((a, b) => isPinned(b) - isPinned(a) || b.value - a.value || b.plays - a.plays);
     const pins = {} as Record<FantaRole, number>;
-    for (const role of ROLES) pins[role] = byRole[role].filter(isPinned).length;
+    for (const role of ROLES) pins[role] = byRole[role].filter((f) => pinned.has(f.player.id)).length;
     /**
      * The n of a role to field, against the cover of the first substitute:
      * a starter who misses is replaced, so what he is worth is his points

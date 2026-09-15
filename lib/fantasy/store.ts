@@ -2,7 +2,7 @@
 
 import {parseManualVote, type ManualVote} from './recap';
 import {useSyncExternalStore} from 'react';
-import {CLOUD_KEY, HISTORY_KEY, LOCKS_KEY, VOTES_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
+import {BENCHED_KEY, CLOUD_KEY, HISTORY_KEY, LOCKS_KEY, VOTES_KEY, OUTS_KEY, PINS_KEY, ROSTER_KEY, STORAGE_KEY, TEAMS_KEY, normalizeConfig, normalizeSavedTeam, type AuctionConfig, type Purchase, type SavedTeam} from './config';
 
 /**
  * Auction state on the device: settings and purchases in localStorage,
@@ -95,6 +95,8 @@ function parsePins(raw: unknown): LineupPins {
 export const pinsStore = createJsonStore<LineupPins>(PINS_KEY, parsePins, {});
 /** Players marked out by hand on the lineup page (the news is ahead of the data), player ids per saved team. */
 export const outsStore = createJsonStore<LineupPins>(OUTS_KEY, parsePins, {});
+/** Players sent to the bench by hand on the lineup page (swapped out for someone else), player ids per saved team. */
+export const benchedStore = createJsonStore<LineupPins>(BENCHED_KEY, parsePins, {});
 
 /**
  * The lineup as it stood before the round kicked off, per saved team: the
@@ -114,6 +116,7 @@ export interface LineupLock {
     forced: string | null;
     pinned: number[];
     outs: number[];
+    benched?: number[];
 }
 export type LineupLocks = Record<string, LineupLock>;
 function parseLocks(raw: unknown): LineupLocks {
@@ -122,7 +125,7 @@ function parseLocks(raw: unknown): LineupLocks {
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
         const l = v as Partial<LineupLock> | null;
         if (!l || typeof l.round !== 'string' || typeof l.deadline !== 'string' || !Array.isArray(l.forecasts)) continue;
-        out[k] = {round: l.round, ...(typeof l.model === 'number' ? {model: l.model} : {}), deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: Array.isArray(l.pinned) ? l.pinned.filter((id): id is number => typeof id === 'number') : [], outs: Array.isArray(l.outs) ? l.outs.filter((id): id is number => typeof id === 'number') : []};
+        out[k] = {round: l.round, ...(typeof l.model === 'number' ? {model: l.model} : {}), deadline: l.deadline, savedAt: typeof l.savedAt === 'string' ? l.savedAt : l.deadline, fingerprint: typeof l.fingerprint === 'string' ? l.fingerprint : '', forecasts: l.forecasts, forced: typeof l.forced === 'string' ? l.forced : null, pinned: Array.isArray(l.pinned) ? l.pinned.filter((id): id is number => typeof id === 'number') : [], outs: Array.isArray(l.outs) ? l.outs.filter((id): id is number => typeof id === 'number') : [], benched: Array.isArray(l.benched) ? l.benched.filter((id): id is number => typeof id === 'number') : []};
     }
     return out;
 }

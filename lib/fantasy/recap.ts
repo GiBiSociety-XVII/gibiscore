@@ -242,10 +242,10 @@ export interface RoundScore {
  * the best eleven with hindsight. Players no longer in the roster are
  * left out of the replay.
  */
-export function scoreRound(team: {rules: FantaRules; formation: string | null; defence: DefenceBonus | false}, roster: LineupPlayer[], results: RoundResults, lock: {forecasts: unknown[]; forced: string | null; pinned: number[]} | null, calibration: VotoCalibration, pending: ReadonlySet<number> = new Set()): RoundScore {
+export function scoreRound(team: {rules: FantaRules; formation: string | null; defence: DefenceBonus | false}, roster: LineupPlayer[], results: RoundResults, lock: {forecasts: unknown[]; forced: string | null; pinned: number[]; benched?: number[]} | null, calibration: VotoCalibration, pending: ReadonlySet<number> = new Set()): RoundScore {
     const ids = new Set(roster.map((p) => p.id));
     const forecasts = lock ? (lock.forecasts as PlayerForecast[]).filter((f) => ids.has(f.player.id)) : [];
-    const advice = lock ? recommendLineup(forecasts, {rules: team.rules, defenceModifier: team.defence, prefer: team.formation as FormationKey | null, force: lock.forced as FormationKey | null, pinned: new Set(lock.pinned)}) : null;
+    const advice = lock ? recommendLineup(forecasts, {rules: team.rules, defenceModifier: team.defence, prefer: team.formation as FormationKey | null, force: lock.forced as FormationKey | null, pinned: new Set(lock.pinned), benched: new Set(lock.benched ?? [])}) : null;
     const lp = (p: {id: number; role: FantaRole}) => ({id: p.id, role: p.role});
     const played = advice ? playLineup(advice.starters.map((f) => lp(f.player)), advice.bench.map((f) => lp(f.player)), results, team.rules, calibration, team.defence, MAX_SUBS, pending) : null;
     const best = bestHindsight(roster, results, team.rules, calibration, team.defence);

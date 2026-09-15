@@ -168,6 +168,7 @@ export const ROSTER_KEY = 'gibiscore:fanta:roster';
 export const CLOUD_KEY = 'gibiscore:fanta:cloud';
 export const PINS_KEY = 'gibiscore:fanta:pins';
 export const OUTS_KEY = 'gibiscore:fanta:outs';
+export const BENCHED_KEY = 'gibiscore:fanta:benched';
 export const LOCKS_KEY = 'gibiscore:fanta:lineup-locks';
 export const HISTORY_KEY = 'gibiscore:fanta:lineup-history';
 export const VOTES_KEY = 'gibiscore:fanta:votes';
