@@ -92,6 +92,41 @@ export interface AuctionConfig {
      * worth having and the fillers go for one credit anyway.
      */
     priceLevel: number;
+    /**
+     * Credits moved outside the purchases, per manager: a balance paid in a trade (negative for
+     * who pays, positive for who receives), the part of a price not refunded by a release. A
+     * manager's credits left are his credits, minus his purchases, plus his entries here.
+     */
+    ledger: LedgerEntry[];
+}
+
+export interface LedgerEntry {
+    manager: number;
+    credits: number;
+    /** "trade" or "release": how the credits moved. */
+    kind: 'trade' | 'release';
+    note: string;
+    at: string;
+}
+
+/** What the ledger adds to a manager's credits (negative when he paid more than he received). */
+export function ledgerOf(ledger: LedgerEntry[] | undefined, manager: number): number {
+    return (ledger ?? []).reduce((s, e) => s + (e.manager === manager ? e.credits : 0), 0);
+}
+
+/** A manager's credits left: his credits, minus his purchases, plus the ledger. */
+export function creditsLeft(config: Pick<AuctionConfig, 'credits'> & Partial<Pick<AuctionConfig, 'ledger'>>, purchases: Purchase[], manager: number): number {
+    return config.credits - purchases.filter((p) => p.manager === manager).reduce((s, p) => s + p.price, 0) + ledgerOf(config.ledger, manager);
+}
+
+export function normalizeLedger(raw: unknown): LedgerEntry[] {
+    if (!Array.isArray(raw)) return [];
+    const out: LedgerEntry[] = [];
+    for (const e of raw as Array<Partial<LedgerEntry> | null>) {
+        if (!e || typeof e.manager !== 'number' || !Number.isInteger(e.manager) || typeof e.credits !== 'number' || !Number.isFinite(e.credits)) continue;
+        out.push({manager: e.manager, credits: Math.round(e.credits), kind: e.kind === 'release' ? 'release' : 'trade', note: typeof e.note === 'string' ? e.note.slice(0, 200) : '', at: typeof e.at === 'string' ? e.at : ''});
+    }
+    return out.slice(-500);
 }
 
 export const DEFAULT_SLOTS: Record<AuctionMode, Record<FantaRole, number>> = {
@@ -122,6 +157,7 @@ export const DEFAULT_CONFIG: AuctionConfig = {
     want: [],
     avoid: [],
     priceLevel: 100,
+    ledger: [],
 };
 
 /** Share of the market that usually goes to each role (Serie A leagues, classic). */
@@ -238,6 +274,7 @@ export function normalizeConfig(raw: unknown): AuctionConfig | null {
         cupsCount: typeof r.cupsCount === 'boolean' ? r.cupsCount : false,
         keeperBlock: typeof r.keeperBlock === 'boolean' ? r.keeperBlock : false,
         roleOverrides: Object.fromEntries(Object.entries(r.roleOverrides ?? {}).filter(([, v]) => v === 'P' || v === 'D' || v === 'C' || v === 'A')) as Record<string, FantaRole>,
+        ledger: normalizeLedger(r.ledger),
         want: ids(r.want),
         avoid: ids(r.avoid),
         // 135 was the default before the value model was retuned: it reads as the new default.

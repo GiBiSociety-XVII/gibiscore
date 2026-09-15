@@ -922,6 +922,52 @@
       }
     }
   },
+  "trade": {
+    "title": "Mercato",
+    "open": "Mercato di riparazione: scambi tra squadre e svincoli con rimborso",
+    "ledgerLine": "Movimenti di mercato: {credits} crediti",
+    "tabs": {
+      "trade": "Scambio",
+      "release": "Svincolo",
+      "ledger": "Movimenti"
+    },
+    "tradeHint": "Scegli le due squadre e spunta i giocatori che ognuna cede. I giocatori passano al costo che avevano; il conguaglio in crediti si registra nei movimenti. Lo scambio va a buon fine solo se entrambe le rose restano nei posti per ruolo e con almeno un credito per ogni posto libero.",
+    "sideA": "Squadra A",
+    "sideB": "Squadra B",
+    "emptyRoster": "Rosa vuota.",
+    "leftAfter": "{left} cr. dopo",
+    "balance": "Conguaglio",
+    "balanceWho": "Chi paga il conguaglio",
+    "pays": "{who} paga",
+    "credits": "crediti",
+    "confirmTrade": "Conferma lo scambio",
+    "tradeNote": "Scambio {a} ↔ {b}: {give} per {get}",
+    "issues": {
+      "empty": "Spunta almeno un giocatore da una parte.",
+      "same": "Le due squadre devono essere diverse.",
+      "notOwned": "{manager} non ha {name} in rosa.",
+      "roleFull": "{manager} avrebbe {count} {role} su {max} posti.",
+      "credits": "{manager} resterebbe con {left} crediti: non bastano per i posti liberi."
+    },
+    "releaseHint": "Svincola un giocatore con il rimborso che dà la tua lega: il prezzo pagato, la metà, la quotazione o una cifra qualsiasi. Il giocatore torna sul listone e la differenza tra prezzo e rimborso resta tra i crediti spesi.",
+    "manager": "Squadra",
+    "player": "Giocatore",
+    "pickPlayer": "Scegli il giocatore…",
+    "refund": "Rimborso",
+    "refundPrice": "Prezzo pagato ({price})",
+    "refundHalf": "Metà ({price})",
+    "refundQuote": "Quotazione ({quote})",
+    "leftAfterRelease": "→ {left} crediti dopo",
+    "confirmRelease": "Svincola",
+    "releaseNote": "Svincolo di {name}: rimborso {refund} su {price}",
+    "ledgerHint": "I crediti mossi fuori dagli acquisti: conguagli degli scambi e differenze dei rimborsi. Sommati ai crediti rimasti di ogni squadra.",
+    "ledgerEmpty": "Nessun movimento ancora.",
+    "kinds": {
+      "trade": "scambio",
+      "release": "svincolo"
+    },
+    "slotsNote": "Rosa di {slots} giocatori."
+  },
   "import": {
     "title": "Importa le rose da Leghe Fantacalcio",
     "button": "Importa da Leghe",

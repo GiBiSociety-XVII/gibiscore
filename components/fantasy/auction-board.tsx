@@ -20,13 +20,14 @@ import {TargetsPanel} from "./targets-panel";
 import {useAccountTeams} from "./account-teams";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {keeperBlocks} from "@/lib/fantasy/block";
-import {customStrategyKey, DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
+import {creditsLeft, customStrategyKey, DEFAULT_RULES, ledgerOf, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {LegheImport} from "./leghe-import";
+import {MarketDialog} from "./market-dialog";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {bargains, type Bargain} from "@/lib/fantasy/bargains";
@@ -136,6 +137,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const t = useTranslations('Fantasy.board');
     const ta = useTranslations('Fantasy.auction');
     const tr = useTranslations('Fantasy.roster');
+    const tm = useTranslations('Fantasy.trade');
     const ts = useTranslations('Fantasy.setup');
     const tst = useTranslations('Fantasy.strategies');
     const tt = useTranslations('Fantasy.tiers');
@@ -147,6 +149,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const purchases = purchasesStore.useValue();
     const [editing, setEditing] = useState(false);
     const [showStrategies, setShowStrategies] = useState(false);
+    const [showMarket, setShowMarket] = useState(false);
     const [teamsTab, setTeamsTab] = useState<TeamsTab | null>(null);
 
     const [q, setQ] = useState('');
@@ -208,7 +211,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const byId = new Map(board.players.map((p) => [p.id, p]));
         const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
         const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-        return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
+        return rankStrategies(board.players, prices, {...board.config, credits: board.config.credits + ledgerOf(board.config.ledger, board.config.me)}, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
     }, [board, prices]);
     // A warning in words; a custom strategy has no translation, so it is named from the plans.
     const healthReason = useHealthReason((key) => plans.find((p) => p.key === key)?.name ?? tst(`${key}.name`));
@@ -291,7 +294,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const setMe = (index: number) => configStore.write({...config, me: index});
     const mine = purchases.filter((p) => p.manager === me);
     const spent = mine.reduce((s, p) => s + p.price, 0);
-    const left = config.credits - spent;
+    const left = creditsLeft(config, purchases, me);
     const slotsTotal = totalSlots(config.slots);
     const freeSlots = Math.max(0, slotsTotal - mine.length);
     const mineByRole = (r: FantaRole) => mine.filter((p) => byId.get(p.playerId)?.role === r);
@@ -300,7 +303,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const roleCount = (manager: number, r: FantaRole) => rosterOf(manager).filter((p) => byId.get(p.playerId)!.role === r).length;
     // Keepers by block: one block fills the keeper slots.
     const roleFull = (manager: number, r: FantaRole) => (blocks && r === 'P' ? roleCount(manager, 'P') >= 1 : roleCount(manager, r) >= config.slots[r]);
-    const creditsLeftOf = (manager: number) => config.credits - rosterOf(manager).reduce((s, p) => s + p.price, 0);
+    const creditsLeftOf = (manager: number) => creditsLeft(config, purchases, manager);
     /** Why a purchase cannot go through, or null. */
     const blocker = (player: AuctionPlayer, manager: number, price: number): string | null => {
         const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
@@ -352,6 +355,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (e.key === 'Escape') {
             if (buying) setBuying(null);
             else if (comparing.length === 2) setCompare([]);
+            else if (showMarket) setShowMarket(false);
             else if (showStrategies) setShowStrategies(false);
             else if (teamsTab !== null) setTeamsTab(null);
             return;
@@ -427,7 +431,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const previewOf = (player: AuctionPlayer, manager: number, price: number) => {
         const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
         const others = purchases.filter((p) => p.manager === manager && p.playerId !== player.id && byId.has(p.playerId));
-        const leftAfter = config.credits - others.reduce((s, p) => s + p.price, 0) - price;
+        const leftAfter = config.credits + ledgerOf(config.ledger, me) - others.reduce((s, p) => s + p.price, 0) - price;
         const slotsAfter = Math.max(0, slotsTotal - others.length - 1);
         const roleSpent = others.filter((p) => byId.get(p.playerId)!.role === player.role).reduce((s, p) => s + p.price, 0) + price;
         const roleBudget = Math.round(config.credits * roleShare[player.role]);
@@ -776,14 +780,18 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
             {/* My roster and the strategies */}
             <div className="flex flex-col gap-3">
-                <Panel title={tr('title')} action={managers.length > 1 ? (
-                    <label className="flex items-center gap-1 text-[11px] font-bold" title={tr('planForHint')}>
-                        <span className="text-muted-foreground">{tr('planFor')}</span>
-                        <select value={me} onChange={(e) => setMe(Number(e.target.value))} className="bb-input h-7 px-1.5 text-[12px] font-extrabold max-w-[10rem]">
-                            {managers.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                        </select>
-                    </label>
-                ) : undefined}>
+                <Panel title={tr('title')} action={(
+                    <span className="flex items-center gap-2 min-w-0">
+                        {managers.length > 1 && (
+                            <label className="flex items-center gap-1 text-[11px] font-bold min-w-0" title={tr('planForHint')}>
+                                <select value={me} onChange={(e) => setMe(Number(e.target.value))} aria-label={tr('planFor')} className="bb-input h-7 px-1.5 text-[12px] font-extrabold max-w-[7rem]">
+                                    {managers.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                                </select>
+                            </label>
+                        )}
+                        <button type="button" onClick={() => setShowMarket(true)} title={tm('open')} className="bb-btn bg-card h-7 px-2 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0"><ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />{tm('title')}</button>
+                    </span>
+                )}>
                     {/* Credits left, slots, average and strategy live in the bar above the table: here only what it does not say. */}
                     <p className="px-3 pt-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('roleBudget')}</p>
                     <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
@@ -796,6 +804,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     </div>
                     <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
                         {tr('spentLine', {spent, total: config.credits})}
+                        {ledgerOf(config.ledger, me) !== 0 && <span className="block">{tm('ledgerLine', {credits: `${ledgerOf(config.ledger, me) > 0 ? '+' : ''}${ledgerOf(config.ledger, me)}`})}</span>}
                         {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, null))})}</span>}
                         {guide && (
                             <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
@@ -858,6 +867,22 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     onClose={() => setTeamsTab(null)}
                     onRelease={release}
                     me={me}
+                />
+            )}
+
+            {/* The market after the auction: trades and releases */}
+            {showMarket && (
+                <MarketDialog
+                    config={config}
+                    purchases={purchases}
+                    byId={byId}
+                    managers={managers}
+                    me={me}
+                    onApply={({purchases: nextPurchases, ledger}) => {
+                        purchasesStore.write(nextPurchases);
+                        configStore.write({...config, ledger});
+                    }}
+                    onClose={() => setShowMarket(false)}
                 />
             )}
 

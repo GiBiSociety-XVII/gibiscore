@@ -1,5 +1,6 @@
 'use client';
 
+import {ledgerOf} from '@/lib/fantasy/config';
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
@@ -71,7 +72,7 @@ export function SharedAuctionView({pool, token, initial}: {pool: AuctionPool; to
             <div className="grid gap-3 grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] items-start">
                 <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                     {cards.map(({name, manager, spent, roster}) => {
-                        const left = auction.credits - spent;
+                        const left = auction.credits - spent + ledgerOf(auction.ledger, manager);
                         const done = roster.length >= totalSlots;
                         return (
                             <Panel key={manager} title={name} action={<span className={cn("font-mono text-[12px] font-extrabold tabular-nums", left < 0 && "text-red-700")}>{left} cr.</span>}>
