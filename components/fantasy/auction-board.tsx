@@ -587,10 +587,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             );
                         })}
                     </span>
-                    {freeSlots > 0 && <span className="text-[11px] font-semibold text-muted-foreground hidden sm:inline">{tr('perSlot', {credits: Math.max(0, Math.floor(left / freeSlots))})}</span>}
+                    {freeSlots > 0 && <span className="font-mono text-[12px] font-extrabold tabular-nums text-muted-foreground hidden sm:inline" title={tr('perSlot', {credits: Math.max(0, Math.floor(left / freeSlots))})}>~{Math.max(0, Math.floor(left / freeSlots))}<span className="text-[10px] font-bold">/slot</span></span>}
                     {(rosterLineup || guide) && (
-                        <span className="text-[11px] font-bold hidden md:inline" title={tr('formationHint')}>
-                            {rosterLineup ? tr('formationNow', {formation: rosterLineup.formation}) : config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide!.formation})}
+                        <span className="bb-badge bg-card font-mono text-[11px] hidden md:inline-flex" title={`${rosterLineup ? tr('formationNow', {formation: rosterLineup.formation}) : config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide!.formation})}\n${tr('formationHint')}`}>
+                            {rosterLineup ? rosterLineup.formation : config.formation ? config.formation : guide!.formation}
                         </span>
                     )}
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -850,34 +850,77 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             onBuy={openBuy}
                         />
                     ) : (<>
-                    {/* Credits left, slots, average and strategy live in the bar above the table: here only what it does not say. */}
-                    <p className="px-3 pt-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('roleBudget')}</p>
-                    <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
-                        {ROLES.map((r) => (
-                            <div key={r} className="px-2 py-1.5 flex flex-col items-center gap-0.5">
-                                <RoleBadge role={r} />
-                                <span className="font-mono text-[11px] font-extrabold tabular-nums whitespace-nowrap">~{Math.round(config.credits * roleShare[r])} cr.</span>
+                    {/* The bar above says credits, slots and strategy: here only the picture the numbers make. */}
+                    {(() => {
+                        const reserve = freeSlots > 0 ? completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me) : 0;
+                        const ledger = ledgerOf(config.ledger, me);
+                        const total = Math.max(1, config.credits + Math.max(0, ledger));
+                        const pct = (n: number) => `${Math.max(0, Math.min(100, (n / total) * 100))}%`;
+                        const free = Math.max(0, left - reserve);
+                        return (
+                            <div className="px-3 py-2 border-b border-muted flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wide">
+                                    <span className="flex items-baseline gap-1"><span className="font-mono text-[13px] tabular-nums normal-case tracking-normal">{spent}</span><span className="text-muted-foreground">{tr('spent')}</span></span>
+                                    {reserve > 0 && <span className="flex items-baseline gap-1 text-amber-700"><span className="font-mono text-[13px] tabular-nums normal-case tracking-normal">{reserve}</span><span title={tr('reserveHint')}>{tr('reserveShort')}</span></span>}
+                                    <span className={cn("ml-auto flex items-baseline gap-1", free > 0 ? "text-emerald-700" : "text-red-700")}><span className="font-mono text-[13px] tabular-nums normal-case tracking-normal">{free}</span><span title={tr('freeHint')}>{tr('freeShort')}</span></span>
+                                </div>
+                                <div className="h-3 w-full rounded border-2 border-foreground bg-card overflow-hidden flex" title={`${tr('spentLine', {spent, total: config.credits})}${ledger !== 0 ? ` · ${tm('ledgerLine', {credits: `${ledger > 0 ? '+' : ''}${ledger}`})}` : ''}`}>
+                                    <span className="h-full bg-foreground" style={{width: pct(spent)}} />
+                                    {reserve > 0 && <span className="h-full bg-amber-400" style={{width: pct(Math.min(reserve, Math.max(0, left)))}} />}
+                                    <span className="h-full bg-emerald-400" style={{width: pct(free)}} />
+                                </div>
                             </div>
-                        ))}
+                        );
+                    })()}
+                    {/* Per role: what was spent against the budget the list suggests, coloured by how far it went */}
+                    <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center" title={tr('roleBudget')}>
+                        {ROLES.map((r) => {
+                            const budget = Math.max(1, Math.round(config.credits * roleShare[r]));
+                            const roleSpent = mineByRole(r).reduce((s, p) => s + p.price, 0);
+                            const ratio = roleSpent / budget;
+                            const tone = roleSpent === 0 ? "bg-muted" : ratio > 1.15 ? "bg-red-500" : ratio > 0.95 ? "bg-amber-400" : "bg-emerald-400";
+                            return (
+                                <div key={r} className="px-2 py-1.5 flex flex-col items-center gap-1" title={`${ts(`roles.${r}`)}: ${roleSpent} / ~${budget} cr.`}>
+                                    <span className="flex items-center gap-1"><RoleBadge role={r} /><span className="font-mono text-[11px] font-extrabold tabular-nums whitespace-nowrap">{roleSpent}<span className="text-muted-foreground font-bold">/{budget}</span></span></span>
+                                    <span className="h-1.5 w-full rounded bg-muted overflow-hidden"><span className={cn("block h-full", tone)} style={{width: `${Math.min(100, ratio * 100)}%`}} /></span>
+                                </div>
+                            );
+                        })}
                     </div>
-                    <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                        {tr('spentLine', {spent, total: config.credits})}
-                        {ledgerOf(config.ledger, me) !== 0 && <span className="block">{tm('ledgerLine', {credits: `${ledgerOf(config.ledger, me) > 0 ? '+' : ''}${ledgerOf(config.ledger, me)}`})}</span>}
-                        {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, null))})}</span>}
-                        {guide && (
-                            <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
-                                {config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide.formation})}
-                                <span className="block font-mono text-[10px] text-muted-foreground tabular-nums">{guide.formations.slice(0, 3).map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}</span>
-                            </span>
-                        )}
-                        {rosterLineup && <span className="block">{tr('formationNow', {formation: rosterLineup.formation})} <span className="font-mono text-[10px] tabular-nums">{rosterLineup.value.toFixed(1)}</span></span>}
-                    </p>
+                    {(guide || rosterLineup) && (
+                        <div className="px-3 py-1.5 border-b border-muted flex flex-wrap items-center gap-1.5" title={tr('formationHint')}>
+                            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('formationLabel')}</span>
+                            {rosterLineup && <span className="bb-badge bg-foreground text-background font-mono text-[11px]" title={tr('formationNow', {formation: rosterLineup.formation})}>{rosterLineup.formation} <span className="opacity-70">{rosterLineup.value.toFixed(1)}</span></span>}
+                            {config.formation && !rosterLineup && <span className="bb-badge bg-foreground text-background font-mono text-[11px]" title={tr('formationChosen', {formation: config.formation})}>{config.formation}</span>}
+                            {guide && guide.formations.slice(0, 3).map((f, i) => (
+                                <span key={f.key} className={cn("bb-badge font-mono text-[11px]", i === 0 && !config.formation && !rosterLineup ? "bg-accent" : "bg-card")} title={i === 0 ? tr('formation', {formation: f.key}) : undefined}>{f.key} <span className="text-muted-foreground">{f.value.toFixed(1)}</span></span>
+                            ))}
+                        </div>
+                    )}
                     {market && market.purchases > 0 && (
-                        <div className="px-3 py-1.5 border-b border-muted text-[11px] font-semibold text-muted-foreground flex flex-col gap-0.5">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wide">{tr('market')}</span>
-                            <span>{tr('marketMoney', {left: market.remaining, pct: Math.round((market.remaining / (config.credits * config.participants)) * 100)})}</span>
-                            <span>{tr('marketTops')}: {ROLES.map((r) => `${r} ${market.byRole[r].topLeft}/${market.byRole[r].topTotal}`).join(' · ')}</span>
-                            {market.inflation !== 1 && <span className={cn(market.inflation > 1 ? "text-red-700" : "text-emerald-700")}>{tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}</span>}
+                        <div className="px-3 py-1.5 border-b border-muted flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('market')}</span>
+                            {(() => {
+                                const pct = Math.round((market.remaining / (config.credits * config.participants)) * 100);
+                                return <span className={cn("bb-badge font-mono text-[11px]", pct > 50 ? "bg-emerald-200" : pct > 20 ? "bg-amber-200" : "bg-red-200")} title={tr('marketMoney', {left: market.remaining, pct})}>{market.remaining} <span className="opacity-70">{pct}%</span></span>;
+                            })()}
+                            {market.inflation !== 1 && (
+                                <span className={cn("bb-badge font-mono text-[11px]", market.inflation > 1 ? "bg-red-200" : "bg-emerald-200")} title={tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}>
+                                    {market.inflation > 1 ? '+' : ''}{Math.round((market.inflation - 1) * 100)}%
+                                </span>
+                            )}
+                            <span className="ml-auto flex items-center gap-1" title={tr('marketTopsHint')}>
+                                {ROLES.map((r) => {
+                                    const {topLeft, topTotal} = market.byRole[r];
+                                    const share = topTotal > 0 ? topLeft / topTotal : 0;
+                                    return (
+                                        <span key={r} className={cn("inline-flex items-center gap-1 h-6 pl-1 pr-1.5 rounded-md border-2 border-foreground/30 font-mono text-[11px] font-extrabold tabular-nums", share === 0 ? "bg-muted text-muted-foreground" : share < 0.34 ? "bg-red-200" : share < 0.67 ? "bg-amber-200" : "bg-emerald-200")} title={`${tr('marketTops')} · ${ts(`roles.${r}`)}: ${topLeft}/${topTotal}`}>
+                                            <span className={cn("inline-flex items-center justify-center w-4 h-4 rounded text-[9px] text-foreground", ROLE_CLASS[r])}>{r}</span>
+                                            {topLeft}
+                                        </span>
+                                    );
+                                })}
+                            </span>
                         </div>
                     )}
                     <div className="border-b border-muted">

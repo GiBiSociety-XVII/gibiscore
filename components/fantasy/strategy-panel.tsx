@@ -2,7 +2,7 @@
 
 import {useState} from "react";
 import {useTranslations} from "next-intl";
-import {Pencil, Plus, Trash2} from "lucide-react";
+import {HelpCircle, Pencil, Plus, Trash2} from "lucide-react";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {FantaRole} from "@/lib/fantasy/scores";
@@ -33,6 +33,11 @@ export function useStrategyName() {
 }
 
 /** One warning of the strategy health, in words. `nameOf` names the strategy a warning points to (a custom one has no translation). */
+/** A "?" that shows the explanation on hover or focus: the words leave the screen, not the help. */
+function Help({text}: {text: string}) {
+    return <span tabIndex={0} title={text} aria-label={text} className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-foreground/40 text-muted-foreground cursor-help align-middle"><HelpCircle className="w-3 h-3" aria-hidden="true" /></span>;
+}
+
 export function useHealthReason(nameOf?: (key: string) => string) {
     const t = useTranslations('Fantasy.strategies');
     const ts = useTranslations('Fantasy.setup');
@@ -117,7 +122,7 @@ export function StrategyEditor({initial, credits, players = [], onSave, onCancel
                 <input type="text" value={draft.name} maxLength={40} onChange={(e) => setDraft({...draft, name: e.target.value})} placeholder={t('editor.namePlaceholder')} className="bb-input h-9 px-2.5 text-[13px] font-extrabold" autoFocus />
             </label>
             <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('editor.split')}</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{t('editor.split')}<Help text={t('editor.splitHint')} /></span>
                 <div className="flex h-5 w-full rounded overflow-hidden border-2 border-foreground font-mono text-[10px] font-extrabold" role="img" aria-label={ROLES.map((r) => `${r} ${pct(r)}%`).join(', ')}>
                     {ROLES.map((r) => (
                         <span key={r} style={{width: `${draft.share[r] * 100}%`}} className={cn("flex items-center justify-center border-r-2 border-foreground last:border-r-0 whitespace-nowrap overflow-hidden", ROLE_BAR[r])}>{r} {pct(r)}%</span>
@@ -130,10 +135,9 @@ export function StrategyEditor({initial, credits, players = [], onSave, onCancel
                         <span className="font-mono text-[12px] font-extrabold tabular-nums text-right whitespace-nowrap">{pct(r)}% <span className="text-muted-foreground font-bold">· {Math.round(credits * draft.share[r])} cr.</span></span>
                     </label>
                 ))}
-                <span className="text-[10px] font-semibold text-muted-foreground">{t('editor.splitHint')}</span>
             </div>
             <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('editor.focus')}</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{t('editor.focus')}<Help text={t('editor.focusHintAll')} /></span>
                 {ROLES.map((r) => (
                     <div key={r} className="flex items-center gap-1.5 flex-wrap">
                         <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded border border-foreground font-mono text-[11px] font-extrabold shrink-0", ROLE_BAR[r])} title={ts(`roles.${r}`)}>{r}</span>
@@ -144,16 +148,14 @@ export function StrategyEditor({initial, credits, players = [], onSave, onCancel
                         </span>
                     </div>
                 ))}
-                <span className="text-[10px] font-semibold text-muted-foreground">{t('editor.focusHintAll')}</span>
             </div>
             <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('editor.formations')}</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{t('editor.formations')}<Help text={t('editor.formationsHint')} /></span>
                 <div className="flex flex-wrap gap-1">
                     {FORMATIONS.map((f) => (
                         <button key={f.key} type="button" aria-pressed={draft.formations.includes(f.key)} onClick={() => toggleFormation(f.key)} className={cn(chip(draft.formations.includes(f.key)), "font-mono")}>{f.key}</button>
                     ))}
                 </div>
-                <span className="text-[10px] font-semibold text-muted-foreground">{t('editor.formationsHint')}</span>
             </div>
             <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('editor.prefer')}</span>
@@ -166,7 +168,7 @@ export function StrategyEditor({initial, credits, players = [], onSave, onCancel
             </div>
             {players.length > 0 && (
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('editor.want')}</span>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{t('editor.want')}<Help text={t('editor.wantHint')} /></span>
                     {wantedPlayers.length === 0 ? (
                         <span className="text-[11px] font-semibold text-muted-foreground">{t('editor.wantNone')}</span>
                     ) : (
@@ -196,7 +198,6 @@ export function StrategyEditor({initial, credits, players = [], onSave, onCancel
                             </ul>
                         )}
                     </div>
-                    <span className="text-[10px] font-semibold text-muted-foreground">{t('editor.wantHint')}</span>
                 </div>
             )}
             <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-muted">
@@ -229,7 +230,7 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
     if (editing) {
         const exists = customs.some((c) => c.id === editing.id);
         return (
-            <Panel title={exists ? t('editor.titleEdit') : t('editor.titleNew')} action={<span className="text-[11px] font-semibold text-muted-foreground">{t('editor.intro')}</span>}>
+            <Panel title={exists ? t('editor.titleEdit') : t('editor.titleNew')} action={<Help text={t('editor.intro')} />}>
                 <StrategyEditor key={editing.id} initial={editing} credits={credits} players={players} onSave={save} onCancel={() => setEditing(null)} onDelete={exists ? () => remove(editing.id) : undefined} />
             </Panel>
         );
@@ -248,8 +249,7 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
         return t('custom.description', {split, prefer: t(`editor.preferKey.${custom.prefer}`), formations: custom.formations.length > 0 ? custom.formations.join(', ') : t('custom.anyFormation')});
     };
     return (
-        <Panel title={t('title')} action={<span className="text-[11px] font-semibold text-muted-foreground">{t('ranked')}</span>}>
-            <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground border-b border-muted">{t('intro')}</p>
+        <Panel title={t('title')} action={<span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">{t('ranked')}<Help text={t('intro')} /></span>}>
             {onFormation && (
                 <div className="px-3 py-2 border-b border-muted flex flex-wrap items-center gap-1.5">
                     <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('formationPick')}</span>
@@ -257,15 +257,13 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
                     {FORMATIONS.map((f) => (
                         <button key={f.key} type="button" onClick={() => onFormation(f.key)} className={chip(formation === f.key)}>{f.key}</button>
                     ))}
-                    <span className="basis-full text-[11px] font-semibold text-muted-foreground">{formation ? t('formationFixed', {formation}) : t('formationAutoHint')}</span>
+                    <Help text={formation ? t('formationFixed', {formation}) : t('formationAutoHint')} />
                 </div>
             )}
-            {(onWant || onAvoid) && (
+            {(onWant || onAvoid) && (wanted.length > 0 || avoided.length > 0) && (
                 <div className="px-3 py-2 border-b border-muted flex flex-col gap-1">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('prefs.title')}</span>
-                    {wanted.length === 0 && avoided.length === 0 ? (
-                        <span className="text-[11px] font-semibold text-muted-foreground">{t('prefs.empty')}</span>
-                    ) : (
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{t('prefs.title')}<Help text={`${t('prefs.empty')}\n${t('prefs.hint')}`} /></span>
+                    {(
                         <div className="flex flex-wrap items-center gap-1">
                             {wanted.map((p) => (
                                 <span key={`w${p.id}`} className="inline-flex items-center gap-1 pl-1.5 h-6 rounded border border-foreground bg-foreground text-background text-[11px] font-bold">
@@ -281,14 +279,12 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
                             ))}
                         </div>
                     )}
-                    <span className="text-[10px] font-semibold text-muted-foreground">{t('prefs.hint')}</span>
                 </div>
             )}
             {health && <HealthBox health={health} onSelect={(key) => onSelect(key)} nameOf={nameOf} />}
             {onSaveCustom && (
                 <div className="px-3 py-2 border-b border-muted flex items-center gap-2 flex-wrap">
-                    <button type="button" onClick={() => setEditing(blank())} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" aria-hidden="true" />{t('custom.create')}</button>
-                    <span className="text-[11px] font-semibold text-muted-foreground">{t('custom.createHint')}</span>
+                    <button type="button" onClick={() => setEditing(blank())} title={t('custom.createHint')} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" aria-hidden="true" />{t('custom.create')}</button>
                 </div>
             )}
             <ol className="flex flex-col">
