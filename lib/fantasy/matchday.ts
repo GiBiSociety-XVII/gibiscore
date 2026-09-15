@@ -198,6 +198,8 @@ export interface MatchdayOptions {
     force?: FormationKey | null;
     /** Players (ids) that must start, whatever the numbers say: the lineup is built around them. */
     pinned?: ReadonlySet<number>;
+    /** Players (ids) sent to the bench by hand: fielded only when the role has nobody else. */
+    benched?: ReadonlySet<number>;
 }
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -435,25 +437,30 @@ function defenceBonusOf(keeper: PlayerForecast | undefined, defenders: PlayerFor
 export function recommendLineup(forecasts: PlayerForecast[], options: MatchdayOptions): LineupAdvice {
     const bonus = options.defenceModifier === true ? DEFAULT_DEFENCE_BONUS : options.defenceModifier || null;
     const pinned = options.pinned ?? new Set<number>();
-    const isPinned = (f: PlayerForecast) => (pinned.has(f.player.id) ? 1 : 0);
+    const benched = options.benched ?? new Set<number>();
+    // Pinned first, benched last, the numbers in between.
+    const isPinned = (f: PlayerForecast) => (pinned.has(f.player.id) ? 1 : 0) - (benched.has(f.player.id) && !pinned.has(f.player.id) ? 1 : 0);
     const byRole = {} as Record<FantaRole, PlayerForecast[]>;
     for (const role of ROLES) byRole[role] = forecasts.filter((f) => f.player.role === role).sort((a, b) => isPinned(b) - isPinned(a) || b.value - a.value || b.plays - a.plays);
     const pins = {} as Record<FantaRole, number>;
-    for (const role of ROLES) pins[role] = byRole[role].filter(isPinned).length;
+    for (const role of ROLES) pins[role] = byRole[role].filter((f) => pinned.has(f.player.id)).length;
     /**
      * The n of a role to field, against the cover of the first substitute:
      * a starter who misses is replaced, so what he is worth is his points
      * when he plays and the substitute's when he does not. Two passes,
      * since the substitute depends on who is fielded.
      */
+    // A player sent to the bench by hand is the manager's choice, not a substitute the eleven is built on:
+    // he does not count as cover, so a swap by hand changes one place and leaves the others as they were.
+    const coverOf = (rest: PlayerForecast[]) => rest.filter((f) => !benched.has(f.player.id)).reduce((best, f) => Math.max(best, f.value), 0);
     const pick = (role: FantaRole, n: number): {fielded: PlayerForecast[]; rest: PlayerForecast[]; cover: number; slot: (f: PlayerForecast) => number} => {
         let order = byRole[role];
-        let cover = order[n]?.value ?? 0;
+        let cover = coverOf(order.slice(n));
         const slotWith = (c: number) => (f: PlayerForecast) => f.value + (1 - f.plays) * c;
         for (let pass = 0; pass < 2; pass += 1) {
             const slot = slotWith(cover);
             order = [...order].sort((a, b) => isPinned(b) - isPinned(a) || slot(b) - slot(a) || b.value - a.value);
-            cover = order.slice(n).reduce((best, f) => Math.max(best, f.value), 0);
+            cover = coverOf(order.slice(n));
         }
         return {fielded: order.slice(0, n), rest: order.slice(n).sort((a, b) => b.value - a.value || b.plays - a.plays), cover, slot: slotWith(cover)};
     };

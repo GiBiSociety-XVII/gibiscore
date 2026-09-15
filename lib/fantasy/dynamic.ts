@@ -1,4 +1,4 @@
-import {ROLE_SHARE, type AuctionConfig, type Purchase} from './config';
+import {creditsLeft, ROLE_SHARE, type AuctionConfig, type Purchase} from './config';
 import {PRICE_TUNING, valueWeights, type FantaRole, type PriceablePlayer} from './scores';
 
 /**
@@ -46,7 +46,7 @@ const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 /** Where the auction stands: money left, slots left, how the table pays. */
-export function marketState(players: PricedPlayer[], listPrices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'participants' | 'slots'>, purchases: Purchase[]): Market {
+export function marketState(players: PricedPlayer[], listPrices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'participants' | 'slots'> & Partial<Pick<AuctionConfig, 'ledger'>>, purchases: Purchase[]): Market {
     const byId = new Map(players.map((p) => [p.id, p]));
     const market = config.credits * config.participants;
     const spent = purchases.reduce((s, p) => s + p.price, 0);
@@ -101,7 +101,7 @@ export function marketState(players: PricedPlayer[], listPrices: Map<number, num
         let hungry = 0;
         for (let m = 0; m < config.participants; m += 1) {
             if (holders.has(m) || roleFull(m, role)) continue;
-            const left = config.credits - purchases.filter((p) => p.manager === m).reduce((s, p) => s + p.price, 0);
+            const left = creditsLeft(config, purchases, m);
             const spare = left - completionReserve(players, listPrices, config, purchases, m, role);
             if (!Number.isFinite(cheapestTop) || spare >= cheapestTop * 0.8) hungry += 1;
         }
@@ -152,7 +152,7 @@ export function completionReserve(players: PricedPlayer[], prices: Map<number, n
  * players keep the price they went for. With no purchases this is the
  * list price.
  */
-export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'participants' | 'slots'> & Partial<Pick<AuctionConfig, 'priceLevel'>>, purchases: Purchase[]): Map<number, number> {
+export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, number>, config: Pick<AuctionConfig, 'credits' | 'participants' | 'slots'> & Partial<Pick<AuctionConfig, 'priceLevel' | 'ledger'>>, purchases: Purchase[]): Map<number, number> {
     if (purchases.length === 0) return new Map(listPrices);
     const prices = new Map<number, number>();
     const market = marketState(players, listPrices, config, purchases);
@@ -166,7 +166,7 @@ export function dynamicPrices(players: PricedPlayer[], listPrices: Map<number, n
         for (let m = 0; m < config.participants; m += 1) {
             // A manager with the role complete is out of this market.
             if (purchases.filter((p) => p.manager === m && byId.get(p.playerId)?.role === role).length >= config.slots[role]) continue;
-            const left = config.credits - purchases.filter((p) => p.manager === m).reduce((s, p) => s + p.price, 0);
+            const left = creditsLeft(config, purchases, m);
             cap = Math.max(cap, left - completionReserve(players, listPrices, config, purchases, m, role));
         }
         return cap;

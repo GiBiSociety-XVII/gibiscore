@@ -1,6 +1,6 @@
 'use client';
 
-import {ChevronDown, ChevronUp, ClipboardCheck, Pencil, RotateCcw} from "lucide-react";
+import {ChevronDown, ChevronUp, ClipboardCheck, HelpCircle, Pencil, RotateCcw} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
@@ -8,11 +8,10 @@ import {Panel} from "@/components/shell/panel";
 import {RoleBadge} from "./role-badge";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import type {AuctionPlayer} from "@/lib/fantasy/data";
-import {recommendLineup, type PlayerForecast} from "@/lib/fantasy/matchday";
-import {bestHindsight, EMPTY_STAT, matchLabel, playLineup, roundPoints, surprises, toVotoEstimate, votoOf, withManualVotes, MAX_SUBS, type ManualVote, type PlayedSlot, type RoundResults, type RoundStat} from "@/lib/fantasy/recap";
+import {EMPTY_STAT, matchLabel, roundPoints, scoreRound, surprises, toVotoEstimate, votoOf, withManualVotes, MAX_SUBS, type ManualVote, type PlayedSlot, type RoundResults, type RoundStat} from "@/lib/fantasy/recap";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import {votesKey, votesStore, type LineupLock} from "@/lib/fantasy/store";
-import {defenceOption, type FormationKey} from "@/lib/fantasy/strategies";
+import {defenceOption} from "@/lib/fantasy/strategies";
 import type {VotoCalibration} from "@/lib/fantasy/voto";
 import {saveVotes} from "@/lib/fantasy/votes";
 
@@ -145,7 +144,7 @@ interface Row {
  */
 export function RoundRecap({team, results, seasonId, roster, byId, past, calibration, signedIn, onSaved}: {team: SavedTeam; results: RoundResults; seasonId: number; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; past: LineupLock | null; calibration: VotoCalibration; signedIn: boolean; /** Called after a save reaches the account, so the page can pull the recalibrated context. */ onSaved?: () => void}) {
     const t = useTranslations('Fantasy.lineup.recap');
-    const [open, setOpen] = useState(results.state === 'live');
+    const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<number | null>(null);
     const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
     const allVotes = votesStore.useValue();
@@ -157,13 +156,10 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
     const defence = defenceOption(team);
     const nameOf = (id: number) => byId.get(id)?.name ?? '–';
     const lp = (p: {id: number; role: FantaRole}) => ({id: p.id, role: p.role});
-    const best = bestHindsight(roster.map(lp), shown, team.rules, calibration, defence);
+    // Live: whoever still has to play is neither a hole nor a substitute yet.
+    const toPlay = new Set(roster.filter((p) => !finished.has(p.team.id)).map((p) => p.id));
+    const {advice, forecasts, played, best} = scoreRound({rules: team.rules, formation: team.formation, defence}, roster.map(lp), shown, past, calibration, toPlay);
     const inBest = new Set(best?.ids ?? []);
-
-    // The advice as it stood at the lock, replayed with its pins and forced formation, then scored.
-    const forecasts = past ? (past.forecasts as PlayerForecast[]).filter((f) => byId.has(f.player.id)) : [];
-    const advice = past ? recommendLineup(forecasts, {rules: team.rules, defenceModifier: defence, prefer: team.formation as FormationKey | null, force: past.forced as FormationKey | null, pinned: new Set(past.pinned)}) : null;
-    const played = advice ? playLineup(advice.starters.map((f) => lp(f.player)), advice.bench.map((f) => lp(f.player)), shown, team.rules, calibration, defence) : null;
     const expectedOf = new Map(forecasts.map((f) => [f.player.id, f.points]));
     const gaps = surprises(forecasts.map((f) => ({id: f.player.id, role: f.player.role, points: f.points})), shown, team.rules, calibration).slice(0, 4);
     const typedCount = roster.filter((p) => shown.stats[p.id]?.source !== undefined).length;
@@ -277,6 +273,7 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
                     <span className="text-muted-foreground">
                         {t('subs', {count: played.subs})}
                         {played.holes > 0 && <span className="text-red-700"> · {t('holes', {count: played.holes})}</span>}
+                        {played.pending > 0 && ` · ${t('pending', {count: played.pending})}`}
                         {played.defence > 0 && ` · ${t('defence', {points: fmt(played.defence)})}`}
                     </span>
                 )}
@@ -296,7 +293,7 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
             {open && (
                 <div className="border-t-2 border-foreground">
                     <p className="px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                        <span>{t('voteHint')}</span>
+                        <span className="inline-flex items-center gap-1.5" title={t('voteHint')}>{t('voteShort')}<HelpCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /><span className="sr-only">{t('voteHint')}</span></span>
                         <span className={cn("ml-auto font-bold", save === 'error' && "text-red-700")}>{!signedIn ? t('signInToSave') : save === 'saving' ? t('saving') : save === 'saved' ? t('saved') : save === 'error' ? t('saveError') : t('autoSave')}</span>
                         {typedCount > 0 && <button type="button" onClick={reset} className="bb-btn bg-card h-6 px-2 text-[10px] font-extrabold inline-flex items-center gap-1"><RotateCcw className="w-3 h-3" aria-hidden="true" />{t('reset')}</button>}
                     </p>

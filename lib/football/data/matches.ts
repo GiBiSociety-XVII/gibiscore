@@ -1,9 +1,10 @@
+import {cachedSeasonStandings} from './competitions';
 import 'server-only';
 import {withRetry} from '@/lib/db/retry';
 import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
 import type {FormEntry, StandingGroup} from '../types';
 import {loadTeamSidelined} from './sidelined';
-import {FIXTURE_LIST_SELECT, FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toFixtures, toTeam, toStandingRow, type FixtureRow, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
+import {FIXTURE_LIST_SELECT, FIXTURE_SELECT, LEAGUE_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toFixtures, toTeam, toStandingRow, type FixtureRow, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
 interface EventRow {
     id: number;
@@ -55,7 +56,8 @@ interface PlayerStatRow {
     key_passes: number | null;
     yellow_cards: number;
     red_cards: number;
-    stats: Record<string, number | string | null> | null;
+    /** The position he played, from the provider's json (the rest of that json is not loaded: it is the heaviest column of the page). */
+    stat_position: string | null;
     player: {id: number; name: string; slug: string; image_url: string | null; position: string | null} | null;
 }
 
@@ -87,7 +89,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
                     'player:players!fixture_events_player_id_fkey(id,name,slug),related:players!fixture_events_related_player_id_fkey(id,name,slug)),' +
                     'lineups(team_id,is_starter,is_expected,formation,formation_position,jersey_number,player:players(id,name,slug,position)),' +
                     'team_stats:fixture_team_stats(team_id,possession,shots_total,shots_on_target,corners,fouls,yellow_cards,red_cards,passes_total,pass_accuracy,xg),' +
-                    'player_stats:fixture_player_stats(team_id,minutes_played,rating,goals,assists,shots_total,shots_on_target,key_passes,yellow_cards,red_cards,stats,' +
+                    'player_stats:fixture_player_stats(team_id,minutes_played,rating,goals,assists,shots_total,shots_on_target,key_passes,yellow_cards,red_cards,stat_position:stats->>position,' +
                     'player:players(id,name,slug,image_url,position))',
             )
             .eq('id', id)
@@ -143,7 +145,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
                 .filter((p) => p.team_id === teamId && p.player)
                 .map((p) => {
                     ratingOf.set(p.player!.id, p.rating);
-                    const position = (p.stats?.position as string | null) ?? p.player!.position;
+                    const position = p.stat_position ?? p.player!.position;
                     const normalizedPosition = normalizePosition(position);
                     return {
                         player: {id: p.player!.id, name: p.player!.name, slug: p.player!.slug, imageUrl: p.player!.image_url},
@@ -253,7 +255,7 @@ export {LEAGUE_SELECT, TEAM_SELECT};
 
 async function loadStandings(db: ReturnType<typeof footballDb>, seasonId: number, homeId: number, awayId: number): Promise<StandingGroup[]> {
     try {
-        const {data, error} = await db.from('standings').select(STANDING_SELECT).eq('season_id', seasonId).order('group').order('position').limit(200);
+        const {data, error} = await cachedSeasonStandings(seasonId);
         if (error) throw error;
         const groups = new Map<string, StandingGroup>();
         for (const r of (data ?? []) as unknown as StandingQueryRow[]) {

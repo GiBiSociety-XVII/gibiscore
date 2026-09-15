@@ -20,13 +20,16 @@ import {TargetsPanel} from "./targets-panel";
 import {useAccountTeams} from "./account-teams";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
 import {keeperBlocks} from "@/lib/fantasy/block";
-import {customStrategyKey, DEFAULT_RULES, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
+import {creditsLeft, customStrategyKey, DEFAULT_RULES, ledgerOf, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
 import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
 import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {LegheImport} from "./leghe-import";
+import {MarketDialog} from "./market-dialog";
+import {Help} from "./help";
+import {auctionPath} from "@/lib/fantasy/routes";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {bargains, type Bargain} from "@/lib/fantasy/bargains";
@@ -36,6 +39,8 @@ const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
 type SortKey = 'overall' | 'price' | 'fantaAvg' | 'bargain' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
+/** How long the phone's "Compra" stays armed for its second tap. */
+const QUICK_MS = 4_000;
 
 
 function ScoreCell({value}: {value: number}) {
@@ -50,10 +55,28 @@ function ScoreCell({value}: {value: number}) {
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
 
 /** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
-function Status({p, rivals, rivalsTaken = [], deal}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]; deal?: Bargain}) {
+type Verdict = 'great' | 'ok' | 'pricey' | 'avoid';
+const VERDICT_CLASS: Record<Verdict, string> = {great: "bg-emerald-200 border-emerald-700", ok: "bg-emerald-100 border-emerald-700/60", pricey: "bg-amber-200 border-amber-700", avoid: "bg-red-200 border-red-700"};
+
+/**
+ * One word on whether to buy him at the live price: with a strategy, the
+ * ceiling it would pay against the price; without, where the site ranks
+ * him against where the list does.
+ */
+function verdictOf(price: number, maxBid: number | null, deal: Bargain | undefined): Verdict | null {
+    if (maxBid !== null) {
+        const ratio = maxBid / Math.max(1, price);
+        return ratio >= 1.15 ? 'great' : ratio >= 0.95 ? 'ok' : ratio >= 0.75 ? 'pricey' : 'avoid';
+    }
+    if (!deal) return null;
+    return deal.index >= 1.3 ? 'great' : deal.index <= 0.75 ? 'pricey' : null;
+}
+
+function Status({p, rivals, rivalsTaken = [], deal, verdict}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]; deal?: Bargain; verdict?: Verdict | null}) {
     const t = useTranslations('Fantasy.board');
     return (
         <span className="inline-flex items-center gap-1 flex-wrap justify-end">
+            {verdict && <Badge variant="outline" className={cn("text-[9px] h-4 px-1 font-extrabold", VERDICT_CLASS[verdict])} title={t(`verdict.${verdict}Hint`)}>{t(`verdict.${verdict}`)}</Badge>}
             {deal?.bargain && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-emerald-700 border-emerald-700" title={t('bargain.hint', {quote: deal.quote, equiv: deal.equivQuote, rank: deal.rank, role: p.role})}>{t('bargain.badge')}</Badge>}
             {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
             {p.injury && (() => {
@@ -136,6 +159,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const t = useTranslations('Fantasy.board');
     const ta = useTranslations('Fantasy.auction');
     const tr = useTranslations('Fantasy.roster');
+    const tm = useTranslations('Fantasy.trade');
+    const tg = useTranslations('Fantasy.targets');
     const ts = useTranslations('Fantasy.setup');
     const tst = useTranslations('Fantasy.strategies');
     const tt = useTranslations('Fantasy.tiers');
@@ -147,6 +172,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const purchases = purchasesStore.useValue();
     const [editing, setEditing] = useState(false);
     const [showStrategies, setShowStrategies] = useState(false);
+    const [showMarket, setShowMarket] = useState(false);
+    const [rosterTab, setRosterTab] = useState<'roster' | 'targets'>('roster');
+    // Phone: a second tap on "Compra" within a few seconds buys at the proposed price, no sheet.
+    const [quick, setQuick] = useState<{id: number; at: number} | null>(null);
     const [teamsTab, setTeamsTab] = useState<TeamsTab | null>(null);
 
     const [q, setQ] = useState('');
@@ -208,7 +237,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const byId = new Map(board.players.map((p) => [p.id, p]));
         const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
         const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-        return rankStrategies(board.players, prices, board.config, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
+        return rankStrategies(board.players, prices, {...board.config, credits: board.config.credits + ledgerOf(board.config.ledger, board.config.me)}, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
     }, [board, prices]);
     // A warning in words; a custom strategy has no translation, so it is named from the plans.
     const healthReason = useHealthReason((key) => plans.find((p) => p.key === key)?.name ?? tst(`${key}.name`));
@@ -227,6 +256,11 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         });
     }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices, deals]);
 
+    useEffect(() => {
+        if (!quick) return;
+        const id = window.setTimeout(() => setQuick(null), QUICK_MS);
+        return () => window.clearTimeout(id);
+    }, [quick]);
     // The planning team is kept for the lineup page: every purchase of mine, and the league's settings, as they change.
     useEffect(() => {
         if (!config) return;
@@ -244,7 +278,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const save = (next: AuctionConfig) => {
         configStore.write(next);
         setEditing(false);
-        if (!pool || next.league !== pool.league) router.push(`/fantacalcio/asta?league=${next.league}`);
+        if (!pool || next.league !== pool.league) router.push(auctionPath(next.league));
     };
     // Rosters exported by Leghe Fantacalcio: a whole league in, the cloud link dropped (it was another auction's).
     const importable = (pool?.players ?? []).map((p) => ({id: p.id, role: p.role, listCode: p.listCode}));
@@ -267,7 +301,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     }
     if (editing) return <AuctionSetup initial={config} onSave={save} onCancel={() => setEditing(false)} />;
     if (pool && pool.league !== config.league) {
-        router.replace(`/fantacalcio/asta?league=${config.league}`);
+        router.replace(auctionPath(config.league));
         return <p className="text-sm font-semibold text-muted-foreground">…</p>;
     }
     if (!pool || !board) return <p className="text-sm font-semibold text-muted-foreground">{ta('empty')}</p>;
@@ -291,7 +325,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const setMe = (index: number) => configStore.write({...config, me: index});
     const mine = purchases.filter((p) => p.manager === me);
     const spent = mine.reduce((s, p) => s + p.price, 0);
-    const left = config.credits - spent;
+    const left = creditsLeft(config, purchases, me);
     const slotsTotal = totalSlots(config.slots);
     const freeSlots = Math.max(0, slotsTotal - mine.length);
     const mineByRole = (r: FantaRole) => mine.filter((p) => byId.get(p.playerId)?.role === r);
@@ -300,7 +334,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const roleCount = (manager: number, r: FantaRole) => rosterOf(manager).filter((p) => byId.get(p.playerId)!.role === r).length;
     // Keepers by block: one block fills the keeper slots.
     const roleFull = (manager: number, r: FantaRole) => (blocks && r === 'P' ? roleCount(manager, 'P') >= 1 : roleCount(manager, r) >= config.slots[r]);
-    const creditsLeftOf = (manager: number) => config.credits - rosterOf(manager).reduce((s, p) => s + p.price, 0);
+    const creditsLeftOf = (manager: number) => creditsLeft(config, purchases, manager);
     /** Why a purchase cannot go through, or null. */
     const blocker = (player: AuctionPlayer, manager: number, price: number): string | null => {
         const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
@@ -313,20 +347,39 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     };
     /** The most I can pay for a player of this role and still finish my roster with the cheapest players left. */
     const myMaxFor = (r: FantaRole) => Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, r));
+    /** Registers a purchase (or a correction of one): the board's one way of writing a bought player. */
+    const commitPurchase = (player: AuctionPlayer, price: number, manager: number, editing: boolean) => {
+        const next = {playerId: player.id, price, manager};
+        const at = purchases.findIndex((p) => p.playerId === player.id);
+        // Keepers by block: the club's other keepers come with the first, at nothing.
+        const followers = blocks && player.role === 'P' ? (blocks.byTeam.get(player.team.id) ?? []).filter((id) => id !== player.id).map((playerId) => ({playerId, price: 0, manager})) : [];
+        const followerIds = new Set(followers.map((f) => f.playerId));
+        // A correction keeps its place in the order; a purchase goes at the end (the last one, for undo).
+        const rest = purchases.filter((p) => !followerIds.has(p.playerId));
+        purchasesStore.write(at >= 0 && editing ? [...rest.map((p) => (p.playerId === player.id ? next : p)), ...followers] : [...rest.filter((p) => p.playerId !== player.id), next, ...followers]);
+        setLastManager(manager);
+    };
     const confirmBuy = () => {
         if (!buying) return;
         const price = Math.max(0, Math.round(Number(buying.price) || 0));
         if (blocker(buying.player, buying.manager, price)) return;
-        const next = {playerId: buying.player.id, price, manager: buying.manager};
-        const at = purchases.findIndex((p) => p.playerId === buying.player.id);
-        // Keepers by block: the club's other keepers come with the first, at nothing.
-        const followers = blocks && buying.player.role === 'P' ? (blocks.byTeam.get(buying.player.team.id) ?? []).filter((id) => id !== buying.player.id).map((playerId) => ({playerId, price: 0, manager: buying.manager})) : [];
-        const followerIds = new Set(followers.map((f) => f.playerId));
-        // A correction keeps its place in the order; a purchase goes at the end (the last one, for undo).
-        const rest = purchases.filter((p) => !followerIds.has(p.playerId));
-        purchasesStore.write(at >= 0 && buying.editing ? [...rest.map((p) => (p.playerId === buying.player.id ? next : p)), ...followers] : [...rest.filter((p) => p.playerId !== buying.player.id), next, ...followers]);
-        setLastManager(buying.manager);
+        commitPurchase(buying.player, price, buying.manager, buying.editing);
         setBuying(null);
+    };
+    /** Phone: first tap arms the price proposed, the second within a few seconds buys at it for the last manager used; anything blocking opens the sheet. */
+    const quickBuy = (player: AuctionPlayer) => {
+        const target = blocks?.backups.has(player.id) ? (byId.get(blocks.starterOf.get(player.id)!) ?? player) : player;
+        const price = prices.get(target.id) ?? 1;
+        if (quick?.id !== player.id || Date.now() - quick.at > QUICK_MS) {
+            setQuick({id: player.id, at: Date.now()});
+            return;
+        }
+        setQuick(null);
+        if (blocker(target, lastManager, price)) {
+            openBuy(player);
+            return;
+        }
+        commitPurchase(target, price, lastManager, false);
     };
     /** Takes a purchase back; a keeper's block goes back whole. */
     const release = (playerId: number) => {
@@ -352,6 +405,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         if (e.key === 'Escape') {
             if (buying) setBuying(null);
             else if (comparing.length === 2) setCompare([]);
+            else if (showMarket) setShowMarket(false);
             else if (showStrategies) setShowStrategies(false);
             else if (teamsTab !== null) setTeamsTab(null);
             return;
@@ -427,7 +481,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const previewOf = (player: AuctionPlayer, manager: number, price: number) => {
         const already = purchases.find((p) => p.playerId === player.id && p.manager === manager);
         const others = purchases.filter((p) => p.manager === manager && p.playerId !== player.id && byId.has(p.playerId));
-        const leftAfter = config.credits - others.reduce((s, p) => s + p.price, 0) - price;
+        const leftAfter = config.credits + ledgerOf(config.ledger, me) - others.reduce((s, p) => s + p.price, 0) - price;
         const slotsAfter = Math.max(0, slotsTotal - others.length - 1);
         const roleSpent = others.filter((p) => byId.get(p.playerId)!.role === player.role).reduce((s, p) => s + p.price, 0) + price;
         const roleBudget = Math.round(config.credits * roleShare[player.role]);
@@ -535,10 +589,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             );
                         })}
                     </span>
-                    {freeSlots > 0 && <span className="text-[11px] font-semibold text-muted-foreground hidden sm:inline">{tr('perSlot', {credits: Math.max(0, Math.floor(left / freeSlots))})}</span>}
+                    {freeSlots > 0 && <span className="font-mono text-[12px] font-extrabold tabular-nums text-muted-foreground hidden sm:inline" title={tr('perSlot', {credits: Math.max(0, Math.floor(left / freeSlots))})}>~{Math.max(0, Math.floor(left / freeSlots))}<span className="text-[10px] font-bold">/slot</span></span>}
                     {(rosterLineup || guide) && (
-                        <span className="text-[11px] font-bold hidden md:inline" title={tr('formationHint')}>
-                            {rosterLineup ? tr('formationNow', {formation: rosterLineup.formation}) : config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide!.formation})}
+                        <span className="bb-badge bg-card font-mono text-[11px] hidden md:inline-flex" title={`${rosterLineup ? tr('formationNow', {formation: rosterLineup.formation}) : config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide!.formation})}\n${tr('formationHint')}`}>
+                            {rosterLineup ? rosterLineup.formation : config.formation ? config.formation : guide!.formation}
                         </span>
                     )}
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -600,6 +654,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         <option value="all">{tt('all')}</option>
                         {TIERS.map((k) => <option key={k} value={k}>{tt(`${k}.name`)}</option>)}
                     </select>
+                    <select className={selectClass} value={teamId === 'all' ? 'all' : String(teamId)} onChange={(e) => { setTeamId(e.target.value === 'all' ? 'all' : Number(e.target.value)); setLimit(PAGE); }} aria-label={t('allTeams')}>
+                        <option value="all">{t('allTeams')}</option>
+                        {pool.teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+                    </select>
                     <select className={selectClass} value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={t('sort')}>
                         {(['overall', 'price', 'fantaAvg', 'bargain', ...SCORE_KEYS, 'name'] as SortKey[]).map((k) => <option key={k} value={k}>{t('sort')}: {k === 'name' ? t('columns.player') : t(`columns.${k === 'team' ? 'team_' : k}`)}</option>)}
                     </select>
@@ -608,38 +666,23 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         {t('hideBought')}
                     </label>
                     <button type="button" onClick={() => setShowScores((v) => !v)} aria-pressed={showScores} title={t('showScoresHint')} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold hidden md:inline-flex", showScores ? "bg-foreground text-background" : "bg-card")}>{t('showScores')}</button>
-                </div>
-
-                {/* View tabs, then the teams on one row, crests only: one at a time, the active one again to clear it */}
-                <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:thin] pb-1 -mb-1">
-                    <div role="radiogroup" aria-label={t('view')} className="flex gap-1 shrink-0 pr-2 mr-1 border-r-2 border-foreground/30">
+                    <div role="radiogroup" aria-label={t('view')} className="flex gap-1 shrink-0 ml-auto">
                         {(['list', 'tiers'] as const).map((v) => (
                             <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold", view === v ? "bg-foreground text-background" : "bg-card")}>{v === 'list' ? t('viewList') : t('viewTiers')}</button>
                         ))}
-                    </div>
-                    <div role="radiogroup" aria-label={t('allTeams')} className="contents">
-                    <button type="button" role="radio" aria-checked={teamId === 'all'} onClick={() => { setTeamId('all'); setLimit(PAGE); }} className={cn("bb-btn h-8 px-2.5 text-[12px] font-extrabold shrink-0", teamId === 'all' ? "bg-foreground text-background" : "bg-card")}>{t('allTeams')}</button>
-                    {pool.teams.map((tm) => {
-                        const active = teamId === tm.id;
-                        return (
-                            <button key={tm.id} type="button" role="radio" aria-checked={active} title={tm.name} aria-label={tm.name} onClick={() => { setTeamId(active ? 'all' : tm.id); setLimit(PAGE); }} className={cn("bb-btn h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center", active ? "bg-foreground" : "bg-card")}>
-                                <TeamCrest team={tm} size={20} />
-                            </button>
-                        );
-                    })}
                     </div>
                 </div>
 
                 {view === 'tiers' && (
                     <>
                         <TierList players={players} infos={tierInfos} prices={prices} bought={bought} targets={targets} onBuy={openBuy} />
-                        <p className="text-[11px] font-semibold text-muted-foreground">{tt('hint')}</p>
+
                     </>
                 )}
                 {view === 'list' && (<>
 
                 {/* List */}
-                <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="text-[11px] font-semibold text-muted-foreground">{ta('updated')}</span>}>
+                <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">{ta('updated')}<Help text={`${ta('intro')}\n\n${t('shortcuts')}`} /></span>}>
                     {/* Phones: one card per player, the numbers that decide and a Buy button; no sideways scrolling */}
                     <ul className="md:hidden flex flex-col">
                         {shown.map((p) => {
@@ -661,8 +704,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                     <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] font-semibold text-muted-foreground">
                                         <span>{t('columns.fantaAvg')} <span className="font-mono font-extrabold text-foreground tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</span></span>
                                         <span>{t('columns.price')} <span className="text-foreground">{priceCell(p.id)}</span></span>
-                                        {strategy && maxBidOf(p.id) !== null && <span>{t('columns.maxBid')} <span className="font-mono font-extrabold text-accent-text tabular-nums">{maxBidOf(p.id)}</span></span>}
-                                        <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                        {strategy && maxBidOf(p.id) !== null && <span>{t('columns.maxBid')} <span className={cn("font-mono font-extrabold tabular-nums px-1 rounded border", (() => { const v = purchase ? null : verdictOf(prices.get(p.id) ?? 1, maxBidOf(p.id), deals.get(p.id)); return v ? VERDICT_CLASS[v] : "border-transparent text-accent-text"; })())}>{maxBidOf(p.id)}</span></span>}
+                                        <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} verdict={purchase ? null : verdictOf(prices.get(p.id) ?? 1, strategy ? maxBidOf(p.id) : null, deals.get(p.id))} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                         <span className="ml-auto inline-flex items-center gap-1">
                                             <button type="button" onClick={() => setOpen(expanded ? null : p.id)} aria-expanded={expanded} aria-label={t('seasonsTitle')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground/40 bg-card">{expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</button>
                                             {!purchase && <PlanStar size={7} wanted={wanted.has(p.id)} avoided={avoided.has(p.id)} target={targets.has(p.id)} onClick={() => cyclePlan(p.id)} />}
@@ -672,8 +715,13 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                     <button type="button" onClick={() => openEdit(p)} aria-label={t('edit')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground bg-card"><Pencil className="w-3.5 h-3.5" /></button>
                                                     <button type="button" onClick={() => release(p.id)} aria-label={t('release')} className="inline-flex w-7 h-7 items-center justify-center rounded border border-foreground bg-card"><X className="w-3.5 h-3.5" /></button>
                                                 </>
+                                            ) : quick?.id === p.id ? (
+                                                <>
+                                                    <button type="button" onClick={() => quickBuy(p)} className="bb-btn bg-foreground text-background h-8 px-3 text-[12px] font-extrabold">{t('quickConfirm', {price: prices.get(blocks?.backups.has(p.id) ? blocks.starterOf.get(p.id)! : p.id) ?? 1, manager: managers[lastManager] ?? t('me')})}</button>
+                                                    <button type="button" onClick={() => { setQuick(null); openBuy(p); }} aria-label={t('quickOther')} title={t('quickOther')} className="inline-flex w-8 h-8 items-center justify-center rounded border border-foreground bg-card"><Pencil className="w-3.5 h-3.5" /></button>
+                                                </>
                                             ) : (
-                                                <button type="button" onClick={() => openBuy(p)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold">{blocks?.backups.has(p.id) ? t('block.buy') : t('buy')}</button>
+                                                <button type="button" onClick={() => quickBuy(p)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold">{blocks?.backups.has(p.id) ? t('block.buy') : t('buy')}</button>
                                             )}
                                         </span>
                                     </div>
@@ -688,10 +736,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <tr className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground border-b-2 border-foreground">
                                 <th className="px-2 py-1.5 text-left w-full">{t('columns.player')}</th>
                                 <th className="px-1 py-1.5 text-center">{t('columns.role')}</th>
-                                <th className="px-1 py-1.5 text-center" title={t('columnHints.tier')}>{t('columns.tier')}</th>
+                                {showScores && <th className="px-1 py-1.5 text-center" title={t('columnHints.tier')}>{t('columns.tier')}</th>}
                                 {showScores && SCORE_KEYS.map((k) => <th key={k} className="px-1 py-1.5 text-center" title={t(`columnHints.${k === 'team' ? 'team_' : k}`)}>{t(`columns.${k === 'team' ? 'team_' : k}`)}</th>)}
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.overall')}>{t('columns.overall')}</th>
-                                <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>
+                                {showScores && <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>}
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.price')}>{t('columns.price')}</th>
                                 {strategy && <th className="px-1 py-1.5 text-right" title={t('columnHints.maxBid')}>{t('columns.maxBid')}</th>}
                                 <th className="px-2 py-1.5 text-right">{t('columns.status')}</th>
@@ -721,15 +769,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                 </div>
                                             </td>
                                             <td className="px-1 py-1 text-center"><RoleBadge role={p.role} /></td>
-                                            <td className="px-1 py-1 text-center"><span className="inline-flex items-center gap-1"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{tierInfos.get(p.id) && <TierWhy player={p} info={tierInfos.get(p.id)!} />}</span></td>
+                                            {showScores && <td className="px-1 py-1 text-center"><span className="inline-flex items-center gap-1"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{tierInfos.get(p.id) && <TierWhy player={p} info={tierInfos.get(p.id)!} />}</span></td>}
                                             {showScores && SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
-                                            <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>
+                                            {showScores && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>}
                                             <td className="px-1 py-1 text-right">{priceCell(p.id)}</td>
-                                            {strategy && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums text-accent-text">{maxBidOf(p.id) ?? '–'}</td>}
+                                            {strategy && <td className="px-1 py-1 text-right">{(() => { const max = maxBidOf(p.id); const v = purchase || max === null ? null : verdictOf(prices.get(p.id) ?? 1, max, deals.get(p.id)); return <span className={cn("inline-flex items-center justify-center min-w-[2.25rem] h-6 px-1 rounded border font-mono text-[12px] font-extrabold tabular-nums", v ? VERDICT_CLASS[v] : "border-transparent text-accent-text")}>{max ?? '–'}</span>; })()}</td>}
                                             <td className="px-2 py-1 text-right">
                                                 <span className="inline-flex items-center gap-1.5 justify-end">
-                                                    <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
+                                                    <Status p={p} rivals={p.rivals} deal={purchase ? undefined : deals.get(p.id)} verdict={purchase ? null : verdictOf(prices.get(p.id) ?? 1, strategy ? maxBidOf(p.id) : null, deals.get(p.id))} rivalsTaken={p.contested ? p.rivals.filter((r) => bought.has(r.id) && bought.get(r.id)!.manager !== (purchase?.manager ?? me)).map((r) => `${r.name} (${managers[bought.get(r.id)!.manager] ?? t('me')})`) : []} />
                                                     <button type="button" onClick={() => toggleCompare(p.id)} aria-pressed={compare.includes(p.id)} aria-label={t('compare')} title={t('compareHint')} className={cn("inline-flex w-6 h-6 items-center justify-center rounded border border-foreground/50 hover:bg-accent", compare.includes(p.id) ? "bg-foreground text-background" : "bg-card")}><ArrowLeftRight className="w-3 h-3" /></button>
                                                     {purchase ? (
                                                         <span className="inline-flex items-center gap-1">
@@ -745,7 +793,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={7 + (strategy ? 1 : 0) + (showScores ? SCORE_KEYS.length : 0)} className="px-3 py-2">
+                                                <td colSpan={5 + (strategy ? 1 : 0) + (showScores ? SCORE_KEYS.length + 2 : 0)} className="px-3 py-2">
                                                     {details(p)}
                                                 </td>
                                             </tr>
@@ -762,8 +810,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </div>
                     )}
                 </Panel>
-                <p className="text-[11px] font-semibold text-muted-foreground">{ta('intro')}</p>
-                <p className="hidden md:block text-[11px] font-semibold text-muted-foreground">{t('shortcuts')}</p>
                 </>)}
                 {compare.length === 1 && byId.has(compare[0]) && (
                     <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bb-surface bg-background px-3 h-9 flex items-center gap-2 text-[12px] font-extrabold shadow-[4px_4px_0_rgb(var(--foreground))]">
@@ -776,41 +822,105 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
             {/* My roster and the strategies */}
             <div className="flex flex-col gap-3">
-                <Panel title={tr('title')} action={managers.length > 1 ? (
-                    <label className="flex items-center gap-1 text-[11px] font-bold" title={tr('planForHint')}>
-                        <span className="text-muted-foreground">{tr('planFor')}</span>
-                        <select value={me} onChange={(e) => setMe(Number(e.target.value))} className="bb-input h-7 px-1.5 text-[12px] font-extrabold max-w-[10rem]">
-                            {managers.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                        </select>
-                    </label>
-                ) : undefined}>
-                    {/* Credits left, slots, average and strategy live in the bar above the table: here only what it does not say. */}
-                    <p className="px-3 pt-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('roleBudget')}</p>
-                    <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center">
-                        {ROLES.map((r) => (
-                            <div key={r} className="px-2 py-1.5 flex flex-col items-center gap-0.5">
-                                <RoleBadge role={r} />
-                                <span className="font-mono text-[11px] font-extrabold tabular-nums whitespace-nowrap">~{Math.round(config.credits * roleShare[r])} cr.</span>
-                            </div>
+                <Panel title={(
+                    <span role="tablist" className="inline-flex items-center gap-1 normal-case tracking-normal">
+                        {(['roster', 'targets'] as const).map((k) => (
+                            <button key={k} type="button" role="tab" aria-selected={rosterTab === k} onClick={() => setRosterTab(k)} className={cn("bb-btn h-7 px-2 text-[11px] font-extrabold uppercase tracking-wide shrink-0", rosterTab === k ? "bg-foreground text-background" : "bg-card")}>{k === 'roster' ? tr('title') : tg('tab')}</button>
                         ))}
+                    </span>
+                )} action={<button type="button" onClick={() => setShowMarket(true)} title={tm('open')} aria-label={tm('title')} className="bb-btn bg-card h-7 px-2 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0"><ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" /><span className="hidden lg:inline">{tm('title')}</span></button>}>
+                    {managers.length > 1 && (
+                        <label className="flex items-center gap-2 px-3 h-8 border-b border-muted text-[11px] font-bold" title={tr('planForHint')}>
+                            <span className="text-muted-foreground shrink-0">{tr('planFor')}</span>
+                            <select value={me} onChange={(e) => setMe(Number(e.target.value))} className="bb-input h-6 px-1.5 text-[12px] font-extrabold min-w-0 flex-1">
+                                {managers.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                            </select>
+                        </label>
+                    )}
+                    {rosterTab === 'targets' ? (
+                        <TargetsPanel
+                            bare
+                            players={marketPlayers}
+                            targets={strategy ? ROLES.flatMap((r) => strategy.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id)) : []}
+                            prices={prices}
+                            bought={bought}
+                            avoided={avoided}
+                            managers={managers}
+                            myIds={new Set(mine.map((p) => p.playerId))}
+                            onBuy={openBuy}
+                        />
+                    ) : (<>
+                    {/* The bar above says credits, slots and strategy: here only the picture the numbers make. */}
+                    {(() => {
+                        const reserve = freeSlots > 0 ? completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me) : 0;
+                        const ledger = ledgerOf(config.ledger, me);
+                        const total = Math.max(1, config.credits + Math.max(0, ledger));
+                        const pct = (n: number) => `${Math.max(0, Math.min(100, (n / total) * 100))}%`;
+                        const free = Math.max(0, left - reserve);
+                        return (
+                            <div className="px-3 py-2 border-b border-muted flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wide">
+                                    <span className="flex items-baseline gap-1"><span className="font-mono text-[13px] tabular-nums normal-case tracking-normal">{spent}</span><span className="text-muted-foreground">{tr('spent')}</span></span>
+                                    {reserve > 0 && <span className="flex items-baseline gap-1 text-amber-700"><span className="font-mono text-[13px] tabular-nums normal-case tracking-normal">{reserve}</span><span title={tr('reserveHint')}>{tr('reserveShort')}</span></span>}
+                                    <span className={cn("ml-auto flex items-baseline gap-1", free > 0 ? "text-emerald-700" : "text-red-700")}><span className="font-mono text-[13px] tabular-nums normal-case tracking-normal">{free}</span><span title={tr('freeHint')}>{tr('freeShort')}</span></span>
+                                </div>
+                                <div className="h-3 w-full rounded border-2 border-foreground bg-card overflow-hidden flex" title={`${tr('spentLine', {spent, total: config.credits})}${ledger !== 0 ? ` · ${tm('ledgerLine', {credits: `${ledger > 0 ? '+' : ''}${ledger}`})}` : ''}`}>
+                                    <span className="h-full bg-foreground" style={{width: pct(spent)}} />
+                                    {reserve > 0 && <span className="h-full bg-amber-400" style={{width: pct(Math.min(reserve, Math.max(0, left)))}} />}
+                                    <span className="h-full bg-emerald-400" style={{width: pct(free)}} />
+                                </div>
+                            </div>
+                        );
+                    })()}
+                    {/* Per role: what was spent against the budget the list suggests, coloured by how far it went */}
+                    <div className="grid grid-cols-4 divide-x divide-muted border-b border-muted text-center" title={tr('roleBudget')}>
+                        {ROLES.map((r) => {
+                            const budget = Math.max(1, Math.round(config.credits * roleShare[r]));
+                            const roleSpent = mineByRole(r).reduce((s, p) => s + p.price, 0);
+                            const ratio = roleSpent / budget;
+                            const tone = roleSpent === 0 ? "bg-muted" : ratio > 1.15 ? "bg-red-500" : ratio > 0.95 ? "bg-amber-400" : "bg-emerald-400";
+                            return (
+                                <div key={r} className="px-2 py-1.5 flex flex-col items-center gap-1" title={`${ts(`roles.${r}`)}: ${roleSpent} / ~${budget} cr.`}>
+                                    <span className="flex items-center gap-1"><RoleBadge role={r} /><span className="font-mono text-[11px] font-extrabold tabular-nums whitespace-nowrap">{roleSpent}<span className="text-muted-foreground font-bold">/{budget}</span></span></span>
+                                    <span className="h-1.5 w-full rounded bg-muted overflow-hidden"><span className={cn("block h-full", tone)} style={{width: `${Math.min(100, ratio * 100)}%`}} /></span>
+                                </div>
+                            );
+                        })}
                     </div>
-                    <p className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-muted">
-                        {tr('spentLine', {spent, total: config.credits})}
-                        {freeSlots > 0 && <span className="block">{tr('reserve', {reserve: completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me), max: Math.max(0, left - completionReserve(marketPlayers, prices, marketConfig, marketPurchases, me, null))})}</span>}
-                        {guide && (
-                            <span className="block text-foreground" title={`${tr('formationHint')}\n${guide.formations.map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}`}>
-                                {config.formation ? tr('formationChosen', {formation: config.formation}) : tr('formation', {formation: guide.formation})}
-                                <span className="block font-mono text-[10px] text-muted-foreground tabular-nums">{guide.formations.slice(0, 3).map((f) => `${f.key} ${f.value.toFixed(1)}`).join(' · ')}</span>
-                            </span>
-                        )}
-                        {rosterLineup && <span className="block">{tr('formationNow', {formation: rosterLineup.formation})} <span className="font-mono text-[10px] tabular-nums">{rosterLineup.value.toFixed(1)}</span></span>}
-                    </p>
+                    {(guide || rosterLineup) && (
+                        <div className="px-3 py-1.5 border-b border-muted flex flex-wrap items-center gap-1.5" title={tr('formationHint')}>
+                            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('formationLabel')}</span>
+                            {rosterLineup && <span className="bb-badge bg-foreground text-background font-mono text-[11px]" title={tr('formationNow', {formation: rosterLineup.formation})}>{rosterLineup.formation} <span className="opacity-70">{rosterLineup.value.toFixed(1)}</span></span>}
+                            {config.formation && !rosterLineup && <span className="bb-badge bg-foreground text-background font-mono text-[11px]" title={tr('formationChosen', {formation: config.formation})}>{config.formation}</span>}
+                            {guide && guide.formations.slice(0, 3).map((f, i) => (
+                                <span key={f.key} className={cn("bb-badge font-mono text-[11px]", i === 0 && !config.formation && !rosterLineup ? "bg-accent" : "bg-card")} title={i === 0 ? tr('formation', {formation: f.key}) : undefined}>{f.key} <span className="text-muted-foreground">{f.value.toFixed(1)}</span></span>
+                            ))}
+                        </div>
+                    )}
                     {market && market.purchases > 0 && (
-                        <div className="px-3 py-1.5 border-b border-muted text-[11px] font-semibold text-muted-foreground flex flex-col gap-0.5">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wide">{tr('market')}</span>
-                            <span>{tr('marketMoney', {left: market.remaining, pct: Math.round((market.remaining / (config.credits * config.participants)) * 100)})}</span>
-                            <span>{tr('marketTops')}: {ROLES.map((r) => `${r} ${market.byRole[r].topLeft}/${market.byRole[r].topTotal}`).join(' · ')}</span>
-                            {market.inflation !== 1 && <span className={cn(market.inflation > 1 ? "text-red-700" : "text-emerald-700")}>{tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}</span>}
+                        <div className="px-3 py-1.5 border-b border-muted flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tr('market')}</span>
+                            {(() => {
+                                const pct = Math.round((market.remaining / (config.credits * config.participants)) * 100);
+                                return <span className={cn("bb-badge font-mono text-[11px]", pct > 50 ? "bg-emerald-200" : pct > 20 ? "bg-amber-200" : "bg-red-200")} title={tr('marketMoney', {left: market.remaining, pct})}>{market.remaining} <span className="opacity-70">{pct}%</span></span>;
+                            })()}
+                            {market.inflation !== 1 && (
+                                <span className={cn("bb-badge font-mono text-[11px]", market.inflation > 1 ? "bg-red-200" : "bg-emerald-200")} title={tr('marketMood', {pct: `${market.inflation > 1 ? '+' : ''}${Math.round((market.inflation - 1) * 100)}%`})}>
+                                    {market.inflation > 1 ? '+' : ''}{Math.round((market.inflation - 1) * 100)}%
+                                </span>
+                            )}
+                            <span className="ml-auto flex items-center gap-1" title={tr('marketTopsHint')}>
+                                {ROLES.map((r) => {
+                                    const {topLeft, topTotal} = market.byRole[r];
+                                    const share = topTotal > 0 ? topLeft / topTotal : 0;
+                                    return (
+                                        <span key={r} className={cn("inline-flex items-center gap-1 h-6 pl-1 pr-1.5 rounded-md border-2 border-foreground/30 font-mono text-[11px] font-extrabold tabular-nums", share === 0 ? "bg-muted text-muted-foreground" : share < 0.34 ? "bg-red-200" : share < 0.67 ? "bg-amber-200" : "bg-emerald-200")} title={`${tr('marketTops')} · ${ts(`roles.${r}`)}: ${topLeft}/${topTotal}`}>
+                                            <span className={cn("inline-flex items-center justify-center w-4 h-4 rounded text-[9px] text-foreground", ROLE_CLASS[r])}>{r}</span>
+                                            {topLeft}
+                                        </span>
+                                    );
+                                })}
+                            </span>
                         </div>
                     )}
                     <div className="border-b border-muted">
@@ -835,17 +945,8 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             }))}
                         </ul>
                     )}
+                    </>)}
                 </Panel>
-                <TargetsPanel
-                    players={marketPlayers}
-                    targets={strategy ? ROLES.flatMap((r) => strategy.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id)) : []}
-                    prices={prices}
-                    bought={bought}
-                    avoided={avoided}
-                    managers={managers}
-                    myIds={new Set(mine.map((p) => p.playerId))}
-                    onBuy={openBuy}
-                />
             </div>
 
             {/* Every roster, in full */}
@@ -858,6 +959,22 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                     onClose={() => setTeamsTab(null)}
                     onRelease={release}
                     me={me}
+                />
+            )}
+
+            {/* The market after the auction: trades and releases */}
+            {showMarket && (
+                <MarketDialog
+                    config={config}
+                    purchases={purchases}
+                    byId={byId}
+                    managers={managers}
+                    me={me}
+                    onApply={({purchases: nextPurchases, ledger}) => {
+                        purchasesStore.write(nextPurchases);
+                        configStore.write({...config, ledger});
+                    }}
+                    onClose={() => setShowMarket(false)}
                 />
             )}
 

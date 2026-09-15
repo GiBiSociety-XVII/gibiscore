@@ -52,12 +52,15 @@ const MATCH_LINE_SELECT = `team_id,minutes_played,rating,goals,assists,yellow_ca
 export async function getPlayerPage(slug: string, seasonYear?: number): Promise<PlayerPage | null> {
     try {
         const db = footballDb();
-        const {data: playerRow, error: playerError} = await db
-            .from('players')
-            .select('id,name,slug,position,age,image_url,nationality,height_cm,weight_kg,injured')
-            .eq('slug', slug)
-            .maybeSingle();
+        const PLAYER_SELECT = 'id,name,slug,position,age,image_url,nationality,height_cm,weight_kg,injured';
+        let {data: playerRow, error: playerError} = await db.from('players').select(PLAYER_SELECT).eq('slug', slug).maybeSingle();
         if (playerError) throw playerError;
+        // A slug from before the name was repaired ("m-apos-bala-nzola-31318") still ends with the provider id
+        const providerId = playerRow ? null : Number(slug.match(/-(\d+)$/)?.[1] ?? Number.NaN);
+        if (!playerRow && providerId !== null && Number.isFinite(providerId)) {
+            ({data: playerRow, error: playerError} = await db.from('players').select(PLAYER_SELECT).eq('provider_id', providerId).maybeSingle());
+            if (playerError) throw playerError;
+        }
         if (!playerRow) return null;
         const p = playerRow as unknown as {id: number; name: string; slug: string; position: string | null; age: number | null; image_url: string | null; nationality: string | null; height_cm: number | null; weight_kg: number | null; injured: boolean | null};
 

@@ -3,6 +3,7 @@
  * No I/O here: everything is unit-tested in mappers.test.ts.
  */
 import type {FixtureState} from '@/lib/football/types';
+import {cleanName, repairName} from '@/lib/football/names';
 import type {
     AfEvent,
     AfFixtureResponse,
@@ -141,8 +142,8 @@ export function mapEvents(events: AfEvent[] | undefined): EventRow[] {
             providerTeamId: event.team?.id ?? null,
             providerPlayerId: event.player?.id ?? null,
             providerRelatedPlayerId: event.assist?.id ?? null,
-            playerName: event.player?.name ?? null,
-            relatedPlayerName: event.assist?.name ?? null,
+            playerName: event.player?.name ? cleanName(event.player.name) : null,
+            relatedPlayerName: event.assist?.name ? cleanName(event.assist.name) : null,
             type: kind,
             minute: event.time?.elapsed ?? null,
             extraMinute: event.time?.extra ?? null,
@@ -454,12 +455,12 @@ export interface PlayerProfileRow {
 }
 
 export function mapPlayerProfile(p: AfPlayerProfile, position: string | null): PlayerProfileRow {
-    const name = p.name && p.name.trim() !== '' ? p.name : `Giocatore ${p.id}`;
+    const name = p.name && p.name.trim() !== '' ? repairName(p.name, p.firstname, p.lastname) : `Giocatore ${p.id}`;
     return {
         provider_id: p.id,
         name,
-        first_name: p.firstname ?? null,
-        last_name: p.lastname ?? null,
+        first_name: p.firstname ? cleanName(p.firstname) : null,
+        last_name: p.lastname ? cleanName(p.lastname) : null,
         age: p.age ?? null,
         date_of_birth: p.birth?.date ?? null,
         birth_place: p.birth?.place ?? null,

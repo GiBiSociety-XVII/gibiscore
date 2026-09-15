@@ -2,7 +2,7 @@ import type {Metadata} from "next";
 import Image from "next/image";
 import {ArrowLeftRight} from "lucide-react";
 import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
-import {Link} from "@/i18n/navigation";
+import {Link, redirect} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {NotFoundBox, PageHeader} from "@/components/football/page-header";
@@ -13,6 +13,7 @@ import {Tabs} from "@/components/football/tabs";
 import {AbsenceLine} from "@/components/football/absences";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
+import {PlayerFantasy} from "@/components/fantasy/player-fantasy";
 
 export const revalidate = 1800;
 
@@ -55,6 +56,9 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                 <NotFoundBox message={t('notFound')} backHref="/competitions" backLabel="Competizioni" />
             </SiteShell>
         );
+    }
+    if (page.player.slug !== slug) {
+        redirect({href: `/players/${page.player.slug}${season && season.length > 0 ? `/${season.join('/')}` : ''}`, locale});
     }
 
     const {player, team, totals} = page;
@@ -256,7 +260,10 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] items-start">
                 <Tabs items={[{id: 'seasons', label: t('tabs.seasons'), content: seasonsTab, count: page.seasons.length}, {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.matches.length}]} />
-                <PlayerAnalysis stat={mainStat} benchmark={benchmark} competitionName={mainStat?.competition.name ?? null} />
+                <div className="flex flex-col gap-3 min-w-0">
+                    <PlayerAnalysis stat={mainStat} benchmark={benchmark} competitionName={mainStat?.competition.name ?? null} />
+                    <PlayerFantasy playerId={player.id} />
+                </div>
             </div>
         </SiteShell>
     );

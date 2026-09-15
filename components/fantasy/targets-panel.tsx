@@ -7,6 +7,7 @@ import {Panel} from "@/components/shell/panel";
 import type {AuctionPlayer} from "@/lib/fantasy/data";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import {playerValue, type StrategyPick} from "@/lib/fantasy/strategies";
+import {Help} from "./help";
 import {RoleBadge} from "./role-badge";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -28,7 +29,7 @@ export interface RivalNote {
  * every contested player of mine or among the targets, who competes for
  * his place, and whether the table has bought him already.
  */
-export function TargetsPanel({players, targets, prices, bought, avoided, managers, myIds, onBuy}: {players: AuctionPlayer[]; targets: StrategyPick[]; prices: Map<number, number>; bought: Map<number, {manager: number; price: number}>; avoided: Set<number>; managers: string[]; myIds: Set<number>; onBuy: (player: AuctionPlayer) => void}) {
+export function TargetsPanel({players, targets, prices, bought, avoided, managers, myIds, onBuy, bare = false}: {players: AuctionPlayer[]; targets: StrategyPick[]; prices: Map<number, number>; bought: Map<number, {manager: number; price: number}>; avoided: Set<number>; managers: string[]; myIds: Set<number>; /** Only the content: the caller draws the frame (a tab of the roster panel). */ bare?: boolean; onBuy: (player: AuctionPlayer) => void}) {
     const t = useTranslations('Fantasy.targets');
     const byId = new Map(players.map((p) => [p.id, p]));
     const targetIds = new Set(targets.map((p) => p.id));
@@ -54,8 +55,8 @@ export function TargetsPanel({players, targets, prices, bought, avoided, manager
     if (open.length === 0 && contested.length === 0) return null;
     const chip = "inline-flex items-center gap-1 h-6 px-1.5 rounded border border-foreground/40 bg-card text-[11px] font-bold hover:bg-accent";
 
-    return (
-        <Panel title={t('title')}>
+    const body = (
+        <>
             {open.length > 0 && (
                 <ul className="flex flex-col divide-y divide-muted">
                     {ROLES.flatMap((role) => open.filter((p) => p.role === role)).map((target) => {
@@ -91,7 +92,7 @@ export function TargetsPanel({players, targets, prices, bought, avoided, manager
             )}
             {contested.length > 0 && (
                 <div className={cn("px-3 py-2 flex flex-col gap-1", open.length > 0 && "border-t-2 border-foreground")}>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('contested')}</span>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{t('contested')}<Help text={t('contestedHint')} /></span>
                     <ul className="flex flex-col gap-1">
                         {contested.map(({player, mine, rivals}) => (
                             <li key={player.id} className="text-[11px] font-semibold flex flex-wrap items-center gap-1">
@@ -107,9 +108,9 @@ export function TargetsPanel({players, targets, prices, bought, avoided, manager
                             </li>
                         ))}
                     </ul>
-                    <span className="text-[10px] font-semibold text-muted-foreground">{t('contestedHint')}</span>
                 </div>
             )}
-        </Panel>
+        </>
     );
+    return bare ? body : <Panel title={t('title')}>{body}</Panel>;
 }

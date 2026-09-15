@@ -12,6 +12,8 @@ import {ScoreFilters, type ScoreFilter} from "./score-filters";
 /** How often the page asks for the live state of its rows, while visible. */
 const POLL_LIVE_MS = 15_000;
 const POLL_DAY_MS = 20_000;
+/** A poll that failed (network, a 503) is tried again this soon, once: coming back to the tab must not wait a whole period. */
+const RETRY_MS = 4_000;
 
 interface Update {
     id: number;
@@ -44,7 +46,11 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
     const {favorites: favoriteCompetitions} = useFavorites();
     const {favorites: favoriteTeamSlugs} = useFavoriteTeams();
     const favoriteTeams = new Set(favoriteTeamSlugs);
-    const [updates, setUpdates] = useState<Map<number, Update>>(() => new Map());
+    // The patches of the polls, tied to the page they were fetched for: a page rendered again by the
+    // server (a refresh on coming back to the tab, say) is newer than any patch kept from before, so
+    // patches from an earlier page are dropped rather than laid over the fresh rows.
+    const [polled, setPolled] = useState<{page: ScoresPage; updates: Map<number, Update>}>(() => ({page, updates: new Map()}));
+    const updates = polled.page === page ? polled.updates : new Map<number, Update>();
     const live = page.mode === 'live';
     // Only while something can still change: a live list, or today with matches open or in play.
     const active = live || (page.date === page.today && (page.total === 0 || page.liveCount + page.scheduledCount > 0));
@@ -53,6 +59,14 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
         if (!active) return;
         let stopped = false;
         let refreshing = false;
+        let retry: number | null = null;
+        const again = () => {
+            if (stopped || retry !== null) return;
+            retry = window.setTimeout(() => {
+                retry = null;
+                void tick();
+            }, RETRY_MS);
+        };
         const known = new Set([...page.pinned, ...page.countries.flatMap((c) => c.competitions)].flatMap((g) => g.fixtures.map((f) => f.id)));
         const wasLive = new Set([...page.pinned, ...page.countries.flatMap((c) => c.competitions)].flatMap((g) => g.fixtures.filter((f) => isLive(f.state)).map((f) => f.id)));
         const tick = async () => {
@@ -60,12 +74,15 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
             try {
                 const url = live ? '/api/scores?mode=live' : `/api/scores?date=${page.date}`;
                 const res = await fetch(url, {cache: 'no-store'});
-                if (!res.ok) return;
+                if (!res.ok) {
+                    again();
+                    return;
+                }
                 const body = (await res.json()) as {fixtures: Update[]};
                 if (stopped) return;
                 const next = new Map<number, Update>();
                 for (const u of body.fixtures) next.set(u.id, u);
-                setUpdates(next);
+                setPolled({page, updates: next});
                 // The server page came out empty (a database hiccup at render) while the day has matches: refresh it.
                 if (!live && known.size === 0 && body.fixtures.length > 0 && !refreshing) {
                     refreshing = true;
@@ -82,7 +99,8 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
                     }
                 }
             } catch {
-                // Network hiccup: the next tick tries again.
+                // Network hiccup: tried again shortly, then on the next tick.
+                again();
             }
         };
         const id = window.setInterval(tick, live ? POLL_LIVE_MS : POLL_DAY_MS);
@@ -94,6 +112,7 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
         return () => {
             stopped = true;
             window.clearInterval(id);
+            if (retry !== null) window.clearTimeout(retry);
             document.removeEventListener('visibilitychange', onVisible);
         };
     }, [active, live, page, router]);

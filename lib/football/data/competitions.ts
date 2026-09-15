@@ -102,8 +102,10 @@ function toRanked(r: RankingRow): RankedPlayer | null {
     };
 }
 
-/** Season rankings from player_season_stats: scorers and assists. */
-export async function getRankings(leagueId: number, seasonYear: number): Promise<CompetitionPage['rankings']> {
+/** Season rankings from player_season_stats: scorers and assists; cached, refreshed with the player seasons sync. */
+export const getRankings = unstable_cache(loadRankings, ['season-rankings'], {revalidate: 1800, tags: ['player-seasons']});
+
+async function loadRankings(leagueId: number, seasonYear: number): Promise<CompetitionPage['rankings']> {
     const db = footballDb();
     const base = () => db.from('player_season_stats').select(RANKING_SELECT).eq('league_id', leagueId).eq('season_year', seasonYear);
     const [scorersRes, assistsRes] = await Promise.all([
@@ -115,15 +117,31 @@ export async function getRankings(leagueId: number, seasonYear: number): Promise
     return {scorers: map(scorersRes.data), assists: map(assistsRes.data)};
 }
 
+/** A league with its seasons, by slug: the same row for every render of its page, refreshed with the competitions sync. */
+const cachedLeagueBySlug = unstable_cache(
+    async (slug: string): Promise<unknown> => {
+        const {data, error} = await footballDb().from('leagues').select(`${LEAGUE_SELECT},seasons(id,name,year,is_current)`).eq('slug', slug).maybeSingle();
+        if (error) throw error;
+        return data ?? null;
+    },
+    ['league-by-slug'],
+    {revalidate: 3600, tags: ['navigation']},
+);
+
+/** A season's fixtures for its competition page: one read per five minutes, however many renders (crawlers included). */
+const cachedSeasonFixtures = unstable_cache(
+    async (seasonId: number): Promise<unknown[]> => {
+        const {data, error} = await footballDb().from('fixtures').select(FIXTURE_LIST_SELECT).eq('season_id', seasonId).order('starting_at', {ascending: true}).limit(1000);
+        if (error) throw error;
+        return (data ?? []) as unknown[];
+    },
+    ['season-fixtures'],
+    {revalidate: 300},
+);
+
 export async function getCompetitionPage(slug: string): Promise<CompetitionPage | null> {
     try {
-        const db = footballDb();
-        const {data: leagueRow, error: leagueError} = await db
-            .from('leagues')
-            .select(`${LEAGUE_SELECT},seasons(id,name,year,is_current)`)
-            .eq('slug', slug)
-            .maybeSingle();
-        if (leagueError) throw leagueError;
+        const leagueRow = await cachedLeagueBySlug(slug);
         if (!leagueRow) return null;
         const league = leagueRow as unknown as LeagueRow & {seasons: Array<{id: number; name: string; year: number; is_current: boolean}>};
         const current = league.seasons?.find((s) => s.is_current) ?? null;
@@ -133,9 +151,9 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
             return {competition, season: null, standings: [], rounds: [], teams: [], currentRound: null, results: [], upcoming: [], live: [], rankings: emptyRankings, pastRankings: []};
         }
 
-        const [standingsRes, fixturesRes, rankings, statSeasons] = await Promise.all([
+        const [standingsRes, fixtureRows, rankings, statSeasons] = await Promise.all([
             cachedSeasonStandings(current.id),
-            db.from('fixtures').select(FIXTURE_LIST_SELECT).eq('season_id', current.id).order('starting_at', {ascending: true}).limit(1000),
+            cachedSeasonFixtures(current.id),
             getRankings(competition.id, current.year).catch((error) => {
                 logReadError(`getRankings(${slug})`, error);
                 return emptyRankings;
@@ -149,7 +167,6 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
                 .map(async (s) => ({year: s.year, name: s.name, rankings: await getRankings(competition.id, s.year).catch(() => emptyRankings)})),
         );
         if (standingsRes.error) throw standingsRes.error;
-        if (fixturesRes.error) throw fixturesRes.error;
 
         const groups = new Map<string, StandingGroup>();
         for (const r of (standingsRes.data ?? []) as unknown as StandingQueryRow[]) {
@@ -159,7 +176,7 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
             groups.get(r.group)!.rows.push(row);
         }
 
-        const fixtures = toFixtures(fixturesRes.data);
+        const fixtures = toFixtures(fixtureRows);
         const now = Date.now();
         const live = fixtures.filter((f) => LIVE_STATES.includes(f.state));
         const finished = fixtures.filter((f) => f.state === 'finished' || (f.state !== 'scheduled' && !LIVE_STATES.includes(f.state) && new Date(f.startingAt).getTime() < now));
@@ -237,8 +254,10 @@ export interface StatSeason {
     isCurrent: boolean;
 }
 
-/** Seasons of a league whose player statistics have been imported, newest first. */
-export async function getStatSeasons(leagueId: number): Promise<StatSeason[]> {
+/** Seasons of a league whose player statistics have been imported, newest first; cached, refreshed with the player seasons sync. */
+export const getStatSeasons = unstable_cache(loadStatSeasons, ['stat-seasons'], {revalidate: 3600, tags: ['player-seasons']});
+
+async function loadStatSeasons(leagueId: number): Promise<StatSeason[]> {
     try {
         const db = footballDb();
         const {data, error} = await db.from('seasons').select('id,year,name,is_current').eq('league_id', leagueId).not('players_synced_at', 'is', null).order('year', {ascending: false}).limit(8);
@@ -251,7 +270,7 @@ export async function getStatSeasons(leagueId: number): Promise<StatSeason[]> {
 }
 
 /** A season's table; shared by the competition page and the standings API, refreshed with the standings sync. */
-const cachedSeasonStandings = unstable_cache(
+export const cachedSeasonStandings = unstable_cache(
     async (seasonId: number): Promise<{data: StandingQueryRow[]; error: null}> => {
         const {data, error} = await footballDb().from('standings').select(STANDING_SELECT).eq('season_id', seasonId).order('group').order('position').limit(200);
         if (error) throw error;

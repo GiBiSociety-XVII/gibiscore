@@ -349,6 +349,8 @@ export interface SidelinedEntry {
     missed: number;
     /** Out for months by the kind of problem: a long spell, not a date. */
     longTerm: boolean;
+    /** A suspension listed for a match of this competition: it holds there, not in the others (a red card in Europe does not skip a league match). */
+    competition?: {id: number; name: string} | null;
 }
 
 // ---------------------------------------------------------------------------

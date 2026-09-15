@@ -1,4 +1,4 @@
-import type {Purchase} from './config';
+import {normalizeLedger, type LedgerEntry, type Purchase} from './config';
 
 /**
  * A fantasy auction shared with the group by link: what the
@@ -12,6 +12,7 @@ export interface SharedAuction {
     league: string;
     managers: string[];
     credits: number;
+    ledger: LedgerEntry[];
     participants: number;
     slots: Record<'P' | 'D' | 'C' | 'A', number>;
     mode: string;
@@ -32,6 +33,7 @@ export function parseShared(row: unknown): SharedAuction | null {
         league: r.league,
         managers: Array.isArray(c.managers) ? c.managers.filter((m): m is string => typeof m === 'string') : [],
         credits: typeof c.credits === 'number' ? c.credits : 500,
+        ledger: normalizeLedger(c.ledger),
         participants: typeof c.participants === 'number' ? c.participants : 8,
         slots: {P: slots?.P ?? 3, D: slots?.D ?? 8, C: slots?.C ?? 8, A: slots?.A ?? 6},
         mode: typeof c.mode === 'string' ? c.mode : 'classic',

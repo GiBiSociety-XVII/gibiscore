@@ -5,6 +5,7 @@ import {dailyRemaining, lastRateLimit, seedRateLimit} from '@/lib/api-football/c
 import {quotaAllows, quotaIsFresh, RESERVE, type JobClass} from '@/lib/api-football/plan';
 import {fetchAll} from '@/lib/db/paginate';
 import {slugify} from '@/lib/api-football/mappers';
+import {cleanName} from '@/lib/football/names';
 
 /**
  * Shared plumbing for sync jobs: a service-role client (public schema),
@@ -357,13 +358,13 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
         const {error} = await db.from('teams').upsert(
             richRows.map((t) => ({
                 provider_id: t.id,
-                name: t.name,
+                name: cleanName(t.name),
                 short_code: t.code ?? null,
                 country: t.country ?? null,
                 logo_url: t.logo ?? null,
                 venue_name: t.venueName ?? null,
                 founded: t.founded ?? null,
-                slug: slugify(t.name, t.id),
+                slug: slugify(cleanName(t.name), t.id),
             })),
             {onConflict: 'provider_id'},
         );
@@ -371,7 +372,7 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
     }
     for (let i = 0; i < minimalRows.length; i += 500) {
         const {error} = await db.from('teams').upsert(
-            minimalRows.slice(i, i + 500).map((t) => ({provider_id: t.id, name: t.name, logo_url: t.logo ?? null, slug: slugify(t.name, t.id)})),
+            minimalRows.slice(i, i + 500).map((t) => ({provider_id: t.id, name: cleanName(t.name), logo_url: t.logo ?? null, slug: slugify(cleanName(t.name), t.id)})),
             {onConflict: 'provider_id', ignoreDuplicates: true},
         );
         if (error) fail('teams.upsert', error);
@@ -402,7 +403,7 @@ export async function ensurePlayers(db: FootballClient, players: MinimalPlayer[]
     if (missing.length > 0) {
         const rows = missing.map((id) => {
             const p = unique.get(id)!;
-            const name = p.name && p.name.trim() !== '' ? p.name : `Giocatore ${id}`;
+            const name = p.name && p.name.trim() !== '' ? cleanName(p.name) : `Giocatore ${id}`;
             return {
                 provider_id: id,
                 name,

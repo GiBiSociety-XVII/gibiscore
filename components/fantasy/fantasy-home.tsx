@@ -220,13 +220,16 @@ export function FantasyHome({round}: {round: NextRound | null}) {
             {/* Three steps, for whoever is new */}
             <Panel title={t('dash.howTitle')}>
                 <ol className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-muted">
-                    {(['step1', 'step2', 'step3'] as const).map((k, i) => (
-                        <li key={k} className="px-3 py-3 flex gap-3">
-                            <span className="inline-flex w-7 h-7 shrink-0 items-center justify-center rounded-full bg-foreground text-background font-mono text-[13px] font-extrabold">{i + 1}</span>
-                            <span className="flex flex-col gap-0.5">
-                                <span className="text-[13px] font-extrabold">{t(`dash.${k}Title`)}</span>
-                                <span className="text-[12px] font-semibold text-muted-foreground">{t(`dash.${k}Text`)}</span>
-                            </span>
+                    {([['step1', Gavel, '/fantacalcio/asta'], ['step2', ClipboardList, '/fantacalcio/asta'], ['step3', CheckCircle2, '/fantacalcio/formazione']] as const).map(([k, Icon, href], i) => (
+                        <li key={k}>
+                            <Link href={href} className="px-3 py-3 flex items-center gap-3 hover:bg-muted">
+                                <span className="inline-flex w-9 h-9 shrink-0 items-center justify-center rounded-lg border-2 border-foreground bg-accent"><Icon className="w-4 h-4" aria-hidden="true" /></span>
+                                <span className="flex flex-col gap-0.5 min-w-0">
+                                    <span className="text-[13px] font-extrabold"><span className="font-mono text-muted-foreground mr-1.5">{i + 1}</span>{t(`dash.${k}Title`)}</span>
+                                    <span className="text-[12px] font-semibold text-muted-foreground">{t(`dash.${k}Text`)}</span>
+                                </span>
+                                <ArrowRight className="w-4 h-4 ml-auto shrink-0 text-muted-foreground" aria-hidden="true" />
+                            </Link>
                         </li>
                     ))}
                 </ol>

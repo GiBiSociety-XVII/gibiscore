@@ -108,6 +108,24 @@ describe('recommendLineup', () => {
         expect(advice.starters.some((f) => f.player.id === 7 || f.player.id === 14 || f.player.id === 21)).toBe(false);
     });
 
+    it('keeps a player sent to the bench by hand out of the eleven, and swaps him with the one pinned in his place', () => {
+        const ctx: PlayerContext = {teamId: 10, recent: recent(['started']), official: null, sidelined: null};
+        const roster: MatchdayPlayer[] = [player(1, 'P', 10, 100), ...[2, 3, 4, 5, 6].map((id) => player(id, 'D', 10, 95)), ...[7, 8, 9, 10, 11].map((id) => player(id, 'C', 10, 95)), ...[12, 13, 14].map((id) => player(id, 'A', 10, 95)), player(15, 'A', 10, 2)];
+        const forecasts = roster.map((p) => forecastPlayer(p, ctx, [fixture], CLASSIC_RULES));
+        const free = recommendLineup(forecasts, {rules: CLASSIC_RULES});
+        const out = free.starters.find((f) => f.player.role === 'A')!.player.id;
+        const swapped = recommendLineup(forecasts, {rules: CLASSIC_RULES, pinned: new Set([15]), benched: new Set([out])});
+        expect(swapped.starters.some((f) => f.player.id === 15)).toBe(true);
+        expect(swapped.starters.some((f) => f.player.id === out)).toBe(false);
+        expect(swapped.bench.some((f) => f.player.id === out)).toBe(true);
+        expect(swapped.total).toBeLessThanOrEqual(free.total);
+        // One place changed, the other ten stayed: the one sent out is not the cover the eleven is built on.
+        const freeIds = new Set(free.starters.map((f) => f.player.id));
+        const swappedIds = new Set(swapped.starters.map((f) => f.player.id));
+        expect([...freeIds].filter((id) => !swappedIds.has(id))).toEqual([out]);
+        expect([...swappedIds].filter((id) => !freeIds.has(id))).toEqual([15]);
+    });
+
     it('prefers the roster\'s own formation when it is within a hair of the best', () => {
         const ctx: PlayerContext = {teamId: 10, recent: recent(['started']), official: null, sidelined: null};
         const roster: MatchdayPlayer[] = [player(1, 'P', 10, 100), ...[2, 3, 4, 5, 6].map((id) => player(id, 'D', 10, 95)), ...[7, 8, 9, 10, 11].map((id) => player(id, 'C', 10, 95)), ...[12, 13, 14].map((id) => player(id, 'A', 10, 95))];

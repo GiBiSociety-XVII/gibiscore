@@ -1,3 +1,4 @@
+import {HelpCircle} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
@@ -53,7 +54,7 @@ export function MatchStudy({study, homeId, awayId}: {study: SeasonStudy | null; 
                     })}
                 </tbody>
             </table>
-            <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('matchHint')}</p>
+            <p className="px-3 py-1 flex justify-end border-t border-muted"><span title={t('matchHint')} className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-foreground/40 bg-card text-muted-foreground"><HelpCircle className="w-3.5 h-3.5" aria-hidden="true" /><span className="sr-only">{t('matchHint')}</span></span></p>
         </Panel>
     );
 }

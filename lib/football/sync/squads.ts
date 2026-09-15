@@ -2,6 +2,7 @@ import 'server-only';
 import {getFeaturedCompetitions, inTransferWindow} from '@/lib/football/competitions';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {positionName, slugify} from '@/lib/api-football/mappers';
+import {cleanName, repairName} from '@/lib/football/names';
 import type {AfPlayerProfileResponse, AfSquadResponse, AfTransferResponse} from '@/lib/api-football/types';
 import {fetchAll} from '@/lib/db/paginate';
 import {seasonWindowStart, squadChanges} from './transfers';
@@ -123,7 +124,7 @@ async function syncSquad(db: FootballClient, run: SyncRun, club: Club) {
     }
 
     const playerRows = members.map((p) => {
-        const name = p.name && p.name.trim() !== '' ? p.name : `Giocatore ${p.id}`;
+        const name = p.name && p.name.trim() !== '' ? cleanName(p.name) : `Giocatore ${p.id}`;
         return {
             provider_id: p.id,
             name,
@@ -219,7 +220,7 @@ async function syncTransfers(db: FootballClient, run: SyncRun, club: Club) {
             const {response: found} = await apiFootballGet<AfPlayerProfileResponse[]>('players/profiles', {player: providerId});
             run.requests += 1;
             const profile = found[0]?.player;
-            const fullName = profile?.name && profile.name.trim() !== '' ? profile.name : name;
+            const fullName = profile?.name && profile.name.trim() !== '' ? repairName(profile.name, profile.firstname, profile.lastname) : cleanName(name);
             const {data: inserted, error} = await db
                 .from('players')
                 .upsert({provider_id: providerId, name: fullName, position: positionName(profile?.position ?? null), age: profile?.age ?? null, image_url: profile?.photo ?? null, slug: slugify(fullName, providerId)}, {onConflict: 'provider_id'})

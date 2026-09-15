@@ -2,6 +2,7 @@
 
 import {useState} from "react";
 import {useTranslations} from "next-intl";
+import {Help} from "./help";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {AUCTION_LEAGUES, DEFAULT_CONFIG, DEFAULT_SLOTS, DEFENCE_THRESHOLDS, totalSlots, type AuctionConfig, type AuctionMode} from "@/lib/fantasy/config";
@@ -12,9 +13,8 @@ const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 function Field({label, hint, children, className}: {label: string; hint?: string; children: React.ReactNode; className?: string}) {
     return (
         <label className={cn("flex flex-col gap-1", className)}>
-            <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{label}</span>
+            <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{label}{hint && <Help text={hint} />}</span>
             {children}
-            {hint && <span className="text-[11px] font-semibold text-muted-foreground">{hint}</span>}
         </label>
     );
 }
@@ -76,9 +76,8 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
 
     return (
         <form onSubmit={submit} className="flex flex-col gap-3">
-            <Panel title={t('title')}>
+            <Panel title={t('title')} action={<Help text={t('intro')} />}>
                 <div className="px-3 py-3 flex flex-col gap-3">
-                    <p className="text-[12px] font-semibold text-muted-foreground">{t('intro')}</p>
                     <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
                         <Field label={t('name')}>
                             <input className={input} value={config.name} onChange={(e) => set('name', e.target.value)} placeholder={t('namePlaceholder')} maxLength={40} />
@@ -122,10 +121,9 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                             ))}
                         </div>
                     </Panel>
-                    <Panel title={t('managers')} className="flex-1" grow>
+                    <Panel title={t('managers')} action={<Help text={t('managersHint')} />} className="flex-1" grow>
                         <div className="px-3 py-3 flex-1 flex flex-col gap-1 min-h-0">
-                            <textarea className={`${input} flex-1 min-h-28 py-2 resize-y`} value={managersText} onChange={(e) => setManagersText(e.target.value)} placeholder={'FC Aston Birra\nSavoia 1908\nCUCS'} />
-                            <span className="text-[11px] font-semibold text-muted-foreground">{t('managersHint')}</span>
+                            <textarea className={`${input} flex-1 min-h-28 py-2 resize-y`} value={managersText} onChange={(e) => setManagersText(e.target.value)} placeholder={'FC Aston Birra\nSavoia 1908\nCUCS'} title={t('managersHint')} />
                         </div>
                     </Panel>
                 </div>
@@ -141,9 +139,8 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                         </div>
                         {config.modifiers.defence && (
                             <div className="px-3 py-2 border-t border-muted flex flex-col gap-2">
-                                <p className="text-[11px] font-semibold text-muted-foreground">{t('defenceBonusHint')}</p>
                                 <div className="grid grid-cols-6 gap-2">
-                                    <Field label={t('defenceMin')}>
+                                    <Field label={t('defenceMin')} hint={t('defenceBonusHint')}>
                                         <NumberField value={config.defenceBonus.minDefenders} min={3} max={5} onCommit={(n) => set('defenceBonus', {...config.defenceBonus, minDefenders: n})} />
                                     </Field>
                                     {DEFENCE_THRESHOLDS.map((from, i) => (
@@ -154,23 +151,22 @@ export function AuctionSetup({initial, onSave, onCancel}: {initial: AuctionConfi
                                 </div>
                             </div>
                         )}
-                        <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
-                            <input type="checkbox" checked={config.cupsCount} onChange={(e) => set('cupsCount', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
-                            <span className="flex flex-col"><span className="text-[13px] font-bold">{t('cupsCount')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('cupsCountHint')}</span></span>
+                        <label className="flex items-center gap-2 px-3 py-2 border-t border-muted cursor-pointer">
+                            <input type="checkbox" checked={config.cupsCount} onChange={(e) => set('cupsCount', e.target.checked)} className="w-4 h-4 accent-[rgb(var(--accent))]" />
+                            <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{t('cupsCount')}<Help text={t('cupsCountHint')} /></span>
                         </label>
-                        <label className="flex items-start gap-2 px-3 py-2 border-t border-muted cursor-pointer">
-                            <input type="checkbox" checked={config.keeperBlock} onChange={(e) => set('keeperBlock', e.target.checked)} className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent))]" />
-                            <span className="flex flex-col"><span className="text-[13px] font-bold">{t('keeperBlock')}</span><span className="text-[11px] font-semibold text-muted-foreground">{t('keeperBlockHint')}</span></span>
+                        <label className="flex items-center gap-2 px-3 py-2 border-t border-muted cursor-pointer">
+                            <input type="checkbox" checked={config.keeperBlock} onChange={(e) => set('keeperBlock', e.target.checked)} className="w-4 h-4 accent-[rgb(var(--accent))]" />
+                            <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{t('keeperBlock')}<Help text={t('keeperBlockHint')} /></span>
                         </label>
                     </Panel>
-                    <Panel title={t('rules')}>
+                    <Panel title={t('rules')} action={<Help text={t('rulesHint')} />}>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 py-3">
                             {(Object.keys(config.rules) as Array<keyof AuctionConfig['rules']>).map((k) => (
                                 <Field key={k} label={t(`rule.${k}`)}>
                                     <NumberField value={config.rules[k]} min={-10} max={10} decimals onCommit={(n) => set('rules', {...config.rules, [k]: n})} />
                                 </Field>
                             ))}
-                            <p className="col-span-full text-[11px] font-semibold text-muted-foreground">{t('rulesHint')}</p>
                         </div>
                     </Panel>
                 </div>

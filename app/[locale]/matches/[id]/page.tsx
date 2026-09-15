@@ -25,7 +25,8 @@ import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
 
 // Refreshed by the live sync whenever the match moves (see sync-live); the timer only catches the rest.
-export const revalidate = 600;
+// The live sync renders the page again whenever the match moves; the timer only catches the rest.
+export const revalidate = 1800;
 
 function parseId(raw: string): number | null {
     const n = Number(raw);
@@ -150,7 +151,6 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                 </Panel>
             )}
             <MatchStudy study={study} homeId={fixture.home.id} awayId={fixture.away.id} />
-            <EventsTimeline events={page.events} title={t('tabs.summary')} />
             <Panel title={t('info')}>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 px-3 py-2 text-[13px]">
                     <dt className="font-bold text-muted-foreground">{tFootball('labels.season', {season: ''}).trim()}</dt>
@@ -230,6 +230,9 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                     </div>
                 )}
             </section>
+
+            {/* What happened comes first: the timeline sits above the tabs as soon as there is one. */}
+            {page.events.length > 0 && <EventsTimeline events={page.events} title={t('tabs.summary')} />}
 
             <Tabs
                 items={[

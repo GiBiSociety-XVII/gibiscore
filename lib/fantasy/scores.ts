@@ -449,11 +449,13 @@ export function scorePlayer(input: AuctionInput, calibration: VotoCalibration = 
     // Thin evidence pulls the overall towards the low range: a man barely seen must not rank above a known reserve.
     const evidence = Math.min(1, sample / 15);
     const games = Math.round(sample);
+    // Four decimals are plenty for anything drawn from them, and the pool travels to every browser.
+    const short = (v: number) => Math.round(v * 10000) / 10000;
     return {
         ...scores,
         overall: clamp(overall * evidence + 20 * (1 - evidence)),
-        fantaAvg: fantaW > 0 ? fantaAvgFor(events, input.role, CLASSIC_RULES) : null,
-        events: fantaW > 0 ? events : null,
+        fantaAvg: fantaW > 0 ? short(fantaAvgFor(events, input.role, CLASSIC_RULES)) : null,
+        events: fantaW > 0 ? (Object.fromEntries(Object.entries(events).map(([k, v]) => [k, short(v)])) as unknown as FantaEvents) : null,
         sample: games,
         confidence: games >= 20 ? 'high' : games >= 8 ? 'medium' : 'low',
     };
