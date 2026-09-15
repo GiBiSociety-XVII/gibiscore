@@ -450,14 +450,17 @@ export function recommendLineup(forecasts: PlayerForecast[], options: MatchdayOp
      * when he plays and the substitute's when he does not. Two passes,
      * since the substitute depends on who is fielded.
      */
+    // A player sent to the bench by hand is the manager's choice, not a substitute the eleven is built on:
+    // he does not count as cover, so a swap by hand changes one place and leaves the others as they were.
+    const coverOf = (rest: PlayerForecast[]) => rest.filter((f) => !benched.has(f.player.id)).reduce((best, f) => Math.max(best, f.value), 0);
     const pick = (role: FantaRole, n: number): {fielded: PlayerForecast[]; rest: PlayerForecast[]; cover: number; slot: (f: PlayerForecast) => number} => {
         let order = byRole[role];
-        let cover = order[n]?.value ?? 0;
+        let cover = coverOf(order.slice(n));
         const slotWith = (c: number) => (f: PlayerForecast) => f.value + (1 - f.plays) * c;
         for (let pass = 0; pass < 2; pass += 1) {
             const slot = slotWith(cover);
             order = [...order].sort((a, b) => isPinned(b) - isPinned(a) || slot(b) - slot(a) || b.value - a.value);
-            cover = order.slice(n).reduce((best, f) => Math.max(best, f.value), 0);
+            cover = coverOf(order.slice(n));
         }
         return {fielded: order.slice(0, n), rest: order.slice(n).sort((a, b) => b.value - a.value || b.plays - a.plays), cover, slot: slotWith(cover)};
     };

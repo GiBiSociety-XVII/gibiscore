@@ -19,6 +19,7 @@ import type {MatchdayRound} from "@/lib/fantasy/matchday-data";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strategies";
 import {hashOf} from "@/lib/fantasy/hash";
+import {keepSpots, sameSpots, type Spot} from "@/lib/fantasy/spots";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 import {RoundRecap} from "./round-recap";
 import {RecapHistory} from "./recap-history";
@@ -169,7 +170,12 @@ function BenchStrip({bench, slots, byId, pinned, benched, outs, picking, locked,
 
 /** The eleven on a pitch: attackers at the top, the keeper at the bottom. */
 function FantasyPitch({starters, formation, byId, pinned, picking, onSwap, onPlace}: {starters: PlayerForecast[]; formation: FormationKey; byId: Map<number, AuctionPlayer>; pinned: ReadonlySet<number>; /** The substitute being placed by hand, if any. */ picking: number | null; onSwap: (inId: number, outId: number) => void; onPlace: (inId: number) => void}) {
-    const rows = [...ROLES].reverse().map((role) => starters.filter((f) => f.player.role === role));
+    // The spots as last drawn: a lineup that changed is laid over them, newcomers in the places left free.
+    const [spots, setSpots] = useState<Spot[]>([]);
+    const order = keepSpots(spots, starters.map((f) => f.player));
+    if (!sameSpots(order, spots)) setSpots(order);
+    const rank = new Map(order.map((s, i) => [s.id, i]));
+    const rows = [...ROLES].reverse().map((role) => starters.filter((f) => f.player.role === role).sort((a, b) => (rank.get(a.player.id) ?? 99) - (rank.get(b.player.id) ?? 99)));
     return (
         <div
             className={cn("relative rounded-xl border-[2.5px] border-foreground overflow-hidden bg-[#3f8f3a] text-background", picking !== null && "ring-4 ring-accent")}

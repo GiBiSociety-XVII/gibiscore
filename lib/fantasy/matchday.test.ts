@@ -119,6 +119,11 @@ describe('recommendLineup', () => {
         expect(swapped.starters.some((f) => f.player.id === out)).toBe(false);
         expect(swapped.bench.some((f) => f.player.id === out)).toBe(true);
         expect(swapped.total).toBeLessThanOrEqual(free.total);
+        // One place changed, the other ten stayed: the one sent out is not the cover the eleven is built on.
+        const freeIds = new Set(free.starters.map((f) => f.player.id));
+        const swappedIds = new Set(swapped.starters.map((f) => f.player.id));
+        expect([...freeIds].filter((id) => !swappedIds.has(id))).toEqual([out]);
+        expect([...swappedIds].filter((id) => !freeIds.has(id))).toEqual([15]);
     });
 
     it('prefers the roster\'s own formation when it is within a hair of the best', () => {
