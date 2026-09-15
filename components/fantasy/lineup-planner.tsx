@@ -1,6 +1,6 @@
 'use client';
 
-import {Ban, Check, Copy, HelpCircle, Lock, Pin, PinOff, Settings2, Trash2, X} from "lucide-react";
+import {Ban, HelpCircle, Lock, Pin, PinOff, Settings2, Trash2, X} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -10,6 +10,7 @@ import {TeamCrest} from "@/components/football/team-crest";
 import {RoleBadge} from "./role-badge";
 import {DEFAULT_RULES, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
+import type {TeamSummary} from "@/lib/football/types";
 import {forecastPlayer, recommendLineup, type ForecastReason, type MatchdayPlayer, type PlayerContext, type PlayerForecast} from "@/lib/fantasy/matchday";
 import type {MatchdayContext} from "@/lib/fantasy/matchday-data";
 import {fantaAvgFor, type FantaRole} from "@/lib/fantasy/scores";
@@ -185,14 +186,14 @@ function signalsOf(f: PlayerForecast, x: ReturnType<typeof facts>, t: ReturnType
     return out.slice(0, 3);
 }
 
-function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; /** Every other row, so the eye follows one across the columns. */ stripe?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
+function ForecastRow({f, slot, index, byId, teamById, reasonText, muted = false, stripe = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; teamById: Map<number, TeamSummary>; /** What the slot is worth with the substitution; the plain value when unknown. */ slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; /** Every other row, so the eye follows one across the columns. */ stripe?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; /** The round has kicked off: nothing can be changed. */ locked: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const [why, setWhy] = useState(false);
     const p = byId.get(f.player.id);
     const fixture = f.fixture;
     const kickoff = fixture ? format.dateTime(new Date(fixture.startingAt), {weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: ROME}) : null;
-    const opponent = p && fixture ? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null} : null;
+    const opponent = p && fixture ? (teamById.get(f.opponent!.id) ?? {id: f.opponent!.id, name: f.opponent!.name, shortCode: null, logoUrl: null}) : null;
     const state = fixture ? (fixture.state === 'finished' ? t('played') : ['live', 'half_time', 'extra_time', 'penalties'].includes(fixture.state) ? t('live') : fixture.state === 'postponed' || fixture.state === 'cancelled' ? t('postponed') : null) : null;
     const x = facts(f);
     // Status badges: what settles his chance before the numbers.
@@ -226,8 +227,8 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = 
                     <RoleBadge role={f.player.role} />
                 </span>
             </td>
-            <td className="px-2 py-1.5 w-full max-w-0 lg:min-w-[8rem]">
-                <span className="flex items-center gap-1.5 min-w-0">
+            <td className="px-2 py-1.5">
+                <span className="flex items-center gap-1.5 min-w-0 whitespace-nowrap">
                     {p && <TeamCrest team={p.team} size={18} />}
                     <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" title={f.reasons.map(reasonText).join(' · ')} className="font-extrabold text-[13px] truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{f.player.name}</Link>
                 </span>
@@ -237,18 +238,19 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = 
                     </span>
                 )}
             </td>
-            <td className="px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap max-w-[8.75rem]">
+            <td className="px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap">
                 {fixture && opponent ? (
-                    <span className="flex flex-col min-w-0">
-                        <span className="font-extrabold truncate" title={opponent.name}>{f.home ? t('vsHome', {team: opponent.name}) : t('vsAway', {team: opponent.name})}</span>
-                        <span className="text-muted-foreground truncate">{kickoff}{state && <span className="ml-1 uppercase">· {state}</span>}</span>
+                    <span className="inline-flex items-center gap-1.5" title={`${f.home ? t('vsHome', {team: opponent.name}) : t('vsAway', {team: opponent.name})} · ${kickoff}`}>
+                        <TeamCrest team={opponent} size={22} />
+                        <span className={cn("bb-badge h-4 px-1 text-[9px] font-extrabold", f.home ? "bg-card" : "bg-muted")}>{f.home ? t('atHome') : t('atAway')}</span>
+                        <span className="text-muted-foreground">{kickoff}{state && <span className="ml-1 uppercase">· {state}</span>}</span>
                     </span>
                 ) : (
                     <span className="text-muted-foreground">{t('noFixture')}</span>
                 )}
             </td>
             <td className={td}><Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'} title={t('playsSplit', {start: pct(f.starts), sub: pct(Math.max(0, f.plays - f.starts)), subPoints: f.subPoints.toFixed(2)})}>{pct(f.plays)}</Cell></td>
-            <td className="px-2 py-1.5">
+            <td className="px-2 py-1.5 w-full">
                 <span className="flex flex-wrap gap-1">
                     {signalsOf(f, x, t, reasonText).map((sg) => <span key={sg.key} className={cn("bb-badge text-[10px] h-5 px-1.5 whitespace-nowrap", TONE_CLASS[sg.tone])} title={sg.title}>{sg.label}</span>)}
                 </span>
@@ -276,7 +278,7 @@ function ForecastRow({f, slot, index, byId, reasonText, muted = false, stripe = 
 }
 
 /** A player's forecast as a card, for phones: the numbers that decide, the status and the pin and out buttons, the reasons on request. */
-function ForecastCard({f, slot, index, byId, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; locked: boolean}) {
+function ForecastCard({f, slot, index, byId, teamById, reasonText, muted = false, pinned, onPin, out, onOut, locked}: {f: PlayerForecast; teamById: Map<number, TeamSummary>; slot: number | undefined; index: number | null; byId: Map<number, AuctionPlayer>; reasonText: (r: ForecastReason) => string; muted?: boolean; pinned: boolean; onPin: () => void; out: boolean; onOut: () => void; locked: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const format = useFormatter();
     const [more, setMore] = useState(false);
@@ -298,7 +300,15 @@ function ForecastCard({f, slot, index, byId, reasonText, muted = false, pinned, 
                 {p && <TeamCrest team={p.team} size={18} />}
                 <span className="flex flex-col leading-tight min-w-0">
                     <Link href={`/players/${f.player.slug}`} target="_blank" rel="noopener noreferrer" className="font-extrabold text-[14px] truncate">{f.player.name}</Link>
-                    <span className="text-[10px] font-semibold text-muted-foreground truncate">{fixture && f.opponent ? `${f.home ? t('vsHome', {team: f.opponent.name}) : t('vsAway', {team: f.opponent.name})} · ${kickoff}` : t('noFixture')}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground truncate">
+                        {fixture && f.opponent ? (
+                            <>
+                                <TeamCrest team={teamById.get(f.opponent.id) ?? {id: f.opponent.id, name: f.opponent.name, shortCode: null, logoUrl: null}} size={14} />
+                                <span className="bb-badge h-3.5 px-1 text-[8px] font-extrabold bg-card">{f.home ? t('atHome') : t('atAway')}</span>
+                                {kickoff}
+                            </>
+                        ) : t('noFixture')}
+                    </span>
                 </span>
                 <span className="ml-auto flex items-center gap-1 shrink-0">
                     <Cell tone={f.plays >= 0.8 ? 'good' : f.plays >= 0.5 ? 'fine' : f.plays >= 0.2 ? 'bad' : 'worst'}>{pct(f.plays)}</Cell>
@@ -325,26 +335,6 @@ function ForecastCard({f, slot, index, byId, reasonText, muted = false, pinned, 
 }
 
 /** Copies the eleven and the bench as plain text, ready to paste in the league's app. */
-function CopyLineup({text}: {text: string}) {
-    const t = useTranslations('Fantasy.lineup');
-    const [copied, setCopied] = useState(false);
-    const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 2000);
-        } catch {
-            window.prompt(t('copyTitle'), text);
-        }
-    };
-    return (
-        <button type="button" onClick={copy} title={t('copyTitle')} className={cn("bb-btn h-7 px-2 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0", copied ? "bg-emerald-200" : "bg-accent")}>
-            {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
-            {copied ? t('copied') : t('copy')}
-        </button>
-    );
-}
-
 function Head() {
     const t = useTranslations('Fantasy.lineup');
     const th = "px-1 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground text-center whitespace-nowrap";
@@ -447,11 +437,11 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
 
-    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} toolbar={toolbar} roundInfo={roundInfo} signedIn={account.user !== null} />;
+    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} teamById={new Map(pool.teams.map((tm) => [tm.id, tm]))} toolbar={toolbar} roundInfo={roundInfo} signedIn={account.user !== null} />;
 }
 
 /** The advice for one team: forecasts, pins and outs, the formation, the tables; frozen once the round has kicked off. */
-function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signedIn}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null; signedIn: boolean}) {
+function LineupBoard({current, context, roster, byId, teamById, toolbar, roundInfo, signedIn}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; teamById: Map<number, TeamSummary>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null; signedIn: boolean}) {
     const t = useTranslations('Fantasy.lineup');
     const router = useRouter();
     const format = useFormatter();
@@ -525,11 +515,6 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
     const when = (iso: string) => format.dateTime(new Date(iso), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME});
     // The rounds of the recap: each with its lock, still in place or already kept aside.
     const lockOf = (round: string) => (stored?.round === round ? stored : (history[current.id] ?? []).find((l) => l.round === round) ?? null);
-    const lineupText = [
-        `${current.name} · ${t('roundLabel', {round: context.round})} · ${advice.formation}`,
-        ...ROLES.map((r) => `${r}: ${advice.starters.filter((f) => f.player.role === r).map((f) => f.player.name).join(', ')}`),
-        `${t('copyBench')}: ${advice.bench.map((f, i) => `${i + 1}. ${f.player.name} (${f.player.role})`).join(', ')}`,
-    ].join('\n');
 
     return (
         <div className="flex flex-col gap-3">
@@ -591,28 +576,28 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
                             </>
                         )}
                     </div>
-                    <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})} action={<CopyLineup text={lineupText} />}>
+                    <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
                         <ul className="md:hidden flex flex-col">
-                            {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                            {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} teamById={teamById} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                         </ul>
                         <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
                                 <Head />
                                 <tbody>
-                                    {advice.starters.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} reasonText={reasonText} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                                    {advice.starters.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} teamById={teamById} reasonText={reasonText} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>
                     </Panel>
                     <Panel title={<span title={t('benchHint')} className="inline-flex items-center gap-1.5">{t('benchTitle', {count: advice.bench.length})}<HelpCircle className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /></span>}>
                         <ul className="md:hidden flex flex-col">
-                            {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                            {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                         </ul>
                         <div className="overflow-x-auto hidden md:block">
                             <table className="w-full text-[12px]">
                                 <Head />
                                 <tbody>
-                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} reasonText={reasonText} muted={f.plays < 0.2} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
+                                    {advice.bench.map((f, i) => <ForecastRow key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} stripe={i % 2 === 1} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                                 </tbody>
                             </table>
                         </div>

@@ -1,3 +1,4 @@
+import {HelpCircle} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -123,7 +124,7 @@ export function SeasonStudyView({study}: {study: SeasonStudy | null}) {
                         </tbody>
                     </table>
                 </div>
-                <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('teamsHint')}</p>
+                <p className="px-3 py-1 flex justify-end border-t border-muted"><span title={t('teamsHint')} className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-foreground/40 bg-card text-muted-foreground"><HelpCircle className="w-3.5 h-3.5" aria-hidden="true" /><span className="sr-only">{t('teamsHint')}</span></span></p>
             </Panel>
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-2 items-start">

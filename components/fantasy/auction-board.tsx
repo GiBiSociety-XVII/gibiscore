@@ -734,10 +734,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <tr className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground border-b-2 border-foreground">
                                 <th className="px-2 py-1.5 text-left w-full">{t('columns.player')}</th>
                                 <th className="px-1 py-1.5 text-center">{t('columns.role')}</th>
-                                <th className="px-1 py-1.5 text-center" title={t('columnHints.tier')}>{t('columns.tier')}</th>
+                                {showScores && <th className="px-1 py-1.5 text-center" title={t('columnHints.tier')}>{t('columns.tier')}</th>}
                                 {showScores && SCORE_KEYS.map((k) => <th key={k} className="px-1 py-1.5 text-center" title={t(`columnHints.${k === 'team' ? 'team_' : k}`)}>{t(`columns.${k === 'team' ? 'team_' : k}`)}</th>)}
                                 <th className="px-1 py-1.5 text-center" title={t('columnHints.overall')}>{t('columns.overall')}</th>
-                                <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>
+                                {showScores && <th className="px-1 py-1.5 text-right" title={t('columnHints.fantaAvg')}>{t('columns.fantaAvg')}</th>}
                                 <th className="px-1 py-1.5 text-right" title={t('columnHints.price')}>{t('columns.price')}</th>
                                 {strategy && <th className="px-1 py-1.5 text-right" title={t('columnHints.maxBid')}>{t('columns.maxBid')}</th>}
                                 <th className="px-2 py-1.5 text-right">{t('columns.status')}</th>
@@ -767,10 +767,10 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                                 </div>
                                             </td>
                                             <td className="px-1 py-1 text-center"><RoleBadge role={p.role} /></td>
-                                            <td className="px-1 py-1 text-center"><span className="inline-flex items-center gap-1"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{tierInfos.get(p.id) && <TierWhy player={p} info={tierInfos.get(p.id)!} />}</span></td>
+                                            {showScores && <td className="px-1 py-1 text-center"><span className="inline-flex items-center gap-1"><TierBadge tier={tiers.get(p.id) ?? 'filler'} />{tierInfos.get(p.id) && <TierWhy player={p} info={tierInfos.get(p.id)!} />}</span></td>}
                                             {showScores && SCORE_KEYS.map((k) => <td key={k} className="px-1 py-1 text-center"><ScoreCell value={p.scores[k]} /></td>)}
                                             <td className="px-1 py-1 text-center"><span className="inline-flex items-center justify-center w-9 h-6 rounded bg-foreground text-background font-mono text-[12px] font-extrabold tabular-nums">{p.scores.overall}</span></td>
-                                            <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>
+                                            {showScores && <td className="px-1 py-1 text-right font-mono font-bold tabular-nums">{p.scores.fantaAvg?.toFixed(2) ?? '–'}</td>}
                                             <td className="px-1 py-1 text-right">{priceCell(p.id)}</td>
                                             {strategy && <td className="px-1 py-1 text-right">{(() => { const max = maxBidOf(p.id); const v = purchase || max === null ? null : verdictOf(prices.get(p.id) ?? 1, max, deals.get(p.id)); return <span className={cn("inline-flex items-center justify-center min-w-[2.25rem] h-6 px-1 rounded border font-mono text-[12px] font-extrabold tabular-nums", v ? VERDICT_CLASS[v] : "border-transparent text-accent-text")}>{max ?? '–'}</span>; })()}</td>}
                                             <td className="px-2 py-1 text-right">
@@ -791,7 +791,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                         </tr>
                                         {expanded && (
                                             <tr className="border-t border-muted bg-muted/30">
-                                                <td colSpan={7 + (strategy ? 1 : 0) + (showScores ? SCORE_KEYS.length : 0)} className="px-3 py-2">
+                                                <td colSpan={5 + (strategy ? 1 : 0) + (showScores ? SCORE_KEYS.length + 2 : 0)} className="px-3 py-2">
                                                     {details(p)}
                                                 </td>
                                             </tr>

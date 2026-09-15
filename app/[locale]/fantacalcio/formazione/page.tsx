@@ -24,7 +24,7 @@ export default async function LineupPage({params, searchParams}: {params: Promis
     const [pool, context] = await Promise.all([getAuctionPool(league), getMatchday(league)]);
     return (
         <SiteShell wide sidebar={false}>
-            <PageHeader title={t('title')} meta={t('intro')} />
+            <PageHeader title={t('title')} />
             {/* The rounds before are heavy and roster-specific: the planner fetches them cut to the roster. */}
             <LineupPlanner pool={pool} context={context ? {...context, history: []} : null} />
         </SiteShell>
