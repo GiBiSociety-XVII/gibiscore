@@ -28,6 +28,7 @@ import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {LegheImport} from "./leghe-import";
 import {MarketDialog} from "./market-dialog";
+import {Help} from "./help";
 import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {bargains, type Bargain} from "@/lib/fantasy/bargains";
@@ -680,7 +681,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 {view === 'list' && (<>
 
                 {/* List */}
-                <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="text-[11px] font-semibold text-muted-foreground">{ta('updated')}</span>}>
+                <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">{ta('updated')}<Help text={`${ta('intro')}\n\n${t('shortcuts')}`} /></span>}>
                     {/* Phones: one card per player, the numbers that decide and a Buy button; no sideways scrolling */}
                     <ul className="md:hidden flex flex-col">
                         {shown.map((p) => {
@@ -808,8 +809,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </div>
                     )}
                 </Panel>
-                <p className="text-[11px] font-semibold text-muted-foreground">{ta('intro')}</p>
-                <p className="hidden md:block text-[11px] font-semibold text-muted-foreground">{t('shortcuts')}</p>
                 </>)}
                 {compare.length === 1 && byId.has(compare[0]) && (
                     <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bb-surface bg-background px-3 h-9 flex items-center gap-2 text-[12px] font-extrabold shadow-[4px_4px_0_rgb(var(--foreground))]">

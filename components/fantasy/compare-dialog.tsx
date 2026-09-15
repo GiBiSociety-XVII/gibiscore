@@ -1,6 +1,7 @@
 'use client';
 
 import {X} from "lucide-react";
+import {Help} from "./help";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -77,7 +78,7 @@ export function CompareDialog({a, b, onClose, onBuy}: {a: CompareSide; b: Compar
             <div onClick={(e) => e.stopPropagation()} className="bb-surface w-full max-w-2xl my-4 bg-background flex flex-col">
                 <div className="flex items-center gap-2 px-3 h-11 border-b-2 border-foreground bg-card rounded-t-[calc(var(--radius-lg)-2px)]">
                     <h2 className="text-[14px] font-extrabold uppercase tracking-wide">{tc('title')}</h2>
-                    <span className="text-[11px] font-semibold text-muted-foreground truncate">{tc('hint')}</span>
+                    <Help text={tc('hint')} />
                     <button type="button" onClick={onClose} aria-label={t('close')} className="ml-auto inline-flex items-center justify-center w-8 h-8 rounded-md border-2 border-foreground bg-background hover:bg-muted"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="overflow-x-auto">

@@ -7,6 +7,7 @@ import {Panel} from "@/components/shell/panel";
 import type {AuctionPlayer} from "@/lib/fantasy/data";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import {playerValue, type StrategyPick} from "@/lib/fantasy/strategies";
+import {Help} from "./help";
 import {RoleBadge} from "./role-badge";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
@@ -91,7 +92,7 @@ export function TargetsPanel({players, targets, prices, bought, avoided, manager
             )}
             {contested.length > 0 && (
                 <div className={cn("px-3 py-2 flex flex-col gap-1", open.length > 0 && "border-t-2 border-foreground")}>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('contested')}</span>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">{t('contested')}<Help text={t('contestedHint')} /></span>
                     <ul className="flex flex-col gap-1">
                         {contested.map(({player, mine, rivals}) => (
                             <li key={player.id} className="text-[11px] font-semibold flex flex-wrap items-center gap-1">
@@ -107,7 +108,6 @@ export function TargetsPanel({players, targets, prices, bought, avoided, manager
                             </li>
                         ))}
                     </ul>
-                    <span className="text-[10px] font-semibold text-muted-foreground">{t('contestedHint')}</span>
                 </div>
             )}
         </>

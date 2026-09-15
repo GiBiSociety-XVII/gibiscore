@@ -2,18 +2,13 @@
 
 import {useState} from "react";
 import {useTranslations} from "next-intl";
-import {HelpCircle} from "lucide-react";
+import {Help} from "./help";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {AUCTION_LEAGUES, DEFAULT_CONFIG, DEFAULT_SLOTS, DEFENCE_THRESHOLDS, totalSlots, type AuctionConfig, type AuctionMode} from "@/lib/fantasy/config";
 import type {FantaRole} from "@/lib/fantasy/scores";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
-
-/** A "?" that shows the explanation on hover or focus, so the form stays short. */
-function Help({text}: {text: string}) {
-    return <span tabIndex={0} title={text} aria-label={text} className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-foreground/40 text-muted-foreground cursor-help"><HelpCircle className="w-3 h-3" aria-hidden="true" /></span>;
-}
 
 function Field({label, hint, children, className}: {label: string; hint?: string; children: React.ReactNode; className?: string}) {
     return (

@@ -1,6 +1,7 @@
 'use client';
 
 import {ArrowLeftRight, HelpCircle, X} from "lucide-react";
+import {Help} from "./help";
 import {useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
@@ -120,6 +121,7 @@ export function MarketDialog({config, purchases, byId, managers, me, onApply, on
                     <h2 className="text-[13px] font-extrabold uppercase tracking-wide">{t('title')}</h2>
                     <div className="ml-2 flex items-center gap-1" role="tablist">
                         {(['trade', 'release', 'ledger'] as Tab[]).map((k) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={tabClass(tab === k)}>{t(`tabs.${k}`)}</button>)}
+                        {tab === 'ledger' && <Help text={t('ledgerHint')} />}
                     </div>
                     <button type="button" onClick={onClose} aria-label={ts('cancel')} className="ml-auto inline-flex w-8 h-8 items-center justify-center rounded-md border-2 border-foreground bg-card"><X className="w-4 h-4" /></button>
                 </div>
@@ -188,7 +190,6 @@ export function MarketDialog({config, purchases, byId, managers, me, onApply, on
 
                 {tab === 'ledger' && (
                     <div className="flex flex-col">
-                        <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-muted">{t('ledgerHint')}</p>
                         {ledger.length === 0 ? (
                             <p className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">{t('ledgerEmpty')}</p>
                         ) : (

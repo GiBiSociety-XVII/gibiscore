@@ -2,7 +2,8 @@
 
 import {useState} from "react";
 import {useTranslations} from "next-intl";
-import {HelpCircle, Pencil, Plus, Trash2} from "lucide-react";
+import {Pencil, Plus, Trash2} from "lucide-react";
+import {Help} from "./help";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {FantaRole} from "@/lib/fantasy/scores";
@@ -33,11 +34,6 @@ export function useStrategyName() {
 }
 
 /** One warning of the strategy health, in words. `nameOf` names the strategy a warning points to (a custom one has no translation). */
-/** A "?" that shows the explanation on hover or focus: the words leave the screen, not the help. */
-function Help({text}: {text: string}) {
-    return <span tabIndex={0} title={text} aria-label={text} className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-foreground/40 text-muted-foreground cursor-help align-middle"><HelpCircle className="w-3 h-3" aria-hidden="true" /></span>;
-}
-
 export function useHealthReason(nameOf?: (key: string) => string) {
     const t = useTranslations('Fantasy.strategies');
     const ts = useTranslations('Fantasy.setup');
@@ -249,7 +245,7 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
         return t('custom.description', {split, prefer: t(`editor.preferKey.${custom.prefer}`), formations: custom.formations.length > 0 ? custom.formations.join(', ') : t('custom.anyFormation')});
     };
     return (
-        <Panel title={t('title')} action={<span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">{t('ranked')}<Help text={t('intro')} /></span>}>
+        <Panel title={t('title')} action={<span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">{t('ranked')}<Help text={`${t('intro')}\n\n${t('hint')}`} /></span>}>
             {onFormation && (
                 <div className="px-3 py-2 border-b border-muted flex flex-wrap items-center gap-1.5">
                     <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground mr-1">{t('formationPick')}</span>
@@ -376,7 +372,6 @@ export function StrategyPanel({plans, selected, onSelect, credits, health = null
                     );
                 })}
             </ol>
-            <p className="px-3 py-2 text-[11px] font-semibold text-muted-foreground border-t border-muted">{t('hint')}</p>
         </Panel>
     );
 }

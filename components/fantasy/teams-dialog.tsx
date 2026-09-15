@@ -1,6 +1,7 @@
 'use client';
 
 import {X} from "lucide-react";
+import {Help} from "./help";
 import {useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
@@ -54,7 +55,7 @@ export function TeamsDialog({teams, credits, tiers, initial, onClose, onRelease,
             <div onClick={(e) => e.stopPropagation()} className="bb-surface w-full max-w-3xl my-4 bg-background flex flex-col">
                 <div className="flex items-center gap-2 px-3 h-11 border-b-2 border-foreground bg-card rounded-t-[calc(var(--radius-lg)-2px)]">
                     <h2 className="text-[14px] font-extrabold uppercase tracking-wide">{t('dialogTitle')}</h2>
-                    <span className="text-[11px] font-semibold text-muted-foreground truncate">{t('dialogHint')}</span>
+                    <Help text={t('dialogHint')} />
                     <button type="button" onClick={onClose} aria-label={tb('close')} className="ml-auto inline-flex items-center justify-center w-8 h-8 rounded-md border-2 border-foreground bg-background hover:bg-muted"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="flex gap-1.5 px-3 py-2 overflow-x-auto [scrollbar-width:thin] border-b border-muted">
