@@ -20,6 +20,7 @@ import {defenceOption, FORMATIONS, type FormationKey} from "@/lib/fantasy/strate
 import {hashOf} from "@/lib/fantasy/hash";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 import {RoundRecap} from "./round-recap";
+import {RecapHistory} from "./recap-history";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
@@ -554,6 +555,7 @@ function LineupBoard({current, context, roster, byId, toolbar, roundInfo, signed
             )}
 
             {context.results.map((results) => <RoundRecap key={results.round} team={current} results={results} seasonId={context.seasonId} roster={roster} byId={byId} past={lockOf(results.round)} calibration={context.calibration} signedIn={signedIn} onSaved={() => router.refresh()} />)}
+            <RecapHistory team={current} roster={roster} current={context.results} locks={[...(history[current.id] ?? []), ...(stored ? [stored] : [])]} seasonId={context.seasonId} calibration={context.calibration} />
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">

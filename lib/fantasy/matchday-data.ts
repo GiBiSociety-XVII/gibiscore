@@ -54,13 +54,20 @@ export interface MatchdayContext {
     calibration: VotoCalibration;
     /** Rounds whose official votes are in, and how many players they matched. */
     votes: Array<{round: number; matched: number; total: number}>;
-    /** The last round played and, while one is being played, the matches of it already over: what every player in a squad did, for the recap. */
+    /** The round of the recap (the one begun, else the last played): what every player in a squad did. */
     results: RoundResults[];
+    /**
+     * The rounds played before, oldest first, for the history of the recaps. Heavy: the lineup page
+     * strips it before the client and serves it, cut to a roster, from /api/fantasy/results.
+     */
+    history: RoundResults[];
     generatedAt: string;
 }
 
 /** How many of the club's last league matches say how a player is used. */
 const RECENT_MATCHES = 8;
+/** Rounds played kept for the history of the recaps (within the matches loaded). */
+const HISTORY_RESULTS = 6;
 const FINISHED = new Set(['finished']);
 
 interface StatRow {
@@ -303,8 +310,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     const current = rounds.find((r) => r.state === 'live' || r.state === 'next') ?? null;
     const begun = current !== null && (byRound.get(current.round) ?? []).some((f) => FINISHED.has(f.state));
     const recap: Array<[MatchdayRound | null, RoundResults['state']]> = begun ? [[current, 'live']] : [[lastPlayed, 'played']];
-    for (const [info, state] of recap) {
-        if (!info) continue;
+    const resultsFor = (info: MatchdayRound, state: RoundResults['state']): RoundResults => {
         const officialRound = votesByRound.has(roundNumber(info.round) ?? -1);
         const statsOf: Record<number, RoundStat> = {};
         const finishedTeams: number[] = [];
@@ -342,9 +348,12 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
                 };
             }
         }
-        results.push({round: info.round, state, official: officialRound, finishedTeams, matches, stats: statsOf});
-    }
-    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], calibration, votes, results, generatedAt: new Date().toISOString()};
+        return {round: info.round, state, official: officialRound, finishedTeams, matches, stats: statsOf};
+    };
+    for (const [info, state] of recap) if (info) results.push(resultsFor(info, state));
+    // The rounds played before, for the history: the last few, oldest first (their lines are loaded: eight matches per club).
+    const history = rounds.filter((r) => r.state === 'played').slice(-HISTORY_RESULTS).map((r) => resultsFor(r, 'played'));
+    return {league, seasonId: season.id, rounds, round, fixtures: matchday, players, teamRecent, official, officialTeams: [...officialTeams], calibration, votes, results, history, generatedAt: new Date().toISOString()};
 }
 
 const cachedMatchday = unstable_cache(buildMatchday, ['fantasy-matchday', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 120, tags: ['fantasy-matchday']});

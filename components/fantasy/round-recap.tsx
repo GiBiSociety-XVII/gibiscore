@@ -8,11 +8,10 @@ import {Panel} from "@/components/shell/panel";
 import {RoleBadge} from "./role-badge";
 import type {SavedTeam} from "@/lib/fantasy/config";
 import type {AuctionPlayer} from "@/lib/fantasy/data";
-import {recommendLineup, type PlayerForecast} from "@/lib/fantasy/matchday";
-import {bestHindsight, EMPTY_STAT, matchLabel, playLineup, roundPoints, surprises, toVotoEstimate, votoOf, withManualVotes, MAX_SUBS, type ManualVote, type PlayedSlot, type RoundResults, type RoundStat} from "@/lib/fantasy/recap";
+import {EMPTY_STAT, matchLabel, roundPoints, scoreRound, surprises, toVotoEstimate, votoOf, withManualVotes, MAX_SUBS, type ManualVote, type PlayedSlot, type RoundResults, type RoundStat} from "@/lib/fantasy/recap";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import {votesKey, votesStore, type LineupLock} from "@/lib/fantasy/store";
-import {defenceOption, type FormationKey} from "@/lib/fantasy/strategies";
+import {defenceOption} from "@/lib/fantasy/strategies";
 import type {VotoCalibration} from "@/lib/fantasy/voto";
 import {saveVotes} from "@/lib/fantasy/votes";
 
@@ -157,15 +156,10 @@ export function RoundRecap({team, results, seasonId, roster, byId, past, calibra
     const defence = defenceOption(team);
     const nameOf = (id: number) => byId.get(id)?.name ?? '–';
     const lp = (p: {id: number; role: FantaRole}) => ({id: p.id, role: p.role});
-    const best = bestHindsight(roster.map(lp), shown, team.rules, calibration, defence);
-    const inBest = new Set(best?.ids ?? []);
-
-    // The advice as it stood at the lock, replayed with its pins and forced formation, then scored.
-    const forecasts = past ? (past.forecasts as PlayerForecast[]).filter((f) => byId.has(f.player.id)) : [];
-    const advice = past ? recommendLineup(forecasts, {rules: team.rules, defenceModifier: defence, prefer: team.formation as FormationKey | null, force: past.forced as FormationKey | null, pinned: new Set(past.pinned)}) : null;
     // Live: whoever still has to play is neither a hole nor a substitute yet.
     const toPlay = new Set(roster.filter((p) => !finished.has(p.team.id)).map((p) => p.id));
-    const played = advice ? playLineup(advice.starters.map((f) => lp(f.player)), advice.bench.map((f) => lp(f.player)), shown, team.rules, calibration, defence, MAX_SUBS, toPlay) : null;
+    const {advice, forecasts, played, best} = scoreRound({rules: team.rules, formation: team.formation, defence}, roster.map(lp), shown, past, calibration, toPlay);
+    const inBest = new Set(best?.ids ?? []);
     const expectedOf = new Map(forecasts.map((f) => [f.player.id, f.points]));
     const gaps = surprises(forecasts.map((f) => ({id: f.player.id, role: f.player.role, points: f.points})), shown, team.rules, calibration).slice(0, 4);
     const typedCount = roster.filter((p) => shown.stats[p.id]?.source !== undefined).length;

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {bestHindsight, defenceModifierOf, MAX_SUBS as MAX_SUBS_TEST, playLineup, roundPoints, surprises, votoOf, withManualVotes, type RoundResults, type RoundStat} from './recap';
+import {bestHindsight, defenceModifierOf, MAX_SUBS as MAX_SUBS_TEST, playLineup, scoreRound, roundPoints, surprises, votoOf, withManualVotes, type RoundResults, type RoundStat} from './recap';
 import {CLASSIC_RULES} from './scores';
 import {DEFAULT_CALIBRATION} from './voto';
 import {DEFAULT_DEFENCE_BONUS} from './config';
@@ -142,5 +142,21 @@ describe('surprises', () => {
         expect(out.map((s) => s.id)).toEqual([1, 2]);
         expect(out[0].delta).toBe(3);
         expect(out[1].delta).toBeCloseTo(-0.7);
+    });
+});
+
+describe('scoreRound', () => {
+    it('without a lock scores only the best eleven; with one, replays the advice on the roster left', () => {
+        const roster = [{id: 1, role: 'P' as const}, ...[2, 3, 4].map((id) => ({id, role: 'D' as const})), ...[5, 6, 7, 8].map((id) => ({id, role: 'C' as const})), ...[9, 10, 11].map((id) => ({id, role: 'A' as const}))];
+        const stats: Record<number, RoundStat> = {};
+        for (const p of roster) stats[p.id] = stat({voto: 6});
+        const results = official(stats);
+        const none = scoreRound({rules: CLASSIC_RULES, formation: null, defence: false}, roster, results, null, DEFAULT_CALIBRATION);
+        expect(none.played).toBeNull();
+        expect(none.best!.total).toBe(67);
+        const forecasts = roster.map((p) => ({player: {id: p.id, name: String(p.id), slug: '', role: p.role, team: {id: 1, name: 'x'}, penaltyTaker: false, scores: {starter: 80, fantaAvg: 6, events: null}}, fixture: null, home: null, opponent: null, plays: 0.9, starts: 0.9, rating: 6, points: 6, subPoints: 3, value: 5.7, reasons: []}));
+        const withLock = scoreRound({rules: CLASSIC_RULES, formation: null, defence: false}, roster, results, {forecasts, forced: null, pinned: []}, DEFAULT_CALIBRATION);
+        expect(withLock.advice!.formation).toBe('3-4-3');
+        expect(withLock.played!.total).toBe(67);
     });
 });
