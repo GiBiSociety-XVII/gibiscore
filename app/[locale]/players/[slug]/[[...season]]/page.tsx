@@ -13,6 +13,7 @@ import {Tabs} from "@/components/football/tabs";
 import {AbsenceLine} from "@/components/football/absences";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
+import {PlayerFantasy} from "@/components/fantasy/player-fantasy";
 
 export const revalidate = 1800;
 
@@ -256,7 +257,10 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] items-start">
                 <Tabs items={[{id: 'seasons', label: t('tabs.seasons'), content: seasonsTab, count: page.seasons.length}, {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.matches.length}]} />
-                <PlayerAnalysis stat={mainStat} benchmark={benchmark} competitionName={mainStat?.competition.name ?? null} />
+                <div className="flex flex-col gap-3 min-w-0">
+                    <PlayerAnalysis stat={mainStat} benchmark={benchmark} competitionName={mainStat?.competition.name ?? null} />
+                    <PlayerFantasy playerId={player.id} />
+                </div>
             </div>
         </SiteShell>
     );

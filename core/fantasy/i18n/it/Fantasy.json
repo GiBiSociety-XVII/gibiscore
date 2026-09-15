@@ -951,6 +951,37 @@
       }
     }
   },
+  "player": {
+    "title": "Fantacalcio",
+    "toAuction": "Listone",
+    "fantaAvgRecent": "FM {count, plural, =0 {recenti} one {ultima} other {ultime #}}",
+    "avgVoto": "Media voto",
+    "fantaAvgExpected": "FM attesa",
+    "quote": "Quotazione",
+    "overall": "Totale",
+    "realCount": "{real, plural, one {# voto reale} other {# voti reali}} su {total}: gli altri sono stime dal rating del provider.",
+    "allEstimated": "Nessun voto reale ancora: i voti sono stime dal rating del provider, sulla scala dei voti.",
+    "penaltyTaker": "rigorista",
+    "noRounds": "Nessuna giornata giocata in questa stagione, ancora.",
+    "colRound": "Giornata",
+    "colVoto": "Voto",
+    "colEvents": "Bonus / malus",
+    "colPoints": "FV",
+    "round": "G{round}",
+    "live": "in corso",
+    "noVote": "s.v.",
+    "source": {
+      "official": "uff.",
+      "manual": "inserito",
+      "estimate": "stima"
+    },
+    "sourceHint": {
+      "official": "Voto ufficiale del Fantacalcio",
+      "manual": "Voto inserito a mano da un utente nel consuntivo",
+      "estimate": "Stima: rating del provider riportato sulla scala dei voti"
+    },
+    "rulesNote": "Fantavoto con le regole classiche: gol +3, assist +1, ammonizione −0,5, espulsione −1, rigore sbagliato −3, autogol −2; portieri: gol subito −1, rigore parato +3, porta inviolata +1. FM attesa e Totale sono i numeri del listone dell'asta."
+  },
   "trade": {
     "title": "Mercato",
     "open": "Mercato di riparazione: scambi tra squadre e svincoli con rimborso",
