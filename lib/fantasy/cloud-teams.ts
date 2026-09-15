@@ -17,6 +17,8 @@ export interface AccountTeam {
     pins: number[];
     outs: number[];
     lock: LineupLock | null;
+    /** The lineups frozen at the kick-off of the rounds gone by, oldest first: the recaps score them. */
+    locks: LineupLock[];
     updatedAt: string;
 }
 
@@ -29,19 +31,19 @@ function parseLock(raw: unknown): LineupLock | null {
 }
 
 export async function listAccountTeams(): Promise<AccountTeam[]> {
-    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,lock,updated_at').order('updated_at', {ascending: false}).limit(50);
+    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,lock,locks,updated_at').order('updated_at', {ascending: false}).limit(50);
     if (error) throw error;
     const rows: AccountTeam[] = [];
     for (const r of data ?? []) {
         const team = normalizeSavedTeam(r.team);
         if (!team) continue;
-        rows.push({id: r.id as string, team, pins: ids(r.pins), outs: ids(r.outs), lock: parseLock(r.lock), updatedAt: r.updated_at as string});
+        rows.push({id: r.id as string, team, pins: ids(r.pins), outs: ids(r.outs), lock: parseLock(r.lock), locks: (Array.isArray(r.locks) ? r.locks : []).map(parseLock).filter((l): l is LineupLock => l !== null), updatedAt: r.updated_at as string});
     }
     return rows;
 }
 
 export async function saveAccountTeam(userId: string, row: Omit<AccountTeam, 'updatedAt'>): Promise<void> {
-    const {error} = await createClient().from('fantasy_teams').upsert({user_id: userId, id: row.id, team: row.team, pins: row.pins, outs: row.outs, lock: row.lock}, {onConflict: 'user_id,id'});
+    const {error} = await createClient().from('fantasy_teams').upsert({user_id: userId, id: row.id, team: row.team, pins: row.pins, outs: row.outs, lock: row.lock, locks: row.locks}, {onConflict: 'user_id,id'});
     if (error) throw error;
 }
 
