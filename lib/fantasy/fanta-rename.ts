@@ -21,6 +21,6 @@ export async function applyFantaNames(matches: Array<{id: number; fantaName: str
             if (error) throw error;
         }));
     }
-    for (const tag of ['fantasy-votes', 'fantasy-matchday', 'fantasy-pool']) revalidateTag(tag, 'max');
+    for (const tag of ['fantasy-votes', 'fantasy-matchday', 'fantasy-pool']) revalidateTag(tag, {expire: 0});
     return changes.length;
 }

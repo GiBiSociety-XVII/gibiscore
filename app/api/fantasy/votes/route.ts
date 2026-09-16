@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
         const {error} = await db.from('fantasy_votes').delete().eq('season_id', seasonId).eq('round', round).in('player_id', remove);
         if (error) return NextResponse.json({error: error.message}, {status: 500});
     }
-    for (const tag of ['fantasy-votes', 'fantasy-matchday', 'fantasy-pool']) revalidateTag(tag, 'max');
+    // Read your own writes: the next request renders fresh instead of serving the stale copy while it refreshes.
+    for (const tag of ['fantasy-votes', 'fantasy-matchday', 'fantasy-pool']) revalidateTag(tag, {expire: 0});
     for (const path of ['/fantacalcio/formazione', '/it/fantacalcio/formazione', '/admin/voti', '/it/admin/voti', '/fantacalcio/modello', '/it/fantacalcio/modello']) revalidatePath(path);
     return NextResponse.json({saved: rows.length, removed: remove.length});
 }

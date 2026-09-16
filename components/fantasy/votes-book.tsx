@@ -9,6 +9,7 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {RoleBadge} from "./role-badge";
 import {cloudUser} from "@/lib/fantasy/cloud";
+import {createClient} from "@/lib/db/client";
 import {isAdminId} from "@/lib/admin";
 import type {BookPlayer, BookRound, VotesBook} from "@/lib/fantasy/votes-data";
 import {roundNumber} from "@/lib/fantasy/matchday";
@@ -121,8 +122,36 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
     }, []);
 
     const teamsById = useMemo(() => new Map(book.teams.map((x) => [x.id, x])), [book.teams]);
-    // Saved from this page: shown as typed until the page comes back fresh from the server (which can take a moment).
+    // What the account holds, read straight from the database on opening and after every save: the static
+    // page can be a copy from before the last save, the database is never.
     const [saved, setSaved] = useState<Record<string, Record<number, number | undefined>>>({});
+    const [live, setLive] = useState(0);
+    useEffect(() => {
+        let alive = true;
+        let supabase: ReturnType<typeof createClient>;
+        try {
+            supabase = createClient();
+        } catch {
+            return;
+        }
+        Promise.resolve(supabase.rpc('fantasy_round_votes', {p_season: book.seasonId}))
+            .then(({data}) => {
+                if (!alive || !data) return;
+                const next: Record<string, Record<number, number | undefined>> = {};
+                for (const r of data as Array<{round: string; player_id: number; voto: number | string | null}>) {
+                    next[r.round] = next[r.round] ?? {};
+                    next[r.round][r.player_id] = r.voto === null ? undefined : Number(r.voto);
+                }
+                // Every round the database knows: a player it does not list is not typed, whatever the page says.
+                for (const r of book.rounds) next[r.round] = next[r.round] ?? {};
+                for (const r of book.rounds) for (const p of r.players) if (!(p.id in next[r.round])) next[r.round][p.id] = undefined;
+                setSaved(next);
+            })
+            .catch(() => undefined);
+        return () => {
+            alive = false;
+        };
+    }, [book, live]);
     const typedOf = (roundKey: string, p: BookPlayer): number | undefined => {
         const s = saved[roundKey];
         if (s && p.id in s) return s[p.id];
@@ -230,9 +259,8 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
             setDrafts({});
             setSave('saved');
             setFile(null);
+            setLive((n) => n + 1);
             router.refresh();
-            // The static page may still come back as it was for a moment: ask once more a little later.
-            window.setTimeout(() => router.refresh(), 2500);
         } catch {
             setSave('error');
         }
