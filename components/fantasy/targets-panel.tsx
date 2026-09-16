@@ -6,14 +6,11 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {AuctionPlayer} from "@/lib/fantasy/data";
 import type {FantaRole} from "@/lib/fantasy/scores";
-import {playerValue, type StrategyPick} from "@/lib/fantasy/strategies";
+import type {StrategyPick} from "@/lib/fantasy/strategies";
 import {Help} from "./help";
 import {RoleBadge} from "./role-badge";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
-/** Plan B may cost up to this much more than the target's ceiling. */
-const PLAN_B_STRETCH = 1.15;
-const PLAN_B_COUNT = 3;
 
 export interface RivalNote {
     /** The player whose place is contested (mine, or a target). */
@@ -24,22 +21,18 @@ export interface RivalNote {
 
 /**
  * My targets with their plan B, and the contested places: for every
- * target of the strategy still on the market, the players of the role
- * who could take its slot if it goes elsewhere, at their live price; for
- * every contested player of mine or among the targets, who competes for
- * his place, and whether the table has bought him already.
+ * target of the strategy still on the market, whom the strategy would
+ * plan in his place if he went to another table (planBFor: the first is
+ * the next target, the others follow if he goes too), at their live
+ * price; for every contested player of mine or among the targets, who
+ * competes for his place, and whether the table has bought him already.
  */
-export function TargetsPanel({players, targets, prices, bought, avoided, managers, myIds, onBuy, bare = false}: {players: AuctionPlayer[]; targets: StrategyPick[]; prices: Map<number, number>; bought: Map<number, {manager: number; price: number}>; avoided: Set<number>; managers: string[]; myIds: Set<number>; /** Only the content: the caller draws the frame (a tab of the roster panel). */ bare?: boolean; onBuy: (player: AuctionPlayer) => void}) {
+export function TargetsPanel({players, targets, planB, prices, bought, managers, myIds, onBuy, bare = false}: {players: AuctionPlayer[]; targets: StrategyPick[]; /** Per target, the strategy's own replacements, first the next target. */ planB: Map<number, StrategyPick[]>; prices: Map<number, number>; bought: Map<number, {manager: number; price: number}>; managers: string[]; myIds: Set<number>; /** Only the content: the caller draws the frame (a tab of the roster panel). */ bare?: boolean; onBuy: (player: AuctionPlayer) => void}) {
     const t = useTranslations('Fantasy.targets');
     const byId = new Map(players.map((p) => [p.id, p]));
-    const targetIds = new Set(targets.map((p) => p.id));
     const open = targets.filter((p) => !bought.has(p.id)).sort((a, b) => b.price - a.price);
-    // Plan B: the best of the role still on the market, within the target's ceiling and a bit, not a target himself.
-    const planB = (target: StrategyPick): AuctionPlayer[] =>
-        players
-            .filter((p) => p.role === target.role && p.id !== target.id && !bought.has(p.id) && !avoided.has(p.id) && !targetIds.has(p.id) && (prices.get(p.id) ?? 1) <= Math.max(2, Math.round(target.maxBid * PLAN_B_STRETCH)) && !p.injury?.longTerm)
-            .sort((a, b) => playerValue(b) - playerValue(a) || b.scores.overall - a.scores.overall)
-            .slice(0, PLAN_B_COUNT);
+    const alternativesOf = (target: StrategyPick): Array<{player: AuctionPlayer; pick: StrategyPick}> =>
+        (planB.get(target.id) ?? []).map((pick) => ({player: byId.get(pick.id), pick})).filter((x): x is {player: AuctionPlayer; pick: StrategyPick} => !!x.player && !bought.has(x.pick.id));
     const managerName = (i: number) => managers[i] ?? '';
     const contested: RivalNote[] = [...myIds, ...open.map((p) => p.id)]
         .map((id) => byId.get(id))
@@ -62,7 +55,7 @@ export function TargetsPanel({players, targets, prices, bought, avoided, manager
                     {ROLES.flatMap((role) => open.filter((p) => p.role === role)).map((target) => {
                         const player = byId.get(target.id);
                         if (!player) return null;
-                        const alternatives = planB(target);
+                        const alternatives = alternativesOf(target);
                         return (
                             <li key={target.id} className="px-3 py-1.5 flex flex-col gap-1">
                                 <div className="flex items-center gap-2 min-w-0">
@@ -73,12 +66,12 @@ export function TargetsPanel({players, targets, prices, bought, avoided, manager
                                     <button type="button" onClick={() => onBuy(player)} className="bb-btn bg-accent h-6 px-2 text-[10px] font-extrabold">{t('buy')}</button>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1 pl-7">
-                                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('planB')}</span>
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground" title={t('planBWhy')}>{t('planB')}</span>
                                     {alternatives.length === 0 ? (
                                         <span className="text-[11px] font-semibold text-muted-foreground">{t('planBNone')}</span>
                                     ) : (
-                                        alternatives.map((p) => (
-                                            <button key={p.id} type="button" onClick={() => onBuy(p)} className={chip} title={t('planBHint', {name: p.name, overall: p.scores.overall, fantaAvg: p.scores.fantaAvg?.toFixed(2) ?? '–'})}>
+                                        alternatives.map(({player: p, pick}, i) => (
+                                            <button key={p.id} type="button" onClick={() => onBuy(p)} className={cn(chip, i === 0 && "border-foreground")} title={t(i === 0 ? 'planBFirst' : 'planBHint', {name: p.name, overall: p.scores.overall, fantaAvg: p.scores.fantaAvg?.toFixed(2) ?? '–', maxBid: pick.maxBid})}>
                                                 <span className="truncate max-w-[110px]">{p.name}</span>
                                                 <span className="font-mono tabular-nums text-muted-foreground">{prices.get(p.id) ?? 1}</span>
                                             </button>

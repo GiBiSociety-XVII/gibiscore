@@ -479,6 +479,53 @@ export function planStrategy(strategy: Strategy, players: PoolPlayer[], prices: 
     return {key: strategy.key, name: strategy.name, strategy, share, budget, picks, spent, lineupValue, formation: lineup.formation, formations: lineup.formations, depth, available: true};
 }
 
+/**
+ * Plan B of every open target: whom the strategy puts in the roster if
+ * the target goes to another table, drawn again without him. The first
+ * name is the next target itself (the plan the board will show once he
+ * is gone), the next ones follow if he goes too: the plan B is never a
+ * player the plan would not pick. Only his role: money the plan moves
+ * elsewhere is not a plan B.
+ */
+export function planBFor(strategy: Strategy, players: PoolPlayer[], prices: Map<number, number>, config: Parameters<typeof planStrategy>[3], taken: Set<number>, mine: OwnPurchase[], prefs: PlanPrefs, targets: StrategyPick[], count = 3): Map<number, StrategyPick[]> {
+    const out = new Map<number, StrategyPick[]>();
+    const base = planStrategy(strategy, players, prices, config, taken, mine, prefs);
+    for (const target of targets) {
+        if (mine.some((m) => m.playerId === target.id)) continue;
+        const gone = new Set(taken);
+        gone.add(target.id);
+        const alternatives: StrategyPick[] = [];
+        // Who takes the slot without him; then without the two of them, and so on.
+        for (let step = 0; step < count; step += 1) {
+            const plan = planStrategy(strategy, players, prices, config, gone, mine, prefs);
+            const known = new Set([...base.picks[target.role].map((p) => p.id), ...alternatives.map((p) => p.id)]);
+            // The dearest newcomer is the one in his slot; a cheaper one the plan shuffled in beside him is not a plan B.
+            const newcomer = plan.picks[target.role].filter((p) => !known.has(p.id) && !gone.has(p.id)).sort((a, b) => b.price - a.price || b.overall - a.overall)[0];
+            if (!newcomer) break;
+            alternatives.push(newcomer);
+            gone.add(newcomer.id);
+        }
+        out.set(target.id, alternatives);
+    }
+    return out;
+}
+
+/**
+ * What the strategy would pay for a player of the role it did not plan:
+ * the ceiling of the slot he would take by rank, the biggest open slot
+ * whose pick he is at least as good as (he is not in the plan because he
+ * costs more than that slot allows, or the plan preferred another). Null
+ * when he is below every pick: the plan has no place for him, whatever
+ * he costs.
+ */
+export function slotCeiling(picks: StrategyPick[], player: {id: number; role: FantaRole; scores: Pick<FantaScores, 'overall'>}, owned: Set<number>): number | null {
+    const own = picks.find((p) => p.id === player.id);
+    if (own) return own.maxBid;
+    const open = picks.filter((p) => p.role === player.role && !owned.has(p.id)).sort((a, b) => b.overall - a.overall || b.maxBid - a.maxBid);
+    const slot = open.find((p) => player.scores.overall >= p.overall);
+    return slot ? slot.maxBid : null;
+}
+
 /** The splits the optimized strategy tries: a coarse grid over the shares, then a step around the best. */
 const OPTIMIZED_GRID = {P: [0.06, 0.1], D: [0.14, 0.2, 0.26], C: [0.22, 0.28, 0.34]};
 const OPTIMIZED_FOCUS: Record<FantaRole, number> = {P: 0.6, D: 0.4, C: 0.6, A: 0.5};

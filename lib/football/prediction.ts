@@ -22,8 +22,12 @@ export interface PredictionFactor {
 }
 
 export interface MatchPrediction {
-    /** Expected goals of each side. */
+    /** Expected goals of each side, tuned (see PredictionTuning). */
     lambda: {home: number; away: number};
+    /** Expected goals before the tuning: what the study alone says. */
+    base: {home: number; away: number};
+    /** Low-score correlation in force (the tuning's). */
+    rho: number;
     /** Percentages, summing to 100. */
     home: number;
     draw: number;
@@ -55,6 +59,28 @@ const SPLIT_PRIOR = 60;
 /** Low-score correlation (Dixon-Coles rho). */
 const RHO = -0.08;
 
+/**
+ * The knobs the archive tunes (backtest.ts): the expected goals of both
+ * sides scaled together, the home side's share of them, and the
+ * low-score correlation. The study's data is never touched: only what
+ * the model makes of it. The defaults are the untuned model.
+ */
+export interface PredictionTuning {
+    /** Both sides' expected goals times this: above one the model was scoring too few. */
+    goalScale: number;
+    /** The home side's expected goals times this, the away side's divided by it: above one the home edge was underrated. */
+    homeEdge: number;
+    /** Dixon-Coles rho: negative values push the draw at low scores. */
+    rho: number;
+}
+
+export const DEFAULT_TUNING: PredictionTuning = {goalScale: 1, homeEdge: 1, rho: RHO};
+
+/** Expected goals with the tuning applied, never below the floor. */
+export function tuneLambdas(base: {home: number; away: number}, tuning: PredictionTuning): {home: number; away: number} {
+    return {home: Math.max(0.15, base.home * tuning.goalScale * tuning.homeEdge), away: Math.max(0.15, (base.away * tuning.goalScale) / tuning.homeEdge)};
+}
+
 const round = (v: number, digits = 2) => Math.round(v * 10 ** digits) / 10 ** digits;
 const pct = (v: number) => Math.round(v * 100);
 
@@ -64,12 +90,33 @@ function poisson(lambda: number, k: number): number {
     return p;
 }
 
-function tau(h: number, a: number, lh: number, la: number): number {
-    if (h === 0 && a === 0) return 1 - lh * la * RHO;
-    if (h === 0 && a === 1) return 1 + lh * RHO;
-    if (h === 1 && a === 0) return 1 + la * RHO;
-    if (h === 1 && a === 1) return 1 - RHO;
+function tau(h: number, a: number, lh: number, la: number, rho: number): number {
+    if (h === 0 && a === 0) return 1 - lh * la * rho;
+    if (h === 0 && a === 1) return 1 + lh * rho;
+    if (h === 1 && a === 0) return 1 + la * rho;
+    if (h === 1 && a === 1) return 1 - rho;
     return 1;
+}
+
+/**
+ * The probability of every scoreline up to MAX_GOALS goals a side, from
+ * the expected goals of a prediction (the same Poisson and low-score
+ * correction the prediction uses), normalised to one. `grid[h][a]`.
+ */
+export function scoreGrid(lambdaHome: number, lambdaAway: number, rho: number = RHO): number[][] {
+    const grid: number[][] = [];
+    let total = 0;
+    const ph = Array.from({length: MAX_GOALS + 1}, (_, h) => poisson(lambdaHome, h));
+    const pa = Array.from({length: MAX_GOALS + 1}, (_, a) => poisson(lambdaAway, a));
+    for (let h = 0; h <= MAX_GOALS; h += 1) {
+        grid.push([]);
+        for (let a = 0; a <= MAX_GOALS; a += 1) {
+            const p = ph[h] * pa[a] * tau(h, a, lambdaHome, lambdaAway, rho);
+            grid[h].push(p);
+            total += p;
+        }
+    }
+    return grid.map((row) => row.map((p) => p / total));
 }
 
 /** Rate per match, shrunk towards the expected rate when the sample is small. */
@@ -138,7 +185,9 @@ export function attackBaseline(study: SeasonStudy | null, teamId: number, prior:
     return round(shrink(team.played > 0 ? scoredRate(team) * team.played : 0, team.played, expectedRates(prior, teamId, perTeam).attack));
 }
 
-export function predictMatch(study: SeasonStudy | null, homeId: number, awayId: number, prior: SeasonStudy | null = null): MatchPrediction | null {
+export function predictMatch(season: SeasonStudy | null, homeId: number, awayId: number, prior: SeasonStudy | null = null, tuning: PredictionTuning = DEFAULT_TUNING): MatchPrediction | null {
+    // A season not started yet is judged on the prior alone: last season's rates, nobody's matches.
+    const study = season ?? (prior ? {...prior, seasonId: prior.seasonId, played: 0, teams: [], home: [], away: []} : null);
     if (!study || (study.played < 10 && !prior)) return null;
     const known = (id: number) => study.teams.find((t) => t.team.id === id) ?? (prior?.teams.some((t) => t.team.id === id) ? blank(id) : undefined);
     const home = known(homeId);
@@ -177,38 +226,7 @@ export function predictMatch(study: SeasonStudy | null, homeId: number, awayId: 
     const formH = 1 + (formScore(home.form) - 0.5) * 0.12;
     const formA = 1 + (formScore(away.form) - 0.5) * 0.12;
 
-    const lambdaHome = Math.max(0.15, leagueHome * attackH * defenceA * formH);
-    const lambdaAway = Math.max(0.15, leagueAway * attackA * defenceH * formA);
-
-    // Score matrix.
-    let pHome = 0;
-    let pDraw = 0;
-    let pAway = 0;
-    let over15 = 0;
-    let over25 = 0;
-    let over35 = 0;
-    let btts = 0;
-    let total = 0;
-    const scores: Array<{home: number; away: number; pct: number}> = [];
-    for (let h = 0; h <= MAX_GOALS; h += 1) {
-        for (let a = 0; a <= MAX_GOALS; a += 1) {
-            const p = poisson(lambdaHome, h) * poisson(lambdaAway, a) * tau(h, a, lambdaHome, lambdaAway);
-            total += p;
-            scores.push({home: h, away: a, pct: p});
-            if (h > a) pHome += p;
-            else if (h < a) pAway += p;
-            else pDraw += p;
-            if (h + a > 1) over15 += p;
-            if (h + a > 2) over25 += p;
-            if (h + a > 3) over35 += p;
-            if (h > 0 && a > 0) btts += p;
-        }
-    }
-    const norm = (p: number) => p / total;
-    const homePct = pct(norm(pHome));
-    const awayPct = pct(norm(pAway));
-    const drawPct = 100 - homePct - awayPct;
-    const pick: MatchPrediction['pick'] = homePct >= awayPct && homePct >= drawPct ? '1' : awayPct >= drawPct ? '2' : 'X';
+    const base = {home: Math.max(0.15, leagueHome * attackH * defenceA * formH), away: Math.max(0.15, leagueAway * attackA * defenceH * formA)};
 
     const sample = Math.min(home.played, away.played);
     const factors: PredictionFactor[] = [];
@@ -221,17 +239,53 @@ export function predictMatch(study: SeasonStudy | null, homeId: number, awayId: 
     factors.push({key: 'homeAdvantage', side: leagueHome > leagueAway ? 'home' : 'none', values: {homeWins: study.homeWinPct, draws: study.drawPct, awayWins: study.awayWinPct}});
     if (sample < 6) factors.push({key: 'sample', side: 'none', values: {matches: sample}});
 
+    return fromLambdas(base, tuning, sample, factors);
+}
+
+/**
+ * The prediction from the expected goals: the tuning applied, the
+ * scorelines counted, every market and the likely scores read off them.
+ * predictMatch ends here; `retune` starts here again with other knobs.
+ */
+export function fromLambdas(base: {home: number; away: number}, tuning: PredictionTuning, sample: number, factors: PredictionFactor[]): MatchPrediction {
+    const lambda = tuneLambdas(base, tuning);
+    const grid = scoreGrid(lambda.home, lambda.away, tuning.rho);
+    let pHome = 0;
+    let pAway = 0;
+    let over15 = 0;
+    let over25 = 0;
+    let over35 = 0;
+    let btts = 0;
+    const scores: Array<{home: number; away: number; pct: number}> = [];
+    for (let h = 0; h < grid.length; h += 1) {
+        for (let a = 0; a < grid[h].length; a += 1) {
+            const p = grid[h][a];
+            scores.push({home: h, away: a, pct: p});
+            if (h > a) pHome += p;
+            else if (h < a) pAway += p;
+            if (h + a > 1) over15 += p;
+            if (h + a > 2) over25 += p;
+            if (h + a > 3) over35 += p;
+            if (h > 0 && a > 0) btts += p;
+        }
+    }
+    const homePct = pct(pHome);
+    const awayPct = pct(pAway);
+    const drawPct = 100 - homePct - awayPct;
+    const pick: MatchPrediction['pick'] = homePct >= awayPct && homePct >= drawPct ? '1' : awayPct >= drawPct ? '2' : 'X';
     return {
-        lambda: {home: round(lambdaHome), away: round(lambdaAway)},
+        lambda: {home: round(lambda.home), away: round(lambda.away)},
+        base: {home: round(base.home), away: round(base.away)},
+        rho: tuning.rho,
         home: homePct,
         draw: drawPct,
         away: awayPct,
-        over15: pct(norm(over15)),
-        over25: pct(norm(over25)),
-        over35: pct(norm(over35)),
-        btts: pct(norm(btts)),
+        over15: pct(over15),
+        over25: pct(over25),
+        over35: pct(over35),
+        btts: pct(btts),
         scores: scores
-            .map((s) => ({...s, pct: Math.round(norm(s.pct) * 1000) / 10}))
+            .map((s) => ({...s, pct: Math.round(s.pct * 1000) / 10}))
             .sort((a, b) => b.pct - a.pct)
             .slice(0, 5),
         pick,
@@ -239,4 +293,9 @@ export function predictMatch(study: SeasonStudy | null, homeId: number, awayId: 
         confidence: sample >= 12 ? 'high' : sample >= 6 ? 'medium' : 'low',
         factors,
     };
+}
+
+/** The same prediction with other knobs: the study's expected goals kept, the tuning redone. */
+export function retune(prediction: MatchPrediction, tuning: PredictionTuning): MatchPrediction {
+    return fromLambdas(prediction.base, tuning, prediction.sample, prediction.factors);
 }

@@ -22,8 +22,6 @@ import {hashOf} from "@/lib/fantasy/hash";
 import {keepSpots, sameSpots, type Spot} from "@/lib/fantasy/spots";
 import {lineupPath} from "@/lib/fantasy/routes";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
-import {RoundRecap} from "./round-recap";
-import {RecapHistory} from "./recap-history";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
@@ -540,13 +538,12 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
         );
     }
 
-    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} teamById={new Map(pool.teams.map((tm) => [tm.id, tm]))} toolbar={toolbar} roundInfo={roundInfo} signedIn={account.user !== null} />;
+    return <LineupBoard key={current.id} current={current} context={context} roster={roster} byId={byId} teamById={new Map(pool.teams.map((tm) => [tm.id, tm]))} toolbar={toolbar} roundInfo={roundInfo} />;
 }
 
 /** The advice for one team: forecasts, pins and outs, the formation, the tables; frozen once the round has kicked off. */
-function LineupBoard({current, context, roster, byId, teamById, toolbar, roundInfo, signedIn}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; teamById: Map<number, TeamSummary>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null; signedIn: boolean}) {
+function LineupBoard({current, context, roster, byId, teamById, toolbar, roundInfo}: {current: SavedTeam; context: MatchdayContext; roster: AuctionPlayer[]; byId: Map<number, AuctionPlayer>; teamById: Map<number, TeamSummary>; toolbar: React.ReactNode; roundInfo: MatchdayRound | null}) {
     const t = useTranslations('Fantasy.lineup');
-    const router = useRouter();
     const format = useFormatter();
     const reasonText = useReasonText();
     const allPins = pinsStore.useValue();
@@ -635,8 +632,6 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
     const fixturesOfRoster = context.fixtures.filter((f) => rosterTeams.includes(f.home.id) || rosterTeams.includes(f.away.id));
     const missingCount = ROLES.reduce((s, r) => s + Math.max(0, (FORMATIONS.find((f) => f.key === advice.formation)?.need[r] ?? 0) - forecasts.filter((f) => f.player.role === r).length), 0);
     const when = (iso: string) => format.dateTime(new Date(iso), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: ROME});
-    // The rounds of the recap: each with its lock, still in place or already kept aside.
-    const lockOf = (round: string) => (stored?.round === round ? stored : (history[current.id] ?? []).find((l) => l.round === round) ?? null);
 
     return (
         <div className="flex flex-col gap-3">
@@ -657,8 +652,6 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                 </div>
             )}
 
-            {context.results.map((results) => <RoundRecap key={results.round} team={current} results={results} seasonId={context.seasonId} roster={roster} byId={byId} past={lockOf(results.round)} calibration={context.calibration} signedIn={signedIn} onSaved={() => router.refresh()} />)}
-            <RecapHistory team={current} roster={roster} current={context.results} locks={[...(history[current.id] ?? []), ...(stored ? [stored] : [])]} seasonId={context.seasonId} calibration={context.calibration} />
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">

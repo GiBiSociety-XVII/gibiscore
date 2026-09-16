@@ -46,6 +46,7 @@ function StatusCell({fixture}: {fixture: FixtureSummary}) {
  */
 export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false, favorite = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean; /** One of the user's favourite teams plays: the row is marked. */ favorite?: boolean}) {
     const format = useFormatter();
+    const tOdds = useTranslations('Football.odds');
     const state = rowState(fixture);
     const isLive = state === 'live';
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
@@ -104,6 +105,14 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
                 <TeamCrest team={fixture.away} size={18} />
                 {teamName('away')}
             </span>
+            {/* The bookmakers' 1X2 under a match not yet played, when stored: the shortest reading of how the market sees it. */}
+            {state === 'scheduled' && fixture.odds && !compact && (
+                <span className="col-span-full -mt-1 pb-1 flex justify-center gap-3 font-mono text-[10px] font-bold tabular-nums text-muted-foreground" title={tOdds('hint')}>
+                    <span><span className="font-extrabold text-foreground/70">1</span> {fixture.odds.home.toFixed(2)}</span>
+                    <span><span className="font-extrabold text-foreground/70">X</span> {fixture.odds.draw.toFixed(2)}</span>
+                    <span><span className="font-extrabold text-foreground/70">2</span> {fixture.odds.away.toFixed(2)}</span>
+                </span>
+            )}
         </div>
     );
 }

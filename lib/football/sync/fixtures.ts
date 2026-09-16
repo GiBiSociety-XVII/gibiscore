@@ -77,6 +77,10 @@ export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?:
 const DETAIL_EVERY_MS = 60_000;
 /** A featured fixture that should have kicked off but is not in the live feed is asked this often. */
 const DUE_EVERY_MS = 10 * 60_000;
+/** A basic-tier fixture out of the live feed for this long is asked whether it ended: a shorter gap is a feed hiccup. */
+const BASIC_ENDED_AFTER_MS = 2 * 60_000;
+/** Basic-tier fixtures asked per pass at most (five requests). */
+const BASIC_ENDED_MAX = 100;
 
 /**
  * sync-live (every minute)
@@ -90,10 +94,13 @@ const DUE_EVERY_MS = 10 * 60_000;
  *    longer lists (they just ended: the final detail), and those that
  *    should have kicked off in the last three hours but are not in the
  *    feed, asked every ten minutes.
+ * 3. Basic-tier fixtures the database still marks as live but the feed
+ *    has not listed for two minutes: they ended, and nothing else would
+ *    say so before the hourly job (the page would keep counting their
+ *    minutes). By id, events only, once per fixture.
  *
- * Basic-tier fixtures never cost a request beyond the live feed.
  * Budget: 1 request a minute while matches are on, plus one per 20
- * featured fixtures in play.
+ * featured fixtures in play, plus one per 20 basic fixtures that end.
  */
 export async function syncLive(): Promise<SyncRun> {
     const db = footballClient();
@@ -152,6 +159,18 @@ export async function syncLive(): Promise<SyncRun> {
         if (dueError) failSync('fixtures.select', dueError);
         for (const r of dueRows ?? []) if (!inplayIds.has(r.provider_id as number)) detailIds.add(r.provider_id as number);
 
+        // Basic-tier fixtures out of the feed for two minutes: their final state, or the feed's hiccup is over.
+        const {data: staleBasic, error: staleBasicError} = await db
+            .from('fixtures')
+            .select('provider_id,league:leagues!inner(tier)')
+            .in('state', ['live', 'half_time', 'extra_time', 'penalties'])
+            .eq('leagues.tier', 'basic')
+            .lt('last_synced_at', new Date(now - BASIC_ENDED_AFTER_MS).toISOString())
+            .order('last_synced_at')
+            .limit(BASIC_ENDED_MAX);
+        if (staleBasicError) failSync('fixtures.select', staleBasicError);
+        const endedIds = (staleBasic ?? []).map((r) => r.provider_id as number).filter((id) => !inplayIds.has(id) && !detailIds.has(id));
+
         // Everything else in play: scores and events straight from the feed, no request.
         const fromFeed = inplay.filter((f) => !detailIds.has(f.fixture.id));
         await upsertFixtures(db, run, fromFeed, {withDetails: true, eventsOnly: true});
@@ -165,9 +184,18 @@ export async function syncLive(): Promise<SyncRun> {
         run.bump('detailed', detailed.length);
         await upsertFixtures(db, run, detailed, {withDetails: true});
 
-        // A due fixture the API did not return either: not before the next check.
-        const returned = new Set(detailed.map((f) => f.fixture.id));
-        const silent = [...detailIds].filter((id) => !returned.has(id));
+        const ended: AfFixtureResponse[] = [];
+        for (const group of chunk(endedIds, 20)) {
+            const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {ids: group.join('-')}, LIVE);
+            run.requests += 1;
+            ended.push(...response.filter(inScope));
+        }
+        if (ended.length > 0) run.bump('ended_basic', ended.length);
+        await upsertFixtures(db, run, ended, {withDetails: true, eventsOnly: true});
+
+        // A fixture the API did not return either: not before the next check.
+        const returned = new Set([...detailed, ...ended].map((f) => f.fixture.id));
+        const silent = [...detailIds, ...endedIds].filter((id) => !returned.has(id));
         if (silent.length > 0) {
             const {error} = await db.from('fixtures').update({last_synced_at: new Date().toISOString()}).in('provider_id', silent);
             if (error) failSync('fixtures.update', error);

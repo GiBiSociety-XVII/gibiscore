@@ -71,6 +71,8 @@ export interface FixtureSummary {
         awayXg: number | null;
     } | null;
     form: {home: string | null; away: string | null} | null;
+    /** The bookmakers' average 1X2 prices, on the lists of the day for a match not yet played (sync-odds). */
+    odds?: {home: number; draw: number; away: number} | null;
 }
 
 export interface StandingRow {

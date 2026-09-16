@@ -3,6 +3,7 @@ import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {FEATURED_COMPETITIONS} from "@/lib/football/competitions";
 import {BrandIcon, BrandLockup} from "./logo";
+import {AdminLogoLink} from "@/components/admin/admin-logo-link";
 
 const pill = "inline-flex items-center gap-2 h-11 px-4 rounded-xl border-[2.5px] border-foreground bg-card text-[15px] font-bold shadow-[4px_4px_0_rgb(var(--foreground))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--foreground))] transition-all whitespace-nowrap";
 const link = "text-[15px] text-muted-foreground hover:text-foreground hover:underline underline-offset-4 decoration-2 transition-colors";
@@ -88,7 +89,7 @@ export default function Footer() {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-[14px] text-muted-foreground">
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                         <span className="inline-flex items-center gap-2">
-                            <BrandIcon site="gibisociety" size={26} />
+                            <AdminLogoLink className="inline-flex"><BrandIcon site="gibisociety" size={26} /></AdminLogoLink>
                             {t('productOf')} <b className="font-extrabold text-foreground">GiBi<span className="text-brand-society-text">Society</span></b>
                         </span>
                         <a href="https://gibiarena.com" className="inline-flex items-center gap-2 hover:text-foreground transition-colors">

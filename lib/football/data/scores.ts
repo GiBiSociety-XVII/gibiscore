@@ -1,4 +1,5 @@
 import 'server-only';
+import {attachOdds} from './odds';
 import {isBuildPhase} from '@/lib/db/phase';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionFixtures, type FixtureSummary} from '../types';
@@ -116,6 +117,7 @@ export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: st
             rows = await fetchAll((a, b) => db.from('fixtures').select(FIXTURE_LIST_SELECT).gte('starting_at', from).lte('starting_at', to).order('starting_at').order('id').range(a, b), {max: 6000});
         }
         const fixtures = toFixtures(rows).filter((f) => mode === 'live' || romeDate(new Date(f.startingAt)) === day);
+        await attachOdds(db, fixtures);
         const {pinned, countries} = group(fixtures);
         return {
             ...empty,

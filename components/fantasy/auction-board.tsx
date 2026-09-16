@@ -30,7 +30,7 @@ import {LegheImport} from "./leghe-import";
 import {MarketDialog} from "./market-dialog";
 import {Help} from "./help";
 import {auctionPath} from "@/lib/fantasy/routes";
-import {bestLineup, defenceOption, planStrategy, rankStrategies, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
+import {bestLineup, defenceOption, planBFor, planStrategy, rankStrategies, slotCeiling, strategyHealth, type StrategyKey, type StrategyPick} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {bargains, type Bargain} from "@/lib/fantasy/bargains";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
@@ -239,6 +239,16 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
         return rankStrategies(board.players, prices, {...board.config, credits: board.config.credits + ledgerOf(board.config.ledger, board.config.me)}, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
     }, [board, prices]);
+    // Plan B of every target of the strategy in use: drawn by the strategy itself without him (see planBFor).
+    const planB = useMemo(() => {
+        const plan = board ? plans.find((p) => p.key === board.config.strategy) : undefined;
+        if (!board || !plan) return new Map<number, StrategyPick[]>();
+        const byId = new Map(board.players.map((p) => [p.id, p]));
+        const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
+        const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
+        const targets = ROLES.flatMap((r) => plan.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id));
+        return planBFor(plan.strategy, board.players, prices, {...board.config, credits: board.config.credits + ledgerOf(board.config.ledger, board.config.me)}, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, targets);
+    }, [board, plans, prices]);
     // A warning in words; a custom strategy has no translation, so it is named from the plans.
     const healthReason = useHealthReason((key) => plans.find((p) => p.key === key)?.name ?? tst(`${key}.name`));
     // The same strategies on the full list at list prices: what each was worth when the auction started.
@@ -468,14 +478,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         else if (targets.has(id)) toggleAvoid(id);
         else toggleWant(id);
     };
-    // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
-    // never more than what leaves me enough to finish the roster with the cheapest players left.
+    // My ceiling per player: the strategy's slot for its targets, for anyone else the slot he would take
+    // by rank (slotCeiling: none when the plan has no place for him), never more than what leaves me
+    // enough to finish the roster with the cheapest players left.
     const maxBidOf = (id: number): number | null => {
         if (!strategy || bought.has(id)) return null;
         const player = byId.get(id);
         if (!player) return null;
-        const pick = ROLES.flatMap((r) => strategy.picks[r]).find((p) => p.id === id);
-        return Math.min(myMaxFor(player.role), pick ? pick.maxBid : (prices.get(id) ?? 1));
+        const ceiling = slotCeiling(strategy.picks[player.role], player, new Set(mine.map((m) => m.playerId)));
+        return ceiling === null ? null : Math.min(myMaxFor(player.role), ceiling);
     };
     /** What a purchase at this price does to the manager's roster: credits and slots after, and for me the eleven and the plan. */
     const previewOf = (player: AuctionPlayer, manager: number, price: number) => {
@@ -842,9 +853,9 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             bare
                             players={marketPlayers}
                             targets={strategy ? ROLES.flatMap((r) => strategy.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id)) : []}
+                            planB={planB}
                             prices={prices}
                             bought={bought}
-                            avoided={avoided}
                             managers={managers}
                             myIds={new Set(mine.map((p) => p.playerId))}
                             onBuy={openBuy}

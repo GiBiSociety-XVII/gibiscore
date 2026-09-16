@@ -9,8 +9,11 @@ import {Flag} from "@/components/football/flag";
 import {FormStrip} from "@/components/football/form-strip";
 import {Lineups} from "@/components/football/lineups";
 import {MatchStudy} from "@/components/football/match-study";
+import {MatchMarkets} from "@/components/football/match-markets";
+import {getMatchMarkets} from "@/lib/football/data/markets";
+import {getFixtureOdds} from "@/lib/football/data/odds";
+import {getPredictionTuning} from "@/lib/football/data/tuning";
 import {AbsenceList} from "@/components/football/absences";
-import {PredictionPanel} from "@/components/football/prediction";
 import {predictMatch} from "@/lib/football/prediction";
 import {getPriorStudy, getSeasonStudy} from "@/lib/football/data/study";
 import {NotFoundBox} from "@/components/football/page-header";
@@ -23,6 +26,8 @@ import {TeamStats} from "@/components/football/team-stats";
 import {getMatchPage} from "@/lib/football/data/matches";
 import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
+import {getVoteScale} from "@/lib/fantasy/calibration-data";
+import {matchVoto} from "@/lib/fantasy/voto";
 
 // Refreshed by the live sync whenever the match moves (see sync-live); the timer only catches the rest.
 // The live sync renders the page again whenever the match moves; the timer only catches the rest.
@@ -54,7 +59,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     const tFootball = await getTranslations('Football');
     const format = await getFormatter();
     const numeric = parseId(id);
-    const page = numeric ? await getMatchPage(numeric) : null;
+    const [page, scale] = await Promise.all([numeric ? getMatchPage(numeric) : null, getVoteScale()]);
 
     if (!page) {
         return (
@@ -65,8 +70,8 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     }
 
     const {fixture} = page;
-    const [study, prior] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId)]) : [null, null];
-    const prediction = predictMatch(study, fixture.home.id, fixture.away.id, prior);
+    const [study, prior, markets, odds, tuning] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId), getMatchMarkets(fixture.id, fixture.seasonId, fixture.home.id, fixture.away.id), getFixtureOdds(fixture.id), getPredictionTuning()]) : [null, null, null, null, undefined];
+    const prediction = predictMatch(study, fixture.home.id, fixture.away.id, prior, tuning);
     const hasAbsences = page.absences.home.length > 0 || page.absences.away.length > 0;
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const isLive = LIVE_STATES.includes(fixture.state);
@@ -134,10 +139,19 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
         </Panel>
     );
 
+    const marketsTab = {
+        id: 'markets',
+        label: t('tabs.markets'),
+        content: (
+            <div className="flex flex-col gap-3">
+                <MatchMarkets data={markets} prediction={prediction} odds={odds} home={fixture.home} away={fixture.away} title={t('markets')} />
+                <MatchStudy study={study} homeId={fixture.home.id} awayId={fixture.away.id} />
+            </div>
+        ),
+    };
     const summaryTab = (
         <>
             {comparison}
-            <PredictionPanel prediction={prediction} home={fixture.home} away={fixture.away} title={fixture.state === 'scheduled' ? t('prediction') : undefined} />
             {hasAbsences && (
                 <Panel title={t('absences')}>
                     <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-muted">
@@ -150,7 +164,6 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                     </div>
                 </Panel>
             )}
-            <MatchStudy study={study} homeId={fixture.home.id} awayId={fixture.away.id} />
             <Panel title={t('info')}>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 px-3 py-2 text-[13px]">
                     <dt className="font-bold text-muted-foreground">{tFootball('labels.season', {season: ''}).trim()}</dt>
@@ -223,7 +236,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                                 <Link href={`/players/${page.bestPlayer.player.slug}`} className="inline-flex flex-wrap items-center justify-center gap-x-1 hover:underline decoration-accent decoration-[2px] underline-offset-2">
                                     <span className="whitespace-nowrap">{t('bestPlayer')}:</span>
                                     <span className="text-foreground">{page.bestPlayer.player.name}</span>
-                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{page.bestPlayer.rating?.toFixed(1)}</span>
+                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{page.bestPlayer.rating !== null ? matchVoto(page.bestPlayer.rating, page.bestPlayer.position, scale).toFixed(1) : ''}</span>
                                 </Link>
                             </span>
                         )}
@@ -234,12 +247,16 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
             {/* What happened comes first: the timeline sits above the tabs as soon as there is one. */}
             {page.events.length > 0 && <EventsTimeline events={page.events} title={t('tabs.summary')} />}
 
+            {/* Before kick-off the page opens on the pre-match reading; once the ball rolls, on what happened. */}
             <Tabs
+                defaultId={fixture.state === 'scheduled' ? 'markets' : 'summary'}
                 items={[
+                    ...(fixture.state === 'scheduled' ? [marketsTab] : []),
                     {id: 'summary', label: t('tabs.summary'), content: summaryTab, count: page.events.length},
-                    {id: 'lineups', label: t('tabs.lineups'), content: <Lineups home={page.lineups.home} away={page.lineups.away} title={t('tabs.lineups')} />},
+                    {id: 'lineups', label: t('tabs.lineups'), content: <Lineups home={page.lineups.home} away={page.lineups.away} title={t('tabs.lineups')} scale={scale} />},
                     {id: 'stats', label: t('tabs.stats'), content: <TeamStats home={page.stats.home} away={page.stats.away} title={t('tabs.stats')} />},
-                    {id: 'players', label: t('tabs.players'), content: <PlayerMatchTable home={page.players.home} away={page.players.away} homeTeam={fixture.home} awayTeam={fixture.away} title={t('players')} />},
+                    {id: 'players', label: t('tabs.players'), content: <PlayerMatchTable home={page.players.home} away={page.players.away} homeTeam={fixture.home} awayTeam={fixture.away} title={t('players')} scale={scale} />},
+                    ...(fixture.state === 'scheduled' ? [] : [marketsTab]),
                 ]}
             />
         </SiteShell>

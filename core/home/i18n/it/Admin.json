@@ -1,0 +1,19 @@
+{
+  "title": "Pannello admin",
+  "intro": "Strumenti riservati all'amministratore del sito.",
+  "deniedTitle": "Accesso riservato",
+  "deniedText": "Questa pagina è disponibile solo per l'amministratore del sito.",
+  "backHome": "Torna alla home",
+  "tools": {
+    "votes": {"title": "Voti in pagella", "text": "I voti veri dell'app, giornata per giornata, per tarare le stime."},
+    "model": {"title": "Quanto ci azzecca", "text": "Scarto tra voti reali e stime del sito, per ruolo e fascia."},
+    "names": {
+      "title": "Nomi come nel Fantacalcio",
+      "text": "Rinomina i giocatori di Serie A come li scrive il listone (Valde diventa Valdepenas). I file dei voti fanno lo stesso da soli.",
+      "run": "Allinea i nomi",
+      "running": "Allineo…",
+      "done": "{matched} giocatori trovati nel listone, {renamed} rinominati, {unmatched} voci del listone senza giocatore.",
+      "error": "Non riuscito, riprova."
+    }
+  }
+}

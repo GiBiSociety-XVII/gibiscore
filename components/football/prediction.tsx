@@ -28,7 +28,7 @@ export function OutcomeBar({prediction, className, labels = true}: {prediction: 
     );
 }
 
-function FactorLine({factor, home, away}: {factor: PredictionFactor; home: TeamSummary; away: TeamSummary}) {
+export function FactorLine({factor, home, away}: {factor: PredictionFactor; home: TeamSummary; away: TeamSummary}) {
     const t = useTranslations('Football.prediction.factors');
     const winner = factor.side === 'away' ? away.name : home.name;
     const loser = factor.side === 'away' ? home.name : away.name;

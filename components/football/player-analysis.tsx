@@ -3,6 +3,7 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {PositionBenchmark} from "@/lib/football/data/study";
 import type {PlayerSeasonStat} from "@/lib/football/types";
+import {meanVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 
 function Bar({value, reference, higherIsBetter = true}: {value: number; reference: number; higherIsBetter?: boolean}) {
     const max = Math.max(value, reference, 0.01) * 1.15;
@@ -16,7 +17,7 @@ function Bar({value, reference, higherIsBetter = true}: {value: number; referenc
 }
 
 /** Per-90 profile of the selected season against the average of the same role in that competition. */
-export function PlayerAnalysis({stat, benchmark, competitionName}: {stat: PlayerSeasonStat | null; benchmark: PositionBenchmark | null; competitionName: string | null}) {
+export function PlayerAnalysis({stat, benchmark, competitionName, scale}: {stat: PlayerSeasonStat | null; benchmark: PositionBenchmark | null; competitionName: string | null; scale: VotoCalibration}) {
     const t = useTranslations('Football.analysis');
     const tPos = useTranslations('Football.positions');
     if (!stat || stat.minutes < 90) return null;
@@ -27,7 +28,7 @@ export function PlayerAnalysis({stat, benchmark, competitionName}: {stat: Player
         {label: t('shots90'), value: p90(stat.shots), ref: benchmark?.shots90 ?? null, digits: 2},
         {label: t('keyPasses90'), value: p90(stat.keyPasses), ref: benchmark?.keyPasses90 ?? null, digits: 2},
         {label: t('passAccuracy'), value: stat.passAccuracy, ref: benchmark?.passAccuracy ?? null, digits: 0, suffix: '%'},
-        {label: t('rating'), value: stat.rating, ref: benchmark?.rating ?? null, digits: 2},
+        {label: t('rating'), value: stat.rating !== null ? meanVoto(stat.rating, stat.position, scale) : null, ref: benchmark?.rating !== null && benchmark?.rating !== undefined ? meanVoto(benchmark.rating, benchmark.position, scale) : null, digits: 2},
     ];
     const conversion = stat.shots && stat.shots > 0 ? Math.round((stat.goals / stat.shots) * 100) : null;
     const minutesPerGoal = stat.goals > 0 ? Math.round(stat.minutes / stat.goals) : null;

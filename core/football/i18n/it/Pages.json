@@ -48,7 +48,8 @@
       "summary": "Cronaca",
       "lineups": "Formazioni",
       "stats": "Statistiche",
-      "players": "Giocatori"
+      "players": "Giocatori",
+      "markets": "Analisi partita"
     },
     "info": "Informazioni",
     "headToHead": "Precedenti",
@@ -61,7 +62,8 @@
     "noForm": "Nessun precedente in archivio.",
     "scorers": "Marcatori",
     "absences": "Indisponibili",
-    "prediction": "Pronostico"
+    "prediction": "Pronostico",
+    "markets": "Analisi partita: pronostico, mercati e quote"
   },
   "team": {
     "notFound": "Squadra non trovata",
@@ -244,8 +246,42 @@
   "predictions": {
     "title": "Pronostici",
     "metaTitle": "Pronostici partite",
-    "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione.",
+    "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione, con le quote dei bookmaker a confronto.",
     "intro": "Le prossime partite delle competizioni principali con le probabilità del nostro modello statistico. Apri la partita per lo studio completo.",
-    "days": "Prossimi {count} giorni"
+    "days": "Prossimi {count} giorni",
+    "odds": "Quote",
+    "oddsHint": "{label}: media dei bookmaker {avg}, quota equa del modello {fair}; la migliore {best} ({book}), {books} bookmaker.",
+    "oddsLegend": "Quote: media dei bookmaker per 1, X, 2, over e under 2,5 e gol; in verde quando pagano più della quota equa del modello (100 / probabilità). Non è un consiglio di gioco.",
+    "recordLink": "Il bilancio del modello",
+    "record": {
+      "title": "Bilancio del modello",
+      "metaTitle": "Bilancio dei pronostici",
+      "metaDescription": "Quante giocate proposte dal modello sono andate a segno, fascia per fascia, e come il modello è tarato sulle stagioni in archivio.",
+      "intro": "Ogni giocata proposta viene scritta prima del calcio d'inizio e verificata sul risultato finale: qui c'è quante ne vince ogni fascia contro quanto prometteva. Sotto, la taratura del modello sull'archivio delle competizioni principali.",
+      "toPredictions": "Pronostici",
+      "liveTitle": "Le giocate proposte, verificate",
+      "liveEmpty": "Nessuna giocata verificata ancora: le prime arrivano con le prossime partite.",
+      "liveHint": "Percentuale vinte = giocate andate a segno sul totale; promessa = probabilità media che il modello dava. Se le due sono vicine il modello è ben tarato. Resa = puntata fissa su ogni giocata alla quota media dei bookmaker, solo per le giocate che avevano una quota.",
+      "settled": "{count} giocate verificate",
+      "slips": "{count} giocate",
+      "hitRate": "Vinte",
+      "hits": "{hits} su {slips}",
+      "promised": "Promessa",
+      "roi": "Resa",
+      "priced": "su {count} con quota",
+      "fitTitle": "La taratura sull'archivio",
+      "fitEmpty": "Taratura non ancora eseguita: il modello gira con i parametri di partenza.",
+      "fitHint": "Ogni partita delle ultime due stagioni è stata pronosticata con quello che si sapeva il giorno prima; sui risultati veri il modello ha tarato tre manopole (gol attesi, fattore campo, correlazione dei punteggi bassi) e ha verificato le giocate che avrebbe proposto. Log-loss: quanto il modello sbaglia il risultato esatto, più basso è meglio. I dati delle pagine non cambiano: cambia solo il pronostico.",
+      "samples": "Partite replicate",
+      "seasons": "{count} stagioni",
+      "goalScale": "Gol attesi",
+      "homeEdge": "Fattore campo",
+      "rho": "Correlazione",
+      "logLoss": "Log-loss",
+      "latestTitle": "Ultime giocate verificate",
+      "won": "Vinta",
+      "lost": "Persa",
+      "disclaimer": "Registro statistico delle proposte del modello, non un consiglio di gioco. Gioca solo se maggiorenne e con misura."
+    }
   }
 }

@@ -15,6 +15,8 @@ import Image from "next/image";
 import {StandingsTable} from "@/components/football/standings-table";
 import {getStandingsBySlug} from "@/lib/football/data/competitions";
 import {getTeamPage} from "@/lib/football/data/teams";
+import {getVoteScale} from "@/lib/fantasy/calibration-data";
+import {GOOD_VOTO, meanVoto} from "@/lib/fantasy/voto";
 
 // Refreshed by the live sync while the club plays; the timer catches the rest.
 // The live sync renders the page again whenever one of the club's matches moves; the timer only catches the rest.
@@ -35,7 +37,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
     setRequestLocale(locale);
     const t = await getTranslations('Pages.team');
     const tFootball = await getTranslations('Football');
-    const page = await getTeamPage(slug);
+    const [page, scale] = await Promise.all([getTeamPage(slug), getVoteScale()]);
 
     if (!page) {
         return (
@@ -188,7 +190,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
                                         <td className="px-1.5 py-1 text-right font-mono tabular-nums hidden md:table-cell">{p.minutes}</td>
                                         <td className="px-1.5 py-1 text-right font-mono tabular-nums font-extrabold">{p.goals || ''}</td>
                                         <td className="px-1.5 py-1 text-right font-mono tabular-nums">{p.assists || ''}</td>
-                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{p.rating !== null ? <span className={cn("px-1 rounded", p.rating >= 7 && "bg-accent")}>{p.rating.toFixed(2)}</span> : '–'}</td>
+                                        <td className="px-1.5 py-1 text-right font-mono tabular-nums">{p.rating !== null ? (({voto}) => <span className={cn("px-1 rounded", voto >= GOOD_VOTO && "bg-accent")}>{voto.toFixed(2)}</span>)({voto: meanVoto(p.rating, p.position, scale)}) : '–'}</td>
                                         <td className="px-1.5 py-1 text-right font-mono tabular-nums text-muted-foreground">{p.yellowCards || p.redCards ? `${p.yellowCards} / ${p.redCards}` : ''}</td>
                                     </tr>
                                 );

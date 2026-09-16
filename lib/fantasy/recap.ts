@@ -3,7 +3,7 @@ import type {FormationKey} from './strategies';
 import {FORMATIONS} from './strategies';
 import {recommendLineup, type LineupAdvice, type PlayerForecast} from './matchday';
 import type {FantaRole, FantaRules} from './scores';
-import {toVoto, type VotoCalibration} from './voto';
+import {halfVoto, toVoto, type VotoCalibration} from './voto';
 
 /**
  * The recap of a round: what every player of a roster really did, the
@@ -87,7 +87,7 @@ const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Mat
 export function parseManualVote(raw: unknown): ManualVote | null {
     const m = raw as Partial<ManualVote> | null;
     if (!m || typeof m !== 'object' || typeof m.teamId !== 'number') return null;
-    const voto = typeof m.voto === 'number' && Number.isFinite(m.voto) ? (m.voto === 0 ? 0 : m.voto >= 1 && m.voto <= 10 ? Math.round(m.voto * 4) / 4 : null) : null;
+    const voto = typeof m.voto === 'number' && Number.isFinite(m.voto) ? (m.voto === 0 ? 0 : m.voto >= 1 && m.voto <= 10 ? halfVoto(m.voto) : null) : null;
     return {teamId: m.teamId, voto, goals: count(m.goals), assists: count(m.assists), yellow: count(m.yellow), red: count(m.red), conceded: count(m.conceded), penaltiesSaved: count(m.penaltiesSaved), penaltiesMissed: count(m.penaltiesMissed), ownGoals: count(m.ownGoals), at: typeof m.at === 'string' ? m.at : ''};
 }
 
@@ -115,7 +115,7 @@ export interface LineupPlayer {
 /** The provider's rating on the vote scale, whatever vote is known: the placeholder of an empty field. */
 export function toVotoEstimate(stat: RoundStat, role: FantaRole, calibration: VotoCalibration): number | null {
     if (stat.rating === null || stat.minutes < VOTE_MINUTES) return null;
-    return toVoto(stat.rating, role, calibration);
+    return halfVoto(toVoto(stat.rating, role, calibration));
 }
 
 /** The newspaper vote: the known one when in, else the rating on the vote scale; null when he had no vote. */
@@ -123,7 +123,7 @@ export function votoOf(stat: RoundStat | undefined, role: FantaRole, calibration
     if (!stat) return null;
     if (stat.voto !== undefined) return stat.voto;
     if (stat.rating === null || stat.minutes < VOTE_MINUTES) return null;
-    return toVoto(stat.rating, role, calibration);
+    return halfVoto(toVoto(stat.rating, role, calibration));
 }
 
 /** The fantasy points of the vote and the events under the league's rules; null without a vote. */

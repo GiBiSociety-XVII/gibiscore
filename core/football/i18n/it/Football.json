@@ -290,5 +290,87 @@
       "fever": "Febbre",
       "covid_19": "Covid-19"
     }
+  },
+  "markets": {
+    "intro": "Il pronostico del sito e ogni mercato letto come lo leggono i bookmaker: la probabilità del modello, la quota che la pagherebbe alla pari e la quota media dei bookmaker; poi la giocata che il modello sceglierebbe per ogni livello di rischio. Sotto, quando le due squadre segnano e subiscono, quanto spesso superano le soglie di gol, angoli e cartellini.",
+    "disclaimer": "Sono numeri sulle partite giocate e sulle probabilità del modello, non un consiglio di gioco. Una quota più alta della quota equa non è una vincita sicura: è un esito che il bookmaker paga più di quanto il modello lo ritenga probabile. Gioca solo se maggiorenne e con misura.",
+    "hint": "Modello di Poisson sui gol attesi delle due squadre (attacco e difesa rispetto al campionato, casa e trasferta, xG, forma), tradotto in ogni mercato. Quota equa = 100 / probabilità. Quote dei bookmaker dal fornitore dati, aggiornate ogni tre ore fino al calcio d'inizio.",
+    "modelTitle": "Mercati secondo il modello",
+    "modelHint": "Le stesse probabilità del pronostico, tradotte in ogni mercato. Evidenziato l'esito più probabile di ogni gruppo. Quota equa = 100 / probabilità.",
+    "fair": "quota",
+    "fairHint": "Probabilità {pct}%: una quota di {odds} la pagherebbe alla pari.",
+    "groups": {
+      "outcome": "Esito finale",
+      "doubleChance": "Doppia chance",
+      "goals": "Over gol totali",
+      "under": "Under gol totali",
+      "btts": "Gol / No gol",
+      "scores": "Risultati più probabili"
+    },
+    "labels": {
+      "over": "Over {line}",
+      "under": "Under {line}",
+      "goal": "Gol",
+      "noGoal": "No gol"
+    },
+    "bandsTitle": "Quando arrivano i gol",
+    "bandsHint": "Gol fatti e subiti in ogni quarto d'ora nelle partite della competizione (stagione in corso e scorsa). Il recupero conta con il tempo che chiude. Lo sfondo azzurro segna solo i quarti d'ora sopra la media (16,7%) sommando le due squadre: dove questa partita dovrebbe muoversi.",
+    "bandsBase": "{count} partite",
+    "noEvents": "Nessun gol registrato.",
+    "firstHalfGoal": "Almeno un gol nel primo tempo nel {pct}% delle partite",
+    "scoredFirst": "segna per prima nel {pct}% delle partite con gol e in quel caso vince il {won}%",
+    "legend": {
+      "for": "gol fatti",
+      "against": "gol subiti",
+      "peak": "sottolineato il quarto d'ora in cui segna di più",
+      "heat": "sfondo azzurro = quarto d'ora con più gol della media (un sesto del totale) sommando le due squadre, fatti e subiti: più scuro, più movimento atteso in questa partita. La percentuale è la quota di ogni quarto d'ora"
+    },
+    "linesTitle": "Over, under e gol",
+    "linesHint": "Quanto spesso le partite di ogni squadra superano ogni soglia, finiscono con entrambe a segno, senza subire o senza segnare. In verde i valori che pesano (over 1,5 dal 70%, over 2,5 e gol dal 60%, porta inviolata dal 50%).",
+    "setPiecesTitle": "Angoli e cartellini",
+    "setPiecesHint": "Medie per partita dalle statistiche in archivio. Gli attesi nella partita sommano quello che ogni squadra fa e quello che l'avversaria concede.",
+    "expectedCorners": "Angoli attesi nella partita: {value}",
+    "expectedYellows": "Gialli attesi nella partita: {value}",
+    "venueLine": "{played} PG · {gf}-{ga} · O2,5 {over}% · gol {btts}%",
+    "base": "Base: {home} partite della squadra di casa, {away} di quella in trasferta, nella competizione (stagioni {seasons}).",
+    "empty": "Nessuna partita giocata in archivio per queste squadre nella competizione: la lettura dei mercati arriva con le prime giornate.",
+    "rows": {
+      "over05": "Over 0,5",
+      "over15": "Over 1,5",
+      "over25": "Over 2,5",
+      "over35": "Over 3,5",
+      "under25": "Under 2,5",
+      "btts": "Gol (entrambe)",
+      "cleanSheet": "Porta inviolata",
+      "failedToScore": "Senza segnare",
+      "goalsFor": "Gol fatti a partita",
+      "goalsAgainst": "Gol subiti a partita",
+      "goalsTotal": "Gol totali a partita",
+      "venue": "In casa / in trasferta",
+      "cornersFor": "Angoli fatti",
+      "cornersAgainst": "Angoli concessi",
+      "yellowFor": "Gialli presi",
+      "yellowAgainst": "Gialli provocati"
+    },
+    "book": "book",
+    "oddsHint": "Probabilità {pct}%, quota equa {fair}. Bookmaker: media {avg}, la migliore {best} ({book}), {books} bookmaker.",
+    "legendFair": "quota = quota equa (100 / probabilità)",
+    "legendBook": "book = media di {books} bookmaker, aggiornata il {at}; in verde quando pagano più della quota equa",
+    "noOdds": "quote dei bookmaker non ancora disponibili per questa partita",
+    "heatHint": "{pct}% dei gol nelle partite delle due squadre, fatti e subiti, arriva in questo quarto d'ora.",
+    "advice": {
+      "title": "Cosa giocherebbe il modello",
+      "hint": "Tre giocate, una per livello di rischio: tra tutte le selezioni e le loro combinazioni su mercati diversi (esito, gol totali, gol/no gol) quella che paga di più restando sopra la probabilità del livello: prudente dal 78%, consigliata dal 62%, audace dal 45%. La probabilità di una combinazione è calcolata sui risultati esatti del modello, quindi le selezioni non si contraddicono mai e una selezione che non restringe nulla viene lasciata fuori.",
+      "tiers": {
+        "safe": "Prudente",
+        "balanced": "Consigliata",
+        "bold": "Audace"
+      },
+      "note": "Probabilità della giocata intera secondo il modello; quota equa = 100 / probabilità; \"book\" è la quota media dei bookmaker, per una combinata il prodotto delle medie (≈, indicativo: non tutti i bookmaker accettano più selezioni sulla stessa partita). Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
+      "record": "Vedi il bilancio delle giocate proposte"
+    }
+  },
+  "odds": {
+    "hint": "Quote 1, X, 2: media dei bookmaker per questa partita. Apri la partita per l'analisi completa."
   }
 }

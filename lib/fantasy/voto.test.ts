@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {DEFAULT_CALIBRATION, fitCalibration, toVoto} from './voto';
+import {DEFAULT_CALIBRATION, fitCalibration, halfVoto, matchVoto, meanVoto, roleOfPosition, toVoto} from './voto';
 
 describe('toVoto', () => {
     it('brings an average provider rating to an average fantasy vote, and compresses the spread', () => {
@@ -38,5 +38,23 @@ describe('fitCalibration', () => {
         expect(Math.abs(few.A.intercept - DEFAULT_CALIBRATION.A.intercept)).toBeLessThan(0.1);
         const flat = Array.from({length: 200}, (_, i) => ({rating: 6 + (i % 20) * 0.1, voto: 6, role: 'P' as const}));
         expect(fitCalibration(flat).P).toEqual(DEFAULT_CALIBRATION.P);
+    });
+});
+
+describe('the vote scale on the football pages', () => {
+    it('reads a role from a provider position or a lineup letter', () => {
+        expect(roleOfPosition('goalkeeper')).toBe('P');
+        expect(roleOfPosition('G')).toBe('P');
+        expect(roleOfPosition('Defender')).toBe('D');
+        expect(roleOfPosition('F')).toBe('A');
+        expect(roleOfPosition(null)).toBe('C');
+    });
+    it('shows a match as a vote in half points and a season as a mean with two decimals', () => {
+        expect(halfVoto(7.13)).toBe(7);
+        expect(halfVoto(6.26)).toBe(6.5);
+        expect(halfVoto(5.4)).toBe(5.5);
+        expect(matchVoto(8.2, 'defender')).toBe(7);
+        expect(matchVoto(5.9, 'goalkeeper')).toBe(5.5);
+        expect(meanVoto(7.13, 'midfielder')).toBeCloseTo(6.2, 1);
     });
 });

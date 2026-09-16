@@ -5,10 +5,12 @@ import {isBuildPhase} from '@/lib/db/phase';
 import {footballDb, logReadError} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getPriorStudy, getSeasonStudy} from '@/lib/football/data/study';
+import {getPredictionTuning} from '@/lib/football/data/tuning';
 import {attackBaseline, predictMatch} from '@/lib/football/prediction';
 import {VOTI as SERIE_A_VOTI} from '@/core/fantasy/voti/serie-a';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
 import {roundNumber, roundStates, type MatchdayFixture, type PlayerContext, type RecentMatch, type RoundState} from './matchday';
+import {readRoundVotes} from './round-votes';
 import type {FantaRole} from './scores';
 import {DEFAULT_CALIBRATION, fitCalibration, type VotoCalibration, type VotoPair} from './voto';
 import {matchVoti, parseVoti, type VotoEntry, type VotoRow} from './voti';
@@ -58,7 +60,7 @@ export interface MatchdayContext {
     results: RoundResults[];
     /**
      * The rounds played before, oldest first, for the history of the recaps. Heavy: the lineup page
-     * strips it before the client and serves it, cut to a roster, from /api/fantasy/results.
+     * strips it before the client.
      */
     history: RoundResults[];
     generatedAt: string;
@@ -101,21 +103,6 @@ async function loadStats(db: ReturnType<typeof footballDb>, fixtureIds: number[]
     }
 }
 
-interface TypedVoteRow {
-    round: string;
-    player_id: number;
-    team_id: number;
-    voto: number | string | null;
-    goals: number;
-    assists: number;
-    yellow: number;
-    red: number;
-    conceded: number;
-    penalties_saved: number;
-    penalties_missed: number;
-    own_goals: number;
-}
-
 interface FixtureRow {
     id: number;
     round: string | null;
@@ -156,7 +143,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     const roundFixtures = byRound.get(round) ?? [];
 
     // Predictions from the season's numbers.
-    const [study, prior] = await Promise.all([getSeasonStudy(season.id), getPriorStudy(season.id)]);
+    const [study, prior, tuning] = await Promise.all([getSeasonStudy(season.id), getPriorStudy(season.id), getPredictionTuning()]);
     // What each club scores in an ordinary match (shrunk on a small sample): the yardstick for the fixture's expected goals.
     const avgFor = new Map<number, number>();
     const formOf = new Map<number, string>();
@@ -166,7 +153,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         if (t.form.length > 0) formOf.set(t.team.id, t.form.join(''));
     }
     const matchday: MatchdayFixture[] = roundFixtures.map((f) => {
-        const p = predictMatch(study, f.home_team_id, f.away_team_id, prior);
+        const p = predictMatch(study, f.home_team_id, f.away_team_id, prior, tuning);
         return {
             id: f.id,
             round,
@@ -187,11 +174,11 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     for (const teamId of teamIds) recentOf.set(teamId, played.filter((f) => f.home_team_id === teamId || f.away_team_id === teamId).slice(0, RECENT_MATCHES));
     const recentIds = [...new Set([...recentOf.values()].flat().map((f) => f.id))];
     // The votes users typed in, the latest per player and round: each on its club's match of that round.
-    const {data: typedRows} = await db.rpc('fantasy_round_votes', {p_season: season.id});
+    const typedRows = await readRoundVotes(db, season.id);
     // A typed vote (0 = "no vote") counts like an official one; a row with no vote typed corrects the events only.
     const typed = new Map<string, VotoEntry>();
     const typedEvents = new Map<string, VotoEntry>();
-    for (const r of (typedRows ?? []) as TypedVoteRow[]) {
+    for (const r of typedRows) {
         const f = (byRound.get(r.round) ?? []).find((x) => x.home_team_id === r.team_id || x.away_team_id === r.team_id);
         if (!f) continue;
         const voto = r.voto === null ? null : Number(r.voto);

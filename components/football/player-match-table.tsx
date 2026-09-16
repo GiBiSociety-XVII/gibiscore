@@ -4,8 +4,9 @@ import {Card} from "@/components/shared/ui/card";
 import {cn} from "@/components/shared/ui/cn";
 import {TeamCrest} from "@/components/football/team-crest";
 import type {PlayerMatchLine, TeamSummary} from "@/lib/football/types";
+import {GOOD_VOTO, matchVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 
-function Rating({value, accent = 7}: {value: number | null; accent?: number}) {
+function Rating({value, accent = GOOD_VOTO}: {value: number | null; accent?: number}) {
     if (value === null) return <span className="text-muted-foreground">–</span>;
     return (
         <span className={cn("inline-block font-mono text-[11px] font-extrabold tabular-nums px-1.5 py-0.5 rounded-md border-2 border-foreground", value >= accent ? "bg-accent" : "bg-card")}>
@@ -14,7 +15,7 @@ function Rating({value, accent = 7}: {value: number | null; accent?: number}) {
     );
 }
 
-function TeamTable({team, lines}: {team: TeamSummary; lines: PlayerMatchLine[]}) {
+function TeamTable({team, lines, scale}: {team: TeamSummary; lines: PlayerMatchLine[]; scale: VotoCalibration}) {
     const t = useTranslations('Football.playerTable');
     const tPos = useTranslations('Football.positionsShort');
     return (
@@ -49,7 +50,7 @@ function TeamTable({team, lines}: {team: TeamSummary; lines: PlayerMatchLine[]})
                                         </span>
                                     </td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums">{l.minutes ?? '–'}</td>
-                                    <td className="px-1.5 py-1 text-right"><Rating value={l.rating} /></td>
+                                    <td className="px-1.5 py-1 text-right"><Rating value={l.rating !== null ? matchVoto(l.rating, l.position, scale) : null} /></td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums">{l.goals || ''}</td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums">{l.assists || ''}</td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums hidden md:table-cell">{l.shots ?? ''}{l.shotsOnTarget !== null && l.shots ? ` (${l.shotsOnTarget})` : ''}</td>
@@ -68,7 +69,7 @@ function TeamTable({team, lines}: {team: TeamSummary; lines: PlayerMatchLine[]})
     );
 }
 
-export function PlayerMatchTable({home, away, homeTeam, awayTeam, title}: {home: PlayerMatchLine[]; away: PlayerMatchLine[]; homeTeam: TeamSummary; awayTeam: TeamSummary; title: string}) {
+export function PlayerMatchTable({home, away, homeTeam, awayTeam, title, scale}: {home: PlayerMatchLine[]; away: PlayerMatchLine[]; homeTeam: TeamSummary; awayTeam: TeamSummary; title: string; scale: VotoCalibration}) {
     const t = useTranslations('Football');
     return (
         <Card className="p-3 md:p-4 flex flex-col gap-3 min-w-0">
@@ -77,8 +78,8 @@ export function PlayerMatchTable({home, away, homeTeam, awayTeam, title}: {home:
                 <p className="text-sm font-semibold text-muted-foreground">{t('empty.noPlayers')}</p>
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                    {home.length > 0 && <TeamTable team={homeTeam} lines={home} />}
-                    {away.length > 0 && <TeamTable team={awayTeam} lines={away} />}
+                    {home.length > 0 && <TeamTable team={homeTeam} lines={home} scale={scale} />}
+                    {away.length > 0 && <TeamTable team={awayTeam} lines={away} scale={scale} />}
                 </div>
             )}
         </Card>
