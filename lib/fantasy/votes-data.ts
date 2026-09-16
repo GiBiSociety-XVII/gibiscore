@@ -5,6 +5,7 @@ import {isBuildPhase} from '@/lib/db/phase';
 import {footballDb, logReadError} from '@/lib/football/data/shared';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
 import {roundNumber} from './matchday';
+import {readRoundVotes} from './round-votes';
 import type {FantaRole} from './scores';
 
 /**
@@ -78,7 +79,6 @@ interface StatRow {
 }
 
 async function buildVotesBook(league: AuctionLeague): Promise<VotesBook | null> {
-    if (isBuildPhase()) return null;
     const slugs = AUCTION_LEAGUES.find((l) => l.key === league)?.slugs ?? [];
     if (slugs.length !== 1) return null;
     const db = footballDb();
@@ -106,8 +106,7 @@ async function buildVotesBook(league: AuctionLeague): Promise<VotesBook | null> 
 
     const typed = new Map<string, number | null>();
     const typedTeam = new Map<string, number>();
-    const {data: typedRows} = await db.rpc('fantasy_round_votes', {p_season: season.id});
-    for (const r of (typedRows ?? []) as Array<{round: string; player_id: number; team_id: number; voto: number | string | null}>) {
+    for (const r of await readRoundVotes(db, season.id)) {
         typed.set(`${r.round}:${r.player_id}`, r.voto === null ? null : Number(r.voto));
         typedTeam.set(`${r.round}:${r.player_id}`, r.team_id);
     }
@@ -165,8 +164,13 @@ async function buildVotesBook(league: AuctionLeague): Promise<VotesBook | null> 
 
 const cachedBook = unstable_cache(buildVotesBook, ['fantasy-votes-book', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 300, tags: ['fantasy-votes', 'fantasy-matchday']});
 
-/** The vote book of the league's season; null when the read fails or the league has no calendar of its own. */
+/**
+ * The vote book of the league's season; null when the read fails or the
+ * league has no calendar of its own. Nothing is read at build time, and
+ * nothing cached either: the first request after the deploy builds it.
+ */
 export async function getVotesBook(league: AuctionLeague): Promise<VotesBook | null> {
+    if (isBuildPhase()) return null;
     try {
         return await cachedBook(league);
     } catch (error) {

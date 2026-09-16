@@ -13,6 +13,7 @@ import {createClient} from "@/lib/db/client";
 import {isAdminId} from "@/lib/admin";
 import type {BookPlayer, BookRound, VotesBook} from "@/lib/fantasy/votes-data";
 import {roundNumber} from "@/lib/fantasy/matchday";
+import {readRoundVotes} from "@/lib/fantasy/round-votes";
 import {halfVoto, toVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import type {ManualVote} from "@/lib/fantasy/recap";
@@ -134,11 +135,11 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
         } catch {
             return;
         }
-        Promise.resolve(supabase.rpc('fantasy_round_votes', {p_season: book.seasonId}))
-            .then(({data}) => {
-                if (!alive || !data) return;
+        readRoundVotes(supabase, book.seasonId)
+            .then((data) => {
+                if (!alive) return;
                 const next: Record<string, Record<number, number | undefined>> = {};
-                for (const r of data as Array<{round: string; player_id: number; voto: number | string | null}>) {
+                for (const r of data) {
                     next[r.round] = next[r.round] ?? {};
                     next[r.round][r.player_id] = r.voto === null ? undefined : Number(r.voto);
                 }

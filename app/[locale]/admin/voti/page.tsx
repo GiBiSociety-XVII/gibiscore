@@ -9,9 +9,10 @@ import {getMatchday} from "@/lib/fantasy/matchday-data";
 import {getVotesBook} from "@/lib/fantasy/votes-data";
 import {DEFAULT_CALIBRATION} from "@/lib/fantasy/voto";
 
-// Static: the book moves when a round ends or votes are saved (both revalidate its tags).
+// Rendered on request: the administrator's page only, and what it shows must be the database of now,
+// never a copy from before a save. The book itself is cached (votes-data) and refreshed by every save.
 // The page shows itself to the administrator's session only; the votes route checks it server-side.
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Fantasy.votes');

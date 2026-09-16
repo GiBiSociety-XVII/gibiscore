@@ -4,6 +4,7 @@ import {fetchAll} from '@/lib/db/paginate';
 import {isBuildPhase} from '@/lib/db/phase';
 import {footballDb, logReadError} from '@/lib/football/data/shared';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
+import {readRoundVotes, type RoundVoteRow} from './round-votes';
 import type {FantaRole} from './scores';
 import {DEFAULT_CALIBRATION, fitCalibration, type VotoCalibration, type VotoPair} from './voto';
 
@@ -19,15 +20,7 @@ const ROLE_OF_POSITION: Record<string, FantaRole> = {goalkeeper: 'P', defender: 
 /** Seasons whose typed votes count: the current one and the one before. */
 const SEASONS = 2;
 
-interface TypedRow {
-    round: string;
-    player_id: number;
-    team_id: number;
-    voto: number | string | null;
-}
-
 async function buildTypedPairs(league: AuctionLeague): Promise<VotoPair[]> {
-    if (isBuildPhase()) return [];
     const db = footballDb();
     const slugs = AUCTION_LEAGUES.find((l) => l.key === league)?.slugs ?? [];
     const {data: leagueRows, error} = await db.from('leagues').select('id,slug,seasons(id,year)').in('slug', slugs);
@@ -38,10 +31,9 @@ async function buildTypedPairs(league: AuctionLeague): Promise<VotoPair[]> {
     if (seasonIds.length === 0) return [];
 
     // Every typed vote (0 is a typed "no vote": no pair), on its club's match of that round.
-    const typed: Array<{seasonId: number; row: TypedRow}> = [];
+    const typed: Array<{seasonId: number; row: RoundVoteRow}> = [];
     for (const seasonId of seasonIds) {
-        const {data} = await db.rpc('fantasy_round_votes', {p_season: seasonId});
-        for (const row of (data ?? []) as TypedRow[]) if (row.voto !== null && Number(row.voto) > 0) typed.push({seasonId, row});
+        for (const row of await readRoundVotes(db, seasonId)) if (row.voto !== null && Number(row.voto) > 0) typed.push({seasonId, row});
     }
     if (typed.length === 0) return [];
     const fixtures = (await fetchAll((a, b) => db.from('fixtures').select('id,season_id,round,home_team_id,away_team_id').in('season_id', seasonIds).order('id').range(a, b), {max: 2000})) as Array<{id: number; season_id: number; round: string | null; home_team_id: number; away_team_id: number}>;
@@ -76,8 +68,9 @@ async function buildTypedPairs(league: AuctionLeague): Promise<VotoPair[]> {
 
 const cachedTypedPairs = unstable_cache(buildTypedPairs, ['fantasy-typed-pairs', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 600, tags: ['fantasy-votes']});
 
-/** The typed votes against the provider's ratings, this season and the last; empty when the read fails. */
+/** The typed votes against the provider's ratings, this season and the last; empty when the read fails, and at build time (not cached then). */
 export async function getTypedPairs(league: AuctionLeague): Promise<VotoPair[]> {
+    if (isBuildPhase()) return [];
     try {
         return await cachedTypedPairs(league);
     } catch (error) {
