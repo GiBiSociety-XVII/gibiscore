@@ -205,7 +205,7 @@ async function computeStudy(seasonId: number): Promise<SeasonStudy | null> {
 export const getSeasonStudy = unstable_cache(computeStudy, ['season-study'], {revalidate: 600});
 
 /** The same league's season before this one, when the database has it. */
-async function previousSeasonId(seasonId: number): Promise<number | null> {
+export async function previousSeasonId(seasonId: number): Promise<number | null> {
     const db = footballDb();
     const {data: season, error} = await db.from('seasons').select('league_id,year').eq('id', seasonId).maybeSingle();
     if (error || !season) return null;

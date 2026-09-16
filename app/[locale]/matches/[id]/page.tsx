@@ -9,6 +9,8 @@ import {Flag} from "@/components/football/flag";
 import {FormStrip} from "@/components/football/form-strip";
 import {Lineups} from "@/components/football/lineups";
 import {MatchStudy} from "@/components/football/match-study";
+import {MatchMarkets} from "@/components/football/match-markets";
+import {getMatchMarkets} from "@/lib/football/data/markets";
 import {AbsenceList} from "@/components/football/absences";
 import {PredictionPanel} from "@/components/football/prediction";
 import {predictMatch} from "@/lib/football/prediction";
@@ -67,7 +69,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     }
 
     const {fixture} = page;
-    const [study, prior] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId)]) : [null, null];
+    const [study, prior, markets] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId), getMatchMarkets(fixture.id, fixture.seasonId, fixture.home.id, fixture.away.id)]) : [null, null, null];
     const prediction = predictMatch(study, fixture.home.id, fixture.away.id, prior);
     const hasAbsences = page.absences.home.length > 0 || page.absences.away.length > 0;
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
@@ -241,6 +243,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                     {id: 'summary', label: t('tabs.summary'), content: summaryTab, count: page.events.length},
                     {id: 'lineups', label: t('tabs.lineups'), content: <Lineups home={page.lineups.home} away={page.lineups.away} title={t('tabs.lineups')} scale={scale} />},
                     {id: 'stats', label: t('tabs.stats'), content: <TeamStats home={page.stats.home} away={page.stats.away} title={t('tabs.stats')} />},
+                    {id: 'markets', label: t('tabs.markets'), content: <MatchMarkets data={markets} prediction={prediction} home={fixture.home} away={fixture.away} title={t('markets')} />},
                     {id: 'players', label: t('tabs.players'), content: <PlayerMatchTable home={page.players.home} away={page.players.away} homeTeam={fixture.home} awayTeam={fixture.away} title={t('players')} scale={scale} />},
                 ]}
             />

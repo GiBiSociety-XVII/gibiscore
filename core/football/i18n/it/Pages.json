@@ -48,7 +48,8 @@
       "summary": "Cronaca",
       "lineups": "Formazioni",
       "stats": "Statistiche",
-      "players": "Giocatori"
+      "players": "Giocatori",
+      "markets": "Scommesse"
     },
     "info": "Informazioni",
     "headToHead": "Precedenti",
@@ -61,7 +62,8 @@
     "noForm": "Nessun precedente in archivio.",
     "scorers": "Marcatori",
     "absences": "Indisponibili",
-    "prediction": "Pronostico"
+    "prediction": "Pronostico",
+    "markets": "Scommesse: come leggere la partita"
   },
   "team": {
     "notFound": "Squadra non trovata",
