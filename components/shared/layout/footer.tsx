@@ -45,9 +45,9 @@ export default function Footer() {
         <footer className="mt-auto w-full bg-background border-t-[2.5px] border-foreground">
             <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-10 md:py-14">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-10">
-                    <AdminLogoLink className="self-start">
+                    <Link href="/" aria-label="GiBiScore" className="self-start">
                         <BrandLockup height={48} />
-                    </AdminLogoLink>
+                    </Link>
                     <div className="flex flex-wrap gap-3">
                         <a href={`mailto:${t('email')}`} className={pill}><Mail className="w-4 h-4" />{t('email')}</a>
                         <a href="https://instagram.com/gibiarena" target="_blank" rel="noopener noreferrer" className={pill}><InstagramIcon />{t('instagram')}</a>
@@ -89,7 +89,7 @@ export default function Footer() {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-[14px] text-muted-foreground">
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                         <span className="inline-flex items-center gap-2">
-                            <BrandIcon site="gibisociety" size={26} />
+                            <AdminLogoLink className="inline-flex"><BrandIcon site="gibisociety" size={26} /></AdminLogoLink>
                             {t('productOf')} <b className="font-extrabold text-foreground">GiBi<span className="text-brand-society-text">Society</span></b>
                         </span>
                         <a href="https://gibiarena.com" className="inline-flex items-center gap-2 hover:text-foreground transition-colors">
