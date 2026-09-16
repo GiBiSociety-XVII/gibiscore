@@ -510,6 +510,22 @@ export function planBFor(strategy: Strategy, players: PoolPlayer[], prices: Map<
     return out;
 }
 
+/**
+ * What the strategy would pay for a player of the role it did not plan:
+ * the ceiling of the slot he would take by rank, the biggest open slot
+ * whose pick he is at least as good as (he is not in the plan because he
+ * costs more than that slot allows, or the plan preferred another). Null
+ * when he is below every pick: the plan has no place for him, whatever
+ * he costs.
+ */
+export function slotCeiling(picks: StrategyPick[], player: {id: number; role: FantaRole; scores: Pick<FantaScores, 'overall'>}, owned: Set<number>): number | null {
+    const own = picks.find((p) => p.id === player.id);
+    if (own) return own.maxBid;
+    const open = picks.filter((p) => p.role === player.role && !owned.has(p.id)).sort((a, b) => b.overall - a.overall || b.maxBid - a.maxBid);
+    const slot = open.find((p) => player.scores.overall >= p.overall);
+    return slot ? slot.maxBid : null;
+}
+
 /** The splits the optimized strategy tries: a coarse grid over the shares, then a step around the best. */
 const OPTIMIZED_GRID = {P: [0.06, 0.1], D: [0.14, 0.2, 0.26], C: [0.22, 0.28, 0.34]};
 const OPTIMIZED_FOCUS: Record<FantaRole, number> = {P: 0.6, D: 0.4, C: 0.6, A: 0.5};

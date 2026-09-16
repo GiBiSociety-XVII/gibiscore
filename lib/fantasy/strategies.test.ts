@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {suggestPrices, type FantaRole} from './scores';
-import {bestLineup, customFrom, defenceOption, FORMATIONS, newCustomId, optimizedStrategy, planBFor, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
+import {bestLineup, customFrom, defenceOption, FORMATIONS, newCustomId, optimizedStrategy, planBFor, planStrategy, rankStrategies, shareFor, slotCeiling, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
 import {normalizeCustomStrategy} from './config';
 
 function pool(): PoolPlayer[] {
@@ -491,5 +491,30 @@ describe('planBFor', () => {
         const planB = planBFor(STRATEGIES[0], players, p, config, taken, mine, {}, targets);
         expect(planB.has(mine[0].playerId)).toBe(false);
         for (const list of planB.values()) for (const a of list) expect(taken.has(a.id)).toBe(false);
+    });
+});
+
+describe('slotCeiling', () => {
+    const picks = [
+        {id: 1, name: 'star', team: 'T', role: 'C' as const, price: 60, overall: 90, maxBid: 65},
+        {id: 2, name: 'good', team: 'T', role: 'C' as const, price: 25, overall: 82, maxBid: 27},
+        {id: 3, name: 'filler', team: 'T', role: 'C' as const, price: 5, overall: 70, maxBid: 8},
+    ];
+    const player = (id: number, overall: number) => ({id, role: 'C' as const, scores: {overall}});
+
+    it('gives a target the ceiling of his own slot', () => {
+        expect(slotCeiling(picks, player(2, 82), new Set())).toBe(27);
+    });
+    it('gives a player not planned the ceiling of the slot he would take by rank', () => {
+        // As good as the second pick but dearer than his slot: the strategy stops at that slot's ceiling.
+        expect(slotCeiling(picks, player(9, 85), new Set())).toBe(27);
+        expect(slotCeiling(picks, player(9, 95), new Set())).toBe(65);
+        expect(slotCeiling(picks, player(9, 71), new Set())).toBe(8);
+    });
+    it('has no ceiling for a player below every pick', () => {
+        expect(slotCeiling(picks, player(9, 60), new Set())).toBeNull();
+    });
+    it('skips the slots I have already filled', () => {
+        expect(slotCeiling(picks, player(9, 95), new Set([1]))).toBe(27);
     });
 });

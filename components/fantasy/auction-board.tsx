@@ -30,7 +30,7 @@ import {LegheImport} from "./leghe-import";
 import {MarketDialog} from "./market-dialog";
 import {Help} from "./help";
 import {auctionPath} from "@/lib/fantasy/routes";
-import {bestLineup, defenceOption, planBFor, planStrategy, rankStrategies, strategyHealth, type StrategyKey, type StrategyPick} from "@/lib/fantasy/strategies";
+import {bestLineup, defenceOption, planBFor, planStrategy, rankStrategies, slotCeiling, strategyHealth, type StrategyKey, type StrategyPick} from "@/lib/fantasy/strategies";
 import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
 import {bargains, type Bargain} from "@/lib/fantasy/bargains";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
@@ -478,14 +478,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         else if (targets.has(id)) toggleAvoid(id);
         else toggleWant(id);
     };
-    // My ceiling per player: the strategy's slot for its targets, the live price for anyone else,
-    // never more than what leaves me enough to finish the roster with the cheapest players left.
+    // My ceiling per player: the strategy's slot for its targets, for anyone else the slot he would take
+    // by rank (slotCeiling: none when the plan has no place for him), never more than what leaves me
+    // enough to finish the roster with the cheapest players left.
     const maxBidOf = (id: number): number | null => {
         if (!strategy || bought.has(id)) return null;
         const player = byId.get(id);
         if (!player) return null;
-        const pick = ROLES.flatMap((r) => strategy.picks[r]).find((p) => p.id === id);
-        return Math.min(myMaxFor(player.role), pick ? pick.maxBid : (prices.get(id) ?? 1));
+        const ceiling = slotCeiling(strategy.picks[player.role], player, new Set(mine.map((m) => m.playerId)));
+        return ceiling === null ? null : Math.min(myMaxFor(player.role), ceiling);
     };
     /** What a purchase at this price does to the manager's roster: credits and slots after, and for me the eleven and the plan. */
     const previewOf = (player: AuctionPlayer, manager: number, price: number) => {
