@@ -71,7 +71,7 @@ describe('teamMarketProfile', () => {
 });
 
 describe('matchMarkets', () => {
-    const prediction: MatchPrediction = {lambda: {home: 1.6, away: 1.1}, home: 48, draw: 26, away: 26, over15: 74, over25: 52, over35: 30, btts: 55, scores: [], pick: '1', sample: 10, confidence: 'medium', factors: []};
+    const prediction: MatchPrediction = {lambda: {home: 1.6, away: 1.1}, base: {home: 1.6, away: 1.1}, rho: -0.08, home: 48, draw: 26, away: 26, over15: 74, over25: 52, over35: 30, btts: 55, scores: [], pick: '1', sample: 10, confidence: 'medium', factors: []};
 
     it('turns the prediction into every market with its fair odds', () => {
         const m = matchMarkets(prediction);
@@ -150,7 +150,7 @@ describe('scoreGrid', () => {
 });
 
 describe('suggestBets', () => {
-    const prediction: MatchPrediction = {lambda: {home: 1.9, away: 0.8}, home: 60, draw: 23, away: 17, over15: 74, over25: 50, over35: 27, btts: 44, scores: [], pick: '1', sample: 12, confidence: 'high', factors: []};
+    const prediction: MatchPrediction = {lambda: {home: 1.9, away: 0.8}, base: {home: 1.9, away: 0.8}, rho: -0.08, home: 60, draw: 23, away: 17, over15: 74, over25: 50, over35: 27, btts: 44, scores: [], pick: '1', sample: 12, confidence: 'high', factors: []};
     const odds = summarizeOdds([{bookmaker: 'A', markets: {outcome: {home: 1.7, draw: 3.8, away: 5.0}, doubleChance: {homeOrDraw: 1.2, drawOrAway: 2.1, homeOrAway: 1.25}, goals: {over15: 1.3, under15: 3.4, over25: 1.9, under25: 1.9, over35: 3.2, under35: 1.33}, btts: {yes: 1.9, no: 1.85}}}]);
 
     it('gives one slip per tier, each within its chance, legs from different markets', () => {

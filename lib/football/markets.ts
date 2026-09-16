@@ -373,7 +373,7 @@ export function legOdds(odds: OddsSummary | null, key: LegKey): number | null {
  * does not narrow the slip is left out. Empty without a prediction.
  */
 export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | null): BetSuggestion[] {
-    const grid = scoreGrid(prediction.lambda.home, prediction.lambda.away);
+    const grid = scoreGrid(prediction.lambda.home, prediction.lambda.away, prediction.rho);
     const chance = (legs: typeof LEGS): number => {
         let p = 0;
         for (let h = 0; h < grid.length; h += 1) for (let a = 0; a < grid[h].length; a += 1) if (legs.every((l) => l.test(h, a))) p += grid[h][a];
@@ -409,4 +409,9 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
         out.push({tier, legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round(prices.reduce((s, p) => s * p, 1) * 100) / 100 : null});
     }
     return out;
+}
+
+/** Whether a slip won on the final score: every leg true. Unknown legs never win. */
+export function settleLegs(keys: LegKey[], homeScore: number, awayScore: number): boolean {
+    return keys.length > 0 && keys.every((k) => LEGS.find((l) => l.key === k)?.test(homeScore, awayScore) === true);
 }
