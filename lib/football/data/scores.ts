@@ -1,5 +1,5 @@
 import 'server-only';
-import {summarizeOdds, type OddsMarkets} from '../markets';
+import {attachOdds} from './odds';
 import {isBuildPhase} from '@/lib/db/phase';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionFixtures, type FixtureSummary} from '../types';
@@ -97,29 +97,6 @@ function group(fixtures: FixtureSummary[]): {pinned: CompetitionFixtures[]; coun
  * Live mode: only matches in play, every competition.
  * Day mode: every match of that Rome day.
  */
-/** The bookmakers' average 1X2 on the featured matches of the list not yet played: one query, nothing when there are none. */
-async function attachOdds(db: ReturnType<typeof footballDb>, fixtures: FixtureSummary[]): Promise<void> {
-    const wanted = fixtures.filter((f) => f.state === 'scheduled' && f.leagueFeatured);
-    if (wanted.length === 0) return;
-    try {
-        const rows: Array<{fixture_id: number; bookmaker: string; markets: OddsMarkets}> = [];
-        for (let i = 0; i < wanted.length; i += 200) {
-            const {data, error} = await db.from('fixture_odds').select('fixture_id,bookmaker,markets').in('fixture_id', wanted.slice(i, i + 200).map((f) => f.id)).limit(5000);
-            if (error) throw error;
-            rows.push(...((data ?? []) as typeof rows));
-        }
-        const byFixture = new Map<number, typeof rows>();
-        for (const r of rows) byFixture.set(r.fixture_id, [...(byFixture.get(r.fixture_id) ?? []), r]);
-        for (const f of wanted) {
-            const outcome = summarizeOdds((byFixture.get(f.id) ?? []).map((r) => ({bookmaker: r.bookmaker, markets: r.markets ?? {}})))?.outcome;
-            if (outcome) f.odds = {home: outcome.home.avg, draw: outcome.draw.avg, away: outcome.away.avg};
-        }
-    } catch (error) {
-        // The list is worth more than its odds: without them it still shows.
-        logReadError('attachOdds', error);
-    }
-}
-
 export async function getScores(options: {mode: 'live'} | {mode: 'day'; date: string}): Promise<ScoresPage> {
     const today = romeDate(new Date());
     const mode = options.mode;

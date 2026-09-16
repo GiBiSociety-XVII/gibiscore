@@ -2,6 +2,7 @@ import 'server-only';
 import {unstable_cache} from 'next/cache';
 import {LIVE_STATES, type FixtureSummary, type SquadPlayer, type TeamPage, type TeamPlayerSeason, type TeamSeasonStats, type TeamStandingLine, type TeamSummary} from '../types';
 import {normalizePosition} from './matches';
+import {attachOdds} from './odds';
 import {loadTeamSidelined} from './sidelined';
 import {FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixtures, toStandingRow, toTeam, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
 
@@ -62,17 +63,20 @@ export async function getTeamPage(slug: string): Promise<TeamPage | null> {
 
         const sidelined = sidelinedRes.get(team.id) ?? [];
 
+        const upcoming = toFixtures(futureRes.data);
+        const calendar = toFixtures(calendarRes.data);
+        await attachOdds(db, [...upcoming, ...calendar]);
         return {
             team: {...toTeam(team), country: team.country, venue: team.venue_name, founded: team.founded},
             standings,
             recent,
-            upcoming: toFixtures(futureRes.data),
+            upcoming,
             live,
             squad,
             sidelined,
             seasonStats,
             players,
-            calendar: toFixtures(calendarRes.data),
+            calendar,
         };
     } catch (error) {
         logReadError(`getTeamPage(${slug})`, error);

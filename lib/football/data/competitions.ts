@@ -19,6 +19,7 @@ import {
     type TeamRow,
 } from './shared';
 import {normalizePosition} from './matches';
+import {attachOdds} from './odds';
 import {fetchAll} from '@/lib/db/paginate';
 
 export interface CompetitionListItem extends CompetitionSummary {
@@ -177,6 +178,7 @@ export async function getCompetitionPage(slug: string): Promise<CompetitionPage 
         }
 
         const fixtures = toFixtures(fixtureRows);
+        await attachOdds(footballDb(), fixtures);
         const now = Date.now();
         const live = fixtures.filter((f) => LIVE_STATES.includes(f.state));
         const finished = fixtures.filter((f) => f.state === 'finished' || (f.state !== 'scheduled' && !LIVE_STATES.includes(f.state) && new Date(f.startingAt).getTime() < now));
