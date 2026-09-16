@@ -15,8 +15,8 @@ export default function robots(): MetadataRoute.Robots {
         rules: [
             {userAgent: BLOCKED_BOTS, disallow: '/'},
             // Bing honours the delay; Google ignores it and paces itself on the server's response time.
-            {userAgent: 'bingbot', allow: '/', disallow: ['/api/', '/search'], crawlDelay: 5},
-            {userAgent: '*', allow: '/', disallow: ['/api/', '/search']},
+            {userAgent: 'bingbot', allow: '/', disallow: ['/api/', '/search', '/admin'], crawlDelay: 5},
+            {userAgent: '*', allow: '/', disallow: ['/api/', '/search', '/admin']},
         ],
         sitemap: `${siteUrl}/sitemap.xml`,
     };

@@ -1,0 +1,12 @@
+{
+  "title": "Pannello admin",
+  "intro": "Strumenti riservati all'amministratore del sito.",
+  "deniedTitle": "Accesso riservato",
+  "deniedText": "Questa pagina è disponibile solo per l'amministratore del sito.",
+  "backHome": "Torna alla home",
+  "menu": "Pannello admin",
+  "tools": {
+    "votes": {"title": "Voti in pagella", "text": "I voti veri dell'app, giornata per giornata, per tarare le stime."},
+    "model": {"title": "Quanto ci azzecca", "text": "Scarto tra voti reali e stime del sito, per ruolo e fascia."}
+  }
+}

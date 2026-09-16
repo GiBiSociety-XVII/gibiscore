@@ -9,6 +9,7 @@ import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
 import {RoleBadge} from "./role-badge";
 import {cloudUser} from "@/lib/fantasy/cloud";
+import {isAdminId} from "@/lib/admin";
 import type {BookPlayer, BookRound, VotesBook} from "@/lib/fantasy/votes-data";
 import {roundNumber} from "@/lib/fantasy/matchday";
 import {toVoto, type VotoCalibration} from "@/lib/fantasy/voto";
@@ -105,7 +106,7 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
     const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
     useEffect(() => {
         let alive = true;
-        cloudUser().then((u) => { if (alive) setSignedIn(u !== null); }).catch(() => { if (alive) setSignedIn(false); });
+        cloudUser().then((u) => { if (alive) setSignedIn(isAdminId(u?.id)); }).catch(() => { if (alive) setSignedIn(false); });
         return () => { alive = false; };
     }, []);
 
@@ -171,7 +172,7 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
                         else votes[p.id] = {teamId: p.teamId, voto, goals: p.goals, assists: p.assists, yellow: p.yellow, red: p.red, conceded: p.conceded, penaltiesSaved: p.penaltiesSaved, penaltiesMissed: p.penaltiesMissed, ownGoals: p.ownGoals, at: new Date().toISOString()};
                     }
                     const res = await fetch('/api/fantasy/votes', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({seasonId: book.seasonId, round: key, votes, remove})});
-                    if (res.status === 401) { setSignedIn(false); setSave('error'); return; }
+                    if (res.status === 401 || res.status === 403) { setSignedIn(false); setSave('error'); return; }
                     if (!res.ok) throw new Error(String(res.status));
                 }
             }

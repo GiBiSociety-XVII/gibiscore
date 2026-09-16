@@ -1,6 +1,6 @@
 'use client';
 
-import {AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, Cloud, Gavel, Lock, PenLine, Plus, Smartphone, Users} from "lucide-react";
+import {AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, Cloud, Gavel, Lock, Plus, Smartphone, Users} from "lucide-react";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -219,8 +219,8 @@ export function FantasyHome({round}: {round: NextRound | null}) {
 
             {/* Three steps, for whoever is new */}
             <Panel title={t('dash.howTitle')}>
-                <ol className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-muted">
-                    {([['step1', Gavel, '/fantacalcio/asta'], ['step2', ClipboardList, '/fantacalcio/asta'], ['step3', CheckCircle2, '/fantacalcio/formazione'], ['step4', PenLine, '/fantacalcio/voti']] as const).map(([k, Icon, href], i) => (
+                <ol className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-muted">
+                    {([['step1', Gavel, '/fantacalcio/asta'], ['step2', ClipboardList, '/fantacalcio/asta'], ['step3', CheckCircle2, '/fantacalcio/formazione']] as const).map(([k, Icon, href], i) => (
                         <li key={k}>
                             <Link href={href} className="px-3 py-3 flex items-center gap-3 hover:bg-muted">
                                 <span className="inline-flex w-9 h-9 shrink-0 items-center justify-center rounded-lg border-2 border-foreground bg-accent"><Icon className="w-4 h-4" aria-hidden="true" /></span>

@@ -3,6 +3,7 @@ import {useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {FEATURED_COMPETITIONS} from "@/lib/football/competitions";
 import {BrandIcon, BrandLockup} from "./logo";
+import {AdminLogoLink} from "@/components/admin/admin-logo-link";
 
 const pill = "inline-flex items-center gap-2 h-11 px-4 rounded-xl border-[2.5px] border-foreground bg-card text-[15px] font-bold shadow-[4px_4px_0_rgb(var(--foreground))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--foreground))] transition-all whitespace-nowrap";
 const link = "text-[15px] text-muted-foreground hover:text-foreground hover:underline underline-offset-4 decoration-2 transition-colors";
@@ -44,9 +45,9 @@ export default function Footer() {
         <footer className="mt-auto w-full bg-background border-t-[2.5px] border-foreground">
             <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-10 md:py-14">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-10">
-                    <Link href="/" aria-label="GiBiScore" className="self-start">
+                    <AdminLogoLink className="self-start">
                         <BrandLockup height={48} />
-                    </Link>
+                    </AdminLogoLink>
                     <div className="flex flex-wrap gap-3">
                         <a href={`mailto:${t('email')}`} className={pill}><Mail className="w-4 h-4" />{t('email')}</a>
                         <a href="https://instagram.com/gibiarena" target="_blank" rel="noopener noreferrer" className={pill}><InstagramIcon />{t('instagram')}</a>

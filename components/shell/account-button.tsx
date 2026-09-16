@@ -1,13 +1,15 @@
 'use client';
 
-import {LogOut, Sparkles, UserRound} from "lucide-react";
+import {LogOut, Shield, Sparkles, UserRound} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link, usePathname, useRouter} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {createClient} from "@/lib/db/client";
+import {isAdminId} from "@/lib/admin";
 
 interface Who {
+    id: string;
     email: string | null;
     name: string | null;
 }
@@ -20,6 +22,7 @@ interface Who {
 export function AccountButton() {
     const t = useTranslations('AppBar');
     const ta = useTranslations('Account');
+    const tad = useTranslations('Admin');
     const path = usePathname();
     const router = useRouter();
     const [who, setWho] = useState<Who | null>(null);
@@ -27,10 +30,10 @@ export function AccountButton() {
     const box = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const read = (user: {email?: string; user_metadata?: Record<string, unknown>} | null | undefined) => {
+        const read = (user: {id: string; email?: string; user_metadata?: Record<string, unknown>} | null | undefined) => {
             if (!user) return null;
             const name = user.user_metadata?.username;
-            return {email: user.email ?? null, name: typeof name === 'string' && name.trim() ? name.trim() : null};
+            return {id: user.id, email: user.email ?? null, name: typeof name === 'string' && name.trim() ? name.trim() : null};
         };
         // Without the project's keys (a build, a preview) there is no session: the icon just goes to sign in.
         let supabase: ReturnType<typeof createClient>;
@@ -83,6 +86,7 @@ export function AccountButton() {
                         </span>
                     </div>
                     <Link href="/fantacalcio/asta" role="menuitem" onClick={() => setOpen(false)} className="bb-btn bg-accent h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><Sparkles className="w-3.5 h-3.5" aria-hidden="true" />{ta('toAuction')}</Link>
+                    {isAdminId(who.id) && <Link href="/admin" role="menuitem" onClick={() => setOpen(false)} className="bb-btn bg-card h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><Shield className="w-3.5 h-3.5" aria-hidden="true" />{tad('menu')}</Link>}
                     <button type="button" role="menuitem" onClick={signOut} className="bb-btn bg-card h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><LogOut className="w-3.5 h-3.5" aria-hidden="true" />{ta('signOut')}</button>
                 </div>
             )}
