@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {suggestPrices, type FantaRole} from './scores';
-import {bestLineup, customFrom, defenceOption, FORMATIONS, newCustomId, optimizedStrategy, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
+import {bestLineup, customFrom, defenceOption, FORMATIONS, newCustomId, optimizedStrategy, planBFor, planStrategy, rankStrategies, shareFor, slotFractions, slotFractionsFor, strategyHealth, STRATEGIES, type PoolPlayer} from './strategies';
 import {normalizeCustomStrategy} from './config';
 
 function pool(): PoolPlayer[] {
@@ -438,5 +438,58 @@ describe('the optimized strategy', () => {
         const best = ranked.find((p) => p.key === 'optimized')!;
         const balanced = ranked.find((p) => p.key === 'balanced')!;
         expect(best.lineupValue).toBeGreaterThanOrEqual(balanced.lineupValue - 0.05);
+    });
+});
+
+describe('planBFor', () => {
+    const prices = () => suggestPrices(pool(), {credits: 500, participants: 8, slots: config.slots, roleShare: {P: 0.08, D: 0.16, C: 0.28, A: 0.48}});
+
+    it('names, first, the player the plan picks once the target is gone', () => {
+        const players = pool();
+        const p = prices();
+        const plan = planStrategy(STRATEGIES[0], players, p, config);
+        const targets = (['P', 'D', 'C', 'A'] as const).flatMap((role) => plan.picks[role]);
+        const planB = planBFor(STRATEGIES[0], players, p, config, new Set(), [], {}, targets);
+        for (const target of targets) {
+            const alternatives = planB.get(target.id) ?? [];
+            expect(alternatives.length).toBeGreaterThan(0);
+            expect(alternatives.length).toBeLessThanOrEqual(3);
+            // Same role, never a current target, never the target himself.
+            for (const a of alternatives) {
+                expect(a.role).toBe(target.role);
+                expect(a.id).not.toBe(target.id);
+                expect(targets.some((t) => t.id === a.id)).toBe(false);
+            }
+            // The first plan B is what the plan shows once the target went to another table.
+            const without = planStrategy(STRATEGIES[0], players, p, config, new Set([target.id]));
+            expect(without.picks[target.role].some((x) => x.id === alternatives[0].id)).toBe(true);
+        }
+        // The three plan B of a target are three different players.
+        const first = planB.get(targets[0].id)!;
+        expect(new Set(first.map((a) => a.id)).size).toBe(first.length);
+    });
+
+    it('differs from target to target: the star gets a star, the filler a filler', () => {
+        const players = pool();
+        const p = prices();
+        const plan = planStrategy(STRATEGIES[0], players, p, config);
+        const mids = plan.picks.C;
+        const planB = planBFor(STRATEGIES[0], players, p, config, new Set(), [], {}, mids);
+        const star = planB.get(mids[0].id)![0];
+        const filler = planB.get(mids[mids.length - 1].id)![0];
+        expect(star.id).not.toBe(filler.id);
+        expect(star.overall).toBeGreaterThan(filler.overall);
+    });
+
+    it('skips what I own and never proposes a player of another table', () => {
+        const players = pool();
+        const p = prices();
+        const taken = new Set([players.find((x) => x.name === 'C2')!.id]);
+        const mine = [{playerId: players.find((x) => x.name === 'A1')!.id, role: 'A' as const, price: 80}];
+        const plan = planStrategy(STRATEGIES[0], players, p, config, taken, mine);
+        const targets = (['P', 'D', 'C', 'A'] as const).flatMap((role) => plan.picks[role]);
+        const planB = planBFor(STRATEGIES[0], players, p, config, taken, mine, {}, targets);
+        expect(planB.has(mine[0].playerId)).toBe(false);
+        for (const list of planB.values()) for (const a of list) expect(taken.has(a.id)).toBe(false);
     });
 });
