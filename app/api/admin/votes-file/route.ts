@@ -6,6 +6,7 @@ import {matchVoti, parseVoti} from '@/lib/fantasy/voti';
 import {parseVotiWorkbook} from '@/lib/fantasy/voti-workbook';
 import {getVotesBook} from '@/lib/fantasy/votes-data';
 import {readWorkbook} from '@/lib/fantasy/xlsx';
+import {applyFantaNames} from '@/lib/fantasy/fanta-rename';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,8 @@ export interface FileVote {
 export interface VotesFileResponse {
     /** The round the workbook's title names. */
     fileRound: number | null;
+    /** Players renamed after the workbook (the fantasy name commands). */
+    renamed: number;
     /** Rows in the workbook, and those with a vote (the players who took the pitch). */
     total: number;
     voted: number;
@@ -88,6 +91,14 @@ export async function POST(request: NextRequest) {
     const matchedEntries = new Set([...byPlayer.values()]);
     const unmatched = entries.filter((e) => e.voto !== null && !matchedEntries.has(e)).map((e) => ({team: e.team, name: e.name, role: e.role}));
     const missing = target.players.filter((p) => !byPlayer.has(p.id)).map((p) => ({id: p.id, name: p.name}));
-    const body: VotesFileResponse = {fileRound: workbook.round, total: entries.length, voted: entries.filter((e) => e.voto !== null).length, matched, unmatched, missing};
+    // The workbook's names command: every player it names is named that way on the site from now on.
+    let renamed = 0;
+    try {
+        const playerById = new Map(target.players.map((p) => [p.id, p]));
+        renamed = await applyFantaNames([...byPlayer.entries()].map(([id, e]) => ({id, fantaName: e.name, name: playerById.get(id)!.name, fanta: null})));
+    } catch {
+        renamed = 0;
+    }
+    const body: VotesFileResponse = {fileRound: workbook.round, renamed, total: entries.length, voted: entries.filter((e) => e.voto !== null).length, matched, unmatched, missing};
     return NextResponse.json(body);
 }

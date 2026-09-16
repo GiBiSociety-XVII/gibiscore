@@ -5,6 +5,7 @@ import {Link} from "@/i18n/navigation";
 import {SiteShell} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
 import {AdminGate} from "@/components/admin/admin-gate";
+import {ListNamesButton} from "@/components/admin/list-names-button";
 
 export const metadata: Metadata = {robots: {index: false, follow: false}};
 
@@ -32,6 +33,7 @@ export default async function AdminPage({params}: PageProps<"/[locale]/admin">) 
                             </Link>
                         </li>
                     ))}
+                    <li><ListNamesButton /></li>
                 </ul>
             </AdminGate>
         </SiteShell>

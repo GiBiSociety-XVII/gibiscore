@@ -1031,6 +1031,7 @@
     "fileMissing": "{count, plural, one {# giocatore senza voto nel file, da inserire a mano} other {# giocatori senza voto nel file, da inserire a mano}}",
     "fileUnmatched": "{count, plural, one {# voto del file senza giocatore corrispondente} other {# voti del file senza giocatore corrispondente}}",
     "fileAllGood": "Tutto corrisponde.",
+    "fileRenamed": "{count, plural, one {# giocatore rinominato come nel file.} other {# giocatori rinominati come nel file.}}",
     "signIn": "Solo l'amministratore può salvare",
     "signInHint": "I voti si salvano nell'account dell'amministratore: entra con quello dal menu in alto a destra."
   },

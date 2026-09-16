@@ -121,8 +121,15 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
     }, []);
 
     const teamsById = useMemo(() => new Map(book.teams.map((x) => [x.id, x])), [book.teams]);
+    // Saved from this page: shown as typed until the page comes back fresh from the server (which can take a moment).
+    const [saved, setSaved] = useState<Record<string, Record<number, number | undefined>>>({});
+    const typedOf = (roundKey: string, p: BookPlayer): number | undefined => {
+        const s = saved[roundKey];
+        if (s && p.id in s) return s[p.id];
+        return p.typed === null ? undefined : p.typed;
+    };
     const draft = round ? drafts[round.round] ?? {} : {};
-    const shownVote = (p: BookPlayer): number | null | undefined => (p.id in draft ? draft[p.id].voto : p.typed === null ? undefined : p.typed);
+    const shownVote = (p: BookPlayer): number | null | undefined => (round && p.id in draft ? draft[p.id].voto : round ? typedOf(round.round, p) : undefined);
     const dirty = Object.values(drafts).reduce((s, d) => s + Object.keys(d).length, 0);
 
     // The clubs in the order of the round's matches: home then away, so the list follows the fixtures.
@@ -150,7 +157,7 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
         if (!round) return;
         setDrafts((d) => {
             const next = {...(d[round.round] ?? {})};
-            const original = p.typed === null ? undefined : p.typed;
+            const original = typedOf(round.round, p);
             const same = voto === original || (voto === null && original === 0) || (voto === 0 && original === null);
             if (same && !next[p.id]?.events) delete next[p.id];
             else next[p.id] = {...next[p.id], voto: voto === null ? 0 : voto};
@@ -215,10 +222,17 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
                     if (!res.ok) throw new Error(String(res.status));
                 }
             }
+            setSaved((s) => {
+                const next = {...s};
+                for (const [key, d] of Object.entries(drafts)) next[key] = {...(next[key] ?? {}), ...Object.fromEntries(Object.entries(d).map(([id, v]) => [Number(id), v.voto]))};
+                return next;
+            });
             setDrafts({});
             setSave('saved');
             setFile(null);
             router.refresh();
+            // The static page may still come back as it was for a moment: ask once more a little later.
+            window.setTimeout(() => router.refresh(), 2500);
         } catch {
             setSave('error');
         }
@@ -232,7 +246,7 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
             <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
                 <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label={t('rounds')}>
                     {rounds.map((r) => {
-                        const done = r.players.filter((p) => p.typed !== null).length;
+                        const done = r.players.filter((p) => typedOf(r.round, p) !== undefined).length;
                         const full = r.players.length > 0 && done >= r.players.length;
                         return (
                             <button key={r.round} type="button" role="tab" aria-selected={r.round === round.round} onClick={() => setRoundKey(r.round)} title={t('roundDone', {done, total: r.players.length})} className={cn("bb-btn h-8 min-w-8 px-2 font-mono text-[12px] font-extrabold inline-flex items-center gap-1", r.round === round.round ? "bg-foreground text-background" : full ? "bg-emerald-200" : done > 0 ? "bg-amber-200" : "bg-card")}>
@@ -276,7 +290,7 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
                     {file.state === 'error' && <span className="font-extrabold text-red-800">{file.reason}</span>}
                     {file.state === 'done' && (
                         <span className="flex flex-col gap-0.5 min-w-0">
-                            <span className="font-extrabold">{t('fileSummary', {round: file.result.fileRound ?? '?', voted: file.result.voted, matched: file.result.matched.length, players: round.players.length})}</span>
+                            <span className="font-extrabold">{t('fileSummary', {round: file.result.fileRound ?? '?', voted: file.result.voted, matched: file.result.matched.length, players: round.players.length})}{file.result.renamed > 0 ? ` ${t('fileRenamed', {count: file.result.renamed})}` : ''}</span>
                             {file.result.missing.length > 0 && <span>{t('fileMissing', {count: file.result.missing.length})}: {file.result.missing.map((m) => m.name).join(', ')}</span>}
                             {file.result.unmatched.length > 0 && <span className="text-muted-foreground">{t('fileUnmatched', {count: file.result.unmatched.length})}: {file.result.unmatched.slice(0, 30).map((u) => `${u.name} (${u.team})`).join(', ')}{file.result.unmatched.length > 30 ? '…' : ''}</span>}
                             {file.result.missing.length === 0 && file.result.unmatched.length === 0 && <span>{t('fileAllGood')}</span>}
