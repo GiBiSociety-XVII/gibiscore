@@ -47,6 +47,9 @@ function MarketGroup({title, cells}: {title: string; cells: Array<{label: string
 function GoalBands({profile, team, scale, heat}: {profile: TeamMarketProfile | null; team: TeamSummary; scale: number; heat: number[] | null}) {
     const t = useTranslations('Football.markets');
     const peakHeat = heat ? Math.max(...heat) : 0;
+    // Only the quarter hours above an even share (a sixth each) are tinted, from faint just above it to full at the peak: a card of six near-equal bands stays white.
+    const evenShare = 100 / BANDS.length;
+    const tintOf = (share: number) => (peakHeat > evenShare + 1.5 && share > evenShare + 1.5 ? Math.round((0.12 + 0.33 * ((share - evenShare) / (peakHeat - evenShare))) * 100) / 100 : 0);
     return (
         <div className="min-w-0">
             <div className="px-3 h-7 flex items-center justify-between gap-2 text-[11px] font-extrabold uppercase tracking-wide border-b border-muted bg-muted/40">
@@ -63,7 +66,7 @@ function GoalBands({profile, team, scale, heat}: {profile: TeamMarketProfile | n
                             const a = profile.bands.against[i];
                             const peakFor = f > 0 && f === Math.max(...profile.bands.for);
                             const share = heat?.[i] ?? 0;
-                            const alpha = peakHeat > 0 ? Math.round((share / peakHeat) * 45) / 100 : 0;
+                            const alpha = tintOf(share);
                             return (
                                 <tr key={band} className="border-b border-muted last:border-b-0" style={alpha > 0 ? {backgroundColor: `rgb(var(--accent) / ${alpha})`} : undefined} title={heat ? t('heatHint', {pct: share}) : undefined}>
                                     <td className="pl-3 pr-2 py-1 font-mono font-bold tabular-nums text-muted-foreground whitespace-nowrap w-14 leading-tight">{band}&apos;{heat && <span className={cn("block text-[10px]", share === peakHeat && "text-foreground font-extrabold")}>{share}%</span>}</td>

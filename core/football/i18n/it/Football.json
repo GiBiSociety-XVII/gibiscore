@@ -314,7 +314,7 @@
       "noGoal": "No gol"
     },
     "bandsTitle": "Quando arrivano i gol",
-    "bandsHint": "Gol fatti e subiti in ogni quarto d'ora nelle partite della competizione (stagione in corso e scorsa). Il recupero conta con il tempo che chiude. Lo sfondo azzurro segna i quarti d'ora in cui, sommando le due squadre, arrivano più gol: dove questa partita dovrebbe muoversi.",
+    "bandsHint": "Gol fatti e subiti in ogni quarto d'ora nelle partite della competizione (stagione in corso e scorsa). Il recupero conta con il tempo che chiude. Lo sfondo azzurro segna solo i quarti d'ora sopra la media (16,7%) sommando le due squadre: dove questa partita dovrebbe muoversi.",
     "bandsBase": "{count} partite",
     "noEvents": "Nessun gol registrato.",
     "firstHalfGoal": "Almeno un gol nel primo tempo nel {pct}% delle partite",
@@ -323,7 +323,7 @@
       "for": "gol fatti",
       "against": "gol subiti",
       "peak": "sottolineato il quarto d'ora in cui segna di più",
-      "heat": "sfondo azzurro e percentuale = quanto dei gol delle due squadre (fatti e subiti) cade in quel quarto d'ora: più scuro, più movimento atteso in questa partita"
+      "heat": "sfondo azzurro = quarto d'ora con più gol della media (un sesto del totale) sommando le due squadre, fatti e subiti: più scuro, più movimento atteso in questa partita. La percentuale è la quota di ogni quarto d'ora"
     },
     "linesTitle": "Over, under e gol",
     "linesHint": "Quanto spesso le partite di ogni squadra superano ogni soglia, finiscono con entrambe a segno, senza subire o senza segnare. In verde i valori che pesano (over 1,5 dal 70%, over 2,5 e gol dal 60%, porta inviolata dal 50%).",
