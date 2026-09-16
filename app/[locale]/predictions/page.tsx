@@ -9,6 +9,7 @@ import {PageHeader} from "@/components/football/page-header";
 import {OutcomeBar} from "@/components/football/prediction";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getUpcomingPredictions} from "@/lib/football/data/predictions";
+import {fairOdds, type OddsLine} from "@/lib/football/markets";
 
 export const revalidate = 600;
 
@@ -46,8 +47,19 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
                             action={<span className="font-mono text-[11px] text-muted-foreground">{b.fixtures.length}</span>}
                         >
                             <ul className="flex flex-col">
-                                {b.fixtures.map(({fixture, prediction}) => {
+                                {b.fixtures.map(({fixture, prediction, odds}) => {
                                     const start = new Date(fixture.startingAt);
+                                    // The bookmakers' average beside the model: green where they pay more than the model's fair price.
+                                    const quote = (label: string, line: OddsLine | undefined, pct: number | undefined) => {
+                                        if (!line) return null;
+                                        const fair = pct !== undefined ? fairOdds(pct) : null;
+                                        const value = fair !== null && line.avg > fair;
+                                        return (
+                                            <span key={label} className={cn("inline-flex items-center gap-1", value && "text-emerald-800")} title={t('oddsHint', {label, avg: line.avg.toFixed(2), fair: fair === null ? '–' : fair.toFixed(2), best: line.best.toFixed(2), book: line.bestBook, books: line.books})}>
+                                                <span className="text-muted-foreground">{label}</span>{line.avg.toFixed(2)}
+                                            </span>
+                                        );
+                                    };
                                     return (
                                         <li key={fixture.id} className="border-t border-muted first:border-t-0">
                                             <Link href={`/matches/${fixture.id}`} className="block px-3 py-2 hover:bg-muted/50">
@@ -66,12 +78,25 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
                                                     </span>
                                                 </div>
                                                 {prediction ? (
-                                                    <div className="mt-1.5 flex items-center gap-3">
-                                                        <OutcomeBar prediction={prediction} className="h-5 flex-1" />
-                                                        <span className="font-mono text-[11px] font-bold text-muted-foreground whitespace-nowrap tabular-nums">
-                                                            xG {prediction.lambda.home.toFixed(1)}-{prediction.lambda.away.toFixed(1)} · O2,5 {prediction.over25}%
-                                                        </span>
-                                                    </div>
+                                                    <>
+                                                        <div className="mt-1.5 flex items-center gap-3">
+                                                            <OutcomeBar prediction={prediction} className="h-5 flex-1" />
+                                                            <span className="font-mono text-[11px] font-bold text-muted-foreground whitespace-nowrap tabular-nums">
+                                                                xG {prediction.lambda.home.toFixed(1)}-{prediction.lambda.away.toFixed(1)} · O2,5 {prediction.over25}%
+                                                            </span>
+                                                        </div>
+                                                        {odds && (
+                                                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] font-extrabold tabular-nums">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{t('odds')}</span>
+                                                                {quote('1', odds.outcome?.home, prediction.home)}
+                                                                {quote('X', odds.outcome?.draw, prediction.draw)}
+                                                                {quote('2', odds.outcome?.away, prediction.away)}
+                                                                {quote('O2,5', odds.goals?.over25, prediction.over25)}
+                                                                {quote('U2,5', odds.goals?.under25, 100 - prediction.over25)}
+                                                                {quote('Gol', odds.btts?.yes, prediction.btts)}
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{tp('empty')}</p>
                                                 )}
@@ -84,7 +109,7 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
                     ))}
                 </div>
             )}
-            <p className="text-[12px] font-semibold text-muted-foreground">{tp('listHint')}</p>
+            <p className="text-[12px] font-semibold text-muted-foreground">{tp('listHint')} {t('oddsLegend')}</p>
         </SiteShell>
     );
 }

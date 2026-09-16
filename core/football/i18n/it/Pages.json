@@ -246,8 +246,11 @@
   "predictions": {
     "title": "Pronostici",
     "metaTitle": "Pronostici partite",
-    "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione.",
+    "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione, con le quote dei bookmaker a confronto.",
     "intro": "Le prossime partite delle competizioni principali con le probabilità del nostro modello statistico. Apri la partita per lo studio completo.",
-    "days": "Prossimi {count} giorni"
+    "days": "Prossimi {count} giorni",
+    "odds": "Quote",
+    "oddsHint": "{label}: media dei bookmaker {avg}, quota equa del modello {fair}; la migliore {best} ({book}), {books} bookmaker.",
+    "oddsLegend": "Quote: media dei bookmaker per 1, X, 2, over e under 2,5 e gol; in verde quando pagano più della quota equa del modello (100 / probabilità). Non è un consiglio di gioco."
   }
 }
