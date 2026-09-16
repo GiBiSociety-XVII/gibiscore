@@ -21,7 +21,7 @@ export default async function ModelPage({params}: PageProps<"/[locale]/fantacalc
     const pairs = await getTypedPairs('serie-a');
     return (
         <SiteShell wide sidebar={false}>
-            <PageHeader title={t('title')} meta={t('intro')} aside={<Link href="/fantacalcio/formazione" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toLineup')}</Link>} />
+            <PageHeader title={t('title')} meta={t('intro')} aside={<span className="flex gap-1.5"><Link href="/fantacalcio/voti" className="bb-btn bg-accent px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toVotes')}</Link><Link href="/fantacalcio/formazione" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toLineup')}</Link></span>} />
             <ModelView pairs={pairs} />
         </SiteShell>
     );

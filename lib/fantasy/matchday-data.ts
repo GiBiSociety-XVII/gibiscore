@@ -58,7 +58,7 @@ export interface MatchdayContext {
     results: RoundResults[];
     /**
      * The rounds played before, oldest first, for the history of the recaps. Heavy: the lineup page
-     * strips it before the client and serves it, cut to a roster, from /api/fantasy/results.
+     * strips it before the client.
      */
     history: RoundResults[];
     generatedAt: string;

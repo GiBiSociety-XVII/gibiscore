@@ -35,13 +35,13 @@ export async function POST(request: NextRequest) {
     if (!auth.user) return NextResponse.json({error: 'signed out'}, {status: 401});
 
     const rows: Array<Record<string, unknown>> = [];
-    for (const [key, raw] of Object.entries((body.votes && typeof body.votes === 'object' ? body.votes : {}) as Record<string, unknown>).slice(0, 60)) {
+    for (const [key, raw] of Object.entries((body.votes && typeof body.votes === 'object' ? body.votes : {}) as Record<string, unknown>).slice(0, 400)) {
         const playerId = Number(key);
         const vote = parseManualVote(raw);
         if (!Number.isInteger(playerId) || playerId <= 0 || !vote) continue;
         rows.push({user_id: auth.user.id, season_id: seasonId, round, player_id: playerId, team_id: vote.teamId, voto: vote.voto, goals: vote.goals, assists: vote.assists, yellow: vote.yellow, red: vote.red, conceded: vote.conceded, penalties_saved: vote.penaltiesSaved, penalties_missed: vote.penaltiesMissed, own_goals: vote.ownGoals});
     }
-    const remove = (Array.isArray(body.remove) ? body.remove : []).filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0).slice(0, 60);
+    const remove = (Array.isArray(body.remove) ? body.remove : []).filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0).slice(0, 400);
     if (rows.length > 0) {
         const {error} = await db.from('fantasy_votes').upsert(rows, {onConflict: 'user_id,season_id,round,player_id'});
         if (error) return NextResponse.json({error: error.message}, {status: 500});
@@ -51,6 +51,6 @@ export async function POST(request: NextRequest) {
         if (error) return NextResponse.json({error: error.message}, {status: 500});
     }
     for (const tag of ['fantasy-votes', 'fantasy-matchday', 'fantasy-pool']) revalidateTag(tag, 'max');
-    for (const path of ['/fantacalcio/formazione', '/it/fantacalcio/formazione']) revalidatePath(path);
+    for (const path of ['/fantacalcio/formazione', '/it/fantacalcio/formazione', '/fantacalcio/voti', '/it/fantacalcio/voti', '/fantacalcio/modello', '/it/fantacalcio/modello']) revalidatePath(path);
     return NextResponse.json({saved: rows.length, removed: remove.length});
 }
