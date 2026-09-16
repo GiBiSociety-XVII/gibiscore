@@ -179,6 +179,27 @@ export function teamMarketProfile(matches: TeamMatchFacts[], venue: 'home' | 'aw
     };
 }
 
+/**
+ * Where this match's goals should fall: each side's goals scored and
+ * conceded per quarter hour, per match played, both sides summed, as
+ * the share of the whole (percent, summing to 100). Null when neither
+ * side has the events of a match.
+ */
+export function bandHeat(home: TeamMarketProfile | null, away: TeamMarketProfile | null): number[] | null {
+    const rate = (p: TeamMarketProfile | null): number[] | null => (p && p.bands.matches > 0 ? BANDS.map((_, i) => (p.bands.for[i] + p.bands.against[i]) / p.bands.matches) : null);
+    const h = rate(home);
+    const a = rate(away);
+    if (!h && !a) return null;
+    const sum = BANDS.map((_, i) => (h?.[i] ?? 0) + (a?.[i] ?? 0));
+    const total = sum.reduce((s, v) => s + v, 0);
+    if (total === 0) return null;
+    const shares = sum.map((v) => Math.round((v / total) * 100));
+    // Rounding must not lose the hundred: the biggest band takes the difference.
+    const drift = 100 - shares.reduce((s, v) => s + v, 0);
+    if (drift !== 0) shares[shares.indexOf(Math.max(...shares))] += drift;
+    return shares;
+}
+
 /** A market's probability (percent) and the decimal odds that would pay it fairly (100 / percent). */
 export interface MarketLine {
     pct: number;

@@ -3,7 +3,7 @@ import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {MatchMarketData} from "@/lib/football/data/markets";
-import {BANDS, matchMarkets, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
+import {bandHeat, BANDS, matchMarkets, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {TeamSummary} from "@/lib/football/types";
 import {FactorLine, OutcomeBar} from "./prediction";
@@ -38,9 +38,15 @@ function MarketGroup({title, cells}: {title: string; cells: Array<{label: string
     );
 }
 
-/** Goals scored and conceded per quarter hour, one column per side, bars on a shared scale. */
-function GoalBands({profile, team, scale}: {profile: TeamMarketProfile | null; team: TeamSummary; scale: number}) {
+/**
+ * Goals scored and conceded per quarter hour, one column per side, bars
+ * on a shared scale. The rows are tinted by `heat`: the share of the
+ * match's goals (both sides, scored and conceded) that falls in the
+ * band, so the quarter hours where the match should move stand out.
+ */
+function GoalBands({profile, team, scale, heat}: {profile: TeamMarketProfile | null; team: TeamSummary; scale: number; heat: number[] | null}) {
     const t = useTranslations('Football.markets');
+    const peakHeat = heat ? Math.max(...heat) : 0;
     return (
         <div className="min-w-0">
             <div className="px-3 h-7 flex items-center justify-between gap-2 text-[11px] font-extrabold uppercase tracking-wide border-b border-muted bg-muted/40">
@@ -56,9 +62,11 @@ function GoalBands({profile, team, scale}: {profile: TeamMarketProfile | null; t
                             const f = profile.bands.for[i];
                             const a = profile.bands.against[i];
                             const peakFor = f > 0 && f === Math.max(...profile.bands.for);
+                            const share = heat?.[i] ?? 0;
+                            const alpha = peakHeat > 0 ? Math.round((share / peakHeat) * 45) / 100 : 0;
                             return (
-                                <tr key={band} className="border-b border-muted last:border-b-0">
-                                    <td className="pl-3 pr-2 py-1 font-mono font-bold tabular-nums text-muted-foreground whitespace-nowrap w-12">{band}&apos;</td>
+                                <tr key={band} className="border-b border-muted last:border-b-0" style={alpha > 0 ? {backgroundColor: `rgb(var(--accent) / ${alpha})`} : undefined} title={heat ? t('heatHint', {pct: share}) : undefined}>
+                                    <td className="pl-3 pr-2 py-1 font-mono font-bold tabular-nums text-muted-foreground whitespace-nowrap w-14 leading-tight">{band}&apos;{heat && <span className={cn("block text-[10px]", share === peakHeat && "text-foreground font-extrabold")}>{share}%</span>}</td>
                                     <td className="py-1 pr-2">
                                         <div className="flex items-center gap-1.5">
                                             <div className="h-2.5 rounded-sm bg-accent border border-foreground/60" style={{width: `${Math.max(2, (f / scale) * 100)}%`}} aria-hidden="true" />
@@ -99,6 +107,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
     const h = data?.home ?? null;
     const a = data?.away ?? null;
     const scale = Math.max(1, ...[h, a].flatMap((p) => (p ? [...p.bands.for, ...p.bands.against] : [])));
+    const heat = bandHeat(h, a);
     const cell = (p: TeamMarketProfile | null, pick: (p: TeamMarketProfile) => string) => (p ? pick(p) : '–');
     const pctOf = (v: number) => `${v}%`;
     const rows: Array<{label: string; home: string; away: string; strong?: (p: TeamMarketProfile) => boolean}> = [
@@ -203,13 +212,14 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                 <>
                     <Panel title={t('bandsTitle')} action={help(t('bandsHint'))}>
                         <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-muted">
-                            <GoalBands profile={h} team={home} scale={scale} />
-                            <GoalBands profile={a} team={away} scale={scale} />
+                            <GoalBands profile={h} team={home} scale={scale} heat={heat} />
+                            <GoalBands profile={a} team={away} scale={scale} heat={heat} />
                         </div>
                         <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
                             <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-accent border border-foreground/60" aria-hidden="true" />{t('legend.for')}</span>
                             <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-foreground" aria-hidden="true" />{t('legend.against')}</span>
                             <span>{t('legend.peak')}</span>
+                            {heat && <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm border border-foreground/40" style={{backgroundColor: 'rgb(var(--accent) / 0.45)'}} aria-hidden="true" />{t('legend.heat')}</span>}
                         </p>
                     </Panel>
                     <Panel title={t('linesTitle')} action={help(t('linesHint'))}>

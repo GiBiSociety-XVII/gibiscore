@@ -314,7 +314,7 @@
       "noGoal": "No gol"
     },
     "bandsTitle": "Quando arrivano i gol",
-    "bandsHint": "Gol fatti e subiti in ogni quarto d'ora nelle partite della competizione (stagione in corso e scorsa). Il recupero conta con il tempo che chiude.",
+    "bandsHint": "Gol fatti e subiti in ogni quarto d'ora nelle partite della competizione (stagione in corso e scorsa). Il recupero conta con il tempo che chiude. Lo sfondo azzurro segna i quarti d'ora in cui, sommando le due squadre, arrivano più gol: dove questa partita dovrebbe muoversi.",
     "bandsBase": "{count} partite",
     "noEvents": "Nessun gol registrato.",
     "firstHalfGoal": "Almeno un gol nel primo tempo nel {pct}% delle partite",
@@ -322,7 +322,8 @@
     "legend": {
       "for": "gol fatti",
       "against": "gol subiti",
-      "peak": "sottolineato il quarto d'ora in cui segna di più"
+      "peak": "sottolineato il quarto d'ora in cui segna di più",
+      "heat": "sfondo azzurro e percentuale = quanto dei gol delle due squadre (fatti e subiti) cade in quel quarto d'ora: più scuro, più movimento atteso in questa partita"
     },
     "linesTitle": "Over, under e gol",
     "linesHint": "Quanto spesso le partite di ogni squadra superano ogni soglia, finiscono con entrambe a segno, senza subire o senza segnare. In verde i valori che pesano (over 1,5 dal 70%, over 2,5 e gol dal 60%, porta inviolata dal 50%).",
@@ -355,6 +356,7 @@
     "oddsHint": "Probabilità {pct}%, quota equa {fair}. Bookmaker: media {avg}, la migliore {best} ({book}), {books} bookmaker.",
     "legendFair": "quota = quota equa (100 / probabilità)",
     "legendBook": "book = media di {books} bookmaker, aggiornata il {at}; in verde quando pagano più della quota equa",
-    "noOdds": "quote dei bookmaker non ancora disponibili per questa partita"
+    "noOdds": "quote dei bookmaker non ancora disponibili per questa partita",
+    "heatHint": "{pct}% dei gol nelle partite delle due squadre, fatti e subiti, arriva in questo quarto d'ora."
   }
 }

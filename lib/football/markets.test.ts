@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandOf, BANDS, expectedTotals, fairOdds, matchMarkets, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {bandHeat, bandOf, BANDS, expectedTotals, fairOdds, matchMarkets, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
 
@@ -116,5 +116,22 @@ describe('summarizeOdds', () => {
     it('is null without rows or without any market', () => {
         expect(summarizeOdds([])).toBeNull();
         expect(summarizeOdds([{bookmaker: 'A', markets: {}}])).toBeNull();
+    });
+});
+
+describe('bandHeat', () => {
+    it('shares the goals of both sides, per match, over the quarter hours', () => {
+        // Home: one match, goals at 10' and 80' for, 20' against. Away: two matches, 20' and 25' for, 85' against.
+        const home = teamMarketProfile([match({goalsFor: 2, goalsAgainst: 1, minutesFor: [10, 80], minutesAgainst: [20]})], 'home');
+        const away = teamMarketProfile([match({goalsFor: 2, goalsAgainst: 1, minutesFor: [20, 25], minutesAgainst: [85]}), match({goalsFor: 0, goalsAgainst: 0})], 'away');
+        const heat = bandHeat(home, away)!;
+        // Per match: home 0-15 1, 16-30 1, 76-90 1; away 16-30 1, 76-90 0.5 -> 1, 2, 0, 0, 0, 1.5 of 4.5.
+        expect(heat).toEqual([22, 45, 0, 0, 0, 33]);
+        expect(heat.reduce((s, v) => s + v, 0)).toBe(100);
+        expect(heat.indexOf(Math.max(...heat))).toBe(1);
+    });
+    it('is null without events on either side', () => {
+        expect(bandHeat(null, null)).toBeNull();
+        expect(bandHeat(teamMarketProfile([match({withEvents: false, goalsFor: 1})], 'home'), null)).toBeNull();
     });
 });
