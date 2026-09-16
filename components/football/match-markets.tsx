@@ -3,7 +3,7 @@ import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {MatchMarketData} from "@/lib/football/data/markets";
-import {bandHeat, BANDS, matchMarkets, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
+import {bandHeat, BANDS, matchMarkets, suggestBets, type BetSuggestion, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {TeamSummary} from "@/lib/football/types";
 import {FactorLine, OutcomeBar} from "./prediction";
@@ -107,6 +107,8 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
     const t = useTranslations('Football.markets');
     const tp = useTranslations('Football.prediction');
     const markets = prediction ? matchMarkets(prediction) : null;
+    const slips: BetSuggestion[] = prediction ? suggestBets(prediction, odds) : [];
+    const legLabel = (key: BetSuggestion['legs'][number]['key']) => (key === 'btts' ? t('labels.goal') : key === 'noBtts' ? t('labels.noGoal') : key.startsWith('over') ? t('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? t('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
     const h = data?.home ?? null;
     const a = data?.away ?? null;
     const scale = Math.max(1, ...[h, a].flatMap((p) => (p ? [...p.bands.for, ...p.bands.against] : [])));
@@ -191,6 +193,26 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                                 </ul>
                             </div>
                         </div>
+                        {slips.length > 0 && (
+                            <div className="border-t border-muted px-3 py-2.5">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('advice.title')}</span>
+                                    {help(t('advice.hint'))}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    {slips.map((s) => (
+                                        <div key={s.tier} className={cn("rounded border-2 border-foreground px-2.5 py-2 flex flex-col gap-1", s.tier === 'balanced' ? "bg-accent" : "bg-card")} title={s.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ')}>
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t(`advice.tiers.${s.tier}`)}</span>
+                                            <span className="text-[13px] font-extrabold leading-tight">{s.legs.map((l) => legLabel(l.key)).join(' + ')}</span>
+                                            <span className="font-mono text-[11px] font-bold tabular-nums text-muted-foreground">
+                                                <span className="text-foreground">{s.pct}%</span> · {t('fair')} {s.fair.toFixed(2)}{s.odds !== null && <> · {t('book')} {s.legs.length > 1 ? '≈' : ''}{s.odds.toFixed(2)}</>}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="mt-1.5 text-[11px] font-semibold text-muted-foreground leading-snug">{t('advice.note')}</p>
+                            </div>
+                        )}
                         <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">
                             {t('legendFair')}{odds ? ` · ${t('legendBook', {books: odds.books, at: updated ? updated.toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'}) : '–'})}` : ` · ${t('noOdds')}`}
                         </p>

@@ -1,4 +1,4 @@
-import type {MatchPrediction} from './prediction';
+import {scoreGrid, type MatchPrediction} from './prediction';
 
 /**
  * The reading of a match the way the betting markets frame it: when the
@@ -292,4 +292,121 @@ export function summarizeOdds(rows: Array<{bookmaker: string; markets: OddsMarke
     const no = fold((m) => m.btts?.no);
     if (yes && no) out.btts = {yes, no};
     return out.outcome || out.doubleChance || out.goals || out.btts ? out : null;
+}
+
+/** A selection of one market, as the betting slips name it. */
+export type LegKey = '1' | 'X' | '2' | '1X' | 'X2' | '12' | 'over15' | 'under15' | 'over25' | 'under25' | 'over35' | 'under35' | 'btts' | 'noBtts';
+
+export interface BetLeg {
+    key: LegKey;
+    /** The leg's own chance, percent. */
+    pct: number;
+    /** The bookmakers' average for the leg, when stored. */
+    odds: number | null;
+}
+
+export interface BetSuggestion {
+    /** How much risk the slip carries: the thresholds in SUGGESTION_TIERS. */
+    tier: 'safe' | 'balanced' | 'bold';
+    legs: BetLeg[];
+    /** Chance of the whole slip, percent: every leg together, on the model's scorelines. */
+    pct: number;
+    fair: number;
+    /** The bookmakers' price: the leg's average alone, the product of the averages for a slip of several (indicative). */
+    odds: number | null;
+}
+
+/** The chance a slip of each tier must keep, in percent. */
+export const SUGGESTION_TIERS: Array<{tier: BetSuggestion['tier']; min: number}> = [
+    {tier: 'safe', min: 78},
+    {tier: 'balanced', min: 62},
+    {tier: 'bold', min: 45},
+];
+
+type Group = 'outcome' | 'goals' | 'btts';
+const LEGS: Array<{key: LegKey; group: Group; test: (h: number, a: number) => boolean}> = [
+    {key: '1', group: 'outcome', test: (h, a) => h > a},
+    {key: 'X', group: 'outcome', test: (h, a) => h === a},
+    {key: '2', group: 'outcome', test: (h, a) => h < a},
+    {key: '1X', group: 'outcome', test: (h, a) => h >= a},
+    {key: 'X2', group: 'outcome', test: (h, a) => h <= a},
+    {key: '12', group: 'outcome', test: (h, a) => h !== a},
+    {key: 'over15', group: 'goals', test: (h, a) => h + a > 1},
+    {key: 'under15', group: 'goals', test: (h, a) => h + a < 2},
+    {key: 'over25', group: 'goals', test: (h, a) => h + a > 2},
+    {key: 'under25', group: 'goals', test: (h, a) => h + a < 3},
+    {key: 'over35', group: 'goals', test: (h, a) => h + a > 3},
+    {key: 'under35', group: 'goals', test: (h, a) => h + a < 4},
+    {key: 'btts', group: 'btts', test: (h, a) => h > 0 && a > 0},
+    {key: 'noBtts', group: 'btts', test: (h, a) => h === 0 || a === 0},
+];
+/** A leg below this chance is not worth a slip, whatever it pays. */
+const LEG_MIN_PCT = 35;
+/** A leg must cut the slip's chance by this much, or it adds nothing but words. */
+const LEG_CUT_PCT = 3;
+/** A slip of one leg more must pay this much more to be preferred over a shorter one of the same tier. */
+const LEG_COST = 0.03;
+
+/** The bookmakers' average for a leg, from the summary of the match. */
+export function legOdds(odds: OddsSummary | null, key: LegKey): number | null {
+    if (!odds) return null;
+    switch (key) {
+        case '1': return odds.outcome?.home.avg ?? null;
+        case 'X': return odds.outcome?.draw.avg ?? null;
+        case '2': return odds.outcome?.away.avg ?? null;
+        case '1X': return odds.doubleChance?.homeOrDraw.avg ?? null;
+        case 'X2': return odds.doubleChance?.drawOrAway.avg ?? null;
+        case '12': return odds.doubleChance?.homeOrAway.avg ?? null;
+        case 'btts': return odds.btts?.yes.avg ?? null;
+        case 'noBtts': return odds.btts?.no.avg ?? null;
+        default: return odds.goals?.[key]?.avg ?? null;
+    }
+}
+
+/**
+ * What the model would put on the slip, one suggestion per tier of
+ * risk: among every selection and every combination of selections from
+ * different markets (outcome, goals, both to score), the one that pays
+ * most while keeping the tier's chance. The chance of a combination is
+ * counted on the model's scorelines, so its legs never contradict each
+ * other (a slip that cannot happen has no chance at all) and a leg that
+ * does not narrow the slip is left out. Empty without a prediction.
+ */
+export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | null): BetSuggestion[] {
+    const grid = scoreGrid(prediction.lambda.home, prediction.lambda.away);
+    const chance = (legs: typeof LEGS): number => {
+        let p = 0;
+        for (let h = 0; h < grid.length; h += 1) for (let a = 0; a < grid[h].length; a += 1) if (legs.every((l) => l.test(h, a))) p += grid[h][a];
+        return p * 100;
+    };
+    const own = new Map(LEGS.map((l) => [l.key, chance([l])]));
+    const usable = LEGS.filter((l) => own.get(l.key)! >= LEG_MIN_PCT);
+    const byGroup = (g: Group) => usable.filter((l) => l.group === g);
+    const slips: Array<{legs: typeof LEGS; pct: number}> = [];
+    const consider = (legs: typeof LEGS) => {
+        const pct = chance(legs);
+        // Every leg must narrow the slip: without it the chance would be higher by a margin.
+        if (legs.length > 1 && legs.some((l) => pct > chance(legs.filter((x) => x !== l)) - LEG_CUT_PCT)) return;
+        slips.push({legs, pct});
+    };
+    for (const l of usable) consider([l]);
+    for (const o of byGroup('outcome')) for (const g of byGroup('goals')) consider([o, g]);
+    for (const o of byGroup('outcome')) for (const b of byGroup('btts')) consider([o, b]);
+    for (const g of byGroup('goals')) for (const b of byGroup('btts')) consider([g, b]);
+    for (const o of byGroup('outcome')) for (const g of byGroup('goals')) for (const b of byGroup('btts')) consider([o, g, b]);
+
+    const out: BetSuggestion[] = [];
+    const taken = new Set<string>();
+    for (const {tier, min} of SUGGESTION_TIERS) {
+        // The slip that pays most while keeping the tier's chance; a longer slip needs to pay a little more per leg.
+        const worth = (s: {legs: typeof LEGS; pct: number}) => (100 / s.pct) * (1 - LEG_COST * (s.legs.length - 1));
+        const best = slips.filter((s) => s.pct >= min && !taken.has(s.legs.map((l) => l.key).join('+'))).sort((a, b) => worth(b) - worth(a))[0];
+        if (!best) continue;
+        taken.add(best.legs.map((l) => l.key).join('+'));
+        const legs: BetLeg[] = best.legs.map((l) => ({key: l.key, pct: Math.round(own.get(l.key)!), odds: legOdds(odds, l.key)}));
+        const prices = legs.map((l) => l.odds);
+        const pct = Math.round(best.pct);
+        out.push({tier, legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round(prices.reduce((s, p) => s * p, 1) * 100) / 100 : null});
+    }
+    return out;
 }

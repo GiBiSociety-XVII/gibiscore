@@ -72,6 +72,25 @@ function tau(h: number, a: number, lh: number, la: number): number {
     return 1;
 }
 
+/**
+ * The probability of every scoreline up to MAX_GOALS goals a side, from
+ * the expected goals of a prediction (the same Poisson and low-score
+ * correction the prediction uses), normalised to one. `grid[h][a]`.
+ */
+export function scoreGrid(lambdaHome: number, lambdaAway: number): number[][] {
+    const grid: number[][] = [];
+    let total = 0;
+    for (let h = 0; h <= MAX_GOALS; h += 1) {
+        grid.push([]);
+        for (let a = 0; a <= MAX_GOALS; a += 1) {
+            const p = poisson(lambdaHome, h) * poisson(lambdaAway, a) * tau(h, a, lambdaHome, lambdaAway);
+            grid[h].push(p);
+            total += p;
+        }
+    }
+    return grid.map((row) => row.map((p) => p / total));
+}
+
 /** Rate per match, shrunk towards the expected rate when the sample is small. */
 function shrink(total: number, played: number, expected: number): number {
     return (total + PRIOR * expected) / (played + PRIOR);

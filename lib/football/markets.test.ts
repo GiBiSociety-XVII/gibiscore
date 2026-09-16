@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandHeat, bandOf, BANDS, expectedTotals, fairOdds, matchMarkets, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {bandHeat, bandOf, BANDS, expectedTotals, fairOdds, legOdds, matchMarkets, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {scoreGrid} from './prediction';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
 
@@ -133,5 +134,58 @@ describe('bandHeat', () => {
     it('is null without events on either side', () => {
         expect(bandHeat(null, null)).toBeNull();
         expect(bandHeat(teamMarketProfile([match({withEvents: false, goalsFor: 1})], 'home'), null)).toBeNull();
+    });
+});
+
+describe('scoreGrid', () => {
+    it('is a distribution that favours the stronger side', () => {
+        const grid = scoreGrid(1.8, 0.9);
+        const total = grid.flat().reduce((s, p) => s + p, 0);
+        expect(total).toBeCloseTo(1, 6);
+        let home = 0;
+        let away = 0;
+        grid.forEach((row, h) => row.forEach((p, a) => { if (h > a) home += p; if (h < a) away += p; }));
+        expect(home).toBeGreaterThan(away);
+    });
+});
+
+describe('suggestBets', () => {
+    const prediction: MatchPrediction = {lambda: {home: 1.9, away: 0.8}, home: 60, draw: 23, away: 17, over15: 74, over25: 50, over35: 27, btts: 44, scores: [], pick: '1', sample: 12, confidence: 'high', factors: []};
+    const odds = summarizeOdds([{bookmaker: 'A', markets: {outcome: {home: 1.7, draw: 3.8, away: 5.0}, doubleChance: {homeOrDraw: 1.2, drawOrAway: 2.1, homeOrAway: 1.25}, goals: {over15: 1.3, under15: 3.4, over25: 1.9, under25: 1.9, over35: 3.2, under35: 1.33}, btts: {yes: 1.9, no: 1.85}}}]);
+
+    it('gives one slip per tier, each within its chance, legs from different markets', () => {
+        const slips = suggestBets(prediction, odds);
+        expect(slips.length).toBeGreaterThanOrEqual(2);
+        for (const s of slips) {
+            const min = SUGGESTION_TIERS.find((t) => t.tier === s.tier)!.min;
+            expect(s.pct).toBeGreaterThanOrEqual(min);
+            expect(s.fair).toBeCloseTo(100 / s.pct, 1);
+            // A slip is never more likely than its least likely leg.
+            expect(s.pct).toBeLessThanOrEqual(Math.min(...s.legs.map((l) => l.pct)));
+            const groups = s.legs.map((l) => (['1', 'X', '2', '1X', 'X2', '12'].includes(l.key) ? 'outcome' : l.key.startsWith('over') || l.key.startsWith('under') ? 'goals' : 'btts'));
+            expect(new Set(groups).size).toBe(groups.length);
+            // The bookmakers' price is the product of the legs' averages.
+            expect(s.odds).toBeCloseTo(s.legs.reduce((p, l) => p * (l.odds ?? 1), 1), 1);
+        }
+        // Tiers pay more as they risk more.
+        for (let i = 1; i < slips.length; i += 1) expect(slips[i].fair).toBeGreaterThan(slips[i - 1].fair);
+        // The three slips differ.
+        expect(new Set(slips.map((s) => s.legs.map((l) => l.key).join('+'))).size).toBe(slips.length);
+    });
+
+    it('never puts contradicting legs together', () => {
+        const slips = suggestBets(prediction, null);
+        for (const s of slips) {
+            const keys = s.legs.map((l) => l.key);
+            expect(keys.includes('under15') && keys.includes('btts')).toBe(false);
+            expect(keys.includes('X') && keys.includes('12')).toBe(false);
+            expect(s.odds).toBeNull();
+        }
+    });
+
+    it('reads a leg price from the summary', () => {
+        expect(legOdds(odds, '1X')).toBe(1.2);
+        expect(legOdds(odds, 'under35')).toBe(1.33);
+        expect(legOdds(null, '1')).toBeNull();
     });
 });

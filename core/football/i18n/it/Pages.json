@@ -49,7 +49,7 @@
       "lineups": "Formazioni",
       "stats": "Statistiche",
       "players": "Giocatori",
-      "markets": "Scommesse"
+      "markets": "Analisi partita"
     },
     "info": "Informazioni",
     "headToHead": "Precedenti",
@@ -63,7 +63,7 @@
     "scorers": "Marcatori",
     "absences": "Indisponibili",
     "prediction": "Pronostico",
-    "markets": "Scommesse: come leggere la partita"
+    "markets": "Analisi partita: pronostico, mercati e quote"
   },
   "team": {
     "notFound": "Squadra non trovata",

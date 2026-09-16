@@ -292,7 +292,7 @@
     }
   },
   "markets": {
-    "intro": "Il pronostico del sito e ogni mercato letto come lo leggono i bookmaker: la probabilità del modello, la quota che la pagherebbe alla pari e la quota media dei bookmaker. Sotto, quando le due squadre segnano e subiscono, quanto spesso superano le soglie di gol, angoli e cartellini.",
+    "intro": "Il pronostico del sito e ogni mercato letto come lo leggono i bookmaker: la probabilità del modello, la quota che la pagherebbe alla pari e la quota media dei bookmaker; poi la giocata che il modello sceglierebbe per ogni livello di rischio. Sotto, quando le due squadre segnano e subiscono, quanto spesso superano le soglie di gol, angoli e cartellini.",
     "disclaimer": "Sono numeri sulle partite giocate e sulle probabilità del modello, non un consiglio di gioco. Una quota più alta della quota equa non è una vincita sicura: è un esito che il bookmaker paga più di quanto il modello lo ritenga probabile. Gioca solo se maggiorenne e con misura.",
     "hint": "Modello di Poisson sui gol attesi delle due squadre (attacco e difesa rispetto al campionato, casa e trasferta, xG, forma), tradotto in ogni mercato. Quota equa = 100 / probabilità. Quote dei bookmaker dal fornitore dati, aggiornate ogni tre ore fino al calcio d'inizio.",
     "modelTitle": "Mercati secondo il modello",
@@ -357,6 +357,19 @@
     "legendFair": "quota = quota equa (100 / probabilità)",
     "legendBook": "book = media di {books} bookmaker, aggiornata il {at}; in verde quando pagano più della quota equa",
     "noOdds": "quote dei bookmaker non ancora disponibili per questa partita",
-    "heatHint": "{pct}% dei gol nelle partite delle due squadre, fatti e subiti, arriva in questo quarto d'ora."
+    "heatHint": "{pct}% dei gol nelle partite delle due squadre, fatti e subiti, arriva in questo quarto d'ora.",
+    "advice": {
+      "title": "Cosa giocherebbe il modello",
+      "hint": "Tre giocate, una per livello di rischio: tra tutte le selezioni e le loro combinazioni su mercati diversi (esito, gol totali, gol/no gol) quella che paga di più restando sopra la probabilità del livello: prudente dal 78%, consigliata dal 62%, audace dal 45%. La probabilità di una combinazione è calcolata sui risultati esatti del modello, quindi le selezioni non si contraddicono mai e una selezione che non restringe nulla viene lasciata fuori.",
+      "tiers": {
+        "safe": "Prudente",
+        "balanced": "Consigliata",
+        "bold": "Audace"
+      },
+      "note": "Probabilità della giocata intera secondo il modello; quota equa = 100 / probabilità; \"book\" è la quota media dei bookmaker, per una combinata il prodotto delle medie (≈, indicativo: non tutti i bookmaker accettano più selezioni sulla stessa partita). Non è un consiglio di gioco: gioca solo se maggiorenne e con misura."
+    }
+  },
+  "odds": {
+    "hint": "Quote 1, X, 2: media dei bookmaker per questa partita. Apri la partita per l'analisi completa."
   }
 }
