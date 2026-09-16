@@ -12,7 +12,7 @@ import {cloudUser} from "@/lib/fantasy/cloud";
 import {isAdminId} from "@/lib/admin";
 import type {BookPlayer, BookRound, VotesBook} from "@/lib/fantasy/votes-data";
 import {roundNumber} from "@/lib/fantasy/matchday";
-import {toVoto, type VotoCalibration} from "@/lib/fantasy/voto";
+import {halfVoto, toVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import type {ManualVote} from "@/lib/fantasy/recap";
 
@@ -25,7 +25,7 @@ const BATCH = 400;
 const VOTE_MINUTES = 10;
 
 const asText = (v: number | null | undefined) => (v === undefined || v === null ? '' : v === 0 ? 's.v.' : String(v));
-const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/0$/, ''));
+const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 /** One vote field: "6.5", "7", "sv" (no vote); empty leaves the site's own estimate. Enter or Tab moves on. */
 function VoteField({value, estimate, label, disabled, onCommit, onNext}: {value: number | null | undefined; estimate: number | null; label: string; disabled: boolean; onCommit: (voto: number | null | undefined) => void; onNext: () => void}) {
@@ -56,7 +56,7 @@ function VoteField({value, estimate, label, disabled, onCommit, onNext}: {value:
             setText(shown.current);
             return;
         }
-        const rounded = Math.round(n * 4) / 4;
+        const rounded = halfVoto(n);
         setText(String(rounded));
         shown.current = String(rounded);
         onCommit(rounded);
@@ -238,7 +238,7 @@ export function VotesBookView({book, calibration}: {book: VotesBook; calibration
                                     {g.players.map((p) => {
                                         inputIndex += 1;
                                         const index = inputIndex;
-                                        const estimate = p.rating !== null && p.minutes >= VOTE_MINUTES ? toVoto(p.rating, p.role, calibration) : null;
+                                        const estimate = p.rating !== null && p.minutes >= VOTE_MINUTES ? halfVoto(toVoto(p.rating, p.role, calibration)) : null;
                                         const bonus = [p.goals > 0 && `${p.goals}G`, p.assists > 0 && `${p.assists}A`, p.yellow > 0 && 'amm.', p.red > 0 && 'esp.', p.role === 'P' && p.conceded > 0 && `${p.conceded} sub.`, p.penaltiesSaved > 0 && 'rig. parato', p.penaltiesMissed > 0 && 'rig. sbagliato', p.ownGoals > 0 && 'autogol'].filter(Boolean).join(' · ');
                                         return (
                                             <li key={p.id} className={cn("flex items-center gap-2 px-3 h-10 border-t border-muted first:border-t-0 text-[13px]", p.id in draft && "bg-accent/15")}>

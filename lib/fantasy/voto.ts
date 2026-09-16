@@ -33,6 +33,39 @@ export function toVoto(rating: number, role: FantaRole, calibration: VotoCalibra
     return Math.round((c.intercept + c.slope * rating) * 100) / 100;
 }
 
+/** Votes come in half points: 6, 6.5, 7. */
+export const halfVoto = (voto: number): number => Math.round(voto * 2) / 2;
+
+/** The fantasy role of a provider position ("goalkeeper", or "G" in a lineup); a midfielder when unknown. */
+export function roleOfPosition(position: string | null | undefined): FantaRole {
+    switch ((position ?? '').toLowerCase()) {
+        case 'goalkeeper':
+        case 'g':
+            return 'P';
+        case 'defender':
+        case 'd':
+            return 'D';
+        case 'attacker':
+        case 'f':
+            return 'A';
+        default:
+            return 'C';
+    }
+}
+
+/** A match rating shown as the vote it stands for: on the vote scale of the role, in half points. */
+export function matchVoto(rating: number, position: string | null | undefined, calibration: VotoCalibration = DEFAULT_CALIBRATION): number {
+    return halfVoto(toVoto(rating, roleOfPosition(position), calibration));
+}
+
+/** An average of ratings shown as an average of votes: on the vote scale of the role, two decimals. */
+export function meanVoto(rating: number, position: string | null | undefined, calibration: VotoCalibration = DEFAULT_CALIBRATION): number {
+    return toVoto(rating, roleOfPosition(position), calibration);
+}
+
+/** From this vote up a match was a good one (the provider's 7 on its own scale). */
+export const GOOD_VOTO = 6.5;
+
 export interface VotoPair {
     rating: number;
     voto: number;

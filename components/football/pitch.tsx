@@ -1,6 +1,7 @@
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import type {LineupPlayer, TeamLineup} from "@/lib/football/types";
+import {GOOD_VOTO, matchVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 
 /** Starters grouped by line (formationPosition = row*10 + column), goalkeeper first. */
 function lines(starters: LineupPlayer[]): LineupPlayer[][] {
@@ -16,16 +17,17 @@ function lines(starters: LineupPlayer[]): LineupPlayer[][] {
         .map(([, players]) => players.sort((a, b) => (a.formationPosition ?? 0) - (b.formationPosition ?? 0)));
 }
 
-function Dot({p, dark}: {p: LineupPlayer; dark: boolean}) {
+function Dot({p, dark, scale}: {p: LineupPlayer; dark: boolean; scale: VotoCalibration}) {
     const surname = p.name.split(' ').slice(-1)[0] ?? p.name;
+    const voto = p.rating !== null ? matchVoto(p.rating, p.position, scale) : null;
     return (
         <Link href={`/players/${p.slug}`} className="group flex flex-col items-center gap-0.5 min-w-0 w-[64px] md:w-[76px]">
             <span className="relative">
                 <span className={cn("inline-flex w-8 h-8 md:w-9 md:h-9 items-center justify-center rounded-full border-[2.5px] border-foreground font-mono text-[12px] font-extrabold tabular-nums group-hover:ring-2 ring-accent", dark ? "bg-foreground text-background" : "bg-card text-foreground")}>
                     {p.number ?? ''}
                 </span>
-                {p.rating !== null && (
-                    <span className={cn("absolute -top-1.5 -right-2.5 font-mono text-[9px] font-extrabold tabular-nums px-1 rounded border border-foreground leading-[14px] text-foreground", p.rating >= 7 ? "bg-accent" : "bg-card")}>{p.rating.toFixed(1)}</span>
+                {voto !== null && (
+                    <span className={cn("absolute -top-1.5 -right-2.5 font-mono text-[9px] font-extrabold tabular-nums px-1 rounded border border-foreground leading-[14px] text-foreground", voto >= GOOD_VOTO ? "bg-accent" : "bg-card")}>{voto.toFixed(1)}</span>
                 )}
             </span>
             <span className="text-[10px] md:text-[11px] font-bold leading-tight text-center truncate max-w-full text-background [text-shadow:0_1px_2px_rgba(0,0,0,.6)] group-hover:underline decoration-accent decoration-2 underline-offset-2">{surname}</span>
@@ -34,7 +36,7 @@ function Dot({p, dark}: {p: LineupPlayer; dark: boolean}) {
 }
 
 /** Both starting elevens on one pitch: home attacks downwards, away mirrored below. */
-export function Pitch({home, away}: {home: TeamLineup | null; away: TeamLineup | null}) {
+export function Pitch({home, away, scale}: {home: TeamLineup | null; away: TeamLineup | null; scale: VotoCalibration}) {
     const homeLines = home ? lines(home.starters) : [];
     const awayLines = away ? lines(away.starters) : [];
     if (homeLines.length === 0 && awayLines.length === 0) return null;
@@ -56,11 +58,11 @@ export function Pitch({home, away}: {home: TeamLineup | null; away: TeamLineup |
                     </div>
                 )}
                 {homeLines.map((line, i) => (
-                    <div key={`h${i}`} className="flex justify-around">{line.map((p) => <Dot key={p.id} p={p} dark />)}</div>
+                    <div key={`h${i}`} className="flex justify-around">{line.map((p) => <Dot key={p.id} p={p} dark scale={scale} />)}</div>
                 ))}
                 <div className="h-3" />
                 {[...awayLines].reverse().map((line, i) => (
-                    <div key={`a${i}`} className="flex justify-around">{line.map((p) => <Dot key={p.id} p={p} dark={false} />)}</div>
+                    <div key={`a${i}`} className="flex justify-around">{line.map((p) => <Dot key={p.id} p={p} dark={false} scale={scale} />)}</div>
                 ))}
                 {away && (
                     <div className="flex items-center justify-between px-1 text-[11px] font-extrabold uppercase tracking-wide">

@@ -91,3 +91,14 @@ export async function getTypedCalibration(league: AuctionLeague): Promise<VotoCa
     const pairs = await getTypedPairs(league);
     return pairs.length > 0 ? fitCalibration(pairs) : DEFAULT_CALIBRATION;
 }
+
+/**
+ * The scale every rating on the site is shown on: the provider rates on
+ * its own scale, the readers know the newspapers' votes, so a rating is
+ * shown as the vote it stands for. Serie A's fitted scale (the votes are
+ * typed for it), applied to every competition: the provider's scale is
+ * the same everywhere.
+ */
+export function getVoteScale(): Promise<VotoCalibration> {
+    return getTypedCalibration('serie-a');
+}

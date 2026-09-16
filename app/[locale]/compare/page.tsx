@@ -8,6 +8,8 @@ import {PageHeader} from "@/components/football/page-header";
 import {PlayerPicker} from "@/components/football/player-picker";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerBrief, getPlayerCompare, type CompareSide} from "@/lib/football/data/compare";
+import {getVoteScale} from "@/lib/fantasy/calibration-data";
+import {meanVoto} from "@/lib/fantasy/voto";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Pages.compare');
@@ -46,7 +48,7 @@ export default async function ComparePage({params, searchParams}: PageProps<"/[l
     const a = typeof sp.a === 'string' ? sp.a : null;
     const b = typeof sp.b === 'string' ? sp.b : null;
     const yearRaw = typeof sp.season === 'string' && /^\d{4}$/.test(sp.season) ? Number(sp.season) : undefined;
-    const [data, briefA, briefB] = await Promise.all([a && b ? getPlayerCompare(a, b, yearRaw) : null, a ? getPlayerBrief(a) : null, b ? getPlayerBrief(b) : null]);
+    const [data, briefA, briefB, scale] = await Promise.all([a && b ? getPlayerCompare(a, b, yearRaw) : null, a ? getPlayerBrief(a) : null, b ? getPlayerBrief(b) : null, getVoteScale()]);
     const picked = (brief: Awaited<ReturnType<typeof getPlayerBrief>>) => (brief ? {name: brief.name, slug: brief.slug, imageUrl: brief.imageUrl, hint: brief.team} : null);
 
     const rows = data
@@ -61,7 +63,7 @@ export default async function ComparePage({params, searchParams}: PageProps<"/[l
               [t('rows.shotsOn'), data.a.totals.shotsOn, data.b.totals.shotsOn, 'high'],
               [t('rows.keyPasses90'), per90(data.a.totals.keyPasses, data.a.totals.minutes), per90(data.b.totals.keyPasses, data.b.totals.minutes), 'high'],
               [t('rows.passAccuracy'), data.a.totals.passAccuracy !== null ? `${data.a.totals.passAccuracy}%` : '–', data.b.totals.passAccuracy !== null ? `${data.b.totals.passAccuracy}%` : '–', 'high'],
-              [t('rows.rating'), data.a.totals.rating?.toFixed(2) ?? '–', data.b.totals.rating?.toFixed(2) ?? '–', 'high'],
+              [t('rows.rating'), data.a.totals.rating !== null ? meanVoto(data.a.totals.rating, data.a.page.player.position, scale).toFixed(2) : '–', data.b.totals.rating !== null ? meanVoto(data.b.totals.rating, data.b.page.player.position, scale).toFixed(2) : '–', 'high'],
               [t('rows.cards'), `${data.a.totals.yellowCards} / ${data.a.totals.redCards}`, `${data.b.totals.yellowCards} / ${data.b.totals.redCards}`, 'none'],
           ] as Array<[string, string | number, string | number, 'high' | 'none']>)
         : [];

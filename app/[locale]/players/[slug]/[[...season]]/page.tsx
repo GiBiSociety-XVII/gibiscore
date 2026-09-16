@@ -14,6 +14,8 @@ import {AbsenceLine} from "@/components/football/absences";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
 import {PlayerFantasy} from "@/components/fantasy/player-fantasy";
+import {getVoteScale} from "@/lib/fantasy/calibration-data";
+import {matchVoto, meanVoto} from "@/lib/fantasy/voto";
 
 export const revalidate = 1800;
 
@@ -62,6 +64,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
     }
 
     const {player, team, totals} = page;
+    const scale = await getVoteScale();
     // Main competition of the selected season (most minutes) and the average of the same role there.
     const mainStat = page.seasons.filter((s) => s.seasonYear === page.selectedSeason).sort((a, b) => b.minutes - a.minutes)[0] ?? null;
     const benchmark = mainStat && mainStat.position ? await getPositionBenchmark(mainStat.competition.id, mainStat.seasonYear, mainStat.position) : null;
@@ -116,7 +119,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                     <td className={cellClass}>{s.appearances}</td>
                                     <td className={cellClass}>{s.lineups}</td>
                                     <td className={cellClass}>{s.minutes}</td>
-                                    <td className={cellClass}>{s.rating !== null ? s.rating.toFixed(2) : '–'}</td>
+                                    <td className={cellClass}>{s.rating !== null ? meanVoto(s.rating, s.position ?? player.position, scale).toFixed(2) : '–'}</td>
                                     <td className={cn(cellClass, "font-extrabold")}>{s.goals}</td>
                                     <td className={cellClass}>{s.assists}</td>
                                     {isKeeper ? (
@@ -174,7 +177,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                             </Link>
                                         </td>
                                         <td className={cellClass}>{m.minutes ?? '–'}</td>
-                                        <td className={cellClass}>{m.rating !== null ? m.rating.toFixed(1) : '–'}</td>
+                                        <td className={cellClass}>{m.rating !== null ? matchVoto(m.rating, player.position, scale).toFixed(1) : '–'}</td>
                                         <td className={cellClass}>{m.goals || ''}</td>
                                         <td className={cellClass}>{m.assists || ''}</td>
                                         <td className="px-1.5 py-1 text-right">
@@ -253,15 +256,15 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                     <Stat value={totals.goals} label={t('goals')} />
                     <Stat value={totals.assists} label={t('assists')} />
                     <Stat value={`${totals.yellowCards}/${totals.redCards}`} label={t('cards')} />
-                    <Stat value={totals.averageRating !== null ? totals.averageRating.toFixed(2) : '–'} label={t('averageRating')} accent />
-                    <RatingTrend matches={page.matches} average={totals.averageRating} label={t('ratingTrend')} />
+                    <Stat value={totals.averageRating !== null ? meanVoto(totals.averageRating, player.position, scale).toFixed(2) : '–'} label={t('averageRating')} accent />
+                    <RatingTrend matches={page.matches} average={totals.averageRating} label={t('ratingTrend')} position={player.position} scale={scale} />
                 </div>
             </section>
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] items-start">
                 <Tabs items={[{id: 'seasons', label: t('tabs.seasons'), content: seasonsTab, count: page.seasons.length}, {id: 'matches', label: t('tabs.matches'), content: matchesTab, count: page.matches.length}]} />
                 <div className="flex flex-col gap-3 min-w-0">
-                    <PlayerAnalysis stat={mainStat} benchmark={benchmark} competitionName={mainStat?.competition.name ?? null} />
+                    <PlayerAnalysis stat={mainStat} benchmark={benchmark} competitionName={mainStat?.competition.name ?? null} scale={scale} />
                     <PlayerFantasy playerId={player.id} />
                 </div>
             </div>
