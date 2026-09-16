@@ -2,6 +2,7 @@ import 'server-only';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {mapOdds} from '@/lib/api-football/mappers';
 import type {AfOddsResponse} from '@/lib/api-football/types';
+import {settleAdvice, snapshotAdvice} from './advice';
 import {allowance, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /** Featured fixtures kicking off within this many days get their odds. */
@@ -18,6 +19,9 @@ const MAX_FIXTURES = 120;
  * two weeks ahead and moves them a few times a day; three hours keeps
  * the page close enough. Routine class: it waits when the day's quota
  * runs low. `days` widens the window.
+ *
+ * The same pass writes down the model's slips for those fixtures and
+ * settles the slips of the matches since finished (advice.ts).
  */
 export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> {
     const db = footballClient();
@@ -31,7 +35,7 @@ export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> 
         const to = new Date(now + (options.days ?? WINDOW_DAYS) * 86_400_000).toISOString();
         const {data, error} = await db
             .from('fixtures')
-            .select('id,provider_id,league:leagues!inner(tier)')
+            .select('id,provider_id,season_id,home_team_id,away_team_id,league:leagues!inner(tier)')
             .eq('state', 'scheduled')
             .eq('leagues.tier', 'featured')
             .gte('starting_at', new Date(now).toISOString())
@@ -39,8 +43,9 @@ export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> 
             .order('starting_at')
             .limit(MAX_FIXTURES);
         if (error) failSync('fixtures.select', error);
-        const fixtures = (data ?? []) as unknown as Array<{id: number; provider_id: number}>;
+        const fixtures = (data ?? []) as unknown as Array<{id: number; provider_id: number; season_id: number | null; home_team_id: number; away_team_id: number}>;
         run.bump('pending', fixtures.length);
+        await settleAdvice(db, run);
         if (fixtures.length === 0) {
             run.bump('idle');
             await finishRun(db, run, 'ok');
@@ -63,6 +68,7 @@ export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> 
             run.bump('fixtures');
             run.bump('bookmakers', rows.length);
         }
+        await snapshotAdvice(db, run, fixtures.filter((f) => f.season_id !== null).map((f) => ({id: f.id, seasonId: f.season_id!, homeId: f.home_team_id, awayId: f.away_team_id})));
         await finishRun(db, run, 'ok');
         return run;
     } catch (error) {

@@ -5,6 +5,7 @@ import {isBuildPhase} from '@/lib/db/phase';
 import {footballDb, logReadError} from '@/lib/football/data/shared';
 import {loadTeamSidelined} from '@/lib/football/data/sidelined';
 import {getPriorStudy, getSeasonStudy} from '@/lib/football/data/study';
+import {getPredictionTuning} from '@/lib/football/data/tuning';
 import {attackBaseline, predictMatch} from '@/lib/football/prediction';
 import {VOTI as SERIE_A_VOTI} from '@/core/fantasy/voti/serie-a';
 import {AUCTION_LEAGUES, type AuctionLeague} from './config';
@@ -142,7 +143,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     const roundFixtures = byRound.get(round) ?? [];
 
     // Predictions from the season's numbers.
-    const [study, prior] = await Promise.all([getSeasonStudy(season.id), getPriorStudy(season.id)]);
+    const [study, prior, tuning] = await Promise.all([getSeasonStudy(season.id), getPriorStudy(season.id), getPredictionTuning()]);
     // What each club scores in an ordinary match (shrunk on a small sample): the yardstick for the fixture's expected goals.
     const avgFor = new Map<number, number>();
     const formOf = new Map<number, string>();
@@ -152,7 +153,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         if (t.form.length > 0) formOf.set(t.team.id, t.form.join(''));
     }
     const matchday: MatchdayFixture[] = roundFixtures.map((f) => {
-        const p = predictMatch(study, f.home_team_id, f.away_team_id, prior);
+        const p = predictMatch(study, f.home_team_id, f.away_team_id, prior, tuning);
         return {
             id: f.id,
             round,

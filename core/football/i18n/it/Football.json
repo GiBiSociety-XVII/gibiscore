@@ -366,7 +366,8 @@
         "balanced": "Consigliata",
         "bold": "Audace"
       },
-      "note": "Probabilità della giocata intera secondo il modello; quota equa = 100 / probabilità; \"book\" è la quota media dei bookmaker, per una combinata il prodotto delle medie (≈, indicativo: non tutti i bookmaker accettano più selezioni sulla stessa partita). Non è un consiglio di gioco: gioca solo se maggiorenne e con misura."
+      "note": "Probabilità della giocata intera secondo il modello; quota equa = 100 / probabilità; \"book\" è la quota media dei bookmaker, per una combinata il prodotto delle medie (≈, indicativo: non tutti i bookmaker accettano più selezioni sulla stessa partita). Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
+      "record": "Vedi il bilancio delle giocate proposte"
     }
   },
   "odds": {

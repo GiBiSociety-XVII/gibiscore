@@ -2,6 +2,7 @@ import {HelpCircle} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
+import {Link} from "@/i18n/navigation";
 import type {MatchMarketData} from "@/lib/football/data/markets";
 import {bandHeat, BANDS, matchMarkets, suggestBets, type BetSuggestion, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
@@ -210,7 +211,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                                         </div>
                                     ))}
                                 </div>
-                                <p className="mt-1.5 text-[11px] font-semibold text-muted-foreground leading-snug">{t('advice.note')}</p>
+                                <p className="mt-1.5 text-[11px] font-semibold text-muted-foreground leading-snug">{t('advice.note')} <Link href="/predictions/record" className="font-extrabold text-foreground hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('advice.record')}</Link></p>
                             </div>
                         )}
                         <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">

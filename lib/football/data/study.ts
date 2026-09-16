@@ -14,22 +14,26 @@ import {TEAM_SELECT, footballDb, logReadError} from './shared';
 export {buildStudy} from '../study';
 export type {SeasonStudy, SplitRow, StudyRow, TeamStudy} from '../study';
 
+/** The finished matches of a season with their team statistics, chronological: what a study is built from. */
+export async function loadStudyRows(seasonId: number): Promise<StudyRow[]> {
+    const db = footballDb();
+    return (await fetchAll(
+        (a, b) =>
+            db
+                .from('fixtures')
+                .select(`id,starting_at,home_team_id,away_team_id,home_score,away_score,home:teams!fixtures_home_team_id_fkey(${TEAM_SELECT}),away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT}),stats:fixture_team_stats(team_id,possession,shots_total,shots_on_target,corners,xg)`)
+                .eq('season_id', seasonId)
+                .eq('state', 'finished')
+                .order('starting_at')
+                .order('id')
+                .range(a, b),
+        {max: 3000},
+    )) as unknown as StudyRow[];
+}
+
 async function computeStudy(seasonId: number): Promise<SeasonStudy | null> {
     try {
-        const db = footballDb();
-        const rows = (await fetchAll(
-            (a, b) =>
-                db
-                    .from('fixtures')
-                    .select(`id,starting_at,home_team_id,away_team_id,home_score,away_score,home:teams!fixtures_home_team_id_fkey(${TEAM_SELECT}),away:teams!fixtures_away_team_id_fkey(${TEAM_SELECT}),stats:fixture_team_stats(team_id,possession,shots_total,shots_on_target,corners,xg)`)
-                    .eq('season_id', seasonId)
-                    .eq('state', 'finished')
-                    .order('starting_at')
-                    .order('id')
-                    .range(a, b),
-            {max: 3000},
-        )) as unknown as StudyRow[];
-        return buildStudy(seasonId, rows);
+        return buildStudy(seasonId, await loadStudyRows(seasonId));
     } catch (error) {
         logReadError(`getSeasonStudy(${seasonId})`, error);
         return null;

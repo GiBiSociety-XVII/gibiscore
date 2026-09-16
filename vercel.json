@@ -55,6 +55,10 @@
     {
       "path": "/api/cron/sync-squads",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/fit-model",
+      "schedule": "30 3 * * 1"
     }
   ]
 }

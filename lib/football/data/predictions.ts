@@ -3,6 +3,7 @@ import {fetchAll} from '@/lib/db/paginate';
 import {featuredPriority} from '../competitions';
 import {summarizeOdds, type OddsMarkets, type OddsSummary} from '../markets';
 import {predictMatch, type MatchPrediction} from '../prediction';
+import {getPredictionTuning} from './tuning';
 import {LIVE_STATES, type CompetitionSummary, type FixtureSummary} from '../types';
 import {getPriorStudy, getSeasonStudy} from './study';
 import {LEAGUE_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, type FixtureRow, type LeagueRow} from './shared';
@@ -47,6 +48,7 @@ export async function getUpcomingPredictions(days = 3): Promise<PredictionBlock[
         const oddsRows = rows.length > 0 ? ((await fetchAll((a, b) => db.from('fixture_odds').select('fixture_id,bookmaker,markets,updated_at').in('fixture_id', rows.map((r) => r.id)).order('fixture_id').order('bookmaker_id').range(a, b), {max: 5000})) as unknown as Array<{fixture_id: number; bookmaker: string; markets: OddsMarkets; updated_at: string | null}>) : [];
         const oddsByFixture = new Map<number, typeof oddsRows>();
         for (const r of oddsRows) oddsByFixture.set(r.fixture_id, [...(oddsByFixture.get(r.fixture_id) ?? []), r]);
+        const tuning = await getPredictionTuning();
         const seasonIds = [...new Set(rows.map((r) => r.season_id).filter((id): id is number => id !== null))];
         const studies = new Map(await Promise.all(seasonIds.map(async (id) => [id, await getSeasonStudy(id)] as const)));
         const priors = new Map(await Promise.all(seasonIds.map(async (id) => [id, await getPriorStudy(id)] as const)));
@@ -59,7 +61,7 @@ export async function getUpcomingPredictions(days = 3): Promise<PredictionBlock[
             const study = row.season_id ? (studies.get(row.season_id) ?? null) : null;
             const prior = row.season_id ? (priors.get(row.season_id) ?? null) : null;
             const odds = summarizeOdds((oddsByFixture.get(row.id) ?? []).map((r) => ({bookmaker: r.bookmaker, markets: r.markets ?? {}, updatedAt: r.updated_at})));
-            blocks.get(row.league.id)!.fixtures.push({fixture, prediction: predictMatch(study, fixture.home.id, fixture.away.id, prior), odds});
+            blocks.get(row.league.id)!.fixtures.push({fixture, prediction: predictMatch(study, fixture.home.id, fixture.away.id, prior, tuning), odds});
         }
         return [...blocks.values()].sort((a, b) => featuredPriority(a.competition.slug) - featuredPriority(b.competition.slug) || a.competition.name.localeCompare(b.competition.name));
     } catch (error) {

@@ -12,6 +12,7 @@ import {MatchStudy} from "@/components/football/match-study";
 import {MatchMarkets} from "@/components/football/match-markets";
 import {getMatchMarkets} from "@/lib/football/data/markets";
 import {getFixtureOdds} from "@/lib/football/data/odds";
+import {getPredictionTuning} from "@/lib/football/data/tuning";
 import {AbsenceList} from "@/components/football/absences";
 import {predictMatch} from "@/lib/football/prediction";
 import {getPriorStudy, getSeasonStudy} from "@/lib/football/data/study";
@@ -69,8 +70,8 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     }
 
     const {fixture} = page;
-    const [study, prior, markets, odds] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId), getMatchMarkets(fixture.id, fixture.seasonId, fixture.home.id, fixture.away.id), getFixtureOdds(fixture.id)]) : [null, null, null, null];
-    const prediction = predictMatch(study, fixture.home.id, fixture.away.id, prior);
+    const [study, prior, markets, odds, tuning] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId), getMatchMarkets(fixture.id, fixture.seasonId, fixture.home.id, fixture.away.id), getFixtureOdds(fixture.id), getPredictionTuning()]) : [null, null, null, null, undefined];
+    const prediction = predictMatch(study, fixture.home.id, fixture.away.id, prior, tuning);
     const hasAbsences = page.absences.home.length > 0 || page.absences.away.length > 0;
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const isLive = LIVE_STATES.includes(fixture.state);

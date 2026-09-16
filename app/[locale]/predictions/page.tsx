@@ -30,7 +30,7 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
 
     return (
         <SiteShell wide>
-            <PageHeader title={t('title')} meta={`${t('days', {count: DAYS})} · ${t('intro')}`} />
+            <PageHeader title={t('title')} meta={`${t('days', {count: DAYS})} · ${t('intro')}`} aside={<Link href="/predictions/record" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('recordLink')}</Link>} />
             {blocks.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{tp('listEmpty')}</p>
             ) : (
