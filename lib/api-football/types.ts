@@ -184,6 +184,14 @@ export interface AfStandingsResponse {
     league: {id: number; name: string; country: string; logo: string | null; season: number; standings: AfStanding[][]};
 }
 
+/** One fixture's pre-match odds: every bookmaker with its bets (Match Winner, Goals Over/Under ...) and their prices. */
+export interface AfOddsResponse {
+    league: {id: number; season: number};
+    fixture: {id: number; date: string; timestamp: number};
+    update: string;
+    bookmakers: Array<{id: number; name: string; bets: Array<{id: number; name: string; values: Array<{value: string; odd: string}>}>}>;
+}
+
 export interface AfInjuryResponse {
     player: {id: number; name: string; photo: string | null; type: string | null; reason: string | null};
     team: {id: number; name: string; logo: string | null};

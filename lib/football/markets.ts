@@ -216,3 +216,59 @@ export function expectedTotals(home: TeamMarketProfile | null, away: TeamMarketP
     const sum = (v: Array<number | null>) => (v.length === 2 && v.every((x) => x !== null) ? Math.round((v[0]! + v[1]!) * 10) / 10 : null);
     return {corners: sum(corners), yellows: sum(yellows)};
 }
+
+/** A bookmaker's prices for the markets the site reads; a market missing is one the bookmaker did not offer. */
+export interface OddsMarkets {
+    outcome?: {home: number; draw: number; away: number};
+    doubleChance?: {homeOrDraw: number; drawOrAway: number; homeOrAway: number};
+    goals?: {over15: number | null; under15: number | null; over25: number | null; under25: number | null; over35: number | null; under35: number | null};
+    btts?: {yes: number; no: number};
+}
+
+/** The bookmakers' price of one market: their average, the best one and who gives it, how many offer it. */
+export interface OddsLine {
+    avg: number;
+    best: number;
+    bestBook: string;
+    books: number;
+}
+
+export type OddsSummary = {
+    outcome?: {home: OddsLine; draw: OddsLine; away: OddsLine};
+    doubleChance?: {homeOrDraw: OddsLine; drawOrAway: OddsLine; homeOrAway: OddsLine};
+    goals?: Partial<Record<'over15' | 'under15' | 'over25' | 'under25' | 'over35' | 'under35', OddsLine>>;
+    btts?: {yes: OddsLine; no: OddsLine};
+    /** Bookmakers with at least one market. */
+    books: number;
+    updatedAt: string | null;
+};
+
+/** The bookmakers' rows folded into one line per market, or null without any. */
+export function summarizeOdds(rows: Array<{bookmaker: string; markets: OddsMarkets; updatedAt?: string | null}>): OddsSummary | null {
+    if (rows.length === 0) return null;
+    const fold = (pick: (m: OddsMarkets) => number | null | undefined): OddsLine | null => {
+        const prices = rows.map((r) => ({book: r.bookmaker, odd: pick(r.markets) ?? null})).filter((x): x is {book: string; odd: number} => x.odd !== null);
+        if (prices.length === 0) return null;
+        const best = prices.reduce((m, x) => (x.odd > m.odd ? x : m));
+        return {avg: Math.round((prices.reduce((s, x) => s + x.odd, 0) / prices.length) * 100) / 100, best: best.odd, bestBook: best.book, books: prices.length};
+    };
+    const out: OddsSummary = {books: rows.filter((r) => Object.keys(r.markets).length > 0).length, updatedAt: rows.map((r) => r.updatedAt ?? null).filter((v): v is string => !!v).sort().at(-1) ?? null};
+    const home = fold((m) => m.outcome?.home);
+    const draw = fold((m) => m.outcome?.draw);
+    const away = fold((m) => m.outcome?.away);
+    if (home && draw && away) out.outcome = {home, draw, away};
+    const homeOrDraw = fold((m) => m.doubleChance?.homeOrDraw);
+    const drawOrAway = fold((m) => m.doubleChance?.drawOrAway);
+    const homeOrAway = fold((m) => m.doubleChance?.homeOrAway);
+    if (homeOrDraw && drawOrAway && homeOrAway) out.doubleChance = {homeOrDraw, drawOrAway, homeOrAway};
+    const goals: NonNullable<OddsSummary['goals']> = {};
+    for (const key of ['over15', 'under15', 'over25', 'under25', 'over35', 'under35'] as const) {
+        const line = fold((m) => m.goals?.[key]);
+        if (line) goals[key] = line;
+    }
+    if (Object.keys(goals).length > 0) out.goals = goals;
+    const yes = fold((m) => m.btts?.yes);
+    const no = fold((m) => m.btts?.no);
+    if (yes && no) out.btts = {yes, no};
+    return out.outcome || out.doubleChance || out.goals || out.btts ? out : null;
+}

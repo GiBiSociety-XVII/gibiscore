@@ -3,27 +3,36 @@ import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import type {MatchMarketData} from "@/lib/football/data/markets";
-import {BANDS, matchMarkets, type MarketLine, type TeamMarketProfile} from "@/lib/football/markets";
+import {BANDS, matchMarkets, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {TeamSummary} from "@/lib/football/types";
+import {FactorLine, OutcomeBar} from "./prediction";
 
-const fmtOdds = (v: number | null) => (v === null ? '–' : v.toFixed(2));
+const fmtOdds = (v: number | null | undefined) => (v === null || v === undefined ? '–' : v.toFixed(2));
 
-/** One market: its cells side by side, the likeliest one lit, the fair odds under each chance. */
-function MarketGroup({title, cells}: {title: string; cells: Array<{label: string; line: MarketLine}>}) {
+/**
+ * One market: its cells side by side, the likeliest one lit; under each
+ * chance the fair odds and, when stored, the bookmakers' average, green
+ * when they pay more than the fair price.
+ */
+function MarketGroup({title, cells}: {title: string; cells: Array<{label: string; line: MarketLine; odds?: OddsLine}>}) {
     const t = useTranslations('Football.markets');
     const best = Math.max(...cells.map((c) => c.line.pct));
     return (
         <div className="flex flex-col gap-1 min-w-0">
             <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{title}</span>
             <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))`}}>
-                {cells.map((c) => (
-                    <div key={c.label} className={cn("flex flex-col items-center justify-center rounded border-2 border-foreground px-1 py-1.5", c.line.pct === best ? "bg-accent" : "bg-card")} title={t('fairHint', {pct: c.line.pct, odds: fmtOdds(c.line.fair)})}>
-                        <span className="text-[11px] font-extrabold leading-none">{c.label}</span>
-                        <span className="font-mono text-base font-extrabold tabular-nums leading-tight">{c.line.pct}%</span>
-                        <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground leading-none">{t('fair')} {fmtOdds(c.line.fair)}</span>
-                    </div>
-                ))}
+                {cells.map((c) => {
+                    const value = !!c.odds && c.line.fair !== null && c.odds.avg > c.line.fair;
+                    return (
+                        <div key={c.label} className={cn("flex flex-col items-center justify-center rounded border-2 border-foreground px-1 py-1.5", c.line.pct === best ? "bg-accent" : "bg-card")} title={c.odds ? t('oddsHint', {pct: c.line.pct, fair: fmtOdds(c.line.fair), avg: fmtOdds(c.odds.avg), best: fmtOdds(c.odds.best), book: c.odds.bestBook, books: c.odds.books}) : t('fairHint', {pct: c.line.pct, odds: fmtOdds(c.line.fair)})}>
+                            <span className="text-[11px] font-extrabold leading-none">{c.label}</span>
+                            <span className="font-mono text-base font-extrabold tabular-nums leading-tight">{c.line.pct}%</span>
+                            <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground leading-none">{t('fair')} {fmtOdds(c.line.fair)}</span>
+                            {c.odds && <span className={cn("font-mono text-[10px] font-extrabold tabular-nums leading-none mt-0.5", value ? "text-emerald-800" : "text-foreground")}>{t('book')} {fmtOdds(c.odds.avg)}</span>}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -76,13 +85,16 @@ function GoalBands({profile, team, scale}: {profile: TeamMarketProfile | null; t
 }
 
 /**
- * The markets tab of a match: what the model gives every market, with
- * the odds that would pay it fairly; when the two sides score and
- * concede; how their matches go over the goal lines; corners and cards.
- * A reading of the numbers, not advice on what to play.
+ * The markets tab of a match: the prediction (outcome bar, expected
+ * goals, the reasons) and what the model gives every market, with the
+ * odds that would pay it fairly and the bookmakers' own beside; when
+ * the two sides score and concede; how their matches go over the goal
+ * lines; corners and cards. A reading of the numbers, not advice on
+ * what to play.
  */
-export function MatchMarkets({data, prediction, home, away, title}: {data: MatchMarketData | null; prediction: MatchPrediction | null; home: TeamSummary; away: TeamSummary; title: string}) {
+export function MatchMarkets({data, prediction, odds, home, away, title}: {data: MatchMarketData | null; prediction: MatchPrediction | null; odds: OddsSummary | null; home: TeamSummary; away: TeamSummary; title: string}) {
     const t = useTranslations('Football.markets');
+    const tp = useTranslations('Football.prediction');
     const markets = prediction ? matchMarkets(prediction) : null;
     const h = data?.home ?? null;
     const a = data?.away ?? null;
@@ -132,22 +144,29 @@ export function MatchMarkets({data, prediction, home, away, title}: {data: Match
         </div>
     );
 
+    const updated = odds?.updatedAt ? new Date(odds.updatedAt) : null;
     return (
         <div className="flex flex-col gap-3">
-            <Panel title={title} action={help(t('hint'))}>
-                <p className="px-3 py-2 text-[12px] font-semibold leading-snug">{t('intro')}</p>
-                <p className="px-3 pb-2 text-[11px] font-semibold text-muted-foreground leading-snug">{t('disclaimer')}</p>
-            </Panel>
-
-            {markets && (
-                <Panel title={t('modelTitle')} action={help(t('modelHint'))}>
-                    <div className="px-3 py-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                        <MarketGroup title={t('groups.outcome')} cells={[{label: '1', line: markets.outcome.home}, {label: 'X', line: markets.outcome.draw}, {label: '2', line: markets.outcome.away}]} />
-                        <MarketGroup title={t('groups.doubleChance')} cells={[{label: '1X', line: markets.doubleChance.homeOrDraw}, {label: 'X2', line: markets.doubleChance.drawOrAway}, {label: '12', line: markets.doubleChance.homeOrAway}]} />
-                        <MarketGroup title={t('groups.goals')} cells={[{label: t('labels.over', {line: '1,5'}), line: markets.goals.over15}, {label: t('labels.over', {line: '2,5'}), line: markets.goals.over25}, {label: t('labels.over', {line: '3,5'}), line: markets.goals.over35}]} />
-                        <MarketGroup title={t('groups.under')} cells={[{label: t('labels.under', {line: '1,5'}), line: markets.goals.under15}, {label: t('labels.under', {line: '2,5'}), line: markets.goals.under25}, {label: t('labels.under', {line: '3,5'}), line: markets.goals.under35}]} />
-                        <MarketGroup title={t('groups.btts')} cells={[{label: t('labels.goal'), line: markets.btts.yes}, {label: t('labels.noGoal'), line: markets.btts.no}]} />
-                        {prediction && (
+            <Panel title={title} action={<span className="flex items-center gap-2">{prediction && <span className="text-[11px] font-bold text-muted-foreground">{tp(`confidence.${prediction.confidence}`)}</span>}{help(t('hint'))}</span>}>
+                <p className="px-3 py-2 text-[12px] font-semibold leading-snug border-b border-muted">{t('intro')}</p>
+                {prediction && markets ? (
+                    <>
+                        <div className="px-3 pt-2.5 pb-2">
+                            <div className="flex justify-between text-[11px] font-extrabold mb-1">
+                                <span className="truncate">{home.name}</span>
+                                <span className="truncate text-right">{away.name}</span>
+                            </div>
+                            <OutcomeBar prediction={prediction} />
+                            <div className="mt-1.5 text-[11px] font-semibold text-muted-foreground text-center">
+                                {tp('pick')}: <span className="font-mono font-extrabold text-foreground bg-accent px-1 rounded">{prediction.pick}</span> · {tp('expectedGoals')} <span className="font-mono font-extrabold text-foreground">{prediction.lambda.home.toFixed(2)}</span> – <span className="font-mono font-extrabold text-foreground">{prediction.lambda.away.toFixed(2)}</span> · {tp('sample', {count: prediction.sample})}
+                            </div>
+                        </div>
+                        <div className="px-3 py-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 border-t border-muted">
+                            <MarketGroup title={t('groups.outcome')} cells={[{label: '1', line: markets.outcome.home, odds: odds?.outcome?.home}, {label: 'X', line: markets.outcome.draw, odds: odds?.outcome?.draw}, {label: '2', line: markets.outcome.away, odds: odds?.outcome?.away}]} />
+                            <MarketGroup title={t('groups.doubleChance')} cells={[{label: '1X', line: markets.doubleChance.homeOrDraw, odds: odds?.doubleChance?.homeOrDraw}, {label: 'X2', line: markets.doubleChance.drawOrAway, odds: odds?.doubleChance?.drawOrAway}, {label: '12', line: markets.doubleChance.homeOrAway, odds: odds?.doubleChance?.homeOrAway}]} />
+                            <MarketGroup title={t('groups.goals')} cells={[{label: t('labels.over', {line: '1,5'}), line: markets.goals.over15, odds: odds?.goals?.over15}, {label: t('labels.over', {line: '2,5'}), line: markets.goals.over25, odds: odds?.goals?.over25}, {label: t('labels.over', {line: '3,5'}), line: markets.goals.over35, odds: odds?.goals?.over35}]} />
+                            <MarketGroup title={t('groups.under')} cells={[{label: t('labels.under', {line: '1,5'}), line: markets.goals.under15, odds: odds?.goals?.under15}, {label: t('labels.under', {line: '2,5'}), line: markets.goals.under25, odds: odds?.goals?.under25}, {label: t('labels.under', {line: '3,5'}), line: markets.goals.under35, odds: odds?.goals?.under35}]} />
+                            <MarketGroup title={t('groups.btts')} cells={[{label: t('labels.goal'), line: markets.btts.yes, odds: odds?.btts?.yes}, {label: t('labels.noGoal'), line: markets.btts.no, odds: odds?.btts?.no}]} />
                             <div className="flex flex-col gap-1 min-w-0">
                                 <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('groups.scores')}</span>
                                 <ul className="flex flex-wrap gap-1">
@@ -159,10 +178,24 @@ export function MatchMarkets({data, prediction, home, away, title}: {data: Match
                                     ))}
                                 </ul>
                             </div>
+                        </div>
+                        <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">
+                            {t('legendFair')}{odds ? ` · ${t('legendBook', {books: odds.books, at: updated ? updated.toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'}) : '–'})}` : ` · ${t('noOdds')}`}
+                        </p>
+                        {prediction.factors.length > 0 && (
+                            <div className="border-t border-muted px-3 py-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tp('why')}</span>
+                                <ul className="mt-1 flex flex-col gap-1 text-[12px] font-semibold leading-snug list-disc pl-4">
+                                    {prediction.factors.map((f) => <FactorLine key={f.key} factor={f} home={home} away={away} />)}
+                                </ul>
+                            </div>
                         )}
-                    </div>
-                </Panel>
-            )}
+                    </>
+                ) : (
+                    <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground">{tp('empty')}</p>
+                )}
+                <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('disclaimer')}</p>
+            </Panel>
 
             {!data ? (
                 <Panel title={t('bandsTitle')}><p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('empty')}</p></Panel>

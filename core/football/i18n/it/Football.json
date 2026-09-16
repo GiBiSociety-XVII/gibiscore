@@ -292,9 +292,9 @@
     }
   },
   "markets": {
-    "intro": "Questa scheda legge la partita come la leggono i mercati: cosa dice il modello su ogni esito con la quota che lo pagherebbe alla pari, in quale quarto d'ora le due squadre segnano e subiscono, quanto spesso le loro partite superano le soglie di gol, angoli e cartellini a partita.",
+    "intro": "Il pronostico del sito e ogni mercato letto come lo leggono i bookmaker: la probabilità del modello, la quota che la pagherebbe alla pari e la quota media dei bookmaker. Sotto, quando le due squadre segnano e subiscono, quanto spesso superano le soglie di gol, angoli e cartellini.",
     "disclaimer": "Sono numeri sulle partite giocate e sulle probabilità del modello, non un consiglio di gioco. Una quota più alta della quota equa non è una vincita sicura: è un esito che il bookmaker paga più di quanto il modello lo ritenga probabile. Gioca solo se maggiorenne e con misura.",
-    "hint": "Tutte le percentuali vengono dalle partite in archivio (eventi, statistiche) e dal modello di Poisson del pronostico. La quota equa è 100 diviso la probabilità: sopra quella il mercato paga più di quanto il modello si aspetti.",
+    "hint": "Modello di Poisson sui gol attesi delle due squadre (attacco e difesa rispetto al campionato, casa e trasferta, xG, forma), tradotto in ogni mercato. Quota equa = 100 / probabilità. Quote dei bookmaker dal fornitore dati, aggiornate ogni tre ore fino al calcio d'inizio.",
     "modelTitle": "Mercati secondo il modello",
     "modelHint": "Le stesse probabilità del pronostico, tradotte in ogni mercato. Evidenziato l'esito più probabile di ogni gruppo. Quota equa = 100 / probabilità.",
     "fair": "quota",
@@ -350,6 +350,11 @@
       "cornersAgainst": "Angoli concessi",
       "yellowFor": "Gialli presi",
       "yellowAgainst": "Gialli provocati"
-    }
+    },
+    "book": "book",
+    "oddsHint": "Probabilità {pct}%, quota equa {fair}. Bookmaker: media {avg}, la migliore {best} ({book}), {books} bookmaker.",
+    "legendFair": "quota = quota equa (100 / probabilità)",
+    "legendBook": "book = media di {books} bookmaker, aggiornata il {at}; in verde quando pagano più della quota equa",
+    "noOdds": "quote dei bookmaker non ancora disponibili per questa partita"
   }
 }

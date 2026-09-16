@@ -7,6 +7,7 @@ import {
     mapEvents,
     mapFixtureState,
     mapLineups,
+    mapOdds,
     mapPlayerProfile,
     mapPlayerSeason,
     mapPlayerStats,
@@ -226,5 +227,37 @@ describe('player seasons', () => {
         expect(row.penalties_scored).toBe(1);
         expect(row.position).toBe('attacker');
         expect(row.saves).toBeNull();
+    });
+});
+
+describe('mapOdds', () => {
+    const odds = {
+        league: {id: 135, season: 2026},
+        fixture: {id: 1, date: '2026-09-20T18:45:00+00:00', timestamp: 0},
+        update: '2026-09-19T10:00:00+00:00',
+        bookmakers: [
+            {id: 8, name: 'Bet365', bets: [
+                {id: 1, name: 'Match Winner', values: [{value: 'Home', odd: '1.85'}, {value: 'Draw', odd: '3.60'}, {value: 'Away', odd: '4.20'}]},
+                {id: 5, name: 'Goals Over/Under', values: [{value: 'Over 2.5', odd: '1.80'}, {value: 'Under 2.5', odd: '2.00'}, {value: 'Over 1.5', odd: '1.25'}, {value: 'Over 4.5', odd: '4.5'}]},
+                {id: 8, name: 'Both Teams Score', values: [{value: 'Yes', odd: '1.70'}, {value: 'No', odd: '2.10'}]},
+                {id: 12, name: 'Double Chance', values: [{value: 'Home/Draw', odd: '1.22'}, {value: 'Home/Away', odd: '1.28'}, {value: 'Draw/Away', odd: '1.95'}]},
+            ]},
+            {id: 6, name: 'Bwin', bets: [{id: 1, name: 'Match Winner', values: [{value: 'Home', odd: '1.90'}, {value: 'Draw', odd: '3.50'}]}]},
+            {id: 2, name: 'Empty', bets: [{id: 99, name: 'Corners', values: [{value: 'Over 9.5', odd: '1.9'}]}]},
+        ],
+    };
+
+    it('keeps the four markets per bookmaker, drops incomplete and unrelated ones', () => {
+        const rows = mapOdds(odds);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].bookmaker).toBe('Bet365');
+        expect(rows[0].markets.outcome).toEqual({home: 1.85, draw: 3.6, away: 4.2});
+        expect(rows[0].markets.goals).toEqual({over15: 1.25, under15: null, over25: 1.8, under25: 2, over35: null, under35: null});
+        expect(rows[0].markets.btts).toEqual({yes: 1.7, no: 2.1});
+        expect(rows[0].markets.doubleChance).toEqual({homeOrDraw: 1.22, drawOrAway: 1.95, homeOrAway: 1.28});
+    });
+
+    it('is empty without a response', () => {
+        expect(mapOdds(undefined)).toEqual([]);
     });
 });

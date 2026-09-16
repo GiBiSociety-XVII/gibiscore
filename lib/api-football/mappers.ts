@@ -3,11 +3,13 @@
  * No I/O here: everything is unit-tested in mappers.test.ts.
  */
 import type {FixtureState} from '@/lib/football/types';
+import type {OddsMarkets} from '@/lib/football/markets';
 import {cleanName, repairName} from '@/lib/football/names';
 import type {
     AfEvent,
     AfFixtureResponse,
     AfLineup,
+    AfOddsResponse,
     AfPlayerMatchStats,
     AfPlayerProfile,
     AfPlayerSeasonStats,
@@ -564,4 +566,62 @@ export function mapPlayerSeason(s: AfPlayerSeasonStats): PlayerSeasonRow {
         raw: s,
         synced_at: new Date().toISOString(),
     };
+}
+
+// ---------------------------------------------------------------------------
+// Odds
+// ---------------------------------------------------------------------------
+
+export interface OddsRow {
+    bookmakerId: number;
+    bookmaker: string;
+    markets: OddsMarkets;
+}
+
+const BET_NAMES = {outcome: 'Match Winner', doubleChance: 'Double Chance', goals: 'Goals Over/Under', btts: 'Both Teams Score'} as const;
+
+/**
+ * The bookmakers' prices for the four markets the site reads, one row
+ * per bookmaker; a bookmaker without any of them is skipped. Labels are
+ * the provider's: "Home"/"Draw"/"Away", "Home/Draw", "Over 2.5", "Yes".
+ */
+export function mapOdds(response: AfOddsResponse | undefined): OddsRow[] {
+    if (!response) return [];
+    const price = (values: Array<{value: string; odd: string}> | undefined, label: string): number | null => {
+        const v = values?.find((x) => x.value.trim().toLowerCase() === label.toLowerCase());
+        const n = v ? Number(v.odd) : NaN;
+        return Number.isFinite(n) && n > 1 ? n : null;
+    };
+    const rows: OddsRow[] = [];
+    for (const b of response.bookmakers ?? []) {
+        const bet = (name: string) => b.bets?.find((x) => x.name === name)?.values;
+        const markets: OddsMarkets = {};
+        const outcome = bet(BET_NAMES.outcome);
+        if (outcome) {
+            const home = price(outcome, 'Home');
+            const draw = price(outcome, 'Draw');
+            const away = price(outcome, 'Away');
+            if (home !== null && draw !== null && away !== null) markets.outcome = {home, draw, away};
+        }
+        const dc = bet(BET_NAMES.doubleChance);
+        if (dc) {
+            const homeOrDraw = price(dc, 'Home/Draw');
+            const drawOrAway = price(dc, 'Draw/Away');
+            const homeOrAway = price(dc, 'Home/Away');
+            if (homeOrDraw !== null && drawOrAway !== null && homeOrAway !== null) markets.doubleChance = {homeOrDraw, drawOrAway, homeOrAway};
+        }
+        const goals = bet(BET_NAMES.goals);
+        if (goals) {
+            const g = {over15: price(goals, 'Over 1.5'), under15: price(goals, 'Under 1.5'), over25: price(goals, 'Over 2.5'), under25: price(goals, 'Under 2.5'), over35: price(goals, 'Over 3.5'), under35: price(goals, 'Under 3.5')};
+            if (Object.values(g).some((v) => v !== null)) markets.goals = g;
+        }
+        const btts = bet(BET_NAMES.btts);
+        if (btts) {
+            const yes = price(btts, 'Yes');
+            const no = price(btts, 'No');
+            if (yes !== null && no !== null) markets.btts = {yes, no};
+        }
+        if (Object.keys(markets).length > 0) rows.push({bookmakerId: b.id, bookmaker: b.name, markets});
+    }
+    return rows;
 }

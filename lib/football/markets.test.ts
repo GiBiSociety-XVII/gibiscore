@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandOf, BANDS, expectedTotals, fairOdds, matchMarkets, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {bandOf, BANDS, expectedTotals, fairOdds, matchMarkets, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
 
@@ -95,5 +95,26 @@ describe('expectedTotals', () => {
         const away = teamMarketProfile([match({cornersFor: 4, cornersAgainst: 6, yellowFor: 3, yellowAgainst: 1})], 'away')!;
         expect(expectedTotals(home, away)).toEqual({corners: 10, yellows: 4});
         expect(expectedTotals(home, null)).toEqual({corners: null, yellows: null});
+    });
+});
+
+describe('summarizeOdds', () => {
+    it('averages the bookmakers, keeps the best price and who gives it', () => {
+        const s = summarizeOdds([
+            {bookmaker: 'A', markets: {outcome: {home: 1.8, draw: 3.5, away: 4.0}, btts: {yes: 1.7, no: 2.1}}, updatedAt: '2026-09-19T10:00:00Z'},
+            {bookmaker: 'B', markets: {outcome: {home: 1.9, draw: 3.4, away: 4.4}, goals: {over15: 1.3, under15: null, over25: 1.85, under25: 1.95, over35: null, under35: null}}, updatedAt: '2026-09-19T12:00:00Z'},
+        ])!;
+        expect(s.books).toBe(2);
+        expect(s.updatedAt).toBe('2026-09-19T12:00:00Z');
+        expect(s.outcome!.home).toEqual({avg: 1.85, best: 1.9, bestBook: 'B', books: 2});
+        expect(s.outcome!.away.best).toBe(4.4);
+        expect(s.btts!.yes).toEqual({avg: 1.7, best: 1.7, bestBook: 'A', books: 1});
+        expect(s.goals!.over25!.avg).toBe(1.85);
+        expect(s.goals!.under15).toBeUndefined();
+        expect(s.doubleChance).toBeUndefined();
+    });
+    it('is null without rows or without any market', () => {
+        expect(summarizeOdds([])).toBeNull();
+        expect(summarizeOdds([{bookmaker: 'A', markets: {}}])).toBeNull();
     });
 });
