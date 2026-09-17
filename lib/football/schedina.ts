@@ -81,7 +81,7 @@ const TIERS_BY_RISK: Record<SchedinaRisk, Array<BetSuggestion['tier']>> = {low: 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 /** Bookmakers take stakes in steps of five cents: down to the step below. */
 export const STAKE_STEP = 0.05;
-export const toStakeStep = (v: number) => Math.max(0, Math.floor(Math.round(v * 100) / (STAKE_STEP * 100)) * STAKE_STEP * 100) / 100;
+export const toStakeStep = (v: number) => Math.max(0, Math.floor(Math.round(v * 100) / 5) * 5) / 100;
 
 /** C(n, k). */
 export function combinations(n: number, k: number): number {
