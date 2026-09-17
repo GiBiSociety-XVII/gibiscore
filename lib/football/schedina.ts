@@ -79,6 +79,9 @@ export const BANKER_MIN_PCT = 75;
 const TIERS_BY_RISK: Record<SchedinaRisk, Array<BetSuggestion['tier']>> = {low: ['safe'], medium: ['balanced', 'safe'], high: ['bold', 'balanced']};
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
+/** Bookmakers take stakes in steps of five cents: down to the step below. */
+export const STAKE_STEP = 0.05;
+export const toStakeStep = (v: number) => Math.max(0, Math.floor(Math.round(v * 100) / (STAKE_STEP * 100)) * STAKE_STEP * 100) / 100;
 
 /** C(n, k). */
 export function combinations(n: number, k: number): number {
@@ -258,21 +261,21 @@ export type StakeMode = 'recommended' | 'full';
  * proportion to each line's edge, so the lines the model rates above
  * the market get the money and the others none; when no line has an
  * edge, everything on the best one. Full: the same stake on every
- * column of every line (a full-cover system). Cents.
+ * column of every line (a full-cover system). Steps of five cents.
  */
 export function suggestedStakes(groups: SystemGroup[], total: number, mode: StakeMode): number[] {
     if (groups.length === 0 || !(total > 0)) return groups.map(() => 0);
     if (mode === 'full') {
         const columns = groups.reduce((sum, g) => sum + g.columns.length, 0);
-        return groups.map(() => Math.floor((total / columns) * 100) / 100);
+        return groups.map(() => toStakeStep(total / columns));
     }
     const edges = groups.map((g) => Math.max(0, g.edge));
     const edgeSum = edges.reduce((sum, v) => sum + v, 0);
     if (edgeSum <= 0) {
         const best = groups.reduce((m, g, i) => (g.edge > groups[m].edge + 1e-9 || (Math.abs(g.edge - groups[m].edge) <= 1e-9 && g.atLeastPct > groups[m].atLeastPct) ? i : m), 0);
-        return groups.map((g, i) => (i === best ? Math.floor((total / g.columns.length) * 100) / 100 : 0));
+        return groups.map((g, i) => (i === best ? toStakeStep(total / g.columns.length) : 0));
     }
-    return groups.map((g, i) => Math.floor(((total * edges[i]) / edgeSum / g.columns.length) * 100) / 100);
+    return groups.map((g, i) => toStakeStep((total * edges[i]) / edgeSum / g.columns.length));
 }
 
 export interface StakePlan {

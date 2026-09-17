@@ -7,7 +7,7 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {cloudUser} from "@/lib/fantasy/cloud";
 import type {LegKey} from "@/lib/football/markets";
-import {buildSchedina, stakePlan, suggestedStakes, systemGroups, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
+import {buildSchedina, stakePlan, STAKE_STEP, suggestedStakes, systemGroups, toStakeStep, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
 
 const RISKS: SchedinaRisk[] = ['low', 'medium', 'high'];
 const KINDS: SchedinaKind[] = ['single', 'multiple', 'system'];
@@ -203,7 +203,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                                         </td>
                                                         <td className="px-2 py-1 text-right">{l.atLeastPct}%</td>
                                                         <td className="px-2 py-1 text-right">
-                                                            <input type="number" min={0} step={0.5} value={l.stake} onChange={(e) => { const next = stakes.map((v, j) => (j === i ? Math.max(0, Number(e.target.value) || 0) : v)); setLineStakes(next); }} className="bb-input h-7 w-20 px-1.5 font-mono text-[12px] font-extrabold text-right" aria-label={`${t('kOfN', {k: l.k, n: l.n})} ${t('perColumn')}`} />
+                                                            <input type="number" min={0} step={STAKE_STEP} value={l.stake} onChange={(e) => { const next = stakes.map((v, j) => (j === i ? toStakeStep(Number(e.target.value) || 0) : v)); setLineStakes(next); }} className="bb-input h-7 w-20 px-1.5 font-mono text-[12px] font-extrabold text-right" aria-label={`${t('kOfN', {k: l.k, n: l.n})} ${t('perColumn')}`} />
                                                         </td>
                                                         <td className="px-2 py-1 text-right">{l.lineStake.toFixed(2)}</td>
                                                         <td className="px-3 py-1 text-right">{l.priced ? '' : '≈'}{l.linePayout.toFixed(2)}</td>

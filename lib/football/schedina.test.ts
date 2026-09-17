@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {BetSuggestion} from './markets';
-import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, suggestedStakes, systemGroups, type SchedinaCandidate} from './schedina';
+import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, suggestedStakes, systemGroups, toStakeStep, type SchedinaCandidate} from './schedina';
 
 const slip = (tier: BetSuggestion['tier'], pct: number, odds: number | null = null): BetSuggestion => ({tier, legs: [{key: '1', pct, odds}], pct, fair: Math.round((100 / pct) * 100) / 100, odds});
 const match = (id: number, day: string, hour: string, competitionId: number, slips: BetSuggestion[]): SchedinaCandidate => ({fixtureId: id, competitionId, competition: `L${competitionId}`, home: `H${id}`, away: `A${id}`, startingAt: `${day}T${hour}:00Z`, day, slips});
@@ -126,5 +126,17 @@ describe('columns, automatic k and the stake plan', () => {
         const one = systemGroups(single.selections);
         expect(one).toHaveLength(1);
         expect(stakePlan(single.selections, one, [10]).maxPayout).toBe(14);
+    });
+});
+
+describe('toStakeStep', () => {
+    it('keeps stakes on five-cent steps, never above what was asked', () => {
+        expect(toStakeStep(5.12)).toBe(5.1);
+        expect(toStakeStep(5.15)).toBe(5.15);
+        expect(toStakeStep(5.149)).toBe(5.1);
+        expect(toStakeStep(0.03)).toBe(0);
+        expect(toStakeStep(10)).toBe(10);
+        const stakes = suggestedStakes(systemGroups(buildSchedina([match(31, '2026-09-18', '18:45', 1, [slip('balanced', 70, 1.5)]), match(32, '2026-09-18', '20:45', 1, [slip('balanced', 65, 1.6)]), match(33, '2026-09-19', '15:00', 1, [slip('balanced', 62, 1.7)])], {risk: 'medium', kind: 'system', size: 3, system: 2, bankers: 0, days: [], competitions: [], now: '2026-09-18T10:00:00Z'})!.selections), 33.33, 'full');
+        for (const v of stakes) expect(Math.round(v * 100) % 5).toBe(0);
     });
 });
