@@ -338,7 +338,41 @@
       "schedineSaved": "Salvate",
       "schedineSettled": "Chiuse",
       "schedineWon": "Vinte",
-      "schedineHint": "Le schedine generate dalla pagina pronostici e salvate nell'account: ogni selezione è una giocata del modello, chiusa sui risultati reali dallo stesso registro. Accedi per vedere le tue."
+      "schedineHint": "Le schedine generate dalla pagina pronostici e salvate nell'account: ogni selezione è una giocata del modello, chiusa sui risultati reali dallo stesso registro. Accedi per vedere le tue.",
+      "tour": {
+        "button": "Guida",
+        "open": "Rivedi la guida passo passo del bilancio del modello",
+        "steps": {
+          "live": {
+            "title": "Le giocate verificate",
+            "text": "Ogni giocata proposta (prudente, consigliata, audace) viene scritta prima del calcio d'inizio e chiusa sul risultato finale. Vinte = quante sono andate a segno; promessa = la probabilità media che il modello dava. Se le due sono vicine il modello è ben tarato. Resa = puntata fissa su ogni giocata alla quota media dei bookmaker."
+          },
+          "fit": {
+            "title": "La taratura",
+            "text": "Ogni partita delle ultime stagioni in archivio è stata pronosticata con quello che si sapeva il giorno prima e confrontata col risultato vero: qui vedi come sarebbero andate le tre giocate su quelle partite. La taratura gira da sola ogni settimana; la data in alto a destra è l'ultima."
+          },
+          "knobs": {
+            "title": "Le manopole del modello",
+            "text": "Partite replicate e stagioni usate, poi le tre manopole tarate sui risultati: gol attesi, fattore campo e correlazione dei punteggi bassi. Log-loss: quanto il modello sbaglia il risultato esatto, prima e dopo la taratura, più basso è meglio. Cambia solo il pronostico, mai i dati delle pagine."
+          },
+          "schedine": {
+            "title": "Le schedine di tutti",
+            "text": "Le schedine generate dalla pagina Pronostici e salvate dagli utenti: quante salvate, quante chiuse sui risultati veri e quante vinte."
+          },
+          "mine": {
+            "title": "Le mie schedine",
+            "text": "Le schedine che hai salvato, dalla più recente: aperta finché le sue partite non sono finite, poi vinta o persa, con quante selezioni hai centrato. Tocca una partita per aprirne l'analisi."
+          },
+          "latest": {
+            "title": "Le ultime verificate",
+            "text": "Le ultime giocate chiuse, con il risultato della partita, il livello, la probabilità che il modello dava e le quote. Tocca la partita per rivedere l'analisi."
+          },
+          "predictions": {
+            "title": "Torna ai pronostici",
+            "text": "Le prossime partite con le tre giocate del modello e il generatore di schedine."
+          }
+        }
+      }
     },
     "filters": {
       "days": "Giorni",

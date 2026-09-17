@@ -53,8 +53,9 @@ export function MySchedine() {
     if (rows === undefined || rows === null) return null;
     const settled = rows.filter((r) => r.hit !== null);
     const won = settled.filter((r) => r.hit).length;
+    // The guide of the record page points at the whole panel (skipped while it is not on the page).
     return (
-        <Panel title={t('title')} action={settled.length > 0 ? <span className="font-mono text-[11px] text-muted-foreground">{t('tally', {won, settled: settled.length})}</span> : undefined}>
+        <div data-tour="mine"><Panel title={t('title')} action={settled.length > 0 ? <span className="font-mono text-[11px] text-muted-foreground">{t('tally', {won, settled: settled.length})}</span> : undefined}>
             {rows.length === 0 ? (
                 <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('empty')}</p>
             ) : (
@@ -81,6 +82,6 @@ export function MySchedine() {
                     ))}
                 </ul>
             )}
-        </Panel>
+        </Panel></div>
     );
 }
