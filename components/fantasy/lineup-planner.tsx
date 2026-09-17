@@ -1,6 +1,7 @@
 'use client';
 
-import {ArrowLeftRight, Ban, HelpCircle, Lock, Pin, PinOff, RotateCcw, Settings2, Sparkles, Trash2, X} from "lucide-react";
+import {ArrowLeftRight, Ban, BookOpen, HelpCircle, Lock, Pin, PinOff, RotateCcw, Settings2, Sparkles, Trash2, X} from "lucide-react";
+import {Tour} from "./tour";
 import {useEffect, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -26,6 +27,9 @@ import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
+const TOUR_KEY = 'gibiscore:lineup-tour:v1';
+/** The guide's stops, in order: each a `data-tour` on the page. */
+const TOUR_STEPS = ['team', 'status', 'fixtures', 'pitch', 'bench', 'pins', 'starters', 'formations', 'how'] as const;
 /** Bumped when the forecast changes scale or meaning: a frozen snapshot from before is drawn again. 2: votes on the fantasy scale. */
 const LINEUP_MODEL = 2;
 
@@ -133,7 +137,7 @@ function PitchDot({f, byId, pinned, picking, onReceive}: {f: PlayerForecast; byI
 function BenchStrip({bench, slots, byId, pinned, benched, outs, picking, locked, onPlace, onUnbench}: {bench: PlayerForecast[]; slots: Map<number, number>; byId: Map<number, AuctionPlayer>; pinned: ReadonlySet<number>; benched: ReadonlySet<number>; outs: ReadonlySet<number>; picking: number | null; locked: boolean; onPlace: (id: number) => void; onUnbench: (id: number) => void}) {
     const t = useTranslations('Fantasy.lineup');
     return (
-        <div className="bb-surface flex flex-col min-h-0 md:relative md:h-full">
+        <div data-tour="bench" className="bb-surface flex flex-col min-h-0 md:relative md:h-full">
             <div className="flex items-center gap-1.5 px-3 h-9 border-b-2 border-foreground bg-card rounded-t-[calc(var(--radius-lg)-2px)] text-[12px] font-extrabold uppercase tracking-wide shrink-0">
                 {t('benchTitle', {count: bench.length})}
                 <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground normal-case tracking-normal" title={t('dragHint')}><ArrowLeftRight className="w-3 h-3" aria-hidden="true" />{t('dragShort')}</span>
@@ -178,6 +182,7 @@ function FantasyPitch({starters, formation, byId, pinned, picking, onSwap, onPla
     const rows = [...ROLES].reverse().map((role) => starters.filter((f) => f.player.role === role).sort((a, b) => (rank.get(a.player.id) ?? 99) - (rank.get(b.player.id) ?? 99)));
     return (
         <div
+            data-tour="pitch"
             className={cn("relative rounded-xl border-[2.5px] border-foreground overflow-hidden bg-[#3f8f3a] text-background", picking !== null && "ring-4 ring-accent")}
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
             onDrop={(e) => { e.preventDefault(); const id = draggedId(e); if (id !== null) onPlace(id); }}
@@ -502,7 +507,7 @@ export function LineupPlanner({pool, context}: {pool: AuctionPool | null; contex
     };
 
     const toolbar = (
-        <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
+        <div data-tour="team" className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5 text-[11px] font-bold min-w-0">
                 <span className="text-muted-foreground">{t('teamLabel')}</span>
                 <select value={current.id} onChange={(e) => choose(e.target.value)} className="bb-input h-8 px-2 text-[12px] font-extrabold max-w-[260px]">
@@ -555,6 +560,23 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
     const [forced, setForced] = useState<FormationKey | null>(null);
     // The substitute being placed by hand: the next tap on a starter is the one who leaves.
     const [picking, setPicking] = useState<number | null>(null);
+    // The step-by-step guide: opens by itself the first time the page is seen on this browser, and from the button after.
+    const [tour, setTour] = useState(false);
+    useEffect(() => {
+        try {
+            if (!localStorage.getItem(TOUR_KEY)) queueMicrotask(() => setTour(true));
+        } catch {
+            // No storage: no guide by itself, the button stays.
+        }
+    }, []);
+    const closeTour = () => {
+        setTour(false);
+        try {
+            localStorage.setItem(TOUR_KEY, '1');
+        } catch {
+            // Shown again next time: no harm.
+        }
+    };
     // The clock, so the page locks itself at kick-off while open.
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
@@ -637,7 +659,8 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
     return (
         <div className="flex flex-col gap-3">
             {toolbar}
-            <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] font-semibold">
+            {tour && <Tour steps={TOUR_STEPS.map((key) => ({target: key, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} onClose={closeTour} />}
+            <div data-tour="status" className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] font-semibold">
                 <span className={cn("inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border-2 border-foreground font-extrabold", frozen ? "bg-amber-200" : "bg-emerald-200")}>
                     <Lock className="w-3.5 h-3.5" aria-hidden="true" />
                     {frozen ? t('status.locked') : roundInfo ? t('status.open', {when: when(roundInfo.from)}) : t('status.openNoDate')}
@@ -645,6 +668,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                 {roundInfo && <span className="text-muted-foreground">{when(roundInfo.from)} → {when(roundInfo.to)}</span>}
                 <span className={cn("bb-badge text-[10px] h-5 px-1.5", withOfficial > 0 ? "bg-emerald-200" : "bg-card")}>{t('officialCount', {have: withOfficial, total: rosterTeams.length})}</span>
                 <span className="text-muted-foreground ml-auto">{frozen ? t('frozenAt', {when: when(frozen.savedAt)}) : t('updated', {when: format.dateTime(new Date(context.generatedAt), {hour: '2-digit', minute: '2-digit', timeZone: ROME})})}</span>
+                <button type="button" onClick={() => setTour(true)} className="bb-btn bg-card px-2.5 h-7 text-[11px] font-extrabold inline-flex items-center gap-1.5" title={t('tour.open')}><BookOpen className="w-3.5 h-3.5" aria-hidden="true" />{t('tour.button')}</button>
             </div>
             {frozen && (
                 <div className="bb-surface px-3 py-2 flex items-start gap-2 text-[12px] font-semibold bg-amber-100">
@@ -657,7 +681,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">
                     {fixturesOfRoster.length > 0 && (
-                        <ul aria-label={t('fixturesTitle')} className="bb-surface px-2 py-1.5 flex gap-1.5 overflow-x-auto [scrollbar-width:thin]">
+                        <ul data-tour="fixtures" aria-label={t('fixturesTitle')} className="bb-surface px-2 py-1.5 flex gap-1.5 overflow-x-auto [scrollbar-width:thin]">
                             {fixturesOfRoster.map((f) => {
                                 const mine = roster.filter((p) => p.team.id === f.home.id || p.team.id === f.away.id);
                                 const official = context.officialTeams.includes(f.home.id) || context.officialTeams.includes(f.away.id);
@@ -690,7 +714,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                             </span>
                         </div>
                     ) : (
-                    <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
+                    <div data-tour="pins" className="bb-surface px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold">
                         <Pin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         {outs.size > 0 && <span className="text-red-700 font-extrabold">{t('outsCount', {count: outs.size})}</span>}
                         {pinned.size === 0 && benched.size === 0 ? (
@@ -709,7 +733,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                     </div>
                     <BenchStrip bench={advice.bench} slots={advice.slots} byId={byId} pinned={pinned} benched={benched} outs={outs} picking={frozen ? null : picking} locked={!!frozen} onPlace={(id) => setPicking(picking === id ? null : id)} onUnbench={unbench} />
                     </div>
-                    <Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
+                    <div data-tour="starters"><Panel title={t('startersTitle', {formation: advice.formation, total: advice.total.toFixed(1)})}>
                         <ul className="md:hidden flex flex-col">
                             {advice.starters.map((f) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={null} byId={byId} teamById={teamById} reasonText={reasonText} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} />)}
                         </ul>
@@ -721,7 +745,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                                 </tbody>
                             </table>
                         </div>
-                    </Panel>
+                    </Panel></div>
                     <Panel title={<span className="inline-flex items-center gap-1.5">{t('benchTitle', {count: advice.bench.length})}<Help text={`${t('benchHint')}\n${t('dragHint')}`} /></span>} action={<span className="hidden md:inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"><ArrowLeftRight className="w-3 h-3" aria-hidden="true" />{t('dragShort')}</span>}>
                         <ul className="md:hidden flex flex-col">
                             {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} swap={{benched: benched.has(f.player.id), onUnbench: () => unbench(f.player.id), onPlace: () => setPicking(picking === f.player.id ? null : f.player.id), picking: picking === f.player.id}} />)}
@@ -738,7 +762,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                 </div>
 
                 <div className="flex flex-col gap-3 min-w-0">
-                    <Panel title={<span className="inline-flex items-center gap-1.5">{t('formationsTitle')}<Help text={t('formationsHint')} /></span>}>
+                    <div data-tour="formations"><Panel title={<span className="inline-flex items-center gap-1.5">{t('formationsTitle')}<Help text={t('formationsHint')} /></span>}>
                         <ul className="flex flex-col divide-y divide-muted">
                             {advice.formations.map((f, i) => (
                                 <li key={f.key}>
@@ -754,8 +778,8 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                             ))}
                         </ul>
 
-                    </Panel>
-                    <details className="bb-surface overflow-hidden group">
+                    </Panel></div>
+                    <details data-tour="how" className="bb-surface overflow-hidden group">
                         <summary className="flex items-center justify-between gap-2 px-3 h-9 bg-card cursor-pointer list-none text-[13px] font-extrabold uppercase tracking-wide">
                             {t('howTitle')}
                             <span className="text-[11px] font-bold text-muted-foreground normal-case tracking-normal group-open:hidden">{t('howOpen')}</span>

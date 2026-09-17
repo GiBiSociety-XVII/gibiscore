@@ -1032,6 +1032,48 @@
         "yellow": "amm.",
         "red": "esp."
       }
+    },
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della formazione",
+      "steps": {
+        "team": {
+          "title": "La tua squadra",
+          "text": "Scegli per quale rosa schierare: le squadre arrivano da sole dalle aste che hai registrato o importato. Accanto la modalità della lega e il modulo fissato, se c'è."
+        },
+        "status": {
+          "title": "La giornata",
+          "text": "Quando si gioca e quando la formazione si blocca (all'inizio della giornata resta fissata così com'era). Il contatore dice per quante delle tue squadre sono uscite le formazioni ufficiali, e l'ora dell'ultimo aggiornamento."
+        },
+        "fixtures": {
+          "title": "Le partite dei tuoi",
+          "text": "Le partite della giornata in cui giocano i tuoi giocatori, con orario, pronostico e quanti dei tuoi ci sono. Tocca una partita per l'analisi."
+        },
+        "pitch": {
+          "title": "L'undici consigliato",
+          "text": "Il modulo e gli undici che rendono di più secondo titolarità reale, formazioni ufficiali, infortuni e pronostico della partita. Tocca un giocatore per il perché, il pin per bloccarlo in campo, il divieto per escluderlo. Trascina un panchinaro sopra un titolare per lo scambio."
+        },
+        "bench": {
+          "title": "La panchina",
+          "text": "Ordinata come conviene: il primo entra per primo. Da qui trascini un giocatore in campo, oppure tocchi le frecce e scegli chi esce, o \"al posto migliore\" e decide il modello."
+        },
+        "pins": {
+          "title": "Le tue scelte",
+          "text": "Il riepilogo di chi hai bloccato, escluso o mandato in panchina a mano, e quanto ti costa rispetto alla formazione libera. \"Ripristina\" toglie tutto e torna al consiglio del modello."
+        },
+        "starters": {
+          "title": "I numeri dei titolari",
+          "text": "Per ogni titolare la probabilità di giocare, i punti attesi e i segnali dietro (ufficiale, ballottaggio, infortunio, partita facile o difficile). Il totale in alto è quello che il modello si aspetta dall'undici."
+        },
+        "formations": {
+          "title": "Gli altri moduli",
+          "text": "Ogni modulo valutato sulla tua rosa, il migliore in cima. Tocca un modulo per imporlo: l'undici si rifà su quello."
+        },
+        "how": {
+          "title": "Come funziona",
+          "text": "Qui trovi in breve come nascono i consigli: cosa pesa, quando si aggiorna e cosa succede al blocco della giornata."
+        }
+      }
     }
   },
   "votes": {
