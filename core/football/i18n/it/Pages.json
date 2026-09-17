@@ -196,7 +196,15 @@
     "scorers": "Marcatori",
     "assists": "Assist",
     "empty": "Dati non ancora disponibili per questa competizione.",
-    "seasonPicker": "Stagione"
+    "seasonPicker": "Stagione",
+    "tools": {
+      "label": "Strumenti",
+      "predictions": "Pronostici e schedine",
+      "record": "Bilancio del modello",
+      "injuries": "Infortunati e squalificati",
+      "compare": "Confronta giocatori",
+      "search": "Cerca squadra o giocatore"
+    }
   },
   "injuries": {
     "title": "Infortunati e squalificati",

@@ -54,6 +54,12 @@ export default async function StatsPage({params}: PageProps<"/[locale]/stats/[[.
                     ) : null
                 }
             />
+            {/* The tools people look for from the "Statistiche" tab, above the tables: one tap each. */}
+            <nav aria-label={t('tools.label')} className="flex flex-wrap gap-1.5">
+                {([['/predictions', 'predictions'], ['/predictions/record', 'record'], ['/injuries', 'injuries'], ['/compare', 'compare'], ['/search', 'search']] as const).map(([href, key]) => (
+                    <Link key={key} href={href} className="bb-btn bg-card h-8 px-3 inline-flex items-center text-[12px] font-extrabold">{t(`tools.${key}`)}</Link>
+                ))}
+            </nav>
             {blocks.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{t('empty')}</p>
             ) : (
