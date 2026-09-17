@@ -3,6 +3,8 @@ import {apiFootballGet} from '@/lib/api-football/client';
 import {mapLineups} from '@/lib/api-football/mappers';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {provides, type LeagueCoverage} from '@/lib/football/coverage';
+import {lineupsCandidate} from '@/lib/notifications/events';
+import {dispatchNotifications} from '@/lib/notifications/dispatch';
 import {chunk, ensurePlayers, failSync, finishRun, footballClient, idMap, startRun, type MinimalPlayer, type SyncRun} from './context';
 
 /** Fixtures kicking off within this many minutes are asked for their official lineups. */
@@ -84,6 +86,12 @@ export async function syncUpcomingLineups(options: {withinMinutes?: number} = {}
             }
             run.bump('lineups', unique.size);
             run.bump('fixtures', withLineups.length);
+            // The fans of the two clubs hear that the lineups are out.
+            await dispatchNotifications(
+                db,
+                run,
+                withLineups.filter((m) => ourId.has(m.f.fixture.id)).map((m) => ({fixtureId: ourId.get(m.f.fixture.id)!, candidates: [lineupsCandidate({home: m.f.teams.home.name, away: m.f.teams.away.name, league: m.f.league.name})]})),
+            );
         }
         await finishRun(db, run, 'ok');
         return run;

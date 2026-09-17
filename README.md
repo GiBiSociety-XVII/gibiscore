@@ -150,6 +150,33 @@ Ogni esecuzione scrive una riga in `sync_runs` con contatori, richieste usate
 e avvisi: è il primo posto dove guardare se qualcosa manca. `sync_state`
 tiene l'ultima lettura della quota giornaliera.
 
+## Notifiche push
+
+Un utente con l'account riceve sul telefono o sul computer, anche a sito
+chiuso, le notifiche delle partite delle competizioni e delle squadre che ha
+tra i preferiti: calcio d'inizio, fine primo tempo, finale, ogni gol con chi
+ha segnato, espulsioni e formazioni ufficiali. Web Push standard
+(`web-push`, chiavi VAPID in `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e
+`VAPID_PRIVATE_KEY`): su Android e desktop con qualsiasi browser, su iPhone
+e iPad solo con il sito aggiunto alla schermata Home.
+
+- `lib/notifications/events.ts` (puro, testato): dallo stato salvato e da
+  quello appena letto dal provider ricava cosa è successo; ogni notifica ha
+  una chiave e la tabella `notified` fa da registro, così un secondo giro del
+  job o un feed che rielenca gli eventi non manda due volte lo stesso gol. Un
+  evento più vecchio di 12 minuti di gioco non è più una notizia: al primo
+  giro dopo un deploy non arriva tutto il primo tempo.
+- `lib/notifications/dispatch.ts`: chiamato da `sync-live` a ogni giro e da
+  `sync-lineups`; trova chi segue la partita (`user_favorites`), rispetta
+  l'interruttore generale e i tipi scelti (`notification_settings`) e le
+  partite silenziate (`muted_fixtures`), manda a ogni browser iscritto
+  (`push_subscriptions`) e dimentica i browser che il servizio push dice
+  spariti.
+- Il profilo (`/account`) attiva o disattiva il dispositivo, mette in pausa
+  tutto, sceglie i tipi; la campanella nella pagina della partita silenzia
+  quella sola partita (niente spoiler mentre la si guarda). Il service worker
+  è `public/sw.js`: mostra la notifica e al tocco apre la partita.
+
 ## Identità
 
 I file del marchio (icone, favicon, lockup di GiBiScore, GiBiArena e

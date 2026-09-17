@@ -58,6 +58,41 @@
       "record": "Bilancio del modello"
     },
     "schedine": "Le mie schedine",
-    "schedineHint": "Ogni schedina generata dalla pagina Pronostici e salvata resta aperta finché le sue partite non sono finite, poi viene chiusa da sola sui risultati reali: vinta o persa, con quante selezioni hai centrato. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura."
+    "schedineHint": "Ogni schedina generata dalla pagina Pronostici e salvata resta aperta finché le sue partite non sono finite, poi viene chiusa da sola sui risultati reali: vinta o persa, con quante selezioni hai centrato. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
+    "favorites": {
+      "title": "I miei preferiti",
+      "competitions": "Competizioni",
+      "teams": "Squadre",
+      "emptyCompetitions": "Nessuna competizione tra i preferiti: usa la stella accanto a un campionato o a una coppa.",
+      "emptyTeams": "Nessuna squadra tra i preferiti: usa la stella nella pagina di una squadra.",
+      "hint": "Le stelle sono le stesse di tutto il sito e seguono il tuo account su ogni dispositivo. Le partite di queste competizioni e squadre vengono prima nella lista, le loro classifiche nella colonna di destra, e sono quelle di cui ricevi le notifiche."
+    },
+    "notifications": {
+      "title": "Notifiche",
+      "intro": "Per le partite delle competizioni e delle squadre tra i preferiti: calcio d'inizio, fine primo tempo, finale, ogni gol con chi ha segnato, espulsioni e formazioni ufficiali. Arrivano sul telefono o sul computer anche a sito chiuso.",
+      "devices": "{count, plural, one {# dispositivo} other {# dispositivi}}",
+      "deviceOn": "Attiva su questo dispositivo",
+      "deviceOff": "Disattiva su questo dispositivo",
+      "deviceIsOn": "Questo dispositivo riceve le notifiche.",
+      "deviceIsOff": "Questo dispositivo non riceve ancora le notifiche.",
+      "iosInstall": "Su iPhone e iPad le notifiche arrivano solo se aggiungi GiBiScore alla schermata Home: da Safari tocca Condividi, poi \"Aggiungi alla schermata Home\", e apri il sito da lì.",
+      "unsupported": "Questo browser non supporta le notifiche.",
+      "notConfigured": "Le notifiche non sono ancora configurate su questo sito.",
+      "denied": "Il browser ha negato il permesso: riattivalo dalle impostazioni del sito.",
+      "masterOn": "Notifiche attive",
+      "masterOff": "Notifiche in pausa",
+      "masterHint": "In pausa non ricevi nulla su nessun dispositivo, senza perdere le impostazioni: riattivi quando vuoi.",
+      "kinds": {
+        "kickoff": "Calcio d'inizio",
+        "half_time": "Fine primo tempo",
+        "full_time": "Finale",
+        "goal": "Gol",
+        "red_card": "Espulsioni",
+        "lineups": "Formazioni ufficiali"
+      },
+      "muteHint": "Stai guardando una partita e non vuoi spoiler? Nella pagina della partita tocca la campanella per silenziare solo quella.",
+      "saving": "Salvataggio…",
+      "error": "Non salvato: riprova."
+    }
   }
 }
