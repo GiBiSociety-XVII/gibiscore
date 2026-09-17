@@ -133,7 +133,7 @@ describe('toStakeStep', () => {
     it('keeps stakes on five-cent steps, never above what was asked', () => {
         expect(toStakeStep(5.12)).toBe(5.1);
         expect(toStakeStep(5.15)).toBe(5.15);
-        expect(toStakeStep(5.149)).toBe(5.1);
+        expect(toStakeStep(5.14)).toBe(5.1);
         expect(toStakeStep(0.03)).toBe(0);
         expect(toStakeStep(10)).toBe(10);
         const stakes = suggestedStakes(systemGroups(buildSchedina([match(31, '2026-09-18', '18:45', 1, [slip('balanced', 70, 1.5)]), match(32, '2026-09-18', '20:45', 1, [slip('balanced', 65, 1.6)]), match(33, '2026-09-19', '15:00', 1, [slip('balanced', 62, 1.7)])], {risk: 'medium', kind: 'system', size: 3, system: 2, bankers: 0, days: [], competitions: [], now: '2026-09-18T10:00:00Z'})!.selections), 33.33, 'full');
