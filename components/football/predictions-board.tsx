@@ -59,28 +59,28 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
     return (
         <div className="flex flex-col gap-3">
             <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
-                <div role="tablist" aria-label={t('filters.days')} className="flex flex-wrap items-center gap-1">
+                <div data-tour="days" role="tablist" aria-label={t('filters.days')} className="flex flex-wrap items-center gap-1">
                     {DAY_FILTERS.map((d) => (
                         <button key={d} type="button" role="tab" aria-selected={day === d} onClick={() => setDay(d)} className={cn("bb-btn h-8 px-3 text-[12px] font-extrabold", day === d ? "bg-foreground text-background" : "bg-card")}>
                             {t(`filters.${d}`)}
                         </button>
                     ))}
                 </div>
-                <select value={league} onChange={(e) => setLeague(e.target.value === 'all' ? 'all' : Number(e.target.value))} aria-label={t('filters.competition')} className="bb-input h-8 px-2 text-[12px] font-bold">
+                <select data-tour="competition" value={league} onChange={(e) => setLeague(e.target.value === 'all' ? 'all' : Number(e.target.value))} aria-label={t('filters.competition')} className="bb-input h-8 px-2 text-[12px] font-bold">
                     <option value="all">{t('filters.allCompetitions')}</option>
                     {blocks.map((b) => <option key={b.competition.id} value={b.competition.id}>{b.competition.country ? `${b.competition.country} · ` : ''}{b.competition.name}</option>)}
                 </select>
                 <span className="ml-auto font-mono text-[11px] font-bold text-muted-foreground">{t('filters.count', {count})}</span>
-                <button type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold" disabled={candidates.length === 0}>{t('schedina.open')}</button>
+                <button data-tour="schedina" type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold" disabled={candidates.length === 0}>{t('schedina.open')}</button>
             </div>
-            <p className="text-[12px] font-semibold text-muted-foreground leading-snug px-0.5">{t('legendShort')}</p>
+            <p data-tour="legend" className="text-[12px] font-semibold text-muted-foreground leading-snug px-0.5">{t('legendShort')}</p>
             {schedina && <SchedinaDialog candidates={candidates} days={dayOptions} competitions={blocks.map((b) => ({id: b.competition.id, name: b.competition.name}))} onClose={() => setSchedina(false)} />}
 
             {shown.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{tp('listEmpty')}</p>
             ) : (
-                <div className="grid gap-3 grid-cols-1 xl:grid-cols-2 items-start">
-                    {shown.map((b) => (
+                <div data-tour="list" className="grid gap-3 grid-cols-1 xl:grid-cols-2 items-start">
+                    {shown.map((b, bi) => (
                         <Panel
                             key={b.competition.id}
                             title={
@@ -92,10 +92,12 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                             action={<span className="font-mono text-[11px] text-muted-foreground">{b.fixtures.length}</span>}
                         >
                             <ul className="flex flex-col">
-                                {b.fixtures.map(({fixture, prediction, slips}) => {
+                                {b.fixtures.map(({fixture, prediction, slips}, fi) => {
                                     const start = new Date(fixture.startingAt);
+                                    // The guide points at the first match on the page and at its three slips.
+                                    const first = bi === 0 && fi === 0;
                                     return (
-                                        <li key={fixture.id} className="border-t border-muted first:border-t-0">
+                                        <li key={fixture.id} data-tour={first ? 'match' : undefined} className="border-t border-muted first:border-t-0">
                                             <Link href={`/matches/${fixture.id}`} target="_blank" rel="noopener noreferrer" className="block px-3 py-2 hover:bg-muted/50">
                                                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
                                                     <span className="flex items-center justify-end gap-2 min-w-0 text-[13px] font-extrabold">
@@ -112,7 +114,7 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                                                     </span>
                                                 </div>
                                                 {prediction ? (
-                                                    <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                                                    <div data-tour={first ? 'tiers' : undefined} className="mt-1.5 grid grid-cols-3 gap-1.5">
                                                         {(['safe', 'balanced', 'bold'] as const).map((tier) => {
                                                             const slip = slips.find((x) => x.tier === tier);
                                                             return (

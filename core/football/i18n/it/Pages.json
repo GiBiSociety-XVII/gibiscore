@@ -432,7 +432,49 @@
       "withBankers": "+ {count} fisse",
       "perColumn": "Per colonna",
       "lineTotal": "Riga",
-      "totalStake": "Puntata totale"
+      "totalStake": "Puntata totale",
+      "tour": {
+        "button": "Guida",
+        "open": "Rivedi la guida passo passo del generatore di schedine",
+        "steps": {
+          "risk": {
+            "title": "Il rischio",
+            "text": "Basso prende solo giocate prudenti (almeno il 78%), medio le consigliate (dal 62%), alto le audaci (dal 45%). Quando una partita non ha la giocata di quel livello, il modello scende a quello più sicuro."
+          },
+          "kind": {
+            "title": "Singola, multipla o sistema",
+            "text": "Singola: una sola partita, la più probabile. Multipla: tutte le selezioni devono vincere, la quota è il prodotto. Sistema: scegli quante partite, quante fisse (che devono sempre essere centrate) e le colonne da k selezioni libere; con \"auto\" il modello sceglie fisse e k con la resa migliore."
+          },
+          "days": {
+            "title": "I giorni",
+            "text": "Qualsiasi giorno oppure solo quelli che tocchi: le selezioni vengono prese tra le partite di quei giorni."
+          },
+          "competitions": {
+            "title": "Le competizioni",
+            "text": "Tutte oppure solo quelle che tocchi. Sotto vedi quante partite restano tra cui scegliere."
+          },
+          "generate": {
+            "title": "Genera",
+            "text": "Il modello prende le giocate in cui crede di più per il rischio scelto, una per partita, mai due dalla stessa. Puoi rigenerare quante volte vuoi cambiando le impostazioni."
+          },
+          "result": {
+            "title": "Le selezioni",
+            "text": "Ogni riga è una partita con la giocata scelta, la sua probabilità e la quota dei bookmaker. Nel sistema il bollino \"Fissa\" segna le selezioni che entrano in ogni colonna. Tocca la partita per aprirne l'analisi."
+          },
+          "summary": {
+            "title": "Probabilità e quota",
+            "text": "Probabilità che la schedina vinca per intero, quota equa del modello, quota dei bookmaker (≈ quando è una stima) e quando la schedina si chiude: due ore dopo l'ultimo calcio d'inizio."
+          },
+          "stake": {
+            "title": "La puntata",
+            "text": "Scrivi quanto vuoi puntare in tutto: il modello la divide per linea, k su N, come sul biglietto del bookmaker, in multipli di 5 centesimi. \"Consigliata\" mette di più sulle linee con la resa migliore, \"Tutte\" la spalma su ogni linea; puoi correggere ogni importo a mano. Sotto: puntata totale, vincita massima, resa attesa e probabilità di chiudere in guadagno."
+          },
+          "save": {
+            "title": "Salva",
+            "text": "Con l'accesso fatto la schedina viene salvata nel tuo account e chiusa da sola sui risultati veri: la ritrovi nel bilancio del modello, sotto \"Le mie schedine\", con vinte e perse."
+          }
+        }
+      }
     },
     "mine": {
       "title": "Le mie schedine",
@@ -443,6 +485,44 @@
       "lost": "Persa",
       "hits": "{hits}/{size} centrate"
     },
-    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa."
+    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa.",
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della pagina pronostici",
+      "steps": {
+        "days": {
+          "title": "Quali giorni",
+          "text": "Oggi, domani, tutti e due o i prossimi sette giorni: la lista sotto mostra solo le partite di quei giorni."
+        },
+        "competition": {
+          "title": "Quale competizione",
+          "text": "Tutte le competizioni principali o una sola. Il contatore a destra dice quante partite restano con i filtri scelti."
+        },
+        "schedina": {
+          "title": "Genera schedina",
+          "text": "Apre il generatore: scegli rischio, singola, multipla o sistema, giorni e competizioni, e il modello compone la schedina con le sue giocate migliori, divide la puntata come un bookmaker e, se hai fatto l'accesso, la salva e la chiude sui risultati veri. Anche il generatore ha la sua guida."
+        },
+        "legend": {
+          "title": "I tre livelli",
+          "text": "Per ogni partita il modello propone tre giocate: prudente (almeno il 78% di probabilità), consigliata (dal 62%) e audace (dal 45%). Sono le stesse dell'analisi partita e vengono tutte verificate nel bilancio."
+        },
+        "list": {
+          "title": "Le partite",
+          "text": "Una scheda per competizione, con le partite in ordine di orario. Tocca il nome della competizione per la sua pagina."
+        },
+        "match": {
+          "title": "Una partita",
+          "text": "Orario e giorno al centro; la squadra sottolineata è quella che il modello vede favorita. Tocca la partita per aprire l'analisi completa in una nuova scheda: probabilità, quote e mercati."
+        },
+        "tiers": {
+          "title": "Le giocate della partita",
+          "text": "Le tre giocate del modello per questa partita con la loro probabilità; quella consigliata è evidenziata. Un trattino vuol dire che per quel livello non c'è una giocata abbastanza sicura. Tieni premuto per vedere le probabilità di ogni esito."
+        },
+        "record": {
+          "title": "Il bilancio del modello",
+          "text": "Ogni giocata proposta viene scritta prima del calcio d'inizio e verificata sul risultato finale: qui vedi quante ne vince ogni livello contro quanto prometteva, la taratura del modello e le tue schedine salvate."
+        }
+      }
+    }
   }
 }

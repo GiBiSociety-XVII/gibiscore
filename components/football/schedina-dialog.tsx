@@ -5,12 +5,15 @@ import {X, Check, CloudOff} from "lucide-react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
+import {TourLauncher} from "./tour-launcher";
 import {cloudUser} from "@/lib/fantasy/cloud";
 import type {LegKey} from "@/lib/football/markets";
 import {buildSchedina, stakePlan, STAKE_STEP, suggestedStakes, systemGroups, toStakeStep, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
 
 const RISKS: SchedinaRisk[] = ['low', 'medium', 'high'];
 const KINDS: SchedinaKind[] = ['single', 'multiple', 'system'];
+/** The guide's stops inside the dialog; the ones after "generate" exist only once a slip is on screen. */
+const TOUR_STEPS = ['risk', 'kind', 'days', 'competitions', 'generate', 'result', 'summary', 'stake', 'save'] as const;
 
 /**
  * The slip generator: risk, kind, how many selections, which days and
@@ -69,15 +72,16 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
             <div onClick={(e) => e.stopPropagation()} className="bb-surface w-full max-w-2xl my-4 bg-background flex flex-col">
                 <div className="flex items-center gap-2 px-3 h-11 border-b-2 border-foreground bg-card rounded-t-[calc(var(--radius-lg)-2px)]">
                     <h2 className="text-[14px] font-extrabold uppercase tracking-wide">{t('title')}</h2>
-                    <button type="button" onClick={onClose} aria-label={t('close')} className="ml-auto inline-flex items-center justify-center w-8 h-8 rounded-md border-2 border-foreground bg-background hover:bg-muted"><X className="w-4 h-4" /></button>
+                    <div className="ml-auto"><TourLauncher storageKey="gibiscore:schedina-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: `schedina-${key}`, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} /></div>
+                    <button type="button" onClick={onClose} aria-label={t('close')} className="inline-flex items-center justify-center w-8 h-8 rounded-md border-2 border-foreground bg-background hover:bg-muted"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="px-3 py-3 flex flex-col gap-3 text-[13px]">
                     <p className="text-[12px] font-semibold text-muted-foreground leading-snug">{t('intro')}</p>
-                    <div className="flex flex-col gap-1">
+                    <div data-tour="schedina-risk" className="flex flex-col gap-1">
                         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('risk')}</span>
                         <div className="flex flex-wrap gap-1">{RISKS.map((r) => <button key={r} type="button" onClick={() => setRisk(r)} className={chip(risk === r)} title={t(`riskHint.${r}`)}>{t(`risks.${r}`)}</button>)}</div>
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div data-tour="schedina-kind" className="flex flex-col gap-1">
                         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('kind')}</span>
                         <div className="flex flex-wrap items-center gap-1">
                             {KINDS.map((k) => <button key={k} type="button" onClick={() => setKind(k)} className={chip(kind === k)} title={t(`kindHint.${k}`)}>{t(`kinds.${k}`)}</button>)}
@@ -108,21 +112,21 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                             )}
                         </div>
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div data-tour="schedina-days" className="flex flex-col gap-1">
                         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('days')}</span>
                         <div className="flex flex-wrap gap-1">
                             <button type="button" onClick={() => setPickedDays([])} className={chip(pickedDays.length === 0)}>{t('anyDay')}</button>
                             {days.map((d) => <button key={d.day} type="button" onClick={() => setPickedDays((list) => toggle(list, d.day))} className={chip(pickedDays.includes(d.day))}>{d.label}</button>)}
                         </div>
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div data-tour="schedina-competitions" className="flex flex-col gap-1">
                         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('competitions')}</span>
                         <div className="flex flex-wrap gap-1">
                             <button type="button" onClick={() => setPickedLeagues([])} className={chip(pickedLeagues.length === 0)}>{t('anyCompetition')}</button>
                             {competitions.map((c) => <button key={c.id} type="button" onClick={() => setPickedLeagues((list) => toggle(list, c.id))} className={chip(pickedLeagues.includes(c.id))}>{c.name}</button>)}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div data-tour="schedina-generate" className="flex items-center gap-2 flex-wrap">
                         <button type="button" onClick={generate} className="bb-btn bg-accent h-9 px-4 text-[13px] font-extrabold">{t('generate')}</button>
                         <span className="text-[11px] font-semibold text-muted-foreground">{t('available', {count: available})}</span>
                     </div>
@@ -134,7 +138,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 <span>{t(`kinds.${result.kind}`)}{result.system ? ` ${result.system.of}/${result.system.free}${result.system.bankers > 0 ? ` + ${t('bankersCount', {count: result.system.bankers})}` : ''}` : ''} · {t(`risks.${result.risk}`)}</span>
                                 <span className="font-mono normal-case tracking-normal text-muted-foreground">{t('selections', {count: result.selections.length})}</span>
                             </div>
-                            <ul className="flex flex-col divide-y divide-muted">
+                            <ul data-tour="schedina-result" className="flex flex-col divide-y divide-muted">
                                 {result.selections.map((s) => (
                                     <li key={s.fixtureId} className="px-3 py-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                                         <span className="flex flex-col leading-tight font-mono text-[11px] font-bold tabular-nums w-14">
@@ -152,7 +156,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                     </li>
                                 ))}
                             </ul>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 border-t-2 border-foreground">
+                            <div data-tour="schedina-summary" className="grid grid-cols-2 sm:grid-cols-4 border-t-2 border-foreground">
                                 {[
                                     [t('chance'), `${result.pct}%`],
                                     [tm('fair'), result.fair.toFixed(2)],
@@ -172,7 +176,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 const plan = stakePlan(result.selections, groups, stakes);
                                 const bankers = result.selections.filter((x) => x.banker).length;
                                 return (
-                                    <div className="border-t-2 border-foreground">
+                                    <div data-tour="schedina-stake" className="border-t-2 border-foreground">
                                         <div className="px-3 py-2 flex flex-wrap items-center gap-2">
                                             <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('stake')}</span>
                                             <label className="inline-flex items-center gap-1 text-[12px] font-bold">
@@ -229,7 +233,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                     </div>
                                 );
                             })()}
-                            <div className="px-3 py-2 border-t border-muted flex items-center gap-2 flex-wrap">
+                            <div data-tour="schedina-save" className="px-3 py-2 border-t border-muted flex items-center gap-2 flex-wrap">
                                 <button type="button" onClick={persist} disabled={signedIn === false || save === 'saving' || save === 'saved'} className={cn("bb-btn h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5 disabled:opacity-50", save === 'saved' ? "bg-card" : "bg-accent")}>
                                     {save === 'saved' ? <><Check className="w-3.5 h-3.5" aria-hidden="true" />{t('saved')}</> : save === 'saving' ? t('saving') : t('save')}
                                 </button>
