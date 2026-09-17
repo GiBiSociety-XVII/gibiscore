@@ -27,9 +27,12 @@ export function Tour({steps, onClose}: {steps: TourStep[]; onClose: () => void})
     const [index, setIndex] = useState(0);
     const [box, setBox] = useState<{top: number; left: number; width: number; height: number} | null>(null);
 
-    // Only the steps whose element exists, decided once when the guide opens.
+    // Only the steps whose element exists and is on screen (not in a closed tab), decided once when the guide opens.
     useEffect(() => {
-        const found = steps.filter((s) => document.querySelector(`[data-tour="${s.target}"]`));
+        const found = steps.filter((s) => {
+            const el = document.querySelector(`[data-tour="${s.target}"]`);
+            return !!el && el.getClientRects().length > 0;
+        });
         queueMicrotask(() => setPresent(found));
     }, [steps]);
 

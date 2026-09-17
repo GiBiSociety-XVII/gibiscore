@@ -63,7 +63,53 @@
     "scorers": "Marcatori",
     "absences": "Indisponibili",
     "prediction": "Pronostico",
-    "markets": "Analisi partita: pronostico, mercati e quote"
+    "markets": "Analisi partita: pronostico, mercati e quote",
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della pagina partita",
+      "steps": {
+        "score": {
+          "title": "La partita",
+          "text": "Competizione, giornata, stato e punteggio con i marcatori; in diretta il minuto avanza da solo e la pagina si aggiorna. Tocca il nome di una squadra per la sua pagina, la stella per seguirla."
+        },
+        "timeline": {
+          "title": "La cronaca",
+          "text": "Gol, cartellini e sostituzioni minuto per minuto, dal fischio d'inizio. Compare appena c'è il primo evento."
+        },
+        "tabs": {
+          "title": "Le schede",
+          "text": "Prima del calcio d'inizio la pagina si apre su Analisi partita; dal fischio d'inizio sulla cronaca. Le altre: formazioni con i voti, statistiche della partita, i giocatori con voti e numeri."
+        },
+        "analysis": {
+          "title": "Analisi partita",
+          "text": "Il pronostico del modello (barra 1X2, gol attesi, affidabilità) e ogni mercato con la probabilità, la quota equa e la media dei bookmaker: in verde quando pagano più della quota equa. Il \"?\" spiega come nascono i numeri."
+        },
+        "advice": {
+          "title": "Cosa giocherebbe il modello",
+          "text": "Tre giocate, una per livello di rischio: prudente, consigliata, audace. Le stesse che trovi nella pagina Pronostici e che vengono verificate nel bilancio del modello."
+        },
+        "bands": {
+          "title": "Quando arrivano i gol",
+          "text": "Gol fatti e subiti per quarto d'ora di ciascuna squadra; lo sfondo azzurro segna i quarti d'ora in cui, sommando le due, arrivano più gol della media."
+        },
+        "lines": {
+          "title": "Over, under e gol",
+          "text": "Quanto spesso le partite di ogni squadra superano ogni soglia, finiscono con entrambe a segno o a porta inviolata, e il rendimento nel campo di questa partita."
+        },
+        "setpieces": {
+          "title": "Angoli e cartellini",
+          "text": "Medie per partita fatti e concessi, e quelli attesi in questa partita."
+        },
+        "comparison": {
+          "title": "Il confronto",
+          "text": "Classifica e forma recente delle due squadre, fianco a fianco."
+        },
+        "absences": {
+          "title": "Gli indisponibili",
+          "text": "Infortunati e squalificati di entrambe, con il motivo e da quando."
+        }
+      }
+    }
   },
   "team": {
     "notFound": "Squadra non trovata",

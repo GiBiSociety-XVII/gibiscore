@@ -162,7 +162,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
     const updated = odds?.updatedAt ? new Date(odds.updatedAt) : null;
     return (
         <div className="flex flex-col gap-3">
-            <Panel title={title} action={<span className="flex items-center gap-2">{prediction && <span className="text-[11px] font-bold text-muted-foreground">{tp(`confidence.${prediction.confidence}`)}</span>}{help(t('hint'))}</span>}>
+            <div data-tour="analysis"><Panel title={title} action={<span className="flex items-center gap-2">{prediction && <span className="text-[11px] font-bold text-muted-foreground">{tp(`confidence.${prediction.confidence}`)}</span>}{help(t('hint'))}</span>}>
                 <p className="px-3 py-2 text-[12px] font-semibold leading-snug border-b border-muted">{t('intro')}</p>
                 {prediction && markets ? (
                     <>
@@ -195,7 +195,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                             </div>
                         </div>
                         {slips.length > 0 && (
-                            <div className="border-t border-muted px-3 py-2.5">
+                            <div data-tour="advice" className="border-t border-muted px-3 py-2.5">
                                 <div className="flex items-center gap-1.5 mb-1.5">
                                     <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('advice.title')}</span>
                                     {help(t('advice.hint'))}
@@ -230,13 +230,13 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                     <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground">{tp('empty')}</p>
                 )}
                 <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('disclaimer')}</p>
-            </Panel>
+            </Panel></div>
 
             {!data ? (
                 <Panel title={t('bandsTitle')}><p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('empty')}</p></Panel>
             ) : (
                 <>
-                    <Panel title={t('bandsTitle')} action={help(t('bandsHint'))}>
+                    <div data-tour="bands"><Panel title={t('bandsTitle')} action={help(t('bandsHint'))}>
                         <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-muted">
                             <GoalBands profile={h} team={home} scale={scale} heat={heat} />
                             <GoalBands profile={a} team={away} scale={scale} heat={heat} />
@@ -247,13 +247,13 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                             <span>{t('legend.peak')}</span>
                             {heat && <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm border border-foreground/40" style={{backgroundColor: 'rgb(var(--accent) / 0.45)'}} aria-hidden="true" />{t('legend.heat')}</span>}
                         </p>
-                    </Panel>
-                    <Panel title={t('linesTitle')} action={help(t('linesHint'))}>
+                    </Panel></div>
+                    <div data-tour="lines"><Panel title={t('linesTitle')} action={help(t('linesHint'))}>
                         {heads}
                         {table(rows)}
                         <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{base}</p>
-                    </Panel>
-                    <Panel title={t('setPiecesTitle')} action={help(t('setPiecesHint'))}>
+                    </Panel></div>
+                    <div data-tour="setpieces"><Panel title={t('setPiecesTitle')} action={help(t('setPiecesHint'))}>
                         {heads}
                         {table(setPieces)}
                         {(data.expected.corners !== null || data.expected.yellows !== null) && (
@@ -263,7 +263,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                                 {data.expected.yellows !== null && <span>{t('expectedYellows', {value: data.expected.yellows.toFixed(1)})}</span>}
                             </p>
                         )}
-                    </Panel>
+                    </Panel></div>
                 </>
             )}
         </div>
