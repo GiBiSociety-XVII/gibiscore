@@ -150,7 +150,8 @@
       "matches": "Partite"
     },
     "ratingTrend": "Andamento voti",
-    "compare": "Confronta"
+    "compare": "Confronta",
+    "noVote": "s.v."
   },
   "scores": {
     "metaTitle": "Risultati calcio in tempo reale",

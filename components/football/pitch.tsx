@@ -1,7 +1,7 @@
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import type {LineupPlayer, TeamLineup} from "@/lib/football/types";
-import {GOOD_VOTO, matchVoto, type VotoCalibration} from "@/lib/fantasy/voto";
+import {GOOD_VOTO, shownVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 
 /** Starters grouped by line (formationPosition = row*10 + column), goalkeeper first. */
 function lines(starters: LineupPlayer[]): LineupPlayer[][] {
@@ -19,7 +19,7 @@ function lines(starters: LineupPlayer[]): LineupPlayer[][] {
 
 function Dot({p, dark, scale}: {p: LineupPlayer; dark: boolean; scale: VotoCalibration}) {
     const surname = p.name.split(' ').slice(-1)[0] ?? p.name;
-    const voto = p.rating !== null ? matchVoto(p.rating, p.position, scale) : null;
+    const voto = shownVoto(p.rating, undefined, p.position, scale);
     return (
         <Link href={`/players/${p.slug}`} className="group flex flex-col items-center gap-0.5 min-w-0 w-[64px] md:w-[76px]">
             <span className="relative">

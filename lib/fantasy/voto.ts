@@ -36,6 +36,9 @@ export function toVoto(rating: number, role: FantaRole, calibration: VotoCalibra
 /** Votes come in half points: 6, 6.5, 7. */
 export const halfVoto = (voto: number): number => Math.round(voto * 2) / 2;
 
+/** Minutes under which the provider's rating is not taken as a vote (the newspaper gives none: "s.v."). */
+export const VOTE_MINUTES = 10;
+
 /** The fantasy role of a provider position ("goalkeeper", or "G" in a lineup); a midfielder when unknown. */
 export function roleOfPosition(position: string | null | undefined): FantaRole {
     switch ((position ?? '').toLowerCase()) {
@@ -56,6 +59,18 @@ export function roleOfPosition(position: string | null | undefined): FantaRole {
 /** A match rating shown as the vote it stands for: on the vote scale of the role, in half points. */
 export function matchVoto(rating: number, position: string | null | undefined, calibration: VotoCalibration = DEFAULT_CALIBRATION): number {
     return halfVoto(toVoto(rating, roleOfPosition(position), calibration));
+}
+
+/**
+ * The vote a match line shows, or none: a rating of zero is no rating
+ * (the provider's placeholder for whoever did not play), fewer than
+ * VOTE_MINUTES on the pitch is "s.v." as in the newspapers. Minutes
+ * unknown: the rating alone decides.
+ */
+export function shownVoto(rating: number | null | undefined, minutes: number | null | undefined, position: string | null | undefined, calibration: VotoCalibration = DEFAULT_CALIBRATION): number | null {
+    if (rating === null || rating === undefined || rating <= 0) return null;
+    if (minutes !== null && minutes !== undefined && minutes < VOTE_MINUTES) return null;
+    return matchVoto(rating, position, calibration);
 }
 
 /** An average of ratings shown as an average of votes: on the vote scale of the role, two decimals. */

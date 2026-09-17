@@ -27,7 +27,7 @@ import {getMatchPage} from "@/lib/football/data/matches";
 import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
 import {getVoteScale} from "@/lib/fantasy/calibration-data";
-import {matchVoto} from "@/lib/fantasy/voto";
+import {shownVoto} from "@/lib/fantasy/voto";
 
 // Refreshed by the live sync whenever the match moves (see sync-live); the timer only catches the rest.
 // The live sync renders the page again whenever the match moves; the timer only catches the rest.
@@ -236,7 +236,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                                 <Link href={`/players/${page.bestPlayer.player.slug}`} className="inline-flex flex-wrap items-center justify-center gap-x-1 hover:underline decoration-accent decoration-[2px] underline-offset-2">
                                     <span className="whitespace-nowrap">{t('bestPlayer')}:</span>
                                     <span className="text-foreground">{page.bestPlayer.player.name}</span>
-                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{page.bestPlayer.rating !== null ? matchVoto(page.bestPlayer.rating, page.bestPlayer.position, scale).toFixed(1) : ''}</span>
+                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{shownVoto(page.bestPlayer.rating, page.bestPlayer.minutes, page.bestPlayer.position, scale)?.toFixed(1) ?? ''}</span>
                                 </Link>
                             </span>
                         )}

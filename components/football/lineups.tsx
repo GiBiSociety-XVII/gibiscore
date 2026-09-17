@@ -5,12 +5,12 @@ import {cn} from "@/components/shared/ui/cn";
 import {TeamCrest} from "@/components/football/team-crest";
 import type {LineupPlayer, TeamLineup} from "@/lib/football/types";
 import {Pitch} from "./pitch";
-import {GOOD_VOTO, matchVoto, type VotoCalibration} from "@/lib/fantasy/voto";
+import {GOOD_VOTO, shownVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 
 function PlayerLine({p, scale}: {p: LineupPlayer; scale: VotoCalibration}) {
     const t = useTranslations('Football.positionsShort');
     const pos = p.position && ['goalkeeper', 'defender', 'midfielder', 'attacker'].includes(p.position) ? p.position : 'unknown';
-    const voto = p.rating !== null ? matchVoto(p.rating, p.position, scale) : null;
+    const voto = shownVoto(p.rating, undefined, p.position, scale);
     return (
         <li className="flex items-center gap-2 py-1 border-t-2 border-muted first:border-t-0">
             <span className="font-mono text-xs font-bold tabular-nums w-6 text-right text-muted-foreground">{p.number ?? ''}</span>

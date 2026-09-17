@@ -4,7 +4,7 @@ import {Card} from "@/components/shared/ui/card";
 import {cn} from "@/components/shared/ui/cn";
 import {TeamCrest} from "@/components/football/team-crest";
 import type {PlayerMatchLine, TeamSummary} from "@/lib/football/types";
-import {GOOD_VOTO, matchVoto, type VotoCalibration} from "@/lib/fantasy/voto";
+import {GOOD_VOTO, shownVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 
 function Rating({value, accent = GOOD_VOTO}: {value: number | null; accent?: number}) {
     if (value === null) return <span className="text-muted-foreground">–</span>;
@@ -50,7 +50,7 @@ function TeamTable({team, lines, scale}: {team: TeamSummary; lines: PlayerMatchL
                                         </span>
                                     </td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums">{l.minutes ?? '–'}</td>
-                                    <td className="px-1.5 py-1 text-right"><Rating value={l.rating !== null ? matchVoto(l.rating, l.position, scale) : null} /></td>
+                                    <td className="px-1.5 py-1 text-right"><Rating value={shownVoto(l.rating, l.minutes, l.position, scale)} /></td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums">{l.goals || ''}</td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums">{l.assists || ''}</td>
                                     <td className="px-1.5 py-1 text-right font-mono tabular-nums hidden md:table-cell">{l.shots ?? ''}{l.shotsOnTarget !== null && l.shots ? ` (${l.shotsOnTarget})` : ''}</td>

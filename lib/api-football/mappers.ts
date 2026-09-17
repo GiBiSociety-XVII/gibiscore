@@ -46,6 +46,9 @@ const STATE_BY_CODE: Record<string, FixtureState> = {
 
 export const LIVE_STATES: readonly FixtureState[] = ['live', 'half_time', 'extra_time', 'penalties'];
 
+/** A rating of zero is the provider's placeholder for whoever did not play: no rating. */
+const positiveOrNull = (v: number | null): number | null => (v !== null && v > 0 ? v : null);
+
 export function mapFixtureState(short: string | null | undefined): FixtureState {
     if (!short) return 'unknown';
     return STATE_BY_CODE[short.toUpperCase()] ?? 'unknown';
@@ -330,7 +333,7 @@ export function mapPlayerStats(players: AfFixtureResponse['players']): PlayerSta
                 providerTeamId: teamBlock.team.id,
                 playerName: entry.player.name,
                 minutes_played: stats.games?.minutes ?? null,
-                rating: asNumber(stats.games?.rating),
+                rating: positiveOrNull(asNumber(stats.games?.rating)),
                 goals: stats.goals?.total ?? 0,
                 assists: stats.goals?.assists ?? 0,
                 shots_total: stats.shots?.total ?? null,
@@ -523,7 +526,7 @@ export interface PlayerSeasonRow {
 
 /** Flatten one `statistics[]` entry of /players into a player_season_stats row (ids added by the caller). */
 export function mapPlayerSeason(s: AfPlayerSeasonStats): PlayerSeasonRow {
-    const rating = asNumber(s.games?.rating);
+    const rating = positiveOrNull(asNumber(s.games?.rating));
     return {
         season_year: s.league.season,
         position: positionName(s.games?.position),
