@@ -44,7 +44,7 @@ function StatusCell({fixture}: {fixture: FixtureSummary}) {
  * `showDate` adds the day before the time (team and player pages);
  * `showCompetition` adds the competition under the time (team pages).
  */
-export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false, favorite = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean; /** One of the user's favourite teams plays: the row is marked. */ favorite?: boolean}) {
+export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false, favorite = false, oddsColumn = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean; /** One of the user's favourite teams plays: the row is marked. */ favorite?: boolean; /** The list keeps a column for the bookmakers' 1X2 on wide screens (some row of it has odds): every row aligns on it. */ oddsColumn?: boolean}) {
     const format = useFormatter();
     const tOdds = useTranslations('Football.odds');
     const state = rowState(fixture);
@@ -79,8 +79,8 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
             className={cn(
                 "relative grid items-center gap-1.5 px-2 min-h-8 border-t border-muted first:border-t-0 hover:bg-muted/70 transition-colors",
                 showDate || showCompetition
-                    ? "grid-cols-[78px_minmax(0,1fr)_52px_minmax(0,1fr)]"
-                    : "grid-cols-[46px_minmax(0,1fr)_52px_minmax(0,1fr)] md:grid-cols-[52px_minmax(0,1fr)_56px_minmax(0,1fr)]",
+                    ? oddsColumn ? "grid-cols-[78px_minmax(0,1fr)_52px_minmax(0,1fr)] md:grid-cols-[78px_minmax(0,1fr)_52px_minmax(0,1fr)_138px]" : "grid-cols-[78px_minmax(0,1fr)_52px_minmax(0,1fr)]"
+                    : oddsColumn ? "grid-cols-[46px_minmax(0,1fr)_52px_minmax(0,1fr)] md:grid-cols-[52px_minmax(0,1fr)_56px_minmax(0,1fr)_138px]" : "grid-cols-[46px_minmax(0,1fr)_52px_minmax(0,1fr)] md:grid-cols-[52px_minmax(0,1fr)_56px_minmax(0,1fr)]",
                 isLive && "bg-accent/10",
             )}
         >
@@ -105,12 +105,18 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
                 <TeamCrest team={fixture.away} size={18} />
                 {teamName('away')}
             </span>
-            {/* The bookmakers' 1X2 under a match not yet played, when stored: the shortest reading of how the market sees it. */}
-            {state === 'scheduled' && fixture.odds && !compact && (
-                <span className="col-span-full -mt-1 pb-1 flex justify-center gap-3 font-mono text-[10px] font-bold tabular-nums text-muted-foreground" title={tOdds('hint')}>
-                    <span><span className="font-extrabold text-foreground/70">1</span> {fixture.odds.home.toFixed(2)}</span>
-                    <span><span className="font-extrabold text-foreground/70">X</span> {fixture.odds.draw.toFixed(2)}</span>
-                    <span><span className="font-extrabold text-foreground/70">2</span> {fixture.odds.away.toFixed(2)}</span>
+            {/* The bookmakers' 1X2 of a match not yet played, on wide screens: three chips in their own column, the favourite lit. */}
+            {oddsColumn && (
+                <span className="hidden md:flex items-center justify-end gap-1" title={fixture.odds ? tOdds('hint') : undefined}>
+                    {state === 'scheduled' && fixture.odds && (([['1', fixture.odds.home], ['X', fixture.odds.draw], ['2', fixture.odds.away]] as const).map(([label, odd]) => {
+                        const lowest = Math.min(fixture.odds!.home, fixture.odds!.draw, fixture.odds!.away);
+                        return (
+                            <span key={label} className={cn("relative z-10 inline-flex flex-col items-center justify-center w-[42px] h-7 rounded border leading-none", odd === lowest ? "border-foreground bg-accent" : "border-foreground/30 bg-card")}>
+                                <span className="text-[9px] font-extrabold text-muted-foreground">{label}</span>
+                                <span className="font-mono text-[11px] font-extrabold tabular-nums">{odd.toFixed(2)}</span>
+                            </span>
+                        );
+                    }))}
                 </span>
             )}
         </div>

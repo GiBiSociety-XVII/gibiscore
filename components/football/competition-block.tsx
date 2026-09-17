@@ -8,6 +8,7 @@ import {MatchRow} from "./match-row";
 
 /** Header line (flag, country, competition, favourite star) plus its rows, as in a scores app. */
 export function CompetitionBlock({group, showCountry = true, favoriteTeams}: {group: CompetitionFixtures; showCountry?: boolean; /** Slugs of the user's favourite teams: their rows are marked. */ favoriteTeams?: ReadonlySet<string>}) {
+    const oddsColumn = group.fixtures.some((f) => f.state === 'scheduled' && !!f.odds);
     const c = group.competition;
     return (
         <section data-block data-slug={c.slug} className="flex flex-col border-t-2 border-foreground first:border-t-0">
@@ -27,7 +28,7 @@ export function CompetitionBlock({group, showCountry = true, favoriteTeams}: {gr
                 </Link>
             </div>
             <div className="flex flex-col">
-                {group.fixtures.map((f) => <MatchRow key={f.id} fixture={f} favorite={!!favoriteTeams && ((!!f.home.slug && favoriteTeams.has(f.home.slug)) || (!!f.away.slug && favoriteTeams.has(f.away.slug)))} />)}
+                {group.fixtures.map((f) => <MatchRow key={f.id} fixture={f} oddsColumn={oddsColumn} favorite={!!favoriteTeams && ((!!f.home.slug && favoriteTeams.has(f.home.slug)) || (!!f.away.slug && favoriteTeams.has(f.away.slug)))} />)}
             </div>
         </section>
     );
