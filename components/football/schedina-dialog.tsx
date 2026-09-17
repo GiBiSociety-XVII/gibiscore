@@ -7,7 +7,7 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {cloudUser} from "@/lib/fantasy/cloud";
 import type {LegKey} from "@/lib/football/markets";
-import {buildSchedina, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk} from "@/lib/football/schedina";
+import {buildSchedina, stakePlan, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
 
 const RISKS: SchedinaRisk[] = ['low', 'medium', 'high'];
 const KINDS: SchedinaKind[] = ['single', 'multiple', 'system'];
@@ -25,8 +25,10 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const [risk, setRisk] = useState<SchedinaRisk>('medium');
     const [kind, setKind] = useState<SchedinaKind>('multiple');
     const [size, setSize] = useState(3);
-    const [system, setSystem] = useState(2);
+    const [system, setSystem] = useState<number | 'auto'>('auto');
     const [bankers, setBankers] = useState<number | 'auto'>('auto');
+    const [stake, setStake] = useState(10);
+    const [stakeMode, setStakeMode] = useState<StakeMode>('equal');
     const [pickedDays, setPickedDays] = useState<string[]>([]);
     const [pickedLeagues, setPickedLeagues] = useState<number[]>([]);
     const [result, setResult] = useState<Schedina | null | undefined>(undefined);
@@ -92,9 +94,12 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                         </select>
                                     </label>
                                     <label className="inline-flex items-center gap-1.5 text-[12px] font-bold" title={t('systemOfHint')}>
-                                        {t('systemOf')}
-                                        <input type="number" min={1} max={Math.max(1, size - 1)} value={Math.min(system, Math.max(1, size - 1))} onChange={(e) => setSystem(Math.max(1, Math.min(size - 1, Number(e.target.value) || 1)))} className="bb-input h-8 w-16 px-2 font-mono text-[13px] font-extrabold text-center" />
-                                        <span className="text-muted-foreground">{t('systemOfFree', {k: Math.min(system, Math.max(1, size - 1)), n: typeof bankers === 'number' ? Math.max(2, size - bankers) : size})}</span>
+                                        <span className="whitespace-nowrap">{t('systemOf')}</span>
+                                        <select value={system} onChange={(e) => setSystem(e.target.value === 'auto' ? 'auto' : Number(e.target.value))} className="bb-input h-8 px-2 text-[12px] font-bold">
+                                            <option value="auto">{t('systemAuto')}</option>
+                                            {Array.from({length: Math.max(1, size - 1)}, (_, i) => i + 1).map((k) => <option key={k} value={k}>{k}</option>)}
+                                        </select>
+                                        <span className="text-muted-foreground">{system === 'auto' ? t('systemAutoNote') : t('systemOfFree', {k: system, n: typeof bankers === 'number' ? Math.max(2, size - bankers) : size})}</span>
                                     </label>
                                 </>
                             )}
@@ -158,6 +163,65 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 ))}
                             </div>
                             {result.system && <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{result.system.bankers > 0 ? t('systemNoteBankers', {bankers: result.system.bankers, columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct}) : t('systemNote', {columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct})}</p>}
+                            {(() => {
+                                const plan = stakePlan(result, stake, stakeMode);
+                                return (
+                                    <div className="border-t-2 border-foreground">
+                                        <div className="px-3 py-2 flex flex-wrap items-center gap-2">
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('stake')}</span>
+                                            <label className="inline-flex items-center gap-1 text-[12px] font-bold">
+                                                <input type="number" min={1} step={1} value={stake} onChange={(e) => setStake(Math.max(0, Number(e.target.value) || 0))} className="bb-input h-8 w-24 px-2 font-mono text-[13px] font-extrabold text-right" aria-label={t('stake')} />
+                                                <span>€</span>
+                                            </label>
+                                            <div className="flex gap-1">
+                                                {(['equal', 'optimised'] as const).map((m) => <button key={m} type="button" onClick={() => setStakeMode(m)} className={chip(stakeMode === m)} title={t(`stakeModeHint.${m}`)}>{t(`stakeModes.${m}`)}</button>)}
+                                            </div>
+                                        </div>
+                                        {plan && (
+                                            <>
+                                                {plan.columns.length > 1 && (
+                                                    <table className="w-full text-[12px]">
+                                                        <thead>
+                                                            <tr className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground border-t border-muted">
+                                                                <th className="px-3 py-1 text-left">{t('column')}</th>
+                                                                <th className="px-2 py-1 text-right">{t('chance')}</th>
+                                                                <th className="px-2 py-1 text-right">{tm('book')}</th>
+                                                                <th className="px-2 py-1 text-right">{t('stake')}</th>
+                                                                <th className="px-3 py-1 text-right">{t('payout')}</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {plan.columns.map((c) => (
+                                                                <tr key={c.indices.join('-')} className={cn("border-t border-muted font-mono tabular-nums", c.stake === 0 && "text-muted-foreground")}>
+                                                                    <td className="px-3 py-1 font-sans font-bold truncate max-w-[220px]">{c.indices.map((i) => `${result.selections[i].home.slice(0, 3)}-${result.selections[i].away.slice(0, 3)} ${legLabel(result.selections[i].slip.legs[0].key)}${result.selections[i].slip.legs.length > 1 ? '+' : ''}`).join(' · ')}</td>
+                                                                    <td className="px-2 py-1 text-right">{Math.round(c.probability * 100)}%</td>
+                                                                    <td className="px-2 py-1 text-right">{c.priced ? '' : '≈'}{c.odds.toFixed(2)}</td>
+                                                                    <td className="px-2 py-1 text-right font-extrabold">{c.stake.toFixed(2)}</td>
+                                                                    <td className="px-3 py-1 text-right">{c.payout.toFixed(2)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-muted">
+                                                    {[
+                                                        [t('maxPayout'), `${plan.maxPayout.toFixed(2)} €`],
+                                                        [t('expectedReturn'), `${plan.expectedReturn.toFixed(2)} €`],
+                                                        [t('expectedProfit'), `${plan.expectedProfit >= 0 ? '+' : ''}${plan.expectedProfit.toFixed(2)} €`],
+                                                        [t('profitChance'), `${plan.profitChance}%`],
+                                                    ].map(([label, value]) => (
+                                                        <div key={label} className="flex flex-col items-center justify-center px-2 py-1.5 border-t border-muted">
+                                                            <span className={cn("font-mono text-base font-extrabold tabular-nums", label === t('expectedProfit') && (plan.expectedProfit >= 0 ? "text-emerald-800" : "text-red-700"))}>{value}</span>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground text-center leading-tight">{label}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{plan.priced ? t('stakeNote') : t('stakeNoteFair')}</p>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                             <div className="px-3 py-2 border-t border-muted flex items-center gap-2 flex-wrap">
                                 <button type="button" onClick={persist} disabled={signedIn === false || save === 'saving' || save === 'saved'} className={cn("bb-btn h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5 disabled:opacity-50", save === 'saved' ? "bg-card" : "bg-accent")}>
                                     {save === 'saved' ? <><Check className="w-3.5 h-3.5" aria-hidden="true" />{t('saved')}</> : save === 'saving' ? t('saving') : t('save')}

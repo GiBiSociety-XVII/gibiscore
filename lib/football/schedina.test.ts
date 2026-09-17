@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {BetSuggestion} from './markets';
-import {atLeast, buildSchedina, combinations, schedinaWon, type SchedinaCandidate} from './schedina';
+import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, type SchedinaCandidate} from './schedina';
 
 const slip = (tier: BetSuggestion['tier'], pct: number, odds: number | null = null): BetSuggestion => ({tier, legs: [{key: '1', pct, odds}], pct, fair: Math.round((100 / pct) * 100) / 100, odds});
 const match = (id: number, day: string, hour: string, competitionId: number, slips: BetSuggestion[]): SchedinaCandidate => ({fixtureId: id, competitionId, competition: `L${competitionId}`, home: `H${id}`, away: `A${id}`, startingAt: `${day}T${hour}:00Z`, day, slips});
@@ -77,5 +77,49 @@ describe('schedinaWon', () => {
         expect(schedinaWon('system', [false, true, true], 1, [true, false, false])).toBe(false);
         expect(schedinaWon('system', [true, true, false], 1, [true, false, false])).toBe(true);
         expect(schedinaWon('system', [true, false, false], 1, [true, false, false])).toBe(false);
+    });
+});
+
+describe('columns, automatic k and the stake plan', () => {
+    const NOW2 = '2026-09-18T10:00:00Z';
+    const priced = [
+        match(11, '2026-09-18', '18:45', 1, [slip('balanced', 80, 1.4)]),
+        match(12, '2026-09-18', '20:45', 1, [slip('balanced', 70, 1.5)]),
+        match(13, '2026-09-19', '15:00', 1, [slip('balanced', 60, 1.9)]),
+        match(14, '2026-09-19', '18:00', 1, [slip('balanced', 55, 2.0)]),
+    ];
+    it('lists every column with the bankers in each', () => {
+        const s = buildSchedina(priced, {risk: 'medium', kind: 'system', size: 4, system: 2, bankers: 1, days: [], competitions: [], now: NOW2})!;
+        const columns = schedinaColumns(s.selections, 2);
+        expect(columns).toHaveLength(3);
+        for (const c of columns) expect(c.indices).toContain(s.selections.findIndex((x) => x.banker));
+        expect(columns[0].odds).toBeCloseTo(1.4 * 1.5 * 1.9, 1);
+        expect(columns[0].probability).toBeCloseTo(0.8 * 0.7 * 0.6, 6);
+    });
+    it('picks the k with the best expected return, and N-1 without prices', () => {
+        const s = buildSchedina(priced, {risk: 'medium', kind: 'system', size: 4, system: 'auto', bankers: 0, days: [], competitions: [], now: NOW2})!;
+        expect(s.system!.of).toBe(autoSystemOf(s.selections));
+        expect(s.system!.of).toBeGreaterThanOrEqual(1);
+        const noPrices = [match(21, '2026-09-18', '18:45', 1, [slip('balanced', 70)]), match(22, '2026-09-18', '20:45', 1, [slip('balanced', 65)]), match(23, '2026-09-19', '15:00', 1, [slip('balanced', 62)])];
+        const unpriced = buildSchedina(noPrices, {risk: 'medium', kind: 'system', size: 3, system: 'auto', bankers: 0, days: [], competitions: [], now: NOW})!;
+        expect(unpriced.system!.of).toBe(2);
+    });
+    it('spreads the stake, equal or by edge, and counts the chance of profit', () => {
+        const s = buildSchedina(priced, {risk: 'medium', kind: 'system', size: 4, system: 2, bankers: 0, days: [], competitions: [], now: NOW2})!;
+        const equal = stakePlan(s, 60, 'equal')!;
+        expect(equal.columns).toHaveLength(6);
+        expect(equal.columns.every((c) => c.stake === 10)).toBe(true);
+        expect(equal.maxPayout).toBeCloseTo(equal.columns.reduce((sum, c) => sum + c.payout, 0), 2);
+        expect(equal.profitChance).toBeGreaterThan(0);
+        expect(equal.profitChance).toBeLessThanOrEqual(100);
+        const optimised = stakePlan(s, 60, 'optimised')!;
+        expect(Math.round(optimised.columns.reduce((sum, c) => sum + c.stake, 0))).toBe(60);
+        // The column with the best edge gets the most.
+        const best = optimised.columns.reduce((m, c) => (c.probability * c.odds > m.probability * m.odds ? c : m));
+        expect(best.stake).toBe(Math.max(...optimised.columns.map((c) => c.stake)));
+        const single = stakePlan(buildSchedina(priced, {risk: 'medium', kind: 'single', size: 1, days: [], competitions: [], now: NOW2})!, 10, 'equal')!;
+        expect(single.columns).toHaveLength(1);
+        expect(single.columns[0].payout).toBe(14);
+        expect(stakePlan(s, 0, 'equal')).toBeNull();
     });
 });

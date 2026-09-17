@@ -31,8 +31,8 @@ export interface SchedinaOptions {
     kind: SchedinaKind;
     /** Selections wanted: 1 for a single, 2..10 for an accumulator or a system. */
     size: number;
-    /** A system: columns of this many of the free selections ("k su N", N the selections that are not bankers). */
-    system?: number;
+    /** A system: columns of this many of the free selections ("k su N", N the selections that are not bankers); 'auto' picks the k with the best expected return at the bookmakers' prices. */
+    system?: number | 'auto';
     /** A system: how many selections are bankers (in every column); 'auto' makes bankers of the safest ones (BANKER_MIN_PCT), at most size - 2. */
     bankers?: number | 'auto';
     /** Rome days allowed; empty = any. */
@@ -137,7 +137,7 @@ export function buildSchedina(candidates: SchedinaCandidate[], options: Schedina
         const bankers = Math.max(0, Math.min(maxBankers, wanted));
         for (const s of bySafety.slice(0, bankers)) s.banker = true;
         const free = size - bankers;
-        const of = Math.max(1, Math.min(free, Math.round(options.system ?? Math.max(1, free - 1))));
+        const of = options.system === 'auto' || options.system === undefined ? autoSystemOf(selections) : Math.max(1, Math.min(free, Math.round(options.system)));
         const freeProbabilities = selections.filter((s) => !s.banker).map((s) => s.slip.pct / 100);
         const bankersChance = selections.filter((s) => s.banker).reduce((p, s) => p * (s.slip.pct / 100), 1);
         out.system = {of, free, bankers, columns: combinations(free, of), atLeastPct: Math.round(bankersChance * atLeast(freeProbabilities, of) * 100)};
@@ -157,4 +157,117 @@ export function schedinaWon(kind: SchedinaKind, hits: boolean[], of: number | nu
     if (hits.some((h, i) => isBanker(i) && !h)) return false;
     const free = hits.filter((_, i) => !isBanker(i));
     return free.filter(Boolean).length >= Math.max(1, Math.min(free.length, of ?? free.length));
+}
+
+/** One column of a system: which selections (indices), its chance and its price (the bookmakers' when every selection has one, else the fair). */
+export interface SchedinaColumn {
+    indices: number[];
+    /** 0..1 */
+    probability: number;
+    odds: number;
+    /** The price is the bookmakers' (false: the fair one stood in). */
+    priced: boolean;
+}
+
+/** Every column of a system: each banker plus every combination of `of` free selections. A single or an accumulator is one column. */
+export function schedinaColumns(selections: SchedinaSelection[], of: number | null | undefined): SchedinaColumn[] {
+    const bankers = selections.map((s, i) => (s.banker ? i : -1)).filter((i) => i >= 0);
+    const free = selections.map((s, i) => (s.banker ? -1 : i)).filter((i) => i >= 0);
+    const k = of === null || of === undefined ? free.length : Math.max(1, Math.min(free.length, of));
+    const combos: number[][] = [];
+    const walk = (start: number, chosen: number[]) => {
+        if (chosen.length === k) {
+            combos.push(chosen);
+            return;
+        }
+        for (let i = start; i < free.length; i += 1) walk(i + 1, [...chosen, free[i]]);
+    };
+    if (free.length === 0) combos.push([]);
+    else walk(0, []);
+    return combos.map((c) => {
+        const indices = [...bankers, ...c].sort((a, b) => a - b);
+        const priced = indices.every((i) => selections[i].slip.odds !== null);
+        return {
+            indices,
+            probability: indices.reduce((p, i) => p * (selections[i].slip.pct / 100), 1),
+            odds: round2(indices.reduce((p, i) => p * (priced ? (selections[i].slip.odds ?? 1) : selections[i].slip.fair), 1)),
+            priced,
+        };
+    });
+}
+
+/**
+ * The k of a system chosen by the numbers: for every k the expected
+ * return of a unit stake spread evenly over the columns, at the
+ * bookmakers' prices; the best wins, a likelier system on a tie. Never
+ * every free selection at once (that is an accumulator, not a system).
+ * With no bookmaker price the returns are all fair (zero): the classic N-1.
+ */
+export function autoSystemOf(selections: SchedinaSelection[]): number {
+    const free = selections.filter((s) => !s.banker).length;
+    if (free <= 1) return 1;
+    let best = Math.max(1, free - 1);
+    let bestReturn = -Infinity;
+    let bestChance = -Infinity;
+    for (let k = 1; k <= free - 1; k += 1) {
+        const columns = schedinaColumns(selections, k);
+        if (!columns.every((c) => c.priced)) continue;
+        const expected = columns.reduce((s, c) => s + c.probability * c.odds, 0) / columns.length - 1;
+        const chance = atLeast(selections.filter((s) => !s.banker).map((s) => s.slip.pct / 100), k);
+        if (expected > bestReturn + 1e-9 || (Math.abs(expected - bestReturn) <= 1e-9 && chance > bestChance)) {
+            best = k;
+            bestReturn = expected;
+            bestChance = chance;
+        }
+    }
+    return best;
+}
+
+export type StakeMode = 'equal' | 'optimised';
+
+export interface StakePlan {
+    mode: StakeMode;
+    total: number;
+    columns: Array<SchedinaColumn & {stake: number; payout: number}>;
+    /** What comes back on average, and the profit it means, for the total staked. */
+    expectedReturn: number;
+    expectedProfit: number;
+    /** Every column wins. */
+    maxPayout: number;
+    /** Chance the payouts exceed the total staked. */
+    profitChance: number;
+    /** The prices are the bookmakers' for every column. */
+    priced: boolean;
+}
+
+/**
+ * The stake spread over the columns of a slip. Equal: the same on every
+ * column, as a bookmaker's system ticket. Optimised: in proportion to
+ * each column's edge (chance times price, minus one), so the columns the
+ * model rates above the market get more and those it rates below get
+ * nothing; equal when no column has an edge. Chance of profit counted
+ * over every outcome of the selections.
+ */
+export function stakePlan(slip: Schedina, total: number, mode: StakeMode): StakePlan | null {
+    if (!(total > 0) || slip.selections.length === 0) return null;
+    const columns = schedinaColumns(slip.selections, slip.system?.of ?? null);
+    const edges = columns.map((c) => Math.max(0, c.probability * c.odds - 1));
+    const edgeSum = edges.reduce((s, v) => s + v, 0);
+    const weights = mode === 'optimised' && edgeSum > 0 ? edges.map((e) => e / edgeSum) : columns.map(() => 1 / columns.length);
+    const staked = columns.map((c, i) => ({...c, stake: round2(total * weights[i]), payout: round2(total * weights[i] * c.odds)}));
+    const expectedReturn = round2(staked.reduce((s, c) => s + c.probability * c.payout, 0));
+    // Every outcome of the selections: which columns win, what comes back.
+    const n = slip.selections.length;
+    let profitChance = 0;
+    for (let mask = 0; mask < 1 << n; mask += 1) {
+        let p = 1;
+        for (let i = 0; i < n; i += 1) {
+            const q = slip.selections[i].slip.pct / 100;
+            p *= mask & (1 << i) ? q : 1 - q;
+        }
+        if (p === 0) continue;
+        const back = staked.reduce((s, c) => (c.indices.every((i) => mask & (1 << i)) ? s + c.payout : s), 0);
+        if (back > total + 1e-9) profitChance += p;
+    }
+    return {mode, total, columns: staked, expectedReturn, expectedProfit: round2(expectedReturn - total), maxPayout: round2(staked.reduce((s, c) => s + c.payout, 0)), profitChance: Math.round(profitChance * 100), priced: columns.every((c) => c.priced)};
 }

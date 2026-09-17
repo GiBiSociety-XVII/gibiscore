@@ -353,7 +353,26 @@
       "banker": "Fissa",
       "systemOfFree": "selezioni libere: sistema {k} su {n}, vince con almeno {k} libere centrate",
       "systemNoteBankers": "{bankers} fisse in ogni colonna e {columns} colonne da {of} selezioni sulle {n} libere: probabilità che tutte le fisse e almeno {of} delle libere siano centrate {pct}%.",
-      "systemOfHint": "Quante selezioni libere entrano in ogni colonna. Le fisse stanno in tutte le colonne e non contano qui: con 2 fisse e 4 libere, \"2\" è il sistema 2 su 4 (6 colonne), che paga se le fisse sono centrate e almeno 2 libere su 4 lo sono. Con le fisse automatiche il numero di libere si sa dopo aver generato."
+      "systemOfHint": "Quante selezioni libere entrano in ogni colonna. Le fisse stanno in tutte le colonne e non contano qui: con 2 fisse e 4 libere, \"2\" è il sistema 2 su 4 (6 colonne), che paga se le fisse sono centrate e almeno 2 libere su 4 lo sono. Automatico: per ogni k il modello calcola il ritorno atteso di una puntata uguale su tutte le colonne alle quote dei bookmaker e prende il migliore (a pari ritorno, il più probabile); senza quote, il classico N-1.",
+      "systemAuto": "Automatico",
+      "systemAutoNote": "il modello sceglie il sistema con il miglior ritorno atteso alle quote dei bookmaker",
+      "stake": "Puntata",
+      "stakeModes": {
+        "equal": "Uguale per colonna",
+        "optimised": "Ottimizzata"
+      },
+      "stakeModeHint": {
+        "equal": "La stessa cifra su ogni colonna, come in un sistema del bookmaker.",
+        "optimised": "Più soldi alle colonne che il modello valuta sopra la quota del bookmaker (probabilità × quota − 1), niente a quelle sotto; uguale se nessuna colonna ha vantaggio. Da giocare come biglietti separati."
+      },
+      "column": "Colonna",
+      "payout": "Vincita",
+      "maxPayout": "Vincita massima",
+      "expectedReturn": "Ritorno atteso",
+      "expectedProfit": "Profitto atteso",
+      "profitChance": "Chiudi in utile",
+      "stakeNote": "Vincita massima se tutte le colonne vincono; ritorno atteso = somma di probabilità × vincita di ogni colonna secondo il modello; \"chiudi in utile\" = probabilità che le vincite superino la puntata, contata su ogni esito possibile delle selezioni. Quote medie dei bookmaker: quelle reali del tuo bookmaker possono differire.",
+      "stakeNoteFair": "Alcune selezioni non hanno la quota dei bookmaker: dove manca vale la quota equa del modello (≈), quindi il ritorno atteso è quello di una giocata alla pari. Con le quote reali i numeri cambiano."
     },
     "mine": {
       "title": "Le mie schedine",
