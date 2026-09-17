@@ -291,6 +291,31 @@ export interface StakePlan {
     priced: boolean;
 }
 
+export interface TicketPlan {
+    stake: number;
+    /** What comes back when every selection wins, at the bookmakers' odds (the fair odds where a bookmaker's is missing). */
+    payout: number;
+    expectedReturn: number;
+    expectedProfit: number;
+    /** Every selection wins: the only way a single or an accumulator pays. */
+    winChance: number;
+    priced: boolean;
+}
+
+/**
+ * A single or an accumulator valued: one stake, one payout, no lines. The
+ * odds are the slip's book odds when every selection has one, the fair
+ * odds otherwise (then the expected return is that of a fair bet).
+ */
+export function ticketPlan(schedina: Pick<Schedina, 'pct' | 'fair' | 'book'>, stake: number): TicketPlan {
+    const amount = Math.max(0, stake);
+    const priced = schedina.book !== null;
+    const odds = schedina.book ?? schedina.fair;
+    const payout = round2(amount * odds);
+    const expectedReturn = round2((payout * schedina.pct) / 100);
+    return {stake: round2(amount), payout, expectedReturn, expectedProfit: round2(expectedReturn - amount), winChance: schedina.pct, priced};
+}
+
 /** The ticket valued: `stakes` is the stake per column of each line, in the order of `groups`. */
 export function stakePlan(selections: SchedinaSelection[], groups: SystemGroup[], stakes: number[]): StakePlan {
     const lines = groups.map((g, i) => {

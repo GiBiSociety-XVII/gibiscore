@@ -555,14 +555,16 @@
           },
           "stake": {
             "title": "La puntata",
-            "text": "Scrivi quanto vuoi puntare in tutto: il modello la divide per linea, k su N, come sul biglietto del bookmaker, in multipli di 5 centesimi. \"Consigliata\" mette di più sulle linee con la resa migliore, \"Tutte\" la spalma su ogni linea; puoi correggere ogni importo a mano. Sotto: puntata totale, vincita massima, resa attesa e probabilità di chiudere in guadagno."
+            "text": "Scrivi quanto vuoi puntare. Singola e multipla: vincita se tutte le selezioni sono centrate, ritorno e profitto atteso secondo il modello. Sistema: la puntata è divisa per riga, k su N, come sul biglietto del bookmaker, in multipli di 5 centesimi; \"Consigliata\" mette di più sulle righe con la resa migliore, \"Integrale\" la spalma su ogni riga; puoi correggere ogni importo a mano."
           },
           "save": {
             "title": "Salva",
             "text": "Con l'accesso fatto la schedina viene salvata nel tuo account e chiusa da sola sui risultati veri: la ritrovi nel bilancio del modello, sotto \"Le mie schedine\", con vinte e perse."
           }
         }
-      }
+      },
+      "winChance": "Probabilità di vincita",
+      "ticketNote": "Vincita = puntata × quota della schedina (per la multipla il prodotto delle quote medie dei bookmaker). Ritorno e profitto atteso secondo il modello: vincita per la probabilità che tutte le selezioni siano centrate. Le quote del tuo bookmaker possono differire."
     },
     "mine": {
       "title": "Le mie schedine",

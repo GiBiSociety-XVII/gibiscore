@@ -8,7 +8,7 @@ import {cn} from "@/components/shared/ui/cn";
 import {TourLauncher} from "./tour-launcher";
 import {cloudUser} from "@/lib/fantasy/cloud";
 import type {LegKey} from "@/lib/football/markets";
-import {buildSchedina, stakePlan, STAKE_STEP, suggestedStakes, systemGroups, toStakeStep, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
+import {buildSchedina, stakePlan, STAKE_STEP, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
 
 const RISKS: SchedinaRisk[] = ['low', 'medium', 'high'];
 const KINDS: SchedinaKind[] = ['single', 'multiple', 'system'];
@@ -170,7 +170,36 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 ))}
                             </div>
                             {result.system && <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{result.system.bankers > 0 ? t('systemNoteBankers', {bankers: result.system.bankers, columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct}) : t('systemNote', {columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct})}</p>}
-                            {(() => {
+                            {result.kind !== 'system' && (() => {
+                                // A single or an accumulator: one stake, one payout, no lines.
+                                const plan = ticketPlan(result, stake);
+                                return (
+                                    <div data-tour="schedina-stake" className="border-t-2 border-foreground">
+                                        <div className="px-3 py-2 flex flex-wrap items-center gap-2">
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('stake')}</span>
+                                            <label className="inline-flex items-center gap-1 text-[12px] font-bold">
+                                                <input type="number" min={0} step={STAKE_STEP} value={stake} onChange={(e) => setStake(toStakeStep(Number(e.target.value) || 0))} className="bb-input h-8 w-24 px-2 font-mono text-[13px] font-extrabold text-right" aria-label={t('stake')} />
+                                                <span>€</span>
+                                            </label>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-muted">
+                                            {[
+                                                [t('payout'), `${plan.priced ? '' : '≈'}${plan.payout.toFixed(2)} €`],
+                                                [t('expectedReturn'), `${plan.expectedReturn.toFixed(2)} €`],
+                                                [t('expectedProfit'), `${plan.expectedProfit >= 0 ? '+' : ''}${plan.expectedProfit.toFixed(2)} €`],
+                                                [t('winChance'), `${plan.winChance}%`],
+                                            ].map(([label, value]) => (
+                                                <div key={label} className="flex flex-col items-center justify-center px-2 py-1.5 border-t border-muted">
+                                                    <span className={cn("font-mono text-base font-extrabold tabular-nums", label === t('expectedProfit') && (plan.expectedProfit >= 0 ? "text-emerald-800" : "text-red-700"))}>{value}</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground text-center leading-tight">{label}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{plan.priced ? t('ticketNote') : t('stakeNoteFair')}</p>
+                                    </div>
+                                );
+                            })()}
+                            {result.kind === 'system' && (() => {
                                 const groups = systemGroups(result.selections);
                                 const stakes = lineStakes ?? suggestedStakes(groups, stake, stakeMode);
                                 const plan = stakePlan(result.selections, groups, stakes);

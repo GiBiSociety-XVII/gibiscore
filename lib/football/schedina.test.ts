@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {BetSuggestion} from './markets';
-import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, suggestedStakes, systemGroups, toStakeStep, type SchedinaCandidate} from './schedina';
+import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type SchedinaCandidate} from './schedina';
 
 const slip = (tier: BetSuggestion['tier'], pct: number, odds: number | null = null): BetSuggestion => ({tier, legs: [{key: '1', pct, odds}], pct, fair: Math.round((100 / pct) * 100) / 100, odds});
 const match = (id: number, day: string, hour: string, competitionId: number, slips: BetSuggestion[]): SchedinaCandidate => ({fixtureId: id, competitionId, competition: `L${competitionId}`, home: `H${id}`, away: `A${id}`, startingAt: `${day}T${hour}:00Z`, day, slips});
@@ -138,5 +138,26 @@ describe('toStakeStep', () => {
         expect(toStakeStep(10)).toBe(10);
         const stakes = suggestedStakes(systemGroups(buildSchedina([match(31, '2026-09-18', '18:45', 1, [slip('balanced', 70, 1.5)]), match(32, '2026-09-18', '20:45', 1, [slip('balanced', 65, 1.6)]), match(33, '2026-09-19', '15:00', 1, [slip('balanced', 62, 1.7)])], {risk: 'medium', kind: 'system', size: 3, system: 2, bankers: 0, days: [], competitions: [], now: '2026-09-18T10:00:00Z'})!.selections), 33.33, 'full');
         for (const v of stakes) expect(Math.round(v * 100) % 5).toBe(0);
+    });
+});
+
+describe('ticketPlan', () => {
+    it('values an accumulator at the book odds', () => {
+        const plan = ticketPlan({pct: 40, fair: 2.5, book: 2.8}, 10);
+        expect(plan.payout).toBe(28);
+        expect(plan.expectedReturn).toBe(11.2);
+        expect(plan.expectedProfit).toBe(1.2);
+        expect(plan.winChance).toBe(40);
+        expect(plan.priced).toBe(true);
+    });
+    it('falls back to the fair odds, a bet at par', () => {
+        const plan = ticketPlan({pct: 40, fair: 2.5, book: null}, 10);
+        expect(plan.payout).toBe(25);
+        expect(plan.expectedReturn).toBe(10);
+        expect(plan.expectedProfit).toBe(0);
+        expect(plan.priced).toBe(false);
+    });
+    it('never stakes below zero', () => {
+        expect(ticketPlan({pct: 50, fair: 2, book: 2}, -5).stake).toBe(0);
     });
 });
