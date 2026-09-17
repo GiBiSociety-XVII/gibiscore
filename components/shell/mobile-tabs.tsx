@@ -17,7 +17,7 @@ export function MobileTabs() {
         {key: 'fantasy', href: '/fantacalcio', icon: Sparkles, active: path.startsWith('/fantacalcio')},
     ] as const;
     return (
-        <nav aria-label={t('scores')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-background border-t-[2.5px] border-foreground pb-[env(safe-area-inset-bottom)]">
+        <nav data-tour="mobileTabs" aria-label={t('scores')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-background border-t-[2.5px] border-foreground pb-[env(safe-area-inset-bottom)]">
             <ul className="grid grid-cols-5">
                 {tabs.map(({key, href, icon: Icon, active}) => (
                     <li key={key}>

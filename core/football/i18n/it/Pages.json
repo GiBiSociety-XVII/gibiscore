@@ -221,7 +221,61 @@
     "emptyLive": "In questo momento non c’è nessuna partita in corso. Scegli un giorno per vedere il programma.",
     "emptyDay": "Nessuna partita per questo filtro.",
     "favoritesGroup": "Preferiti",
-    "refresh": "Aggiornamento automatico"
+    "refresh": "Aggiornamento automatico",
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della pagina iniziale",
+      "steps": {
+        "welcome": {
+          "title": "Benvenuto",
+          "text": "Le tre porte del sito: risultati e live, pronostici e schedine, fantacalcio. \"Ho capito\" lo chiude per sempre su questo browser; ogni pagina ha poi la sua guida dal pulsante \"Guida\"."
+        },
+        "dates": {
+          "title": "Il giorno",
+          "text": "Le partite del giorno scelto: le frecce spostano di un giorno, il calendario porta a una data qualsiasi, oggi resta sottolineato. LIVE mostra solo le partite in corso in questo momento, col loro numero."
+        },
+        "filters": {
+          "title": "I filtri",
+          "text": "Tutte, in corso, finite o ancora da giocare, con il conteggio di ciascuna. La lista sotto cambia all'istante."
+        },
+        "list": {
+          "title": "Le partite",
+          "text": "Prima le competizioni che hai messo tra i preferiti, poi quelle principali, poi tutte le altre per paese. Risultati e minuti si aggiornano da soli, senza ricaricare la pagina."
+        },
+        "competition": {
+          "title": "Una competizione",
+          "text": "Tocca il nome per classifica, calendario e statistiche della competizione. La stella la mette tra i preferiti: sale in cima alla lista e la sua classifica compare nella colonna di destra."
+        },
+        "match": {
+          "title": "Una partita",
+          "text": "Orario o minuto, squadre e risultato; le squadre delle tue preferite sono evidenziate. Tocca la partita per aprire in una nuova scheda cronaca, formazioni, statistiche e analisi con le quote. Tocca una squadra per la sua pagina. Prima del calcio d'inizio, a destra, le quote 1X2 dei bookmaker."
+        },
+        "sidebar": {
+          "title": "Le competizioni",
+          "text": "Le competizioni principali e tutte le altre per paese: da qui raggiungi qualsiasi campionato o coppa."
+        },
+        "chips": {
+          "title": "Le competizioni principali",
+          "text": "Scorri la fila per saltare a un campionato o a una coppa; tutte le altre sono nel menu Competizioni."
+        },
+        "rail": {
+          "title": "Le tue cose",
+          "text": "Le squadre che segui con la loro prossima partita e le classifiche delle competizioni preferite, aggiornate. Si riempie con le stelle che metti in giro per il sito."
+        },
+        "sections": {
+          "title": "Le sezioni",
+          "text": "Risultati, live, competizioni, pronostici, statistiche e fantacalcio: ogni voce apre un menu con le sue pagine. Il logo riporta sempre qui."
+        },
+        "search": {
+          "title": "La ricerca",
+          "text": "Cerca una squadra, una competizione o un giocatore per nome: i risultati compaiono mentre scrivi."
+        },
+        "mobileTabs": {
+          "title": "La barra in basso",
+          "text": "Le sezioni principali sempre a portata di pollice: risultati, live, competizioni, pronostici e fantacalcio."
+        }
+      }
+    }
   },
   "search": {
     "title": "Risultati per “{query}”",

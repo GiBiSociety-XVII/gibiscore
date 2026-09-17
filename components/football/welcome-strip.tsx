@@ -38,7 +38,7 @@ export function WelcomeStrip() {
         {key: 'fantasy', href: '/fantacalcio' as const, Icon: Sparkles},
     ];
     return (
-        <section className="bb-surface overflow-hidden" aria-label={t('title')}>
+        <section data-tour="welcome" className="bb-surface overflow-hidden" aria-label={t('title')}>
             <div className="flex items-center justify-between gap-2 px-3 h-9 border-b-2 border-foreground bg-card">
                 <h2 className="text-[13px] font-extrabold uppercase tracking-wide truncate">{t('title')}</h2>
                 <button type="button" onClick={dismiss} className="bb-btn bg-background h-7 px-2.5 text-[11px] font-extrabold inline-flex items-center gap-1"><X className="w-3.5 h-3.5" aria-hidden="true" />{t('dismiss')}</button>

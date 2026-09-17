@@ -44,7 +44,7 @@ function StatusCell({fixture}: {fixture: FixtureSummary}) {
  * `showDate` adds the day before the time (team and player pages);
  * `showCompetition` adds the competition under the time (team pages).
  */
-export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false, favorite = false, oddsColumn = false}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean; /** One of the user's favourite teams plays: the row is marked. */ favorite?: boolean; /** The list keeps a column for the bookmakers' 1X2 on wide screens (some row of it has odds): every row aligns on it. */ oddsColumn?: boolean}) {
+export function MatchRow({fixture, highlightTeamId, showDate = false, showCompetition = false, compact = false, favorite = false, oddsColumn = false, tourId}: {fixture: FixtureSummary; highlightTeamId?: number; showDate?: boolean; showCompetition?: boolean; /** Narrow panels: three-letter codes and the year in the date. */ compact?: boolean; /** One of the user's favourite teams plays: the row is marked. */ favorite?: boolean; /** The list keeps a column for the bookmakers' 1X2 on wide screens (some row of it has odds): every row aligns on it. */ oddsColumn?: boolean; /** The `data-tour` anchor of a page's guide, on the one row it points at. */ tourId?: string}) {
     const format = useFormatter();
     const tOdds = useTranslations('Football.odds');
     const state = rowState(fixture);
@@ -74,6 +74,7 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
     return (
         <div
             data-row={state}
+            data-tour={tourId}
             data-teams={`${fixture.home.slug ?? ''}|${fixture.away.slug ?? ''}`}
             data-fav={favorite ? '1' : undefined}
             className={cn(

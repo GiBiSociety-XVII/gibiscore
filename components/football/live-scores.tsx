@@ -132,27 +132,30 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
         scheduled: all.filter((f) => f.state === 'scheduled').length,
     };
 
+    // The guide of the front page points at the first competition of the list and its first row.
+    const firstSlug = [...favorites, ...pinned, ...countries.flatMap((c) => c.competitions)][0]?.competition.slug;
+    const block = (g: (typeof everyGroup)[number]) => <CompetitionBlock key={g.competition.slug} group={g} favoriteTeams={favoriteTeams} tour={g.competition.slug === firstSlug} />;
     const list = all.length === 0 ? (
         <p className="px-2 py-6 text-center text-[13px] font-semibold text-muted-foreground">{emptyText}</p>
     ) : (
-        <div className="flex flex-col gap-2">
+        <div data-tour="list" className="flex flex-col gap-2">
             {favorites.length > 0 && (
                 <div data-group className="border-2 border-foreground rounded-lg overflow-hidden">
                     <div className="flex items-center gap-1.5 px-2 h-7 bg-foreground text-background text-[11px] font-extrabold uppercase tracking-wide">
                         <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-hidden="true" />
                         {favoritesLabel}
                     </div>
-                    {favorites.map((g) => <CompetitionBlock key={g.competition.slug} group={g} favoriteTeams={favoriteTeams} />)}
+                    {favorites.map(block)}
                 </div>
             )}
             {pinned.length > 0 && (
                 <div data-group className="border-2 border-foreground rounded-lg overflow-hidden">
-                    {pinned.map((g) => <CompetitionBlock key={g.competition.slug} group={g} favoriteTeams={favoriteTeams} />)}
+                    {pinned.map(block)}
                 </div>
             )}
             {countries.map((c) => (
                 <div key={c.country} data-group className="border-2 border-foreground/30 rounded-lg overflow-hidden">
-                    {c.competitions.map((g) => <CompetitionBlock key={g.competition.slug} group={g} favoriteTeams={favoriteTeams} />)}
+                    {c.competitions.map(block)}
                 </div>
             ))}
             <p data-empty className="hidden px-2 py-6 text-center text-[13px] font-semibold text-muted-foreground">{emptyText}</p>

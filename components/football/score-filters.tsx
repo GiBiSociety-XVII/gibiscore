@@ -25,7 +25,7 @@ export function ScoreFilters({
     const options: ScoreFilter[] = ['all', 'live', 'finished', 'scheduled'];
     return (
         <div data-filter={filter} className="flex flex-col gap-2">
-            <div role="tablist" className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
+            <div data-tour="filters" role="tablist" className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
                 {options.map((option) => {
                     const selected = option === filter;
                     return (

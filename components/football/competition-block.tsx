@@ -7,12 +7,12 @@ import {Flag} from "./flag";
 import {MatchRow} from "./match-row";
 
 /** Header line (flag, country, competition, favourite star) plus its rows, as in a scores app. */
-export function CompetitionBlock({group, showCountry = true, favoriteTeams}: {group: CompetitionFixtures; showCountry?: boolean; /** Slugs of the user's favourite teams: their rows are marked. */ favoriteTeams?: ReadonlySet<string>}) {
+export function CompetitionBlock({group, showCountry = true, favoriteTeams, tour = false}: {group: CompetitionFixtures; showCountry?: boolean; /** Slugs of the user's favourite teams: their rows are marked. */ favoriteTeams?: ReadonlySet<string>; /** The block the page's guide points at: its header and first row carry the anchors. */ tour?: boolean}) {
     const oddsColumn = group.fixtures.some((f) => f.state === 'scheduled' && !!f.odds);
     const c = group.competition;
     return (
         <section data-block data-slug={c.slug} className="flex flex-col border-t-2 border-foreground first:border-t-0">
-            <div className="flex items-center gap-1 pl-2 pr-1 h-8 bg-muted/60 text-[12px] font-extrabold">
+            <div data-tour={tour ? 'competition' : undefined} className="flex items-center gap-1 pl-2 pr-1 h-8 bg-muted/60 text-[12px] font-extrabold">
                 <Link href={`/competitions/${c.slug}`} className="group flex-1 min-w-0 flex items-center gap-2 h-full hover:underline decoration-accent decoration-[3px] underline-offset-2">
                     {c.logoUrl && !c.countryCode ? (
                         <Image src={c.logoUrl} alt="" width={16} height={16} unoptimized className="object-contain shrink-0" />
@@ -28,7 +28,7 @@ export function CompetitionBlock({group, showCountry = true, favoriteTeams}: {gr
                 </Link>
             </div>
             <div className="flex flex-col">
-                {group.fixtures.map((f) => <MatchRow key={f.id} fixture={f} oddsColumn={oddsColumn} favorite={!!favoriteTeams && ((!!f.home.slug && favoriteTeams.has(f.home.slug)) || (!!f.away.slug && favoriteTeams.has(f.away.slug)))} />)}
+                {group.fixtures.map((f, i) => <MatchRow key={f.id} fixture={f} oddsColumn={oddsColumn} tourId={tour && i === 0 ? 'match' : undefined} favorite={!!favoriteTeams && ((!!f.home.slug && favoriteTeams.has(f.home.slug)) || (!!f.away.slug && favoriteTeams.has(f.away.slug)))} />)}
             </div>
         </section>
     );
