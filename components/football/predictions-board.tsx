@@ -103,21 +103,20 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                                                     </span>
                                                 </div>
                                                 {prediction ? (
-                                                    (() => {
-                                                        // One slip only: the balanced one, the prudent one when the match has none, the bold one last.
-                                                        const slip = slips.find((x) => x.tier === 'balanced') ?? slips.find((x) => x.tier === 'safe') ?? slips[0];
-                                                        return slip ? (
-                                                            <div className="mt-1.5 flex items-center justify-center gap-2" title={slip.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ')}>
-                                                                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${slip.tier}`)}</span>
-                                                                <span className={cn("inline-flex items-center gap-2 rounded border-2 border-foreground px-2.5 h-7 text-[13px] font-extrabold", slip.tier === 'balanced' ? "bg-accent" : "bg-card")}>
-                                                                    {slip.legs.map((l) => legLabel(l.key)).join(' + ')}
-                                                                    <span className="font-mono text-[11px] font-bold tabular-nums text-muted-foreground">{slip.pct}%</span>
+                                                    <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                                                        {(['safe', 'balanced', 'bold'] as const).map((tier) => {
+                                                            const slip = slips.find((x) => x.tier === tier);
+                                                            return (
+                                                                <span key={tier} className="flex flex-col items-center gap-0.5 min-w-0" title={slip ? slip.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ') : t('noAdvice')}>
+                                                                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${tier}`)}</span>
+                                                                    <span className={cn("inline-flex items-center justify-center gap-1.5 w-full rounded border-2 px-1.5 h-7 text-[12px] font-extrabold leading-none min-w-0", slip ? (tier === 'balanced' ? "border-foreground bg-accent" : "border-foreground bg-card") : "border-muted bg-card text-muted-foreground")}>
+                                                                        <span className="truncate">{slip ? slip.legs.map((l) => legLabel(l.key)).join(' + ') : '–'}</span>
+                                                                        {slip && <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground shrink-0">{slip.pct}%</span>}
+                                                                    </span>
                                                                 </span>
-                                                            </div>
-                                                        ) : (
-                                                            <p className="mt-1 text-[11px] font-semibold text-muted-foreground text-center">{t('noAdvice')}</p>
-                                                        );
-                                                    })()
+                                                            );
+                                                        })}
+                                                    </div>
                                                 ) : (
                                                     <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{tp('empty')}</p>
                                                 )}

@@ -248,7 +248,7 @@
     "title": "Pronostici",
     "metaTitle": "Pronostici partite",
     "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione, con le quote dei bookmaker a confronto.",
-    "intro": "Le prossime partite delle competizioni principali con la giocata che il modello consiglia. Apri la partita per l'analisi completa.",
+    "intro": "Le prossime partite delle competizioni principali con le giocate che il modello propone. Apri la partita per l'analisi completa.",
     "days": "Prossimi {count} giorni",
     "recordLink": "Il bilancio del modello",
     "record": {
@@ -291,7 +291,7 @@
       "allCompetitions": "Tutte le competizioni",
       "count": "{count} partite"
     },
-    "adviceLegend": "Sotto ogni partita la giocata consigliata dal modello (dal 62% di probabilità), la stessa dell'analisi partita; quando manca, quella prudente (dal 78%). Apri la partita per probabilità, quote e le altre giocate. Non è un consiglio di gioco.",
-    "noAdvice": "Nessuna giocata abbastanza probabile per questa partita."
+    "adviceLegend": "Sotto ogni partita le tre giocate del modello, le stesse dell'analisi partita: prudente (dal 78% di probabilità), consigliata (dal 62%), audace (dal 45%). Apri la partita per probabilità complete e quote. Non è un consiglio di gioco.",
+    "noAdvice": "Nessuna giocata abbastanza probabile per questa fascia."
   }
 }
