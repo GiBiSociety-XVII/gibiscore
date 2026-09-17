@@ -10,7 +10,6 @@ import type {BetSuggestion, LegKey} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {CompetitionSummary, FixtureSummary} from "@/lib/football/types";
 import {Flag} from "./flag";
-import {OutcomeBar} from "./prediction";
 import {TeamCrest} from "./team-crest";
 
 export interface BoardFixture {
@@ -104,25 +103,21 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                                                     </span>
                                                 </div>
                                                 {prediction ? (
-                                                    <>
-                                                        <div className="mt-1.5 flex items-center gap-3">
-                                                            <OutcomeBar prediction={prediction} className="h-5 flex-1" />
-                                                            <span className="font-mono text-[11px] font-bold text-muted-foreground whitespace-nowrap tabular-nums">
-                                                                xG {prediction.lambda.home.toFixed(1)}-{prediction.lambda.away.toFixed(1)} · O2,5 {prediction.over25}%
-                                                            </span>
-                                                        </div>
-                                                        {slips.length > 0 && (
-                                                            <div className="mt-1.5 grid grid-cols-3 gap-1">
-                                                                {slips.map((s) => (
-                                                                    <span key={s.tier} className={cn("flex flex-col rounded border px-1.5 py-1 leading-tight min-w-0", s.tier === 'balanced' ? "border-foreground bg-accent" : "border-foreground/30 bg-card")} title={s.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ')}>
-                                                                        <span className="text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${s.tier}`)}</span>
-                                                                        <span className="text-[12px] font-extrabold truncate">{s.legs.map((l) => legLabel(l.key)).join(' + ')}</span>
-                                                                        <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground leading-tight">{s.pct}% · {tm('fair')} {s.fair.toFixed(2)}{s.odds !== null && ` · ${tm('book')} ${s.legs.length > 1 ? '≈' : ''}${s.odds.toFixed(2)}`}</span>
-                                                                    </span>
-                                                                ))}
+                                                    (() => {
+                                                        // One slip only: the balanced one, the prudent one when the match has none, the bold one last.
+                                                        const slip = slips.find((x) => x.tier === 'balanced') ?? slips.find((x) => x.tier === 'safe') ?? slips[0];
+                                                        return slip ? (
+                                                            <div className="mt-1.5 flex items-center justify-center gap-2" title={slip.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ')}>
+                                                                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${slip.tier}`)}</span>
+                                                                <span className={cn("inline-flex items-center gap-2 rounded border-2 border-foreground px-2.5 h-7 text-[13px] font-extrabold", slip.tier === 'balanced' ? "bg-accent" : "bg-card")}>
+                                                                    {slip.legs.map((l) => legLabel(l.key)).join(' + ')}
+                                                                    <span className="font-mono text-[11px] font-bold tabular-nums text-muted-foreground">{slip.pct}%</span>
+                                                                </span>
                                                             </div>
-                                                        )}
-                                                    </>
+                                                        ) : (
+                                                            <p className="mt-1 text-[11px] font-semibold text-muted-foreground text-center">{t('noAdvice')}</p>
+                                                        );
+                                                    })()
                                                 ) : (
                                                     <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{tp('empty')}</p>
                                                 )}
