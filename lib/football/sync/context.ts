@@ -6,6 +6,7 @@ import {quotaAllows, quotaIsFresh, RESERVE, type JobClass} from '@/lib/api-footb
 import {fetchAll} from '@/lib/db/paginate';
 import {slugify} from '@/lib/api-football/mappers';
 import {cleanName} from '@/lib/football/names';
+import type {LeagueCoverage} from '@/lib/football/coverage';
 
 /**
  * Shared plumbing for sync jobs: a service-role client (public schema),
@@ -159,16 +160,18 @@ export interface LeagueRef {
     id: number;
     providerId: number;
     tier: LeagueTier;
+    /** What the provider declares for the current season (see lib/football/coverage.ts). */
+    coverage: LeagueCoverage | null;
 }
 
-/** Leagues by provider id, with tier. */
+/** Leagues by provider id, with tier and coverage. */
 export async function leagueMap(db: FootballClient, providerIds: number[]): Promise<Map<number, LeagueRef>> {
     const map = new Map<number, LeagueRef>();
     for (let i = 0; i < providerIds.length; i += 500) {
         const chunk = providerIds.slice(i, i + 500);
-        const {data, error} = await db.from('leagues').select('id,provider_id,tier').in('provider_id', chunk);
+        const {data, error} = await db.from('leagues').select('id,provider_id,tier,season_coverage').in('provider_id', chunk);
         if (error) fail('leagues.select', error);
-        for (const row of data ?? []) map.set(row.provider_id as number, {id: row.id as number, providerId: row.provider_id as number, tier: row.tier as LeagueTier});
+        for (const row of data ?? []) map.set(row.provider_id as number, {id: row.id as number, providerId: row.provider_id as number, tier: row.tier as LeagueTier, coverage: (row.season_coverage as LeagueCoverage | null) ?? null});
     }
     return map;
 }
@@ -215,33 +218,48 @@ export interface SeasonRef {
     leagueProviderId: number;
     leagueSlug: string;
     tier: LeagueTier;
+    /** The league's declared coverage; the jobs ask a basic league only for what it covers. */
+    coverage: LeagueCoverage | null;
     year: number;
     name: string;
+    isCurrent: boolean;
+    /** When each job last stored the season (null: never). */
+    fixturesListedAt: string | null;
+    playersSyncedAt: string | null;
+    standingsSyncedAt: string | null;
+    teamsListedAt: string | null;
+}
+
+const SEASON_SELECT = 'id,year,name,is_current,fixtures_listed_at,players_synced_at,standings_synced_at,teams_listed_at,league:leagues!inner(id,provider_id,slug,tier,season_coverage)';
+
+function toSeasonRef(row: Record<string, unknown>): SeasonRef {
+    const league = row.league as unknown as {id: number; provider_id: number; slug: string; tier: LeagueTier; season_coverage: LeagueCoverage | null};
+    return {
+        id: row.id as number,
+        leagueId: league.id,
+        leagueProviderId: league.provider_id,
+        leagueSlug: league.slug,
+        tier: league.tier,
+        coverage: league.season_coverage ?? null,
+        year: row.year as number,
+        name: row.name as string,
+        isCurrent: row.is_current === true,
+        fixturesListedAt: (row.fixtures_listed_at as string | null) ?? null,
+        playersSyncedAt: (row.players_synced_at as string | null) ?? null,
+        standingsSyncedAt: (row.standings_synced_at as string | null) ?? null,
+        teamsListedAt: (row.teams_listed_at as string | null) ?? null,
+    };
 }
 
 /** Every season flagged current, with its league; optionally one tier only. */
 export async function currentSeasons(db: FootballClient, tier?: LeagueTier): Promise<SeasonRef[]> {
-    // ~1,100 current seasons: more than one Data API page.
+    // ~1,250 current seasons: more than one Data API page.
     const data = await fetchAll((a, b) => {
-        let query = db
-            .from('seasons')
-            .select('id,year,name,league:leagues!inner(id,provider_id,slug,tier)')
-            .eq('is_current', true);
+        let query = db.from('seasons').select(SEASON_SELECT).eq('is_current', true);
         if (tier) query = query.eq('leagues.tier', tier);
         return query.order('id').range(a, b);
     }, {max: 10000});
-    return data.map((row) => {
-        const league = row.league as unknown as {id: number; provider_id: number; slug: string; tier: LeagueTier};
-        return {
-            id: row.id as number,
-            leagueId: league.id,
-            leagueProviderId: league.provider_id,
-            leagueSlug: league.slug,
-            tier: league.tier,
-            year: row.year as number,
-            name: row.name as string,
-        };
-    });
+    return data.map((row) => toSeasonRef(row as Record<string, unknown>));
 }
 
 /**
@@ -281,11 +299,8 @@ export async function ensureSeasons(db: FootballClient, wanted: Array<{leagueId:
     return map;
 }
 
-export interface SeasonRow extends SeasonRef {
-    isCurrent: boolean;
-    fixturesListedAt: string | null;
-    playersSyncedAt: string | null;
-}
+/** Kept for the jobs that grew up on it: a season row is a season ref. */
+export type SeasonRow = SeasonRef;
 
 /**
  * Seasons of the featured leagues to keep in the database: the current one
@@ -303,29 +318,11 @@ export async function featuredSeasons(db: FootballClient, historyCount: number, 
     const leagueIds = [...new Set(current.map((s) => s.leagueId))];
     if (leagueIds.length === 0) return [];
     const minYear = new Map<number, number>(current.map((s) => [s.leagueId, s.year - historyCount]));
-    const {data, error} = await db
-        .from('seasons')
-        .select('id,year,name,is_current,fixtures_listed_at,players_synced_at,league:leagues!inner(id,provider_id,slug,tier)')
-        .in('league_id', leagueIds)
-        .limit(2000);
+    const {data, error} = await db.from('seasons').select(SEASON_SELECT).in('league_id', leagueIds).limit(2000);
     if (error) fail('seasons.select', error);
     const byLeague = new Map<number, SeasonRef>(current.map((s) => [s.leagueId, s]));
     return (data ?? [])
-        .map((row): SeasonRow => {
-            const league = row.league as unknown as {id: number; provider_id: number; slug: string; tier: LeagueTier};
-            return {
-                id: row.id as number,
-                leagueId: league.id,
-                leagueProviderId: league.provider_id,
-                leagueSlug: league.slug,
-                tier: league.tier,
-                year: row.year as number,
-                name: row.name as string,
-                isCurrent: row.is_current === true,
-                fixturesListedAt: (row.fixtures_listed_at as string | null) ?? null,
-                playersSyncedAt: (row.players_synced_at as string | null) ?? null,
-            };
-        })
+        .map((row) => toSeasonRef(row as Record<string, unknown>))
         .filter((s) => s.year >= (minYear.get(s.leagueId) ?? 0) && s.year <= (byLeague.get(s.leagueId)?.year ?? 0))
         .sort((a, b) => b.year - a.year || a.leagueSlug.localeCompare(b.leagueSlug));
 }

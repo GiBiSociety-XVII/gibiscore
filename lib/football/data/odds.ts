@@ -21,11 +21,11 @@ export const getFixtureOdds = unstable_cache(
     {revalidate: 600},
 );
 
-/** The bookmakers' average 1X2 on the featured matches of a list not yet played (the next two weeks): one query, nothing when there are none. */
+/** The bookmakers' average 1X2 on the matches of a list not yet played (the next two weeks), wherever sync-odds stored some: one query, nothing when there are none. */
 export async function attachOdds(db: ReturnType<typeof footballDb>, fixtures: FixtureSummary[], options: {withinDays?: number} = {}): Promise<void> {
     // Only matches close enough for the bookmakers to price them: a season's calendar is not asked in full.
     const limit = Date.now() + (options.withinDays ?? 14) * 86_400_000;
-    const wanted = fixtures.filter((f) => f.state === 'scheduled' && f.leagueFeatured && new Date(f.startingAt).getTime() <= limit);
+    const wanted = fixtures.filter((f) => f.state === 'scheduled' && new Date(f.startingAt).getTime() <= limit);
     if (wanted.length === 0) return;
     try {
         const rows: Array<{fixture_id: number; bookmaker: string; markets: OddsMarkets}> = [];

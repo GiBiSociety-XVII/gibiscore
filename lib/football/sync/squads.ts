@@ -14,60 +14,69 @@ const DEADLINE_MS = 230_000;
 const CONCURRENCY = 3;
 /** Profiles fetched per club per run for players the database has never seen: bounded, they cost a request each. */
 const MAX_PROFILES_PER_TEAM = 6;
+/** Basic clubs per run at most: ~8,500 of them, a week to go round once, fifty an hour after. */
+const BASIC_MAX_PER_RUN = 300;
 
 interface Club {
     id: number;
     providerId: number;
     name: string;
+    /** Featured when any of its seasons is: a featured club is asked the featured way, whatever cups it also plays. */
+    tier: 'featured' | 'basic';
     squadSyncedAt: string | null;
     transfersSyncedAt: string | null;
-    /** Every featured season the club takes part in: league, cup, Europe. */
+    /** Every current season the club takes part in: league, cup, Europe. */
     seasons: Array<{id: number; year: number; leagueProviderId: number}>;
 }
 
 /**
- * The featured clubs with the seasons they play in, from season_teams,
- * the ones that waited longest first (then the featured order, for ties).
+ * Every club of a current season, from season_teams, with the seasons it
+ * plays in: featured first (the ones that waited longest, then the
+ * featured order for ties), then the basic ones that waited longest.
  */
-async function featuredClubs(db: FootballClient): Promise<Club[]> {
+async function currentClubs(db: FootballClient): Promise<Club[]> {
     const rows = await fetchAll(
         (a, b) =>
             db
                 .from('season_teams')
                 .select('team:teams!inner(id,provider_id,name,squad_synced_at,transfers_synced_at),season:seasons!inner(id,year,is_current,league:leagues!inner(provider_id,tier))')
                 .eq('seasons.is_current', true)
-                .eq('seasons.leagues.tier', 'featured')
                 .order('team_id')
                 .range(a, b),
-        {max: 5000},
+        {max: 30000},
     );
     const rank = new Map(getFeaturedCompetitions().map((c, i) => [c.providerId, i]));
     const clubs = new Map<number, Club>();
     for (const r of rows) {
         const team = r.team as unknown as {id: number; provider_id: number; name: string; squad_synced_at: string | null; transfers_synced_at: string | null};
-        const season = r.season as unknown as {id: number; year: number; league: {provider_id: number}};
-        const club = clubs.get(team.id) ?? {id: team.id, providerId: team.provider_id, name: team.name, squadSyncedAt: team.squad_synced_at, transfersSyncedAt: team.transfers_synced_at, seasons: []};
+        const season = r.season as unknown as {id: number; year: number; league: {provider_id: number; tier: 'featured' | 'basic'}};
+        const club = clubs.get(team.id) ?? {id: team.id, providerId: team.provider_id, name: team.name, tier: 'basic' as const, squadSyncedAt: team.squad_synced_at, transfersSyncedAt: team.transfers_synced_at, seasons: []};
         club.seasons.push({id: season.id, year: season.year, leagueProviderId: season.league.provider_id});
+        if (season.league.tier === 'featured') club.tier = 'featured';
         clubs.set(team.id, club);
     }
     const best = (c: Club) => Math.min(...c.seasons.map((s) => rank.get(s.leagueProviderId) ?? 999));
-    return [...clubs.values()].sort((a, b) => (a.squadSyncedAt ?? '').localeCompare(b.squadSyncedAt ?? '') || best(a) - best(b));
+    return [...clubs.values()].sort((a, b) => (a.tier !== b.tier ? (a.tier === 'featured' ? -1 : 1) : (a.squadSyncedAt ?? '').localeCompare(b.squadSyncedAt ?? '') || best(a) - best(b)));
 }
 
 /** Outside the transfer windows a squad is refreshed this often: nobody moves, only a free agent now and then. */
 const QUIET_REFRESH_MS = 7 * 24 * 3_600_000;
+/** While a window is open a featured squad is refreshed this often: daily, whatever the hour the cron fires. */
+const WINDOW_REFRESH_MS = 20 * 3_600_000;
 
 /**
- * sync-squads (daily; archive class, ~2 requests per club)
+ * sync-squads (hourly; archive class, ~2 requests per featured club, 1 per basic club)
  *
- * Every featured club: the provider's squad (players and shirt numbers,
- * departures removed) and its transfer feed since the season started
- * (arrivals join at once, departures leave). While a transfer window is
- * open every club is asked every day; outside the windows nobody buys or
- * sells, so a club is asked only when its squad is a week old, and the
- * transfer feed not at all. `force` asks everyone now; `limit` caps the
- * clubs per run. Clubs are taken oldest squad first, so a run cut by the
- * deadline is completed by the next one.
+ * Every club of a current season. Featured clubs: the provider's squad
+ * (players and shirt numbers, departures removed) and, while a transfer
+ * window is open, the transfer feed since the season started (arrivals
+ * join at once, departures leave), every day; outside the windows nobody
+ * buys or sells, so a club is asked only when its squad is a week old,
+ * and the transfer feed not at all. Basic clubs: the squad alone, when a
+ * week old, 300 a run after the featured ones. `force` asks every
+ * featured club now; `limit` caps the clubs per run. Clubs are taken
+ * oldest squad first, so a run cut by the deadline is completed by the
+ * next one.
  */
 export async function syncSquads(options: {limit?: number; force?: boolean} = {}): Promise<SyncRun> {
     const db = footballClient();
@@ -79,9 +88,15 @@ export async function syncSquads(options: {limit?: number; force?: boolean} = {}
             return run;
         }
         const windowOpen = options.force || inTransferWindow(new Date());
-        const stale = (c: Club) => c.squadSyncedAt === null || Date.now() - Date.parse(c.squadSyncedAt) > QUIET_REFRESH_MS;
-        const clubs = (await featuredClubs(db)).filter((c) => windowOpen || stale(c)).slice(0, options.limit ?? Number.POSITIVE_INFINITY);
+        const olderThan = (c: Club, ms: number) => c.squadSyncedAt === null || Date.now() - Date.parse(c.squadSyncedAt) > ms;
+        const due = (c: Club) => (c.tier === 'featured' ? (options.force ? true : windowOpen ? olderThan(c, WINDOW_REFRESH_MS) : olderThan(c, QUIET_REFRESH_MS)) : olderThan(c, QUIET_REFRESH_MS));
+        const all = (await currentClubs(db)).filter(due);
+        const basicDue = all.filter((c) => c.tier === 'basic').length;
+        if (basicDue > BASIC_MAX_PER_RUN) run.bump('basic_deferred', basicDue - BASIC_MAX_PER_RUN);
+        let basicTaken = 0;
+        const clubs = all.filter((c) => c.tier === 'featured' || basicTaken++ < BASIC_MAX_PER_RUN).slice(0, options.limit ?? Number.POSITIVE_INFINITY);
         run.bump('clubs', clubs.length);
+        run.bump('clubs_basic', clubs.filter((c) => c.tier === 'basic').length);
         if (!windowOpen) run.bump('window_closed');
         let done = 0;
         for (const group of chunk(clubs, CONCURRENCY)) {
@@ -94,7 +109,7 @@ export async function syncSquads(options: {limit?: number; force?: boolean} = {}
                 group.map(async (club) => {
                     try {
                         await syncSquad(db, run, club);
-                        if (windowOpen) await syncTransfers(db, run, club);
+                        if (windowOpen && club.tier === 'featured') await syncTransfers(db, run, club);
                     } catch (error) {
                         run.warn(`${club.name} (#${club.providerId}): ${(error as Error).message}`);
                         if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
@@ -111,7 +126,7 @@ export async function syncSquads(options: {limit?: number; force?: boolean} = {}
     }
 }
 
-/** The provider's squad of a club, stored for every featured season it plays in. One request. */
+/** The provider's squad of a club, stored for every current season it plays in. One request. */
 async function syncSquad(db: FootballClient, run: SyncRun, club: Club) {
     const {response} = await apiFootballGet<AfSquadResponse[]>('players/squads', {team: club.providerId});
     run.requests += 1;

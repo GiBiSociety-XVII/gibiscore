@@ -4,7 +4,7 @@ import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {currentSeason, seasonName, slugify} from '@/lib/api-football/mappers';
 import type {AfLeagueResponse, AfTeamResponse} from '@/lib/api-football/types';
 import {fetchAll} from '@/lib/db/paginate';
-import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type SyncRun} from './context';
+import {chunk, currentSeasons, ensureTeams, failSync, finishRun, footballClient, startRun, SyncError, type SyncRun} from './context';
 
 /**
  * sync-competitions (daily, ~15 requests)
@@ -14,14 +14,20 @@ import {chunk, ensureTeams, failSync, finishRun, footballClient, startRun, SyncE
  *    ones when API_FOOTBALL_SCOPE=featured.
  * 2. Mark the current season of each league; featured leagues also get
  *    their past seasons (history archive), not current.
- * 3. Featured leagues only: the teams of the current season (one request
- *    per league), stored in season_teams for the squads job; asked again
- *    only when the list is a week old, it changes once a season.
+ * 3. The teams of every current season (one request per league), with
+ *    their country, ground and year of foundation, stored in season_teams
+ *    for the squads job and the competition page; asked again only when
+ *    the list is a week old, it changes once a season. Featured leagues
+ *    first, then the basic ones that waited longest, 200 a run: the first
+ *    pass over ~1,250 leagues takes a few days, the weekly refresh spreads
+ *    over the week by itself.
  *
  * Squads and transfers are not here any more: see squads.ts.
  */
 /** The teams of a season change once a season: the list is asked again after this. */
 const TEAMS_REFRESH_MS = 7 * 24 * 3_600_000;
+/** Seasons whose teams are listed per run at most. */
+const TEAMS_MAX_PER_RUN = 200;
 
 export async function syncCompetitions(): Promise<SyncRun> {
     const db = footballClient();
@@ -119,35 +125,21 @@ export async function syncCompetitions(): Promise<SyncRun> {
             await db.from('seasons').update({is_current: false}).eq('league_id', r.league_id).neq('year', r.year).eq('is_current', true);
         }
 
-        // Featured leagues: the teams of the season.
-        const {data: featuredSeasons, error: fsError} = await db
-            .from('seasons')
-            .select('id,year,league:leagues!inner(id,provider_id,name,tier)')
-            .eq('is_current', true)
-            .eq('leagues.tier', 'featured');
-        if (fsError) failSync('seasons.select', fsError);
+        // The teams of every current season: featured first, then the basic ones that waited longest.
+        const stale = (listedAt: string | null) => listedAt === null || Date.now() - Date.parse(listedAt) > TEAMS_REFRESH_MS;
+        const dueSeasons = (await currentSeasons(db))
+            .filter((s) => stale(s.teamsListedAt))
+            .sort((a, b) => (a.tier === b.tier ? (a.teamsListedAt ?? '').localeCompare(b.teamsListedAt ?? '') : a.tier === 'featured' ? -1 : 1));
+        run.bump('teams_due', dueSeasons.length);
+        if (dueSeasons.length > TEAMS_MAX_PER_RUN) run.bump('teams_deferred', dueSeasons.length - TEAMS_MAX_PER_RUN);
 
-        const {data: listed, error: listedError} = await db
-            .from('season_teams')
-            .select('season_id,updated_at')
-            .in('season_id', (featuredSeasons ?? []).map((s) => s.id as number))
-            .gt('updated_at', new Date(Date.now() - TEAMS_REFRESH_MS).toISOString())
-            .limit(5000);
-        if (listedError) failSync('season_teams.select', listedError);
-        const fresh = new Set((listed ?? []).map((r) => r.season_id as number));
-
-        for (const s of featuredSeasons ?? []) {
-            if (fresh.has(s.id as number)) {
-                run.bump('teams_fresh');
-                continue;
-            }
-            const league = s.league as unknown as {id: number; provider_id: number; name: string};
+        for (const s of dueSeasons.slice(0, TEAMS_MAX_PER_RUN)) {
             let teamEntries: AfTeamResponse[] = [];
             try {
-                const {response} = await apiFootballGet<AfTeamResponse[]>('teams', {league: league.provider_id, season: s.year});
+                const {response} = await apiFootballGet<AfTeamResponse[]>('teams', {league: s.leagueProviderId, season: s.year});
                 teamEntries = response;
             } catch (error) {
-                run.warn(`teams of ${league.name}: ${(error as Error).message}`);
+                run.warn(`teams of ${s.leagueSlug}: ${(error as Error).message}`);
                 if (error instanceof ApiFootballError && error.kind === 'quota') throw error;
                 continue;
             } finally {
@@ -166,14 +158,17 @@ export async function syncCompetitions(): Promise<SyncRun> {
                 })),
             );
             run.bump('teams', teamEntries.length);
-            const rows = [...new Set([...teamIds.values()])].map((teamId) => ({season_id: s.id as number, team_id: teamId, updated_at: new Date().toISOString()}));
+            const rows = [...new Set([...teamIds.values()])].map((teamId) => ({season_id: s.id, team_id: teamId, updated_at: new Date().toISOString()}));
             if (rows.length > 0) {
                 const {error} = await db.from('season_teams').upsert(rows, {onConflict: 'season_id,team_id'});
                 if (error) failSync('season_teams.upsert', error);
                 // A club relegated or out of a cup is no longer in the season.
-                const {error: pruneError} = await db.from('season_teams').delete().eq('season_id', s.id as number).not('team_id', 'in', `(${rows.map((r) => r.team_id).join(',')})`);
+                const {error: pruneError} = await db.from('season_teams').delete().eq('season_id', s.id).not('team_id', 'in', `(${rows.map((r) => r.team_id).join(',')})`);
                 if (pruneError) failSync('season_teams.delete', pruneError);
             }
+            // Listed, with or without teams (a cup not drawn yet): asked again in a week.
+            const {error: markError} = await db.from('seasons').update({teams_listed_at: new Date().toISOString()}).eq('id', s.id);
+            if (markError) failSync('seasons.update', markError);
         }
 
         if (leagueRows.length === 0) {

@@ -1,15 +1,18 @@
 import 'server-only';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import type {AfInjuryResponse} from '@/lib/api-football/types';
+import {provides} from '@/lib/football/coverage';
 import {allowance, currentSeasons, ensurePlayers, ensureTeams, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /** A season with no match this far ahead has no one to report as missing. */
 const LOOKAHEAD_MS = 7 * 24 * 3_600_000;
 
 /**
- * sync-injuries (every 30 minutes, featured leagues only: up to ~13 requests)
+ * sync-injuries (every 30 minutes: up to ~13 requests, plus the few basic leagues the provider covers)
  *
- * One request per featured season with a match in the next seven days.
+ * One request per season with a match in the next seven days: the featured
+ * ones, and the basic ones whose league the provider covers for injuries
+ * (lib/football/coverage.ts, a handful).
  * API-Football reports injuries and suspensions per upcoming fixture
  * ("Missing Fixture", "Questionable"); rows have no id, so the season's
  * list is replaced on every run. A season on a break costs nothing.
@@ -22,7 +25,7 @@ export async function syncInjuries(): Promise<SyncRun> {
             await finishRun(db, run, 'ok');
             return run;
         }
-        const seasons = await currentSeasons(db, 'featured');
+        const seasons = (await currentSeasons(db)).filter((s) => provides(s.tier, s.coverage, 'injuries'));
         const {data: upcoming, error: upcomingError} = await db
             .from('fixtures')
             .select('season_id')

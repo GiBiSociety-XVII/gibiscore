@@ -54,11 +54,21 @@ GiBiScore segue **tutte** le competizioni pubblicate da API-Football (~1.100
 tra campionati e coppe), divise in due livelli:
 
 - **in evidenza** (`tier = featured`): Serie A, Serie B, Coppa Italia,
-  Supercoppa, le tre coppe UEFA e le altre top 5 europee. Dettaglio completo:
-  squadre e rose, formazioni, statistiche squadra e giocatore, infortuni,
-  classifiche aggiornate a fine giornata.
-- **base** (`tier = basic`): tutto il resto. Calendario, risultati, eventi
-  live e classifiche una volta al giorno. Le squadre nascono dalle partite.
+  Supercoppa, le tre coppe UEFA e le altre top 5 europee. Dettaglio completo
+  al ritmo più alto: squadre e rose, formazioni, statistiche squadra e
+  giocatore a ogni minuto di gioco, infortuni, quote ogni tre ore,
+  classifiche a fine giornata, archivio delle stagioni passate, pronostici
+  e schedine.
+- **base** (`tier = basic`): tutto il resto. Tutto quello che il provider
+  dichiara di coprire per quella lega (`leagues.season_coverage`, letto da
+  `lib/football/coverage.ts`), a un ritmo più lento e solo per la stagione
+  in corso: calendario completo, risultati ed eventi live, formazioni e
+  statistiche delle partite ogni tre minuti di gioco e a fine gara,
+  classifiche a ogni risultato, squadre e rose (aggiornate ogni settimana),
+  statistiche stagionali dei giocatori, infortuni e quote (una volta al
+  giorno) dove coperti. Una lega senza copertura per un dato non viene mai
+  interrogata per quello. Nessun archivio delle stagioni passate e nessun
+  pronostico nella pagina Pronostici.
 
 La lista in evidenza è in `lib/football/competitions.ts`
 (`API_FOOTBALL_FEATURED_LEAGUE_IDS` per cambiarla senza codice);
@@ -88,20 +98,25 @@ rose e cessioni restano ferme.
 
 | Job | Frequenza | Richieste | Cosa fa |
 |---|---|---|---|
-| `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso; altrimenti 1, più 1 ogni 20 partite in evidenza in corso | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) solo per le partite in evidenza, a ogni giro e a fine gara |
+| `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso; altrimenti 1, più 1 ogni 20 partite in evidenza in corso, più 1 ogni 60 partite base coperte in corso | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) per le partite in evidenza a ogni giro, per quelle base coperte ogni tre minuti, per tutte a fine gara |
 | `sync-fixtures` | ogni ora | 3 | tutte le partite di ieri, oggi e domani (una richiesta per giorno) |
 | `sync-fixtures?window=month` | ogni giorno | 32 | finestra estesa a +30 giorni |
-| `sync-standings` | ogni ora | 0-13 | classifiche delle leghe in evidenza, solo se una loro partita è finita da quando la tabella è stata salvata |
-| `sync-standings?scope=all` | ogni giorno | fino a 300 | classifiche delle altre competizioni con un risultato nelle ultime 24 ore |
-| `sync-injuries` | ogni 8 ore | 0-13 | infortuni e squalifiche delle leghe in evidenza con una partita nei prossimi 7 giorni (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
-| `sync-competitions` | ogni giorno | 1-14 | tutte le leghe e stagioni correnti, stagioni passate delle leghe in evidenza; squadre di ogni stagione in evidenza (`season_teams`) una volta a settimana |
-| `sync-squads` | ogni giorno | 0 a mercato chiuso, ~2 per club (~520) a mercato aperto | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, tutti allo stesso modo, i più vecchi prima; a mercato chiuso solo le rose vecchie di una settimana; quel che non entra nei 4 minuti passa al giro dopo |
-| `sync-backfill` | ogni ora | 0 se niente manca, fino a ~50 | archivio delle leghe in evidenza: calendario completo di ogni stagione (corrente + `API_FOOTBALL_HISTORY_SEASONS` passate) e dettaglio (eventi, formazioni, voti) delle partite finite mai scaricato, dalle più recenti, 1.000 partite per giro |
-| `sync-player-seasons` | ogni ora | 0 senza giornate giocate, ~35 per lega-stagione dopo | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`; stagioni passate una volta sola |
+| `sync-standings` | ogni ora | 0-13 in evidenza, fino a 300 base | classifiche delle stagioni con un risultato da quando la tabella è stata salvata: prima le leghe in evidenza (comunque una volta al giorno), poi quelle base coperte |
+| `sync-injuries` | ogni 30 minuti | 0-13, più le poche leghe base coperte | infortuni e squalifiche delle leghe con una partita nei prossimi 7 giorni (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
+| `sync-competitions` | ogni giorno | 1 + fino a 200 | tutte le leghe e stagioni correnti con la copertura dichiarata, stagioni passate delle leghe in evidenza; squadre di ogni stagione corrente (`season_teams`, con paese, stadio e anno di fondazione) una volta a settimana, prima le leghe in evidenza poi 200 base a giro |
+| `sync-squads` | ogni ora | 0 a mercato chiuso, ~2 per club in evidenza (~520, una volta al giorno) a mercato aperto; 1 per club base, fino a 300 a giro | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, i più vecchi prima; a mercato chiuso solo le rose vecchie di una settimana; poi le rose dei club base vecchie di una settimana (~8.500 club, un giro completo alla settimana); quel che non entra nei 4 minuti passa al giro dopo |
+| `sync-backfill` | ogni ora | 0 se niente manca, fino a ~250 liste + 50 dettaglio | calendario completo di ogni stagione (leghe in evidenza: corrente + `API_FOOTBALL_HISTORY_SEASONS` passate; leghe base: la corrente) e dettaglio (eventi, formazioni, statistiche, voti) delle partite finite mai scaricato, dove il provider lo copre, dalle più recenti, 1.000 partite per giro |
+| `sync-player-seasons` | ogni ora | 0 senza giornate giocate, ~35 per lega-stagione dopo (budget 1.500 a giro) | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`: leghe in evidenza con le stagioni passate (una volta sola), poi le leghe base coperte (~500), solo stagione corrente e senza il payload grezzo |
+| `sync-lineups` | ogni 5 minuti | 0 senza calci d'inizio vicini, 1 ogni 20 partite | formazioni ufficiali delle partite che iniziano entro 90 minuti (leghe in evidenza e base coperte), salvate come formazioni attese per la giornata del fantacalcio |
+| `sync-odds` | ogni 3 ore | 1 per partita: in evidenza dei prossimi 3 giorni a ogni giro, base coperte dei prossimi 2 giorni una volta al giorno (fino a 600 a giro) | quote pre-partita dei bookmaker (`fixture_odds`); nello stesso giro scrive le giocate del modello per le partite in evidenza e chiude quelle finite |
 
-Consumo tipico a regime: 1.500-3.000 richieste al giorno nei weekend di
-campionato (di cui ~1.000 del live), qualche centinaio nei giorni senza
-partite. L'archivio storico si completa in un giorno.
+Consumo tipico a regime: 10.000-20.000 richieste al giorno nei weekend
+(live di ~1.500 partite base e formazioni/statistiche di quelle coperte,
+quote, classifiche), 3.000-6.000 nei giorni feriali; il primo giro sulle
+leghe base (calendari, squadre, rose, statistiche stagionali, dettaglio
+delle partite già giocate) costa qualche decina di migliaia di richieste
+spalmate su alcuni giorni. L'archivio storico delle leghe in evidenza si
+completa in un giorno.
 
 ### Archivio storico
 

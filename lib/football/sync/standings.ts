@@ -2,26 +2,31 @@ import 'server-only';
 import {apiFootballGet, ApiFootballError} from '@/lib/api-football/client';
 import {mapStandings} from '@/lib/api-football/mappers';
 import type {AfStandingsResponse} from '@/lib/api-football/types';
+import {provides} from '@/lib/football/coverage';
 import {fetchAll} from '@/lib/db/paginate';
 import {allowance, currentSeasons, ensureTeams, failSync, finishRun, footballClient, startRun, type SeasonRef, type SyncRun} from './context';
 
 const HOUR = 3_600_000;
-/** A table with nothing new for this long is refreshed anyway (a walkover, a points deduction). */
+/** A featured table with nothing new for this long is refreshed anyway (a walkover, a points deduction). */
 const REFRESH_ANYWAY_MS = 24 * HOUR;
-/** Requests one 'all' run may spend on the basic tier: the rest waits for tomorrow. */
-const ALL_MAX_REQUESTS = 300;
+/** Results this far back decide which tables moved: a basic league never stored gets its table if it played this week. */
+const RESULTS_WINDOW_MS = 8 * 24 * HOUR;
+/** Requests one run may spend on the basic tier: the rest waits for the next hour. */
+const BASIC_MAX_REQUESTS = 300;
 
 /**
- * sync-standings
+ * sync-standings (hourly)
  *
  * A table only changes when a match ends, so a season is asked only when
- * a fixture of its finished since the table was last stored (or a day has
- * passed). scope 'featured' (hourly): the featured seasons, ~13 requests
- * on a matchday, none otherwise. scope 'all' (daily): every current season
- * with a result in the last 24 hours, up to 300 requests. Cups without a
- * table return nothing and are marked like the others.
+ * a fixture of its finished since the table was last stored. scope
+ * 'featured': the featured seasons only, ~13 requests on a matchday, none
+ * otherwise (and once a day regardless). scope 'all' (the cron): the
+ * featured ones first, then every basic season whose league the provider
+ * covers with a table (lib/football/coverage.ts) and a result since its
+ * last store, up to 300 requests a run. Cups without a table return
+ * nothing and are marked like the others.
  */
-export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Promise<SyncRun> {
+export async function syncStandings(scope: 'featured' | 'all' = 'all'): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, scope === 'all' ? 'sync-standings-all' : 'sync-standings');
     try {
@@ -32,8 +37,9 @@ export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Pro
         const seasons = await dueSeasons(db, scope);
         run.bump('seasons', seasons.length);
 
+        let basicRequests = 0;
         for (const season of seasons) {
-            if (scope === 'all' && run.requests >= ALL_MAX_REQUESTS) {
+            if (season.tier === 'basic' && basicRequests >= BASIC_MAX_REQUESTS) {
                 run.bump('seasons_deferred');
                 continue;
             }
@@ -46,6 +52,7 @@ export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Pro
                 continue;
             } finally {
                 run.requests += 1;
+                if (season.tier === 'basic') basicRequests += 1;
             }
             const league = response[0]?.league;
             if (league && league.standings && league.standings.length > 0) {
@@ -75,6 +82,7 @@ export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Pro
                 const {error} = await db.from('standings').upsert(dbRows, {onConflict: 'season_id,stage,group,team_id'});
                 if (error) failSync('standings.upsert', error);
                 run.bump('standing_rows', dbRows.length);
+                run.bump(season.tier === 'basic' ? 'basic_tables' : 'featured_tables');
             } else {
                 run.bump('seasons_without_table');
             }
@@ -90,37 +98,26 @@ export async function syncStandings(scope: 'featured' | 'all' = 'featured'): Pro
     }
 }
 
-type SeasonWithMark = SeasonRef & {standingsSyncedAt: string | null};
-
 /**
  * Seasons whose table may have changed: a fixture finished since the last
- * store (kick-off after it minus three hours, and at least ~2h ago), or
- * never stored, or stored more than a day ago. The 'all' scope only looks
- * at the last 24 hours of results and leaves the featured tier to the
- * hourly run.
+ * store (kick-off after it minus three hours, and at least ~2h ago). A
+ * featured season is also due when never stored or stored more than a day
+ * ago; a basic one only with a result in the last eight days. Featured
+ * first, then the basic ones whose table waited longest.
  */
-async function dueSeasons(db: ReturnType<typeof footballClient>, scope: 'featured' | 'all'): Promise<SeasonWithMark[]> {
+async function dueSeasons(db: ReturnType<typeof footballClient>, scope: 'featured' | 'all'): Promise<SeasonRef[]> {
     const now = Date.now();
-    const all = (await currentSeasons(db, scope === 'featured' ? 'featured' : undefined)).filter((s) => scope === 'featured' || s.tier !== 'featured');
-    if (all.length === 0) return [];
-    const marks = new Map<number, string | null>();
-    for (let i = 0; i < all.length; i += 500) {
-        const ids = all.slice(i, i + 500).map((s) => s.id);
-        const {data, error} = await db.from('seasons').select('id,standings_synced_at').in('id', ids);
-        if (error) failSync('seasons.select', error);
-        for (const r of data ?? []) marks.set(r.id as number, (r.standings_synced_at as string | null) ?? null);
-    }
-    const seasons: SeasonWithMark[] = all.map((s) => ({...s, standingsSyncedAt: marks.get(s.id) ?? null}));
+    const seasons = (await currentSeasons(db, scope === 'featured' ? 'featured' : undefined)).filter((s) => provides(s.tier, s.coverage, 'standings'));
+    if (seasons.length === 0) return [];
 
     // Results of the window, by season: one query, then decide in memory.
-    const windowFrom = scope === 'all' ? now - 24 * HOUR : Math.min(...seasons.map((s) => (s.standingsSyncedAt ? Date.parse(s.standingsSyncedAt) : now) - 3 * HOUR));
     const finished = await fetchAll(
         (a, b) =>
             db
                 .from('fixtures')
                 .select('season_id,starting_at')
                 .eq('state', 'finished')
-                .gte('starting_at', new Date(Math.max(windowFrom, now - 8 * 24 * HOUR)).toISOString())
+                .gte('starting_at', new Date(now - RESULTS_WINDOW_MS).toISOString())
                 .lte('starting_at', new Date(now - 2 * HOUR).toISOString())
                 .order('id')
                 .range(a, b),
@@ -133,11 +130,12 @@ async function dueSeasons(db: ReturnType<typeof footballClient>, scope: 'feature
         if ((lastResult.get(seasonId) ?? 0) < at) lastResult.set(seasonId, at);
     }
 
-    return seasons.filter((s) => {
-        const syncedAt = s.standingsSyncedAt ? Date.parse(s.standingsSyncedAt) : null;
-        const result = lastResult.get(s.id);
-        if (scope === 'all') return result !== undefined && (syncedAt === null || result > syncedAt - 3 * HOUR);
-        if (syncedAt === null || now - syncedAt > REFRESH_ANYWAY_MS) return true;
-        return result !== undefined && result > syncedAt - 3 * HOUR;
-    });
+    return seasons
+        .filter((s) => {
+            const syncedAt = s.standingsSyncedAt ? Date.parse(s.standingsSyncedAt) : null;
+            const result = lastResult.get(s.id);
+            if (s.tier === 'featured' && (syncedAt === null || now - syncedAt > REFRESH_ANYWAY_MS)) return true;
+            return result !== undefined && (syncedAt === null || result > syncedAt - 3 * HOUR);
+        })
+        .sort((a, b) => (a.tier === b.tier ? (a.standingsSyncedAt ?? '').localeCompare(b.standingsSyncedAt ?? '') : a.tier === 'featured' ? -1 : 1));
 }
