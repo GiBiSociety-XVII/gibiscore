@@ -279,7 +279,12 @@
       "latestTitle": "Ultime giocate verificate",
       "won": "Vinta",
       "lost": "Persa",
-      "disclaimer": "Registro statistico delle proposte del modello, non un consiglio di gioco. Gioca solo se maggiorenne e con misura."
+      "disclaimer": "Registro statistico delle proposte del modello, non un consiglio di gioco. Gioca solo se maggiorenne e con misura.",
+      "schedineTitle": "Le schedine generate dagli utenti",
+      "schedineSaved": "Salvate",
+      "schedineSettled": "Chiuse",
+      "schedineWon": "Vinte",
+      "schedineHint": "Le schedine generate dalla pagina pronostici e salvate nell'account: ogni selezione è una giocata del modello, chiusa sui risultati reali dallo stesso registro. Accedi per vedere le tue."
     },
     "filters": {
       "days": "Giorni",
@@ -292,6 +297,64 @@
       "count": "{count} partite"
     },
     "adviceLegend": "Sotto ogni partita le tre giocate del modello, le stesse dell'analisi partita: prudente (dal 78% di probabilità), consigliata (dal 62%), audace (dal 45%). Apri la partita per probabilità complete e quote. Non è un consiglio di gioco.",
-    "noAdvice": "Nessuna giocata abbastanza probabile per questa fascia."
+    "noAdvice": "Nessuna giocata abbastanza probabile per questa fascia.",
+    "schedina": {
+      "open": "Genera schedina",
+      "title": "Genera una schedina",
+      "close": "Chiudi",
+      "intro": "Scegli rischio, tipo e quante partite; il modello prende le giocate in cui crede di più per quel rischio tra le partite dei giorni e delle competizioni che indichi, e ti dice probabilità, quota e quando la schedina si chiude.",
+      "risk": "Rischio",
+      "risks": {
+        "low": "Basso",
+        "medium": "Medio",
+        "high": "Alto"
+      },
+      "riskHint": {
+        "low": "Giocate prudenti: ogni selezione almeno al 78%.",
+        "medium": "Giocate consigliate: ogni selezione almeno al 62% (prudente quando la partita non ne ha una).",
+        "high": "Giocate audaci: ogni selezione almeno al 45% (consigliata quando la partita non ne ha una)."
+      },
+      "kind": "Tipo",
+      "kinds": {
+        "single": "Singola",
+        "multiple": "Multipla",
+        "system": "Sistema"
+      },
+      "kindHint": {
+        "single": "Una sola partita, la più probabile.",
+        "multiple": "Tutte le selezioni devono vincere: la quota è il prodotto.",
+        "system": "Colonne di k selezioni su N: vince con almeno k centrate."
+      },
+      "size": "Partite",
+      "systemOf": "Sistema",
+      "systemOfN": "su {n}",
+      "days": "Giorni",
+      "anyDay": "Qualsiasi",
+      "competitions": "Competizioni",
+      "anyCompetition": "Tutte",
+      "generate": "Genera",
+      "available": "{count} partite disponibili con i filtri scelti",
+      "none": "Non ci sono abbastanza partite con una giocata per questo rischio nei giorni e nelle competizioni scelti: allarga i filtri o abbassa il numero di partite.",
+      "selections": "{count} selezioni",
+      "chance": "Probabilità",
+      "settles": "Si chiude",
+      "systemNote": "{columns} colonne da {of} selezioni su {n}: probabilità che almeno {of} siano centrate {pct}%.",
+      "save": "Salva e segui",
+      "saving": "Salvo…",
+      "saved": "Salvata",
+      "saveError": "Non salvata: riprova.",
+      "signIn": "Accedi per salvare la schedina e seguirne l'esito.",
+      "toRecord": "Vai al bilancio",
+      "disclaimer": "Le selezioni sono le stesse giocate verificate nel bilancio del modello: ogni schedina salvata viene chiusa sui risultati reali. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura."
+    },
+    "mine": {
+      "title": "Le mie schedine",
+      "empty": "Nessuna schedina salvata: generane una dalla pagina pronostici.",
+      "tally": "{won} vinte su {settled} chiuse",
+      "open": "Aperta",
+      "won": "Vinta",
+      "lost": "Persa",
+      "hits": "{hits}/{size} centrate"
+    }
   }
 }

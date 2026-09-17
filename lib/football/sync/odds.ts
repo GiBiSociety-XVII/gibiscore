@@ -2,7 +2,7 @@ import 'server-only';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {mapOdds} from '@/lib/api-football/mappers';
 import type {AfOddsResponse} from '@/lib/api-football/types';
-import {settleAdvice, snapshotAdvice} from './advice';
+import {settleAdvice, settleSchedine, snapshotAdvice} from './advice';
 import {allowance, failSync, finishRun, footballClient, startRun, type SyncRun} from './context';
 
 /** Featured fixtures kicking off within this many days get their odds. */
@@ -46,6 +46,7 @@ export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> 
         const fixtures = (data ?? []) as unknown as Array<{id: number; provider_id: number; season_id: number | null; home_team_id: number; away_team_id: number}>;
         run.bump('pending', fixtures.length);
         await settleAdvice(db, run);
+        await settleSchedine(db, run);
         if (fixtures.length === 0) {
             run.bump('idle');
             await finishRun(db, run, 'ok');

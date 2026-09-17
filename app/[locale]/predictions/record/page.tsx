@@ -5,7 +5,8 @@ import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
 import {TeamCrest} from "@/components/football/team-crest";
-import {getAdviceRecord} from "@/lib/football/data/record";
+import {getAdviceRecord, getSchedineTally} from "@/lib/football/data/record";
+import {MySchedine} from "@/components/football/my-schedine";
 import {getModelFit} from "@/lib/football/data/tuning";
 import type {LegKey} from "@/lib/football/markets";
 
@@ -24,7 +25,7 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
     const t = await getTranslations('Pages.predictions.record');
     const tm = await getTranslations('Football.markets');
     const format = await getFormatter();
-    const [record, fit] = await Promise.all([getAdviceRecord(), getModelFit()]);
+    const [record, fit, schedine] = await Promise.all([getAdviceRecord(), getModelFit(), getSchedineTally()]);
     const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
     const cell = (label: string, value: string, note?: string) => (
         <div className="flex flex-col items-center justify-center px-2 py-2 border-t border-muted">
@@ -97,6 +98,16 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                     </>
                 )}
             </Panel>
+
+            <Panel title={t('schedineTitle')}>
+                <div className="grid grid-cols-3">
+                    {cell(t('schedineSaved'), schedine ? String(schedine.total) : '–')}
+                    {cell(t('schedineSettled'), schedine ? String(schedine.settled) : '–')}
+                    {cell(t('schedineWon'), schedine && schedine.settled > 0 ? `${Math.round((schedine.won / schedine.settled) * 100)}%` : '–', schedine ? t('hits', {hits: schedine.won, slips: schedine.settled}) : undefined)}
+                </div>
+                <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('schedineHint')}</p>
+            </Panel>
+            <MySchedine />
 
             {record && record.latest.length > 0 && (
                 <Panel title={t('latestTitle')}>

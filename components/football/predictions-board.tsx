@@ -11,6 +11,8 @@ import type {MatchPrediction} from "@/lib/football/prediction";
 import type {CompetitionSummary, FixtureSummary} from "@/lib/football/types";
 import {Flag} from "./flag";
 import {TeamCrest} from "./team-crest";
+import {SchedinaDialog} from "./schedina-dialog";
+import type {SchedinaCandidate} from "@/lib/football/schedina";
 
 export interface BoardFixture {
     fixture: FixtureSummary;
@@ -41,6 +43,10 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
     const format = useFormatter();
     const [day, setDay] = useState<DayFilter>('all');
     const [league, setLeague] = useState<number | 'all'>('all');
+    const [schedina, setSchedina] = useState(false);
+    // Everything the slip generator needs, from the blocks already on the page.
+    const candidates: SchedinaCandidate[] = useMemo(() => blocks.flatMap((b) => b.fixtures.filter((f) => f.fixture.state === 'scheduled' && f.slips.length > 0).map((f) => ({fixtureId: f.fixture.id, competitionId: b.competition.id, competition: b.competition.name, home: f.fixture.home.name, away: f.fixture.away.name, startingAt: f.fixture.startingAt, day: f.day, slips: f.slips}))), [blocks]);
+    const dayOptions = useMemo(() => [...new Set(candidates.map((c) => c.day))].sort().map((d) => ({day: d, label: d === today ? t('filters.today') : d === tomorrow ? t('filters.tomorrow') : format.dateTime(new Date(`${d}T12:00:00Z`), {weekday: 'short', day: 'numeric', month: 'numeric'})})), [candidates, today, tomorrow, format, t]);
     const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
     const inDay = (d: string) => (day === 'all' ? true : day === 'today' ? d === today : day === 'tomorrow' ? d === tomorrow : d === today || d === tomorrow);
     const shown = useMemo(
@@ -65,7 +71,9 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                     {blocks.map((b) => <option key={b.competition.id} value={b.competition.id}>{b.competition.country ? `${b.competition.country} · ` : ''}{b.competition.name}</option>)}
                 </select>
                 <span className="ml-auto font-mono text-[11px] font-bold text-muted-foreground">{t('filters.count', {count})}</span>
+                <button type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold" disabled={candidates.length === 0}>{t('schedina.open')}</button>
             </div>
+            {schedina && <SchedinaDialog candidates={candidates} days={dayOptions} competitions={blocks.map((b) => ({id: b.competition.id, name: b.competition.name}))} onClose={() => setSchedina(false)} />}
 
             {shown.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{tp('listEmpty')}</p>
