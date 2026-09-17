@@ -326,7 +326,7 @@
         "system": "Fisse in ogni colonna, le altre combinate k alla volta: vince se tutte le fisse e almeno k delle altre sono centrate."
       },
       "size": "Partite",
-      "systemOf": "Sistema",
+      "systemOf": "Colonne da",
       "systemOfN": "su {n}",
       "days": "Giorni",
       "anyDay": "Qualsiasi",
@@ -351,8 +351,9 @@
       "bankersHint": "Quante selezioni stanno in ogni colonna. Automatiche: il modello rende fisse le selezioni almeno al 75%, lasciando almeno due selezioni libere.",
       "bankersCount": "{count} fisse",
       "banker": "Fissa",
-      "systemOfFree": "sulle libere",
-      "systemNoteBankers": "{bankers} fisse in ogni colonna e {columns} colonne da {of} selezioni sulle {n} libere: probabilità che tutte le fisse e almeno {of} delle libere siano centrate {pct}%."
+      "systemOfFree": "selezioni libere: sistema {k} su {n}, vince con almeno {k} libere centrate",
+      "systemNoteBankers": "{bankers} fisse in ogni colonna e {columns} colonne da {of} selezioni sulle {n} libere: probabilità che tutte le fisse e almeno {of} delle libere siano centrate {pct}%.",
+      "systemOfHint": "Quante selezioni libere entrano in ogni colonna. Le fisse stanno in tutte le colonne e non contano qui: con 2 fisse e 4 libere, \"2\" è il sistema 2 su 4 (6 colonne), che paga se le fisse sono centrate e almeno 2 libere su 4 lo sono. Con le fisse automatiche il numero di libere si sa dopo aver generato."
     },
     "mine": {
       "title": "Le mie schedine",

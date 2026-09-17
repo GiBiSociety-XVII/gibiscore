@@ -91,10 +91,10 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                             {Array.from({length: Math.max(0, size - 1)}, (_, i) => i).map((n) => <option key={n} value={n}>{n}</option>)}
                                         </select>
                                     </label>
-                                    <label className="inline-flex items-center gap-1.5 text-[12px] font-bold">
+                                    <label className="inline-flex items-center gap-1.5 text-[12px] font-bold" title={t('systemOfHint')}>
                                         {t('systemOf')}
                                         <input type="number" min={1} max={Math.max(1, size - 1)} value={Math.min(system, Math.max(1, size - 1))} onChange={(e) => setSystem(Math.max(1, Math.min(size - 1, Number(e.target.value) || 1)))} className="bb-input h-8 w-16 px-2 font-mono text-[13px] font-extrabold text-center" />
-                                        <span className="text-muted-foreground">{t('systemOfFree')}</span>
+                                        <span className="text-muted-foreground">{t('systemOfFree', {k: Math.min(system, Math.max(1, size - 1)), n: typeof bankers === 'number' ? Math.max(2, size - bankers) : size})}</span>
                                     </label>
                                 </>
                             )}
