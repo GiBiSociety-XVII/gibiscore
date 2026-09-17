@@ -26,6 +26,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const [kind, setKind] = useState<SchedinaKind>('multiple');
     const [size, setSize] = useState(3);
     const [system, setSystem] = useState(2);
+    const [bankers, setBankers] = useState<number | 'auto'>('auto');
     const [pickedDays, setPickedDays] = useState<string[]>([]);
     const [pickedLeagues, setPickedLeagues] = useState<number[]>([]);
     const [result, setResult] = useState<Schedina | null | undefined>(undefined);
@@ -41,7 +42,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const available = useMemo(() => candidates.filter((c) => (pickedDays.length === 0 || pickedDays.includes(c.day)) && (pickedLeagues.length === 0 || pickedLeagues.includes(c.competitionId))).length, [candidates, pickedDays, pickedLeagues]);
     const generate = () => {
         setSave('idle');
-        setResult(buildSchedina(candidates, {risk, kind, size, system, days: pickedDays, competitions: pickedLeagues, now: new Date().toISOString()}));
+        setResult(buildSchedina(candidates, {risk, kind, size, system, bankers, days: pickedDays, competitions: pickedLeagues, now: new Date().toISOString()}));
     };
     const persist = async () => {
         if (!result || save === 'saving') return;
@@ -82,11 +83,20 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 </label>
                             )}
                             {kind === 'system' && (
-                                <label className="inline-flex items-center gap-1.5 text-[12px] font-bold">
-                                    {t('systemOf')}
-                                    <input type="number" min={1} max={Math.max(1, size - 1)} value={Math.min(system, Math.max(1, size - 1))} onChange={(e) => setSystem(Math.max(1, Math.min(size - 1, Number(e.target.value) || 1)))} className="bb-input h-8 w-16 px-2 font-mono text-[13px] font-extrabold text-center" />
-                                    <span className="text-muted-foreground">{t('systemOfN', {n: size})}</span>
-                                </label>
+                                <>
+                                    <label className="inline-flex items-center gap-1.5 text-[12px] font-bold">
+                                        {t('bankers')}
+                                        <select value={bankers} onChange={(e) => setBankers(e.target.value === 'auto' ? 'auto' : Number(e.target.value))} className="bb-input h-8 px-2 text-[12px] font-bold" title={t('bankersHint')}>
+                                            <option value="auto">{t('bankersAuto')}</option>
+                                            {Array.from({length: Math.max(0, size - 1)}, (_, i) => i).map((n) => <option key={n} value={n}>{n}</option>)}
+                                        </select>
+                                    </label>
+                                    <label className="inline-flex items-center gap-1.5 text-[12px] font-bold">
+                                        {t('systemOf')}
+                                        <input type="number" min={1} max={Math.max(1, size - 1)} value={Math.min(system, Math.max(1, size - 1))} onChange={(e) => setSystem(Math.max(1, Math.min(size - 1, Number(e.target.value) || 1)))} className="bb-input h-8 w-16 px-2 font-mono text-[13px] font-extrabold text-center" />
+                                        <span className="text-muted-foreground">{t('systemOfFree')}</span>
+                                    </label>
+                                </>
                             )}
                         </div>
                     </div>
@@ -113,7 +123,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                     {result && (
                         <div className="bb-surface flex flex-col">
                             <div className="px-3 h-8 flex items-center justify-between gap-2 border-b-2 border-foreground bg-card text-[11px] font-extrabold uppercase tracking-wide">
-                                <span>{t(`kinds.${result.kind}`)}{result.system ? ` ${result.system.of}/${result.selections.length}` : ''} · {t(`risks.${result.risk}`)}</span>
+                                <span>{t(`kinds.${result.kind}`)}{result.system ? ` ${result.system.of}/${result.system.free}${result.system.bankers > 0 ? ` + ${t('bankersCount', {count: result.system.bankers})}` : ''}` : ''} · {t(`risks.${result.risk}`)}</span>
                                 <span className="font-mono normal-case tracking-normal text-muted-foreground">{t('selections', {count: result.selections.length})}</span>
                             </div>
                             <ul className="flex flex-col divide-y divide-muted">
@@ -125,7 +135,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                         </span>
                                         <span className="min-w-0 flex flex-col leading-tight">
                                             <Link href={`/matches/${s.fixtureId}`} target="_blank" rel="noopener noreferrer" className="font-extrabold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{s.home} – {s.away}</Link>
-                                            <span className="text-[11px] font-semibold text-muted-foreground truncate">{s.competition} · {tm(`advice.tiers.${s.tier}`)}</span>
+                                            <span className="text-[11px] font-semibold text-muted-foreground truncate">{s.banker && <span className="inline-flex items-center h-4 px-1 mr-1 rounded border border-foreground bg-accent text-[9px] font-extrabold uppercase tracking-wide text-foreground">{t('banker')}</span>}{s.competition} · {tm(`advice.tiers.${s.tier}`)}</span>
                                         </span>
                                         <span className="text-right leading-tight">
                                             <span className="block font-extrabold">{s.slip.legs.map((l) => legLabel(l.key)).join(' + ')}</span>
@@ -147,7 +157,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                     </div>
                                 ))}
                             </div>
-                            {result.system && <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('systemNote', {columns: result.system.columns, of: result.system.of, n: result.selections.length, pct: result.system.atLeastPct})}</p>}
+                            {result.system && <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{result.system.bankers > 0 ? t('systemNoteBankers', {bankers: result.system.bankers, columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct}) : t('systemNote', {columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct})}</p>}
                             <div className="px-3 py-2 border-t border-muted flex items-center gap-2 flex-wrap">
                                 <button type="button" onClick={persist} disabled={signedIn === false || save === 'saving' || save === 'saved'} className={cn("bb-btn h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5 disabled:opacity-50", save === 'saved' ? "bg-card" : "bg-accent")}>
                                     {save === 'saved' ? <><Check className="w-3.5 h-3.5" aria-hidden="true" />{t('saved')}</> : save === 'saving' ? t('saving') : t('save')}

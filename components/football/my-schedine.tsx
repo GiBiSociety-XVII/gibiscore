@@ -14,7 +14,7 @@ interface Row {
     risk: 'low' | 'medium' | 'high';
     size: number;
     system_of: number | null;
-    selections: Array<{fixtureId: number; home: string; away: string; competition: string; startingAt: string; tier: 'safe' | 'balanced' | 'bold'; legs: Array<{key: LegKey; pct: number}>; pct: number}>;
+    selections: Array<{fixtureId: number; home: string; away: string; competition: string; startingAt: string; tier: 'safe' | 'balanced' | 'bold'; banker?: boolean; legs: Array<{key: LegKey; pct: number}>; pct: number}>;
     pct: number;
     fair: number | string;
     book: number | string | null;
@@ -71,6 +71,7 @@ export function MySchedine() {
                                 {r.selections.map((s) => (
                                     <li key={s.fixtureId} className="flex items-center gap-2 min-w-0">
                                         <span className="font-mono text-[10px] font-bold text-muted-foreground w-12 shrink-0">{format.dateTime(new Date(s.startingAt), {weekday: 'short', day: 'numeric'})}</span>
+                                        {s.banker && <span className="inline-flex items-center h-4 px-1 rounded border border-foreground bg-accent text-[9px] font-extrabold uppercase tracking-wide shrink-0">{ts('banker')}</span>}
                                         <Link href={`/matches/${s.fixtureId}`} target="_blank" rel="noopener noreferrer" className="font-bold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">{s.home} – {s.away}</Link>
                                         <span className="ml-auto font-extrabold whitespace-nowrap">{s.legs.map((l) => legLabel(l.key)).join(' + ')} <span className="font-mono text-[10px] font-bold text-muted-foreground">{s.pct}%</span></span>
                                     </li>

@@ -323,7 +323,7 @@
       "kindHint": {
         "single": "Una sola partita, la più probabile.",
         "multiple": "Tutte le selezioni devono vincere: la quota è il prodotto.",
-        "system": "Colonne di k selezioni su N: vince con almeno k centrate."
+        "system": "Fisse in ogni colonna, le altre combinate k alla volta: vince se tutte le fisse e almeno k delle altre sono centrate."
       },
       "size": "Partite",
       "systemOf": "Sistema",
@@ -345,7 +345,14 @@
       "saveError": "Non salvata: riprova.",
       "signIn": "Accedi per salvare la schedina e seguirne l'esito.",
       "toRecord": "Vai al bilancio",
-      "disclaimer": "Le selezioni sono le stesse giocate verificate nel bilancio del modello: ogni schedina salvata viene chiusa sui risultati reali. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura."
+      "disclaimer": "Le selezioni sono le stesse giocate verificate nel bilancio del modello: ogni schedina salvata viene chiusa sui risultati reali. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
+      "bankers": "Fisse",
+      "bankersAuto": "Automatiche",
+      "bankersHint": "Quante selezioni stanno in ogni colonna. Automatiche: il modello rende fisse le selezioni almeno al 75%, lasciando almeno due selezioni libere.",
+      "bankersCount": "{count} fisse",
+      "banker": "Fissa",
+      "systemOfFree": "sulle libere",
+      "systemNoteBankers": "{bankers} fisse in ogni colonna e {columns} colonne da {of} selezioni sulle {n} libere: probabilità che tutte le fisse e almeno {of} delle libere siano centrate {pct}%."
     },
     "mine": {
       "title": "Le mie schedine",

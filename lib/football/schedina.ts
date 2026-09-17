@@ -31,8 +31,10 @@ export interface SchedinaOptions {
     kind: SchedinaKind;
     /** Selections wanted: 1 for a single, 2..10 for an accumulator or a system. */
     size: number;
-    /** A system: columns of this many selections out of `size` ("k su N"). */
+    /** A system: columns of this many of the free selections ("k su N", N the selections that are not bankers). */
     system?: number;
+    /** A system: how many selections are bankers (in every column); 'auto' makes bankers of the safest ones (BANKER_MIN_PCT), at most size - 2. */
+    bankers?: number | 'auto';
     /** Rome days allowed; empty = any. */
     days: string[];
     /** Competitions allowed; empty = any. */
@@ -49,6 +51,8 @@ export interface SchedinaSelection {
     startingAt: string;
     tier: BetSuggestion['tier'];
     slip: BetSuggestion;
+    /** A system: in every column. */
+    banker: boolean;
 }
 
 export interface Schedina {
@@ -64,9 +68,12 @@ export interface Schedina {
     /** First and last kick-off: when the slip starts and when it is settled (about two hours after the last). */
     firstKickoff: string;
     lastKickoff: string;
-    /** A system only: the columns and the chance that at least `system` selections win. */
-    system?: {of: number; columns: number; atLeastPct: number};
+    /** A system only: the bankers, the columns (combinations of the free selections, each with every banker) and the chance the slip pays: every banker and at least `of` of the free selections. */
+    system?: {of: number; free: number; bankers: number; columns: number; atLeastPct: number};
 }
+
+/** A selection at least this likely is a banker when the bankers are chosen automatically. */
+export const BANKER_MIN_PCT = 75;
 
 /** The tier a risk asks for, and the ones it falls back to when a match has none. */
 const TIERS_BY_RISK: Record<SchedinaRisk, Array<BetSuggestion['tier']>> = {low: ['safe'], medium: ['balanced', 'safe'], high: ['bold', 'balanced']};
@@ -108,7 +115,7 @@ export function buildSchedina(candidates: SchedinaCandidate[], options: Schedina
         const tier = tiers.find((t) => c.slips.some((s) => s.tier === t));
         const slip = tier ? c.slips.find((s) => s.tier === tier) : undefined;
         if (!tier || !slip) continue;
-        picks.push({fixtureId: c.fixtureId, competition: c.competition, home: c.home, away: c.away, startingAt: c.startingAt, tier, slip});
+        picks.push({fixtureId: c.fixtureId, competition: c.competition, home: c.home, away: c.away, startingAt: c.startingAt, tier, slip, banker: false});
     }
     if (picks.length < size) return null;
     // The most likely first; the tier asked for before a fallback; then what pays more.
@@ -123,14 +130,31 @@ export function buildSchedina(candidates: SchedinaCandidate[], options: Schedina
     const book = selections.every((s) => s.slip.odds !== null) ? round2(selections.reduce((p, s) => p * (s.slip.odds ?? 1), 1)) : null;
     const out: Schedina = {kind: options.kind, risk: options.risk, selections, pct, fair, book, firstKickoff: selections[0].startingAt, lastKickoff: selections[selections.length - 1].startingAt};
     if (options.kind === 'system' && size >= 2) {
-        const of = Math.max(1, Math.min(size - 1, Math.round(options.system ?? Math.max(1, size - 1))));
-        out.system = {of, columns: combinations(size, of), atLeastPct: Math.round(atLeast(probabilities, of) * 100)};
+        // Bankers: the safest selections, at most size - 2 so the system keeps two free ones; the free ones combine k at a time.
+        const bySafety = [...selections].sort((a, b) => b.slip.pct - a.slip.pct || a.slip.fair - b.slip.fair);
+        const maxBankers = Math.max(0, size - 2);
+        const wanted = options.bankers === 'auto' || options.bankers === undefined ? bySafety.filter((s) => s.slip.pct >= BANKER_MIN_PCT).length : Math.round(options.bankers);
+        const bankers = Math.max(0, Math.min(maxBankers, wanted));
+        for (const s of bySafety.slice(0, bankers)) s.banker = true;
+        const free = size - bankers;
+        const of = Math.max(1, Math.min(free, Math.round(options.system ?? Math.max(1, free - 1))));
+        const freeProbabilities = selections.filter((s) => !s.banker).map((s) => s.slip.pct / 100);
+        const bankersChance = selections.filter((s) => s.banker).reduce((p, s) => p * (s.slip.pct / 100), 1);
+        out.system = {of, free, bankers, columns: combinations(free, of), atLeastPct: Math.round(bankersChance * atLeast(freeProbabilities, of) * 100)};
     }
     return out;
 }
 
-/** Whether a slip won, from which selections did: every one for a single or an accumulator, at least `of` for a system. */
-export function schedinaWon(kind: SchedinaKind, hits: boolean[], of: number | null | undefined): boolean {
-    const won = hits.filter(Boolean).length;
-    return kind === 'system' ? won >= Math.max(1, of ?? hits.length) : won === hits.length && hits.length > 0;
+/**
+ * Whether a slip won, from which selections did: every one for a single
+ * or an accumulator; for a system every banker and at least `of` of the
+ * free selections (`bankers` marks which are which, none when absent).
+ */
+export function schedinaWon(kind: SchedinaKind, hits: boolean[], of: number | null | undefined, bankers?: boolean[]): boolean {
+    if (hits.length === 0) return false;
+    if (kind !== 'system') return hits.every(Boolean);
+    const isBanker = (i: number) => bankers?.[i] === true;
+    if (hits.some((h, i) => isBanker(i) && !h)) return false;
+    const free = hits.filter((_, i) => !isBanker(i));
+    return free.filter(Boolean).length >= Math.max(1, Math.min(free.length, of ?? free.length));
 }

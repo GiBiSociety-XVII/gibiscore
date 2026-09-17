@@ -38,9 +38,20 @@ describe('buildSchedina', () => {
         expect(buildSchedina(candidates, {risk: 'low', kind: 'multiple', size: 5, days: [], competitions: [], now: NOW})).toBeNull();
     });
     it('describes a system by its columns and the chance of enough winners', () => {
-        const s = buildSchedina(candidates, {risk: 'medium', kind: 'system', size: 3, system: 2, days: [], competitions: [], now: NOW})!;
-        expect(s.system).toEqual({of: 2, columns: 3, atLeastPct: Math.round(atLeast([0.66, 0.63, 0.7], 2) * 100)});
+        const s = buildSchedina(candidates, {risk: 'medium', kind: 'system', size: 3, system: 2, bankers: 0, days: [], competitions: [], now: NOW})!;
+        expect(s.system).toEqual({of: 2, free: 3, bankers: 0, columns: 3, atLeastPct: Math.round(atLeast([0.66, 0.63, 0.7], 2) * 100)});
         expect(s.system!.atLeastPct).toBeGreaterThan(s.pct);
+        expect(s.selections.every((x) => !x.banker)).toBe(true);
+    });
+    it('makes bankers of the safest selections, in every column, and combines the free ones', () => {
+        // Low risk, four matches: 85, 80, 79 and (fallback none: low has safe only) -> only 1, 2, 4 are safe... use size 3 with bankers auto.
+        const s = buildSchedina(candidates, {risk: 'low', kind: 'system', size: 3, system: 1, bankers: 'auto', days: [], competitions: [], now: NOW})!;
+        // 85 and 80 are bankers (>= 75), at most size - 2 = 1: only the safest.
+        expect(s.selections.filter((x) => x.banker).map((x) => x.fixtureId)).toEqual([1]);
+        expect(s.system).toEqual({of: 1, free: 2, bankers: 1, columns: 2, atLeastPct: Math.round(0.85 * atLeast([0.8, 0.79], 1) * 100)});
+        const two = buildSchedina(candidates, {risk: 'medium', kind: 'system', size: 4, system: 1, bankers: 2, days: [], competitions: [], now: NOW})!;
+        expect(two.selections.filter((x) => x.banker).map((x) => x.fixtureId).sort()).toEqual([3, 4]);
+        expect(two.system!.free).toBe(2);
     });
 });
 
@@ -62,5 +73,9 @@ describe('schedinaWon', () => {
         expect(schedinaWon('system', [true, true, false], 2)).toBe(true);
         expect(schedinaWon('system', [true, false, false], 2)).toBe(false);
         expect(schedinaWon('multiple', [], null)).toBe(false);
+        // A banker lost: the whole system is lost, whatever the free ones did.
+        expect(schedinaWon('system', [false, true, true], 1, [true, false, false])).toBe(false);
+        expect(schedinaWon('system', [true, true, false], 1, [true, false, false])).toBe(true);
+        expect(schedinaWon('system', [true, false, false], 1, [true, false, false])).toBe(false);
     });
 });

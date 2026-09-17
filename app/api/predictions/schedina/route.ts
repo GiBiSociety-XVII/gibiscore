@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         risk,
         size: selections.length,
         system_of: kind === 'system' && body.system ? Math.max(1, Math.min(selections.length, Math.round(body.system.of))) : null,
-        selections: selections.map((s) => ({fixtureId: s.fixtureId, home: String(s.home ?? ''), away: String(s.away ?? ''), competition: String(s.competition ?? ''), startingAt: String(s.startingAt), tier: s.tier, legs: s.slip.legs.map((l) => ({key: l.key, pct: Number(l.pct) || 0})), pct: Number(s.slip.pct) || 0})),
+        selections: selections.map((s) => ({fixtureId: s.fixtureId, home: String(s.home ?? ''), away: String(s.away ?? ''), competition: String(s.competition ?? ''), startingAt: String(s.startingAt), tier: s.tier, banker: kind === 'system' && s.banker === true, legs: s.slip.legs.map((l) => ({key: l.key, pct: Number(l.pct) || 0})), pct: Number(s.slip.pct) || 0})),
         pct: Math.max(0, Math.min(100, Math.round(Number(body.pct) || 0))),
         fair: Math.round((Number(body.fair) || 0) * 100) / 100,
         book: body.book === null || body.book === undefined ? null : Math.round(Number(body.book) * 100) / 100,
