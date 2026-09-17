@@ -27,10 +27,18 @@ const study: SeasonStudy = {
 };
 
 describe('predictMatch', () => {
-    it('returns null without a study or with unknown teams', () => {
+    it('returns null without a study or with too few matches', () => {
         expect(predictMatch(null, 1, 2)).toBeNull();
-        expect(predictMatch(study, 1, 99)).toBeNull();
         expect(predictMatch({...study, played: 4}, 1, 2)).toBeNull();
+    });
+
+    it('judges a side without a match in the competition as an average one, with low confidence', () => {
+        const p = predictMatch(study, 1, 99)!;
+        expect(p).not.toBeNull();
+        expect(p.sample).toBe(0);
+        expect(p.confidence).toBe('low');
+        // Strong at home against an average newcomer: favoured.
+        expect(p.home).toBeGreaterThan(p.away);
     });
 
     it('favours the stronger side and sums to 100', () => {

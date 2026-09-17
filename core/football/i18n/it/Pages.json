@@ -248,11 +248,8 @@
     "title": "Pronostici",
     "metaTitle": "Pronostici partite",
     "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione, con le quote dei bookmaker a confronto.",
-    "intro": "Le prossime partite delle competizioni principali con le probabilità del nostro modello statistico. Apri la partita per lo studio completo.",
+    "intro": "Le prossime partite delle competizioni principali con le probabilità del nostro modello e le giocate che proporrebbe. Apri la partita per l'analisi completa.",
     "days": "Prossimi {count} giorni",
-    "odds": "Quote",
-    "oddsHint": "{label}: media dei bookmaker {avg}, quota equa del modello {fair}; la migliore {best} ({book}), {books} bookmaker.",
-    "oddsLegend": "Quote: media dei bookmaker per 1, X, 2, over e under 2,5 e gol; in verde quando pagano più della quota equa del modello (100 / probabilità). Non è un consiglio di gioco.",
     "recordLink": "Il bilancio del modello",
     "record": {
       "title": "Bilancio del modello",
@@ -283,6 +280,17 @@
       "won": "Vinta",
       "lost": "Persa",
       "disclaimer": "Registro statistico delle proposte del modello, non un consiglio di gioco. Gioca solo se maggiorenne e con misura."
-    }
+    },
+    "filters": {
+      "days": "Giorni",
+      "today": "Oggi",
+      "tomorrow": "Domani",
+      "both": "Oggi e domani",
+      "all": "7 giorni",
+      "competition": "Competizione",
+      "allCompetitions": "Tutte le competizioni",
+      "count": "{count} partite"
+    },
+    "adviceLegend": "Sotto ogni partita le tre giocate del modello, le stesse dell'analisi partita: prudente (dal 78%), consigliata (dal 62%), audace (dal 45%), con probabilità, quota equa e quota media dei bookmaker (≈ prodotto delle medie per le combinate). Non è un consiglio di gioco."
   }
 }
