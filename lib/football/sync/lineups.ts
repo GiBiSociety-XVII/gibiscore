@@ -2,21 +2,26 @@ import 'server-only';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {mapLineups} from '@/lib/api-football/mappers';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
+import {provides, type LeagueCoverage} from '@/lib/football/coverage';
 import {chunk, ensurePlayers, failSync, finishRun, footballClient, idMap, startRun, type MinimalPlayer, type SyncRun} from './context';
 
-/** Featured fixtures kicking off within this many minutes are asked for their official lineups. */
+/** Fixtures kicking off within this many minutes are asked for their official lineups. */
 const WINDOW_MINUTES = 90;
 /** Fixtures per request. */
 const BATCH = 20;
+/** Fixtures considered per run: a Saturday afternoon of every league fits. */
+const MAX_CANDIDATES = 600;
 
 /**
  * sync-lineups (every five minutes)
  *
  * The official lineups the provider publishes about an hour before
- * kick-off, for featured fixtures starting within ninety minutes that have none stored
- * yet: one request per twenty fixtures, nothing at all when no kick-off
- * is near. Stored as expected lineups (is_expected = true), the rows the
- * fantasy matchday reads; the match itself later stores the real ones.
+ * kick-off, for fixtures starting within ninety minutes that have none
+ * stored yet: the featured ones and the basic ones whose league the
+ * provider covers for lineups (lib/football/coverage.ts). One request per
+ * twenty fixtures, nothing at all when no kick-off is near. Stored as
+ * expected lineups (is_expected = true), the rows the fantasy matchday
+ * reads; the match itself later stores the real ones.
  */
 export async function syncUpcomingLineups(options: {withinMinutes?: number} = {}): Promise<SyncRun> {
     const db = footballClient();
@@ -26,14 +31,14 @@ export async function syncUpcomingLineups(options: {withinMinutes?: number} = {}
         const to = new Date(now + (options.withinMinutes ?? WINDOW_MINUTES) * 60_000).toISOString();
         const {data: soon, error} = await db
             .from('fixtures')
-            .select('id,provider_id,league:leagues!inner(tier)')
+            .select('id,provider_id,league:leagues!inner(tier,season_coverage)')
             .eq('state', 'scheduled')
-            .eq('leagues.tier', 'featured')
             .gte('starting_at', new Date(now - 5 * 60_000).toISOString())
             .lte('starting_at', to)
-            .limit(200);
+            .order('starting_at')
+            .limit(MAX_CANDIDATES);
         if (error) failSync('fixtures.select', error);
-        const candidates = (soon ?? []) as unknown as Array<{id: number; provider_id: number}>;
+        const candidates = ((soon ?? []) as unknown as Array<{id: number; provider_id: number; league: {tier: 'featured' | 'basic'; season_coverage: LeagueCoverage | null}}>).filter((c) => provides(c.league.tier, c.league.season_coverage, 'lineups'));
         if (candidates.length === 0) {
             run.bump('idle');
             await finishRun(db, run, 'ok');

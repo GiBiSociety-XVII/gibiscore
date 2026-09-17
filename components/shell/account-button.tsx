@@ -15,7 +15,7 @@ interface Who {
 /**
  * The account in the app bar. Signed out: the icon goes to sign in and
  * comes back here. Signed in: the icon opens a small menu with who you
- * are, the way to the auction and the way out. No page in between.
+ * are, the way to the profile page and the auction, and the way out.
  */
 export function AccountButton() {
     const t = useTranslations('AppBar');
@@ -82,7 +82,8 @@ export function AccountButton() {
                             {who.email && <span className="text-[11px] font-semibold text-muted-foreground truncate">{who.email}</span>}
                         </span>
                     </div>
-                    <Link href="/fantacalcio/asta" role="menuitem" onClick={() => setOpen(false)} className="bb-btn bg-accent h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><Sparkles className="w-3.5 h-3.5" aria-hidden="true" />{ta('toAuction')}</Link>
+                    <Link href="/account" role="menuitem" onClick={() => setOpen(false)} className="bb-btn bg-accent h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><UserRound className="w-3.5 h-3.5" aria-hidden="true" />{ta('profile.menu')}</Link>
+                    <Link href="/fantacalcio/asta" role="menuitem" onClick={() => setOpen(false)} className="bb-btn bg-card h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><Sparkles className="w-3.5 h-3.5" aria-hidden="true" />{ta('toAuction')}</Link>
                     <button type="button" role="menuitem" onClick={signOut} className="bb-btn bg-card h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><LogOut className="w-3.5 h-3.5" aria-hidden="true" />{ta('signOut')}</button>
                 </div>
             )}

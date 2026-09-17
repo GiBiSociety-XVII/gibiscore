@@ -1,29 +1,34 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
+import {provides} from '@/lib/football/coverage';
 import {apiFootballGet} from '@/lib/api-football/client';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {fetchAll} from '@/lib/db/paginate';
-import {allowance, chunk, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
+import {allowance, chunk, currentSeasons, failSync, featuredSeasons, finishRun, footballClient, startRun, type SyncRun} from './context';
 import {upsertFixtures} from './fixtures';
 
 const DAY = 86_400_000;
 /** Stop starting new requests after this, well inside the route's maxDuration. */
 const DEADLINE_MS = 230_000;
+/** Season lists per run at most: the first pass over ~1,250 basic seasons must leave time for the detail. */
+const LIST_MAX_PER_RUN = 250;
 
 /**
  * sync-backfill (hourly, archive class; by hand with a bigger limit after the install)
  *
- * Fills the archive of the featured leagues, current season plus
- * API_FOOTBALL_HISTORY_SEASONS past ones, without ever touching the API at
- * page render time:
+ * Fills the archive without ever touching the API at page render time:
+ * the featured leagues, current season plus API_FOOTBALL_HISTORY_SEASONS
+ * past ones; the basic leagues, current season only.
  *
  * 1. Fixture lists. GET /fixtures?league&season (one request, the whole
  *    season) for every season never listed; the current season is listed
  *    again every 7 days to pick up rescheduled matches. This is what
- *    brings in the matchdays played before the site went live.
+ *    brings in the matchdays played before the site went live, and the
+ *    whole calendar of a minor league beyond the month the day lists cover.
  * 2. Fixture detail. Finished fixtures whose events, lineups, statistics
  *    and player ratings were never stored, newest first, 20 per request,
- *    `limit` fixtures per run.
+ *    `limit` fixtures per run: every featured fixture, and the basic ones
+ *    whose league the provider covers (lib/football/coverage.ts).
  */
 export async function syncBackfill(limit = 1000): Promise<SyncRun> {
     const db = footballClient();
@@ -36,17 +41,20 @@ export async function syncBackfill(limit = 1000): Promise<SyncRun> {
             await finishRun(db, run, 'ok');
             return run;
         }
-        const seasons = await featuredSeasons(db, historySeasonCount(), run);
+        // Featured first (with their history), then the current season of every basic league.
+        const seasons = [...(await featuredSeasons(db, historySeasonCount(), run)), ...(await currentSeasons(db, 'basic'))];
 
         // 1. Season fixture lists.
+        let listed = 0;
         for (const s of seasons) {
             const listedAt = s.fixturesListedAt ? Date.parse(s.fixturesListedAt) : null;
             const stale = listedAt === null || (s.isCurrent && Date.now() - listedAt > 7 * DAY);
             if (!stale) continue;
-            if (outOfTime()) {
+            if (outOfTime() || listed >= LIST_MAX_PER_RUN) {
                 run.bump('seasons_deferred');
                 continue;
             }
+            listed += 1;
             const {response} = await apiFootballGet<AfFixtureResponse[]>('fixtures', {league: s.leagueProviderId, season: s.year});
             run.requests += 1;
             await upsertFixtures(db, run, response);
@@ -56,21 +64,26 @@ export async function syncBackfill(limit = 1000): Promise<SyncRun> {
             run.bump('fixtures_listed', response.length);
         }
 
-        // 2. Detail of finished fixtures, most recent first.
-        const data = await fetchAll(
-            (a, b) =>
-                db
-                    .from('fixtures')
-                    .select('provider_id')
-                    .eq('state', 'finished')
-                    .is('details_synced_at', null)
-                    .in('season_id', seasons.map((s) => s.id))
-                    .order('starting_at', {ascending: false})
-                    .order('id')
-                    .range(a, b),
-            {max: limit},
-        );
-        const ids = data.map((r) => r.provider_id as number);
+        // 2. Detail of finished fixtures, most recent first, where the provider has any to give.
+        const detailSeasons = seasons.filter((s) => provides(s.tier, s.coverage, 'detail'));
+        const pending: Array<{provider_id: number; starting_at: string}> = [];
+        for (const group of chunk(detailSeasons.map((s) => s.id), 300)) {
+            const rows = await fetchAll(
+                (a, b) =>
+                    db
+                        .from('fixtures')
+                        .select('provider_id,starting_at')
+                        .eq('state', 'finished')
+                        .is('details_synced_at', null)
+                        .in('season_id', group)
+                        .order('starting_at', {ascending: false})
+                        .order('id')
+                        .range(a, b),
+                {max: limit},
+            );
+            pending.push(...(rows as unknown as typeof pending));
+        }
+        const ids = pending.sort((a, b) => b.starting_at.localeCompare(a.starting_at)).slice(0, limit).map((r) => r.provider_id);
         run.bump('pending', ids.length);
 
         // Fetched and stored a hundred at a time, so the deadline counts the

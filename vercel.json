@@ -49,12 +49,8 @@
       "schedule": "10 4 * * *"
     },
     {
-      "path": "/api/cron/sync-standings?scope=all",
-      "schedule": "25 4 * * *"
-    },
-    {
       "path": "/api/cron/sync-squads",
-      "schedule": "30 4 * * *"
+      "schedule": "45 * * * *"
     },
     {
       "path": "/api/cron/fit-model",

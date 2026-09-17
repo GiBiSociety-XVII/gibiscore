@@ -1,19 +1,21 @@
 import type {Metadata} from "next";
-import Image from "next/image";
-import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
+import {getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
-import {cn} from "@/components/shared/ui/cn";
-import {SiteShell, Panel} from "@/components/shell/site-shell";
-import {Flag} from "@/components/football/flag";
+import {SiteShell} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
-import {OutcomeBar} from "@/components/football/prediction";
-import {TeamCrest} from "@/components/football/team-crest";
+import {PredictionsBoard, type BoardBlock} from "@/components/football/predictions-board";
+import {TourLauncher} from "@/components/football/tour-launcher";
 import {getUpcomingPredictions} from "@/lib/football/data/predictions";
-import {fairOdds, type OddsLine} from "@/lib/football/markets";
+import {romeDate, shiftDay} from "@/lib/football/data/scores";
+import {suggestBets} from "@/lib/football/markets";
 
 export const revalidate = 600;
 
-const DAYS = 3;
+/** Days ahead the page lists; the filters narrow to today and tomorrow. */
+const DAYS = 7;
+
+/** The guide's stops, in order: each a `data-tour` on the page; the list ones are skipped when no match is on. */
+const TOUR_STEPS = ['days', 'competition', 'schedina', 'legend', 'list', 'match', 'tiers', 'record'] as const;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Pages.predictions');
@@ -25,91 +27,24 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
     setRequestLocale(locale);
     const t = await getTranslations('Pages.predictions');
     const tp = await getTranslations('Football.prediction');
-    const format = await getFormatter();
     const blocks = await getUpcomingPredictions(DAYS);
+    const today = romeDate(new Date());
+    // The same slips the match page proposes, from the same prediction and odds.
+    const board: BoardBlock[] = blocks.map((b) => ({
+        competition: b.competition,
+        fixtures: b.fixtures.map(({fixture, prediction, odds}) => ({fixture, prediction, slips: prediction ? suggestBets(prediction, odds) : [], day: romeDate(new Date(fixture.startingAt))})),
+    }));
 
     return (
         <SiteShell wide>
-            <PageHeader title={t('title')} meta={`${t('days', {count: DAYS})} · ${t('intro')}`} aside={<Link href="/predictions/record" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('recordLink')}</Link>} />
-            {blocks.length === 0 ? (
-                <p className="text-sm font-semibold text-muted-foreground">{tp('listEmpty')}</p>
-            ) : (
-                <div className="grid gap-3 grid-cols-1 xl:grid-cols-2 items-start">
-                    {blocks.map((b) => (
-                        <Panel
-                            key={b.competition.id}
-                            title={
-                                <Link href={`/competitions/${b.competition.slug}`} className="inline-flex items-center gap-2 hover:underline decoration-accent decoration-[2px] underline-offset-2">
-                                    {b.competition.logoUrl ? <Image src={b.competition.logoUrl} alt="" width={16} height={16} unoptimized className="object-contain" /> : <Flag code={b.competition.countryCode} size={16} />}
-                                    {b.competition.country ? `${b.competition.country} · ` : ''}{b.competition.name}
-                                </Link>
-                            }
-                            action={<span className="font-mono text-[11px] text-muted-foreground">{b.fixtures.length}</span>}
-                        >
-                            <ul className="flex flex-col">
-                                {b.fixtures.map(({fixture, prediction, odds}) => {
-                                    const start = new Date(fixture.startingAt);
-                                    // The bookmakers' average beside the model: green where they pay more than the model's fair price.
-                                    const quote = (label: string, line: OddsLine | undefined, pct: number | undefined) => {
-                                        if (!line) return null;
-                                        const fair = pct !== undefined ? fairOdds(pct) : null;
-                                        const value = fair !== null && line.avg > fair;
-                                        return (
-                                            <span key={label} className={cn("inline-flex items-center gap-1", value && "text-emerald-800")} title={t('oddsHint', {label, avg: line.avg.toFixed(2), fair: fair === null ? '–' : fair.toFixed(2), best: line.best.toFixed(2), book: line.bestBook, books: line.books})}>
-                                                <span className="text-muted-foreground">{label}</span>{line.avg.toFixed(2)}
-                                            </span>
-                                        );
-                                    };
-                                    return (
-                                        <li key={fixture.id} className="border-t border-muted first:border-t-0">
-                                            <Link href={`/matches/${fixture.id}`} className="block px-3 py-2 hover:bg-muted/50">
-                                                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-                                                    <span className="flex items-center justify-end gap-2 min-w-0 text-[13px] font-extrabold">
-                                                        <span className={cn("truncate", prediction?.pick === '1' && "underline decoration-accent decoration-[3px] underline-offset-2")}>{fixture.home.name}</span>
-                                                        <TeamCrest team={fixture.home} size={20} />
-                                                    </span>
-                                                    <span className="flex flex-col items-center leading-tight">
-                                                        <span className="font-mono text-[12px] font-bold">{format.dateTime(start, {hour: '2-digit', minute: '2-digit'})}</span>
-                                                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">{format.dateTime(start, {weekday: 'short', day: 'numeric'})}</span>
-                                                    </span>
-                                                    <span className="flex items-center gap-2 min-w-0 text-[13px] font-extrabold">
-                                                        <TeamCrest team={fixture.away} size={20} />
-                                                        <span className={cn("truncate", prediction?.pick === '2' && "underline decoration-accent decoration-[3px] underline-offset-2")}>{fixture.away.name}</span>
-                                                    </span>
-                                                </div>
-                                                {prediction ? (
-                                                    <>
-                                                        <div className="mt-1.5 flex items-center gap-3">
-                                                            <OutcomeBar prediction={prediction} className="h-5 flex-1" />
-                                                            <span className="font-mono text-[11px] font-bold text-muted-foreground whitespace-nowrap tabular-nums">
-                                                                xG {prediction.lambda.home.toFixed(1)}-{prediction.lambda.away.toFixed(1)} · O2,5 {prediction.over25}%
-                                                            </span>
-                                                        </div>
-                                                        {odds && (
-                                                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] font-extrabold tabular-nums">
-                                                                <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{t('odds')}</span>
-                                                                {quote('1', odds.outcome?.home, prediction.home)}
-                                                                {quote('X', odds.outcome?.draw, prediction.draw)}
-                                                                {quote('2', odds.outcome?.away, prediction.away)}
-                                                                {quote('O2,5', odds.goals?.over25, prediction.over25)}
-                                                                {quote('U2,5', odds.goals?.under25, 100 - prediction.over25)}
-                                                                {quote('Gol', odds.btts?.yes, prediction.btts)}
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{tp('empty')}</p>
-                                                )}
-                                            </Link>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </Panel>
-                    ))}
-                </div>
-            )}
-            <p className="text-[12px] font-semibold text-muted-foreground">{tp('listHint')} {t('oddsLegend')}</p>
+            <PageHeader title={t('title')} meta={`${t('days', {count: DAYS})} · ${t('intro')}`} aside={
+                    <div className="flex items-center gap-2">
+                        <TourLauncher storageKey="gibiscore:predictions-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: key, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} />
+                        <Link data-tour="record" href="/predictions/record" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('recordLink')}</Link>
+                    </div>
+                } />
+            <PredictionsBoard blocks={board} today={today} tomorrow={shiftDay(today, 1)} />
+            <p className="text-[12px] font-semibold text-muted-foreground">{tp('listHint')} {t('adviceLegend')}</p>
         </SiteShell>
     );
 }

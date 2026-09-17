@@ -63,7 +63,53 @@
     "scorers": "Marcatori",
     "absences": "Indisponibili",
     "prediction": "Pronostico",
-    "markets": "Analisi partita: pronostico, mercati e quote"
+    "markets": "Analisi partita: pronostico, mercati e quote",
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della pagina partita",
+      "steps": {
+        "score": {
+          "title": "La partita",
+          "text": "Competizione, giornata, stato e punteggio con i marcatori; in diretta il minuto avanza da solo e la pagina si aggiorna. Tocca il nome di una squadra per la sua pagina, la stella per seguirla."
+        },
+        "timeline": {
+          "title": "La cronaca",
+          "text": "Gol, cartellini e sostituzioni minuto per minuto, dal fischio d'inizio. Compare appena c'è il primo evento."
+        },
+        "tabs": {
+          "title": "Le schede",
+          "text": "Prima del calcio d'inizio la pagina si apre su Analisi partita; dal fischio d'inizio sulla cronaca. Le altre: formazioni con i voti, statistiche della partita, i giocatori con voti e numeri."
+        },
+        "analysis": {
+          "title": "Analisi partita",
+          "text": "Il pronostico del modello (barra 1X2, gol attesi, affidabilità) e ogni mercato con la probabilità, la quota equa e la media dei bookmaker: in verde quando pagano più della quota equa. Il \"?\" spiega come nascono i numeri."
+        },
+        "advice": {
+          "title": "Cosa giocherebbe il modello",
+          "text": "Tre giocate, una per livello di rischio: prudente, consigliata, audace. Le stesse che trovi nella pagina Pronostici e che vengono verificate nel bilancio del modello."
+        },
+        "bands": {
+          "title": "Quando arrivano i gol",
+          "text": "Gol fatti e subiti per quarto d'ora di ciascuna squadra; lo sfondo azzurro segna i quarti d'ora in cui, sommando le due, arrivano più gol della media."
+        },
+        "lines": {
+          "title": "Over, under e gol",
+          "text": "Quanto spesso le partite di ogni squadra superano ogni soglia, finiscono con entrambe a segno o a porta inviolata, e il rendimento nel campo di questa partita."
+        },
+        "setpieces": {
+          "title": "Angoli e cartellini",
+          "text": "Medie per partita fatti e concessi, e quelli attesi in questa partita."
+        },
+        "comparison": {
+          "title": "Il confronto",
+          "text": "Classifica e forma recente delle due squadre, fianco a fianco."
+        },
+        "absences": {
+          "title": "Gli indisponibili",
+          "text": "Infortunati e squalificati di entrambe, con il motivo e da quando."
+        }
+      }
+    }
   },
   "team": {
     "notFound": "Squadra non trovata",
@@ -150,7 +196,8 @@
       "matches": "Partite"
     },
     "ratingTrend": "Andamento voti",
-    "compare": "Confronta"
+    "compare": "Confronta",
+    "noVote": "s.v."
   },
   "scores": {
     "metaTitle": "Risultati calcio in tempo reale",
@@ -174,7 +221,61 @@
     "emptyLive": "In questo momento non c’è nessuna partita in corso. Scegli un giorno per vedere il programma.",
     "emptyDay": "Nessuna partita per questo filtro.",
     "favoritesGroup": "Preferiti",
-    "refresh": "Aggiornamento automatico"
+    "refresh": "Aggiornamento automatico",
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della pagina iniziale",
+      "steps": {
+        "welcome": {
+          "title": "Benvenuto",
+          "text": "Le tre porte del sito: risultati e live, pronostici e schedine, fantacalcio. \"Ho capito\" lo chiude per sempre su questo browser; ogni pagina ha poi la sua guida dal pulsante \"Guida\"."
+        },
+        "dates": {
+          "title": "Il giorno",
+          "text": "Le partite del giorno scelto: le frecce spostano di un giorno, il calendario porta a una data qualsiasi, oggi resta sottolineato. LIVE mostra solo le partite in corso in questo momento, col loro numero."
+        },
+        "filters": {
+          "title": "I filtri",
+          "text": "Tutte, in corso, finite o ancora da giocare, con il conteggio di ciascuna. La lista sotto cambia all'istante."
+        },
+        "list": {
+          "title": "Le partite",
+          "text": "Prima le competizioni che hai messo tra i preferiti, poi quelle principali, poi tutte le altre per paese. Risultati e minuti si aggiornano da soli, senza ricaricare la pagina."
+        },
+        "competition": {
+          "title": "Una competizione",
+          "text": "Tocca il nome per classifica, calendario e statistiche della competizione. La stella la mette tra i preferiti: sale in cima alla lista e la sua classifica compare nella colonna di destra."
+        },
+        "match": {
+          "title": "Una partita",
+          "text": "Orario o minuto, squadre e risultato; le squadre delle tue preferite sono evidenziate. Tocca la partita per aprire in una nuova scheda cronaca, formazioni, statistiche e analisi con le quote. Tocca una squadra per la sua pagina. Prima del calcio d'inizio, a destra, le quote 1X2 dei bookmaker."
+        },
+        "sidebar": {
+          "title": "Le competizioni",
+          "text": "Le competizioni principali e tutte le altre per paese: da qui raggiungi qualsiasi campionato o coppa."
+        },
+        "chips": {
+          "title": "Le competizioni principali",
+          "text": "Scorri la fila per saltare a un campionato o a una coppa; tutte le altre sono nel menu Competizioni."
+        },
+        "rail": {
+          "title": "Le tue cose",
+          "text": "Le squadre che segui con la loro prossima partita e le classifiche delle competizioni preferite, aggiornate. Si riempie con le stelle che metti in giro per il sito."
+        },
+        "sections": {
+          "title": "Le sezioni",
+          "text": "Risultati, live, competizioni, pronostici, statistiche e fantacalcio: ogni voce apre un menu con le sue pagine. Il logo riporta sempre qui."
+        },
+        "search": {
+          "title": "La ricerca",
+          "text": "Cerca una squadra, una competizione o un giocatore per nome: i risultati compaiono mentre scrivi."
+        },
+        "mobileTabs": {
+          "title": "La barra in basso",
+          "text": "Le sezioni principali sempre a portata di pollice: risultati, live, competizioni, pronostici e fantacalcio."
+        }
+      }
+    }
   },
   "search": {
     "title": "Risultati per “{query}”",
@@ -195,7 +296,15 @@
     "scorers": "Marcatori",
     "assists": "Assist",
     "empty": "Dati non ancora disponibili per questa competizione.",
-    "seasonPicker": "Stagione"
+    "seasonPicker": "Stagione",
+    "tools": {
+      "label": "Strumenti",
+      "predictions": "Pronostici e schedine",
+      "record": "Bilancio del modello",
+      "injuries": "Infortunati e squalificati",
+      "compare": "Confronta giocatori",
+      "search": "Cerca squadra o giocatore"
+    }
   },
   "injuries": {
     "title": "Infortunati e squalificati",
@@ -247,11 +356,8 @@
     "title": "Pronostici",
     "metaTitle": "Pronostici partite",
     "metaDescription": "Pronostici statistici delle prossime partite: probabilità 1-X-2, gol attesi, over e entrambe a segno calcolati sullo studio della stagione, con le quote dei bookmaker a confronto.",
-    "intro": "Le prossime partite delle competizioni principali con le probabilità del nostro modello statistico. Apri la partita per lo studio completo.",
+    "intro": "Le prossime partite delle competizioni principali con le giocate che il modello propone. Apri la partita per l'analisi completa.",
     "days": "Prossimi {count} giorni",
-    "odds": "Quote",
-    "oddsHint": "{label}: media dei bookmaker {avg}, quota equa del modello {fair}; la migliore {best} ({book}), {books} bookmaker.",
-    "oddsLegend": "Quote: media dei bookmaker per 1, X, 2, over e under 2,5 e gol; in verde quando pagano più della quota equa del modello (100 / probabilità). Non è un consiglio di gioco.",
     "recordLink": "Il bilancio del modello",
     "record": {
       "title": "Bilancio del modello",
@@ -281,7 +387,241 @@
       "latestTitle": "Ultime giocate verificate",
       "won": "Vinta",
       "lost": "Persa",
-      "disclaimer": "Registro statistico delle proposte del modello, non un consiglio di gioco. Gioca solo se maggiorenne e con misura."
+      "disclaimer": "Registro statistico delle proposte del modello, non un consiglio di gioco. Gioca solo se maggiorenne e con misura.",
+      "schedineTitle": "Le schedine generate dagli utenti",
+      "schedineSaved": "Salvate",
+      "schedineSettled": "Chiuse",
+      "schedineWon": "Vinte",
+      "schedineHint": "Le schedine generate dalla pagina pronostici e salvate nell'account: ogni selezione è una giocata del modello, chiusa sui risultati reali dallo stesso registro. Accedi per vedere le tue.",
+      "tour": {
+        "button": "Guida",
+        "open": "Rivedi la guida passo passo del bilancio del modello",
+        "steps": {
+          "live": {
+            "title": "Le giocate verificate",
+            "text": "Ogni giocata proposta (prudente, consigliata, audace) viene scritta prima del calcio d'inizio e chiusa sul risultato finale. Vinte = quante sono andate a segno; promessa = la probabilità media che il modello dava. Se le due sono vicine il modello è ben tarato. Resa = puntata fissa su ogni giocata alla quota media dei bookmaker."
+          },
+          "fit": {
+            "title": "La taratura",
+            "text": "Ogni partita delle ultime stagioni in archivio è stata pronosticata con quello che si sapeva il giorno prima e confrontata col risultato vero: qui vedi come sarebbero andate le tre giocate su quelle partite. La taratura gira da sola ogni settimana; la data in alto a destra è l'ultima."
+          },
+          "knobs": {
+            "title": "Le manopole del modello",
+            "text": "Partite replicate e stagioni usate, poi le tre manopole tarate sui risultati: gol attesi, fattore campo e correlazione dei punteggi bassi. Log-loss: quanto il modello sbaglia il risultato esatto, prima e dopo la taratura, più basso è meglio. Cambia solo il pronostico, mai i dati delle pagine."
+          },
+          "schedine": {
+            "title": "Le schedine di tutti",
+            "text": "Le schedine generate dalla pagina Pronostici e salvate dagli utenti: quante salvate, quante chiuse sui risultati veri e quante vinte."
+          },
+          "mine": {
+            "title": "Le mie schedine",
+            "text": "Le schedine che hai salvato, dalla più recente: aperta finché le sue partite non sono finite, poi vinta o persa, con quante selezioni hai centrato. Tocca una partita per aprirne l'analisi."
+          },
+          "latest": {
+            "title": "Le ultime verificate",
+            "text": "Le ultime giocate chiuse, con il risultato della partita, il livello, la probabilità che il modello dava e le quote. Tocca la partita per rivedere l'analisi."
+          },
+          "predictions": {
+            "title": "Torna ai pronostici",
+            "text": "Le prossime partite con le tre giocate del modello e il generatore di schedine."
+          }
+        }
+      }
+    },
+    "filters": {
+      "days": "Giorni",
+      "today": "Oggi",
+      "tomorrow": "Domani",
+      "both": "Oggi e domani",
+      "all": "7 giorni",
+      "competition": "Competizione",
+      "allCompetitions": "Tutte le competizioni",
+      "count": "{count} partite"
+    },
+    "adviceLegend": "Sotto ogni partita le tre giocate del modello, le stesse dell'analisi partita: prudente (dal 78% di probabilità), consigliata (dal 62%), audace (dal 45%). Apri la partita per probabilità complete e quote. Non è un consiglio di gioco.",
+    "noAdvice": "Nessuna giocata abbastanza probabile per questa fascia.",
+    "schedina": {
+      "open": "Genera schedina",
+      "title": "Genera una schedina",
+      "close": "Chiudi",
+      "intro": "Scegli rischio, tipo e quante partite; il modello prende le giocate in cui crede di più per quel rischio tra le partite dei giorni e delle competizioni che indichi, e ti dice probabilità, quota e quando la schedina si chiude.",
+      "risk": "Rischio",
+      "risks": {
+        "low": "Basso",
+        "medium": "Medio",
+        "high": "Alto"
+      },
+      "riskHint": {
+        "low": "Giocate prudenti: ogni selezione almeno al 78%.",
+        "medium": "Giocate consigliate: ogni selezione almeno al 62% (prudente quando la partita non ne ha una).",
+        "high": "Giocate audaci: ogni selezione almeno al 45% (consigliata quando la partita non ne ha una)."
+      },
+      "kind": "Tipo",
+      "kinds": {
+        "single": "Singola",
+        "multiple": "Multipla",
+        "system": "Sistema"
+      },
+      "kindHint": {
+        "single": "Una sola partita, la più probabile.",
+        "multiple": "Tutte le selezioni devono vincere: la quota è il prodotto.",
+        "system": "Fisse in ogni colonna, le altre combinate k alla volta: vince se tutte le fisse e almeno k delle altre sono centrate."
+      },
+      "size": "Partite",
+      "systemOf": "Colonne da",
+      "systemOfN": "su {n}",
+      "days": "Giorni",
+      "anyDay": "Qualsiasi",
+      "competitions": "Competizioni",
+      "anyCompetition": "Tutte",
+      "generate": "Genera",
+      "available": "{count} partite disponibili con i filtri scelti",
+      "none": "Non ci sono abbastanza partite con una giocata per questo rischio nei giorni e nelle competizioni scelti: allarga i filtri o abbassa il numero di partite.",
+      "selections": "{count} selezioni",
+      "chance": "Probabilità",
+      "settles": "Si chiude",
+      "systemNote": "{columns} colonne da {of} selezioni su {n}: probabilità che almeno {of} siano centrate {pct}%.",
+      "save": "Salva e segui",
+      "saving": "Salvo…",
+      "saved": "Salvata",
+      "saveError": "Non salvata: riprova.",
+      "signIn": "Accedi per salvare la schedina e seguirne l'esito.",
+      "toRecord": "Vai al bilancio",
+      "disclaimer": "Le selezioni sono le stesse giocate verificate nel bilancio del modello: ogni schedina salvata viene chiusa sui risultati reali. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
+      "bankers": "Fisse",
+      "bankersAuto": "Automatiche",
+      "bankersHint": "Quante selezioni stanno in ogni colonna. Automatiche: il modello rende fisse le selezioni almeno al 75%, lasciando almeno due selezioni libere.",
+      "bankersCount": "{count} fisse",
+      "banker": "Fissa",
+      "systemOfFree": "selezioni libere: sistema {k} su {n}, vince con almeno {k} libere centrate",
+      "systemNoteBankers": "{bankers} fisse in ogni colonna e {columns} colonne da {of} selezioni sulle {n} libere: probabilità che tutte le fisse e almeno {of} delle libere siano centrate {pct}%.",
+      "systemOfHint": "Quante selezioni libere entrano in ogni colonna. Le fisse stanno in tutte le colonne e non contano qui: con 2 fisse e 4 libere, \"2\" è il sistema 2 su 4 (6 colonne), che paga se le fisse sono centrate e almeno 2 libere su 4 lo sono. Automatico: per ogni k il modello calcola il ritorno atteso di una puntata uguale su tutte le colonne alle quote dei bookmaker e prende il migliore (a pari ritorno, il più probabile); senza quote, il classico N-1.",
+      "systemAuto": "Automatico",
+      "systemAutoNote": "il modello sceglie il sistema con il miglior ritorno atteso alle quote dei bookmaker",
+      "stake": "Puntata",
+      "stakeModes": {
+        "recommended": "Consigliata",
+        "full": "Integrale"
+      },
+      "stakeModeHint": {
+        "recommended": "Il modello mette la puntata sulle righe che valuta sopra le quote dei bookmaker (probabilità × quota − 1), in proporzione al vantaggio; se nessuna ha vantaggio, tutto sulla riga migliore.",
+        "full": "La stessa puntata su ogni colonna di ogni riga: sistema integrale."
+      },
+      "column": "Colonna",
+      "payout": "Vincita",
+      "maxPayout": "Vincita massima",
+      "expectedReturn": "Ritorno atteso",
+      "expectedProfit": "Profitto atteso",
+      "profitChance": "Chiudi in utile",
+      "stakeNote": "Ogni riga \"k su N\" è il sistema con colonne da k selezioni libere (le fisse in tutte); la puntata è per colonna, come sul bookmaker, e puoi cambiarla riga per riga. Probabilità = tutte le fisse e almeno k libere centrate. Vincita = se tutte le colonne della riga vincono. Ritorno atteso e \"chiudi in utile\" secondo il modello, su ogni esito possibile. Quote medie dei bookmaker: quelle del tuo possono differire.",
+      "stakeNoteFair": "Alcune selezioni non hanno la quota dei bookmaker: dove manca vale la quota equa del modello (≈), quindi il ritorno atteso è quello di una giocata alla pari. Con le quote reali i numeri cambiano.",
+      "line": "Riga",
+      "kOfN": "{k} su {n}",
+      "withBankers": "+ {count} fisse",
+      "perColumn": "Per colonna",
+      "lineTotal": "Riga",
+      "totalStake": "Puntata totale",
+      "tour": {
+        "button": "Guida",
+        "open": "Rivedi la guida passo passo del generatore di schedine",
+        "steps": {
+          "risk": {
+            "title": "Il rischio",
+            "text": "Basso prende solo giocate prudenti (almeno il 78%), medio le consigliate (dal 62%), alto le audaci (dal 45%). Quando una partita non ha la giocata di quel livello, il modello scende a quello più sicuro."
+          },
+          "kind": {
+            "title": "Singola, multipla o sistema",
+            "text": "Singola: una sola partita, la più probabile. Multipla: tutte le selezioni devono vincere, la quota è il prodotto. Sistema: scegli quante partite, quante fisse (che devono sempre essere centrate) e le colonne da k selezioni libere; con \"auto\" il modello sceglie fisse e k con la resa migliore."
+          },
+          "days": {
+            "title": "I giorni",
+            "text": "Qualsiasi giorno oppure solo quelli che tocchi: le selezioni vengono prese tra le partite di quei giorni."
+          },
+          "competitions": {
+            "title": "Le competizioni",
+            "text": "Tutte oppure solo quelle che tocchi. Sotto vedi quante partite restano tra cui scegliere."
+          },
+          "generate": {
+            "title": "Genera",
+            "text": "Il modello prende le giocate in cui crede di più per il rischio scelto, una per partita, mai due dalla stessa. Puoi rigenerare quante volte vuoi cambiando le impostazioni."
+          },
+          "result": {
+            "title": "Le selezioni",
+            "text": "Ogni riga è una partita con la giocata scelta, la sua probabilità e la quota dei bookmaker. Nel sistema il bollino \"Fissa\" segna le selezioni che entrano in ogni colonna. Tocca la partita per aprirne l'analisi."
+          },
+          "summary": {
+            "title": "Probabilità e quota",
+            "text": "Probabilità che la schedina vinca per intero, quota equa del modello, quota dei bookmaker (≈ quando è una stima) e quando la schedina si chiude: due ore dopo l'ultimo calcio d'inizio."
+          },
+          "stake": {
+            "title": "La puntata",
+            "text": "Scrivi quanto vuoi puntare. Singola e multipla: vincita se tutte le selezioni sono centrate, ritorno e profitto atteso secondo il modello. Sistema: la puntata è divisa per riga, k su N, come sul biglietto del bookmaker, in multipli di 5 centesimi; \"Consigliata\" mette di più sulle righe con la resa migliore, \"Integrale\" la spalma su ogni riga; puoi correggere ogni importo a mano."
+          },
+          "save": {
+            "title": "Salva",
+            "text": "Con l'accesso fatto la schedina viene salvata nel tuo account e chiusa da sola sui risultati veri: la ritrovi nel bilancio del modello, sotto \"Le mie schedine\", con vinte e perse."
+          }
+        }
+      },
+      "winChance": "Probabilità di vincita",
+      "ticketNote": "Vincita = puntata × quota della schedina (per la multipla il prodotto delle quote medie dei bookmaker). Ritorno e profitto atteso secondo il modello: vincita per la probabilità che tutte le selezioni siano centrate. Le quote del tuo bookmaker possono differire."
+    },
+    "mine": {
+      "title": "Le mie schedine",
+      "empty": "Nessuna schedina salvata: generane una dalla pagina pronostici.",
+      "tally": "{won} vinte su {settled} chiuse",
+      "open": "Aperta",
+      "won": "Vinta",
+      "lost": "Persa",
+      "hits": "{hits}/{size} centrate",
+      "ticket": {
+        "number": "Schedina n. {id}",
+        "odds": "Quota",
+        "stake": "Puntata",
+        "payout": "Vincita",
+        "perColumn": "/col",
+        "settles": "Si chiude",
+        "settled": "Chiusa"
+      }
+    },
+    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa.",
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della pagina pronostici",
+      "steps": {
+        "days": {
+          "title": "Quali giorni",
+          "text": "Oggi, domani, tutti e due o i prossimi sette giorni: la lista sotto mostra solo le partite di quei giorni."
+        },
+        "competition": {
+          "title": "Quale competizione",
+          "text": "Tutte le competizioni principali o una sola. Il contatore a destra dice quante partite restano con i filtri scelti."
+        },
+        "schedina": {
+          "title": "Genera schedina",
+          "text": "Apre il generatore: scegli rischio, singola, multipla o sistema, giorni e competizioni, e il modello compone la schedina con le sue giocate migliori, divide la puntata come un bookmaker e, se hai fatto l'accesso, la salva e la chiude sui risultati veri. Anche il generatore ha la sua guida."
+        },
+        "legend": {
+          "title": "I tre livelli",
+          "text": "Per ogni partita il modello propone tre giocate: prudente (almeno il 78% di probabilità), consigliata (dal 62%) e audace (dal 45%). Sono le stesse dell'analisi partita e vengono tutte verificate nel bilancio."
+        },
+        "list": {
+          "title": "Le partite",
+          "text": "Una scheda per competizione, con le partite in ordine di orario. Tocca il nome della competizione per la sua pagina."
+        },
+        "match": {
+          "title": "Una partita",
+          "text": "Orario e giorno al centro; la squadra sottolineata è quella che il modello vede favorita. Tocca la partita per aprire l'analisi completa in una nuova scheda: probabilità, quote e mercati."
+        },
+        "tiers": {
+          "title": "Le giocate della partita",
+          "text": "Le tre giocate del modello per questa partita con la loro probabilità; quella consigliata è evidenziata. Un trattino vuol dire che per quel livello non c'è una giocata abbastanza sicura. Tieni premuto per vedere le probabilità di ogni esito."
+        },
+        "record": {
+          "title": "Il bilancio del modello",
+          "text": "Ogni giocata proposta viene scritta prima del calcio d'inizio e verificata sul risultato finale: qui vedi quante ne vince ogni livello contro quanto prometteva, la taratura del modello e le tue schedine salvate."
+        }
+      }
     }
   }
 }

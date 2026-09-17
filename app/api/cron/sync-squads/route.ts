@@ -7,10 +7,11 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * Daily: squads and transfer feed of every featured club while a transfer
- * window is open (~2 requests per club, ~520 in all); outside the windows
- * only squads a week old. `?force=1` asks everyone now, `?limit=40` caps
- * the clubs per run.
+ * Hourly: squads and transfer feed of every featured club while a
+ * transfer window is open (~2 requests per club, ~520 in all, once a
+ * day); outside the windows only squads a week old. Then the squads of
+ * the basic clubs a week old, 300 a run. `?force=1` asks every featured
+ * club now, `?limit=40` caps the clubs per run.
  */
 export async function GET(request: NextRequest) {
     const limit = Number(request.nextUrl.searchParams.get('limit')) || undefined;

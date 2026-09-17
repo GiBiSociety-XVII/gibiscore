@@ -5,13 +5,18 @@ import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
 import {TeamCrest} from "@/components/football/team-crest";
-import {getAdviceRecord} from "@/lib/football/data/record";
+import {getAdviceRecord, getSchedineTally} from "@/lib/football/data/record";
+import {MySchedine} from "@/components/football/my-schedine";
+import {TourLauncher} from "@/components/football/tour-launcher";
 import {getModelFit} from "@/lib/football/data/tuning";
 import type {LegKey} from "@/lib/football/markets";
 
 export const revalidate = 600;
 
 const TIERS = ['safe', 'balanced', 'bold'] as const;
+
+/** The guide's stops, in order: each a `data-tour` on the page; the ones not on the page (no slips yet, not signed in) are skipped. */
+const TOUR_STEPS = ['live', 'fit', 'knobs', 'schedine', 'mine', 'latest', 'predictions'] as const;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Pages.predictions.record');
@@ -24,7 +29,7 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
     const t = await getTranslations('Pages.predictions.record');
     const tm = await getTranslations('Football.markets');
     const format = await getFormatter();
-    const [record, fit] = await Promise.all([getAdviceRecord(), getModelFit()]);
+    const [record, fit, schedine] = await Promise.all([getAdviceRecord(), getModelFit(), getSchedineTally()]);
     const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
     const cell = (label: string, value: string, note?: string) => (
         <div className="flex flex-col items-center justify-center px-2 py-2 border-t border-muted">
@@ -36,9 +41,14 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
 
     return (
         <SiteShell wide>
-            <PageHeader title={t('title')} meta={t('intro')} aside={<Link href="/predictions" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toPredictions')}</Link>} />
+            <PageHeader title={t('title')} meta={t('intro')} aside={
+                    <div className="flex items-center gap-2">
+                        <TourLauncher storageKey="gibiscore:record-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: key, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} />
+                        <Link data-tour="predictions" href="/predictions" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toPredictions')}</Link>
+                    </div>
+                } />
 
-            <Panel title={t('liveTitle')} action={record ? <span className="font-mono text-[11px] text-muted-foreground">{t('settled', {count: record.total})}</span> : undefined}>
+            <div data-tour="live"><Panel title={t('liveTitle')} action={record ? <span className="font-mono text-[11px] text-muted-foreground">{t('settled', {count: record.total})}</span> : undefined}>
                 {!record || record.total === 0 ? (
                     <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('liveEmpty')}</p>
                 ) : (
@@ -62,9 +72,9 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                     </div>
                 )}
                 <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('liveHint')}</p>
-            </Panel>
+            </Panel></div>
 
-            <Panel title={t('fitTitle')} action={fit ? <span className="font-mono text-[11px] text-muted-foreground">{format.dateTime(new Date(fit.fittedAt), {day: '2-digit', month: '2-digit', year: 'numeric'})}</span> : undefined}>
+            <div data-tour="fit"><Panel title={t('fitTitle')} action={fit ? <span className="font-mono text-[11px] text-muted-foreground">{format.dateTime(new Date(fit.fittedAt), {day: '2-digit', month: '2-digit', year: 'numeric'})}</span> : undefined}>
                 {!fit ? (
                     <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('fitEmpty')}</p>
                 ) : (
@@ -86,7 +96,7 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                                 );
                             })}
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 border-t border-muted">
+                        <div data-tour="knobs" className="grid grid-cols-2 sm:grid-cols-5 border-t border-muted">
                             {cell(t('samples'), String(fit.samples), t('seasons', {count: fit.seasons.length}))}
                             {cell(t('goalScale'), `×${fit.tuning.goalScale.toFixed(2)}`)}
                             {cell(t('homeEdge'), `×${fit.tuning.homeEdge.toFixed(2)}`)}
@@ -96,16 +106,26 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                         <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('fitHint')}</p>
                     </>
                 )}
-            </Panel>
+            </Panel></div>
+
+            <div data-tour="schedine"><Panel title={t('schedineTitle')}>
+                <div className="grid grid-cols-3">
+                    {cell(t('schedineSaved'), schedine ? String(schedine.total) : '–')}
+                    {cell(t('schedineSettled'), schedine ? String(schedine.settled) : '–')}
+                    {cell(t('schedineWon'), schedine && schedine.settled > 0 ? `${Math.round((schedine.won / schedine.settled) * 100)}%` : '–', schedine ? t('hits', {hits: schedine.won, slips: schedine.settled}) : undefined)}
+                </div>
+                <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('schedineHint')}</p>
+            </Panel></div>
+            <MySchedine />
 
             {record && record.latest.length > 0 && (
-                <Panel title={t('latestTitle')}>
+                <div data-tour="latest"><Panel title={t('latestTitle')}>
                     <ul className="flex flex-col divide-y divide-muted">
                         {record.latest.map((s) => (
                             <li key={`${s.fixtureId}-${s.tier}`} className="px-3 py-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 text-[12px]">
                                 <span className={cn("inline-flex items-center justify-center w-14 h-6 rounded border-2 border-foreground font-mono text-[11px] font-extrabold", s.hit ? "bg-emerald-200" : "bg-red-100")}>{s.hit ? t('won') : t('lost')}</span>
                                 <span className="min-w-0 flex flex-col leading-tight">
-                                    <Link href={`/matches/${s.fixtureId}`} className="font-extrabold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">
+                                    <Link href={`/matches/${s.fixtureId}`} target="_blank" rel="noopener noreferrer" className="font-extrabold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">
                                         <TeamCrest team={s.home} size={14} /> {s.home.name} {s.homeScore}-{s.awayScore} {s.away.name} <TeamCrest team={s.away} size={14} />
                                     </Link>
                                     <span className="text-[11px] font-semibold text-muted-foreground truncate">{format.dateTime(new Date(s.startingAt), {day: '2-digit', month: '2-digit'})} · {s.league} · {tm(`advice.tiers.${s.tier}`)}</span>
@@ -117,7 +137,7 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                             </li>
                         ))}
                     </ul>
-                </Panel>
+                </Panel></div>
             )}
             <p className="text-[12px] font-semibold text-muted-foreground">{t('disclaimer')}</p>
         </SiteShell>

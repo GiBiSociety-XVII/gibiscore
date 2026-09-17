@@ -3,7 +3,7 @@ import type {FormationKey} from './strategies';
 import {FORMATIONS} from './strategies';
 import {recommendLineup, type LineupAdvice, type PlayerForecast} from './matchday';
 import type {FantaRole, FantaRules} from './scores';
-import {halfVoto, toVoto, type VotoCalibration} from './voto';
+import {halfVoto, toVoto, type VotoCalibration, VOTE_MINUTES} from './voto';
 
 /**
  * The recap of a round: what every player of a roster really did, the
@@ -18,8 +18,7 @@ import {halfVoto, toVoto, type VotoCalibration} from './voto';
 export const OWN_GOAL = -2;
 /** Substitutions a lineup gets, in bench order, same role. */
 export const MAX_SUBS = 3;
-/** Minutes under which the provider's rating is not taken as a vote (the newspaper gives none). */
-export const VOTE_MINUTES = 10;
+export {VOTE_MINUTES};
 
 export interface RoundStat {
     minutes: number;

@@ -8,7 +8,8 @@
     "competitions": "Competizioni",
     "stats": "Statistiche",
     "search": "Cerca",
-    "fantasy": "Fanta"
+    "fantasy": "Fanta",
+    "predictions": "Pronostici"
   },
   "searchHint": "Invio per tutti i risultati",
   "searchTeams": "Squadre",
@@ -46,9 +47,7 @@
       "teamStatsHint": "Cerca una squadra e apri la tab Statistiche",
       "overview": "Tutte le statistiche",
       "compare": "Confronto giocatori",
-      "compareHint": "Due giocatori a confronto, stessa stagione",
-      "predictions": "Pronostici",
-      "predictionsHint": "Probabilità 1-X-2 delle prossime partite"
+      "compareHint": "Due giocatori a confronto, stessa stagione"
     }
   }
 }

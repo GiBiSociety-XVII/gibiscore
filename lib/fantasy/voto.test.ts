@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {DEFAULT_CALIBRATION, fitCalibration, halfVoto, matchVoto, meanVoto, roleOfPosition, toVoto} from './voto';
+import {DEFAULT_CALIBRATION, fitCalibration, halfVoto, matchVoto, meanVoto, roleOfPosition, toVoto, shownVoto} from './voto';
 
 describe('toVoto', () => {
     it('brings an average provider rating to an average fantasy vote, and compresses the spread', () => {
@@ -56,5 +56,17 @@ describe('the vote scale on the football pages', () => {
         expect(matchVoto(8.2, 'defender')).toBe(7);
         expect(matchVoto(5.9, 'goalkeeper')).toBe(5.5);
         expect(meanVoto(7.13, 'midfielder')).toBeCloseTo(6.2, 1);
+    });
+});
+
+describe('shownVoto', () => {
+    it('gives no vote to a zero rating or a short cameo, the rating\'s vote otherwise', () => {
+        expect(shownVoto(0, 0, 'attacker')).toBeNull();
+        expect(shownVoto(null, 90, 'attacker')).toBeNull();
+        expect(shownVoto(6.8, 4, 'midfielder')).toBeNull();
+        expect(shownVoto(6.8, 10, 'midfielder')).toBe(6);
+        expect(shownVoto(6.8, undefined, 'midfielder')).toBe(6);
+        // A bad match with the minutes played keeps its low vote.
+        expect(shownVoto(3.0, 50, 'defender')).toBeLessThan(4.5);
     });
 });

@@ -15,7 +15,7 @@ import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerPage} from "@/lib/football/data/players";
 import {PlayerFantasy} from "@/components/fantasy/player-fantasy";
 import {getVoteScale} from "@/lib/fantasy/calibration-data";
-import {matchVoto, meanVoto} from "@/lib/fantasy/voto";
+import {shownVoto, meanVoto} from "@/lib/fantasy/voto";
 
 export const revalidate = 1800;
 
@@ -177,7 +177,7 @@ export default async function PlayerPage({params}: PageProps<"/[locale]/players/
                                             </Link>
                                         </td>
                                         <td className={cellClass}>{m.minutes ?? '–'}</td>
-                                        <td className={cellClass}>{m.rating !== null ? matchVoto(m.rating, player.position, scale).toFixed(1) : '–'}</td>
+                                        <td className={cellClass}>{(({voto}) => (voto !== null ? voto.toFixed(1) : t('noVote')))({voto: shownVoto(m.rating, m.minutes, player.position, scale)})}</td>
                                         <td className={cellClass}>{m.goals || ''}</td>
                                         <td className={cellClass}>{m.assists || ''}</td>
                                         <td className="px-1.5 py-1 text-right">

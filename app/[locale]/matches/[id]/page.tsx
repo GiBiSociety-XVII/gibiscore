@@ -21,17 +21,21 @@ import {PlayerMatchTable} from "@/components/football/player-match-table";
 import {HeadToHeadPanel, StandingsPanel} from "@/components/football/rail";
 import {StatusBadge} from "@/components/football/status-badge";
 import {Tabs} from "@/components/football/tabs";
+import {TourLauncher} from "@/components/football/tour-launcher";
 import {TeamCrest} from "@/components/football/team-crest";
 import {TeamStats} from "@/components/football/team-stats";
 import {getMatchPage} from "@/lib/football/data/matches";
 import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
 import {getVoteScale} from "@/lib/fantasy/calibration-data";
-import {matchVoto} from "@/lib/fantasy/voto";
+import {shownVoto} from "@/lib/fantasy/voto";
 
 // Refreshed by the live sync whenever the match moves (see sync-live); the timer only catches the rest.
 // The live sync renders the page again whenever the match moves; the timer only catches the rest.
 export const revalidate = 1800;
+
+/** The guide's stops, in order: each a `data-tour` on the page; those in a closed tab are skipped. */
+const TOUR_STEPS = ['score', 'timeline', 'tabs', 'analysis', 'advice', 'bands', 'lines', 'setpieces', 'comparison', 'absences'] as const;
 
 function parseId(raw: string): number | null {
     const n = Number(raw);
@@ -119,7 +123,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     const homeRow = rowOf(fixture.home.id);
     const awayRow = rowOf(fixture.away.id);
     const comparison = (homeRow || awayRow || page.form.home.length > 0 || page.form.away.length > 0) && (
-        <Panel title={t('comparison')}>
+        <div data-tour="comparison"><Panel title={t('comparison')}>
             <table className="w-full text-[13px]">
                 <tbody>
                     {[
@@ -136,7 +140,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                     ))}
                 </tbody>
             </table>
-        </Panel>
+        </Panel></div>
     );
 
     const marketsTab = {
@@ -153,7 +157,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
         <>
             {comparison}
             {hasAbsences && (
-                <Panel title={t('absences')}>
+                <div data-tour="absences"><Panel title={t('absences')}>
                     <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-muted">
                         {(['home', 'away'] as const).map((side) => (
                             <div key={side} className="min-w-0">
@@ -162,7 +166,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                             </div>
                         ))}
                     </div>
-                </Panel>
+                </Panel></div>
             )}
             <Panel title={t('info')}>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 px-3 py-2 text-[13px]">
@@ -180,7 +184,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
             <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
             <AutoRefresh seconds={20} enabled={isLive} aroundIso={fixture.state === 'scheduled' ? fixture.startingAt : undefined} />
             {/* Scoreboard */}
-            <section className="bb-surface overflow-hidden">
+            <section data-tour="score" className="bb-surface overflow-hidden">
                 <div className="flex items-center gap-2 px-3 h-8 border-b-2 border-foreground bg-muted/60 text-[12px] font-extrabold">
                     <Flag code={fixture.competition.countryCode} logoUrl={fixture.competition.logoUrl} size={14} />
                     <Link href={`/competitions/${fixture.competition.slug}`} className="hover:underline decoration-accent decoration-[3px] underline-offset-2 truncate">
@@ -236,7 +240,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                                 <Link href={`/players/${page.bestPlayer.player.slug}`} className="inline-flex flex-wrap items-center justify-center gap-x-1 hover:underline decoration-accent decoration-[2px] underline-offset-2">
                                     <span className="whitespace-nowrap">{t('bestPlayer')}:</span>
                                     <span className="text-foreground">{page.bestPlayer.player.name}</span>
-                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{page.bestPlayer.rating !== null ? matchVoto(page.bestPlayer.rating, page.bestPlayer.position, scale).toFixed(1) : ''}</span>
+                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{shownVoto(page.bestPlayer.rating, page.bestPlayer.minutes, page.bestPlayer.position, scale)?.toFixed(1) ?? ''}</span>
                                 </Link>
                             </span>
                         )}
@@ -245,10 +249,15 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
             </section>
 
             {/* What happened comes first: the timeline sits above the tabs as soon as there is one. */}
-            {page.events.length > 0 && <EventsTimeline events={page.events} title={t('tabs.summary')} />}
+            {page.events.length > 0 && <div data-tour="timeline"><EventsTimeline events={page.events} title={t('tabs.summary')} /></div>}
+
+            <div className="flex justify-end -mb-1">
+                <TourLauncher storageKey="gibiscore:match-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: key, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} />
+            </div>
 
             {/* Before kick-off the page opens on the pre-match reading; once the ball rolls, on what happened. */}
             <Tabs
+                tourId="tabs"
                 defaultId={fixture.state === 'scheduled' ? 'markets' : 'summary'}
                 items={[
                     ...(fixture.state === 'scheduled' ? [marketsTab] : []),

@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 /**
- * Every five minutes: the official lineups of featured fixtures kicking
- * off within the next 90 minutes, when the provider has them. No
+ * Every five minutes: the official lineups of the fixtures kicking off
+ * within the next 90 minutes, when the provider has them (featured
+ * leagues, and basic ones covered for lineups). No
  * request when no kick-off is near. `?within=120` widens the window.
  */
 export async function GET(request: NextRequest) {

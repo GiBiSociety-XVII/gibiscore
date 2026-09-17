@@ -1,5 +1,6 @@
 import {cachedSeasonStandings} from './competitions';
 import 'server-only';
+import {VOTE_MINUTES} from '@/lib/fantasy/voto';
 import {withRetry} from '@/lib/db/retry';
 import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
 import type {FormEntry, StandingGroup} from '../types';
@@ -199,7 +200,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
             loadForm(db, awayId, row.starting_at, row.id),
             upcoming ? loadTeamSidelined(db, [homeId, awayId]) : Promise.resolve(new Map<number, SidelinedEntry[]>()),
         ]);
-        const rated = [...home, ...away].filter((p) => p.rating !== null && (p.minutes ?? 0) > 0);
+        const rated = [...home, ...away].filter((p) => p.rating !== null && p.rating > 0 && (p.minutes ?? 0) >= VOTE_MINUTES);
         const bestPlayer = rated.length > 0 ? rated.reduce((best, p) => ((p.rating ?? 0) > (best.rating ?? 0) ? p : best)) : null;
 
         return {

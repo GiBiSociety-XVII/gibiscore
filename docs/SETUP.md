@@ -102,8 +102,7 @@ export BASE_URL=https://<deploy>
 pnpm cron sync-competitions                 # tutte le leghe e stagioni; squadre delle leghe in evidenza (~15 richieste)
 pnpm cron "sync-squads?force=1"             # rose e feed cessioni dei club in evidenza (~520 richieste; ripeti se `clubs_deferred` > 0)
 pnpm cron "sync-fixtures?window=month"      # tutte le partite da ieri a +30 giorni (32 richieste)
-pnpm cron sync-standings                    # classifiche delle leghe in evidenza (~13)
-pnpm cron "sync-standings?scope=all"        # classifiche delle altre competizioni con un risultato ieri (fino a 300)
+pnpm cron sync-standings                    # classifiche delle stagioni base coperte con un risultato in settimana (fino a 300 a chiamata, ripeti)
 pnpm cron sync-injuries                     # infortuni e squalifiche delle leghe in evidenza (~13)
 pnpm cron "sync-backfill?limit=1000"        # calendario completo della stagione + eventi, formazioni e voti delle partite gia' giocate (~100 richieste a giro)
 pnpm cron "sync-player-seasons?scope=current&budget=600"   # statistiche stagionali di ogni giocatore delle leghe in evidenza (~450 richieste)
@@ -158,19 +157,24 @@ rigenera ogni 60 secondi, quindi il live ha al massimo un minuto di ritardo.
 
 ## 7. Cron automatici
 
-Su Vercel, **Settings → Cron Jobs** deve elencare i nove job di `vercel.json`:
+Su Vercel, **Settings → Cron Jobs** deve elencare i quattordici job di `vercel.json`:
 
 | Job | Orario (UTC) |
 |---|---|
-| `sync-competitions` | ogni giorno alle 04:00 |
-| `sync-fixtures?window=month` | ogni giorno alle 04:30 |
-| `sync-standings?scope=all` | ogni giorno alle 05:00 |
+| `sync-live` | ogni minuto |
+| `sync-lineups` | ogni 5 minuti |
+| `warm` | ogni 10 minuti al minuto 3 |
+| `sync-odds` | ogni 3 ore al minuto 35 |
 | `sync-fixtures` | ogni ora al minuto 15 |
-| `sync-standings` | ogni 30 minuti |
-| `sync-injuries` | ogni 6 ore al minuto 45 |
+| `sync-standings` | ogni ora al minuto 5 |
 | `sync-backfill` | ogni ora al minuto 20 |
 | `sync-player-seasons` | ogni ora al minuto 40 |
-| `sync-live` | ogni minuto |
+| `sync-squads` | ogni ora al minuto 45 |
+| `sync-injuries` | ogni 30 minuti (5 e 35) |
+| `sync-sidelined` | ogni 2 ore al minuto 50 |
+| `sync-competitions` | ogni giorno alle 04:00 |
+| `sync-fixtures?window=month` | ogni giorno alle 04:10 |
+| `fit-model` | ogni lunedì alle 03:30 |
 
 I cron girano **solo sul deploy di produzione** (branch `master`), non sulle
 preview. Consumo tipico: 1.500-3.000 richieste al giorno, una frazione del

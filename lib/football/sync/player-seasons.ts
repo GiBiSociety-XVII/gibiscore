@@ -1,11 +1,13 @@
 import 'server-only';
 import {historySeasonCount} from '@/lib/football/competitions';
+import {provides} from '@/lib/football/coverage';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {mapPlayerProfile, mapPlayerSeason} from '@/lib/api-football/mappers';
 import type {AfPlayerResponse} from '@/lib/api-football/types';
 import {
     allowance,
     chunk,
+    currentSeasons,
     ensureTeams,
     failSync,
     featuredSeasons,
@@ -46,11 +48,14 @@ export interface PlayerSeasonsOptions {
 /**
  * sync-player-seasons (hourly; archive class, ~35 requests per league-season)
  *
- * Season aggregates of every player of the featured leagues, as computed
- * by API-Football (/players?league&season, ~20 players per page, ~35
- * pages per league-season): appearances, minutes, rating, goals, assists,
- * shots, passes, tackles, duels, dribbles, fouls, cards, penalties. Stored
- * in player_season_stats so rankings and formulas read only our database.
+ * Season aggregates of every player, as computed by API-Football
+ * (/players?league&season, ~20 players per page, ~35 pages per
+ * league-season): appearances, minutes, rating, goals, assists, shots,
+ * passes, tackles, duels, dribbles, fouls, cards, penalties. Stored in
+ * player_season_stats so rankings and formulas read only our database.
+ * The featured leagues with their history; the basic leagues the provider
+ * covers for player statistics (lib/football/coverage.ts), current season
+ * only and without the raw payload nobody reads.
  *
  * Current season: refreshed after each matchday (a fixture finished since
  * the previous run) and in any case weekly. Past seasons: imported once,
@@ -64,7 +69,9 @@ export async function syncPlayerSeasons(options: PlayerSeasonsOptions = {}): Pro
     try {
         const budget = options.budget ?? DEFAULT_BUDGET;
         const scope = options.scope ?? 'auto';
-        let seasons = await featuredSeasons(db, historySeasonCount(), run);
+        // Featured first (with their history), then the covered basic leagues, the ones that waited longest first.
+        const basic = (await currentSeasons(db, 'basic')).filter((s) => provides(s.tier, s.coverage, 'players')).sort((a, b) => (a.playersSyncedAt ?? '').localeCompare(b.playersSyncedAt ?? ''));
+        let seasons = [...(await featuredSeasons(db, historySeasonCount(), run)), ...basic];
         if (options.leagues && options.leagues.length > 0) seasons = seasons.filter((s) => options.leagues!.includes(s.leagueSlug));
         if (options.year !== undefined) seasons = seasons.filter((s) => s.year === options.year);
 
@@ -187,9 +194,12 @@ async function syncSeason(db: FootballClient, run: SyncRun, s: SeasonRow): Promi
         const {error} = await db.from('player_season_stats').upsert(group, {onConflict: 'player_id,team_id,league_id,season_year'});
         if (error) failSync('player_season_stats.upsert', error);
     }
-    for (const group of chunk([...rawByKey.values()], 100)) {
-        const {error} = await db.from('player_season_raw').upsert(group, {onConflict: 'player_id,team_id,league_id,season_year'});
-        if (error) failSync('player_season_raw.upsert', error);
+    // The raw payload is kept for the featured leagues only: the basic tier would triple the table for nothing.
+    if (s.tier === 'featured') {
+        for (const group of chunk([...rawByKey.values()], 100)) {
+            const {error} = await db.from('player_season_raw').upsert(group, {onConflict: 'player_id,team_id,league_id,season_year'});
+            if (error) failSync('player_season_raw.upsert', error);
+        }
     }
     run.bump('player_seasons', rows.length);
     return unique.size;

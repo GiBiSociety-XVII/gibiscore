@@ -1,6 +1,6 @@
 'use client';
 
-import {ArrowLeftRight, HelpCircle, X} from "lucide-react";
+import {ArrowLeftRight, X} from "lucide-react";
 import {Help} from "./help";
 import {useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
@@ -128,7 +128,7 @@ export function MarketDialog({config, purchases, byId, managers, me, onApply, on
 
                 {tab === 'trade' && (
                     <div className="p-3 flex flex-col gap-3">
-                        <p className="text-[11px] font-semibold text-muted-foreground inline-flex items-center gap-1.5" title={t('tradeHint')}><HelpCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />{t('tradeShort')}</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground inline-flex items-center gap-1.5"><Help text={t('tradeHint')} />{t('tradeShort')}</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {([['a', a, setA, giveA, setGiveA], ['b', b, setB, giveB, setGiveB]] as Array<['a' | 'b', number, (m: number) => void, Set<number>, (s: Set<number>) => void]>).map(([side, m, setM, chosen, setChosen]) => (
                                 <div key={side} className="bb-surface overflow-hidden">
@@ -164,7 +164,7 @@ export function MarketDialog({config, purchases, byId, managers, me, onApply, on
 
                 {tab === 'release' && (
                     <div className="p-3 flex flex-col gap-3">
-                        <p className="text-[11px] font-semibold text-muted-foreground inline-flex items-center gap-1.5" title={t('releaseHint')}><HelpCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />{t('releaseShort')}</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground inline-flex items-center gap-1.5"><Help text={t('releaseHint')} />{t('releaseShort')}</p>
                         <div className="flex flex-wrap items-center gap-2 text-[12px] font-semibold">
                             <select value={releaseManager} onChange={(e) => { setReleaseManager(Number(e.target.value)); pick(null); }} className={select} aria-label={t('manager')}>
                                 {managers.map((n, i) => <option key={i} value={i}>{n}</option>)}

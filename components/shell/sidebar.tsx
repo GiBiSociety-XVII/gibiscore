@@ -8,7 +8,7 @@ import type {Navigation} from "@/lib/football/data/navigation";
 export function Sidebar({nav}: {nav: Navigation}) {
     const t = useTranslations('Common.sidebar');
     return (
-        <nav aria-label={t('label')} className="bb-surface p-1.5 flex flex-col gap-1 text-[13px]">
+        <nav data-tour="sidebar" aria-label={t('label')} className="bb-surface p-1.5 flex flex-col gap-1 text-[13px]">
             <h2 className="px-2 pt-1.5 pb-0.5 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">{t('pinned')}</h2>
             <ul className="flex flex-col">
                 {nav.pinned.map((c) => (
@@ -54,7 +54,7 @@ export function Sidebar({nav}: {nav: Navigation}) {
 export function PinnedChips({nav}: {nav: Navigation}) {
     const t = useTranslations('Common.sidebar');
     return (
-        <div className="lg:hidden -mx-2 px-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+        <div data-tour="chips" className="lg:hidden -mx-2 px-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
             {nav.pinned.map((c) => (
                 <Link key={c.slug} href={`/competitions/${c.slug}`} className="shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border-2 border-foreground bg-card text-xs font-extrabold whitespace-nowrap">
                     {c.logoUrl && <Image src={c.logoUrl} alt="" width={14} height={14} unoptimized className="object-contain" />}

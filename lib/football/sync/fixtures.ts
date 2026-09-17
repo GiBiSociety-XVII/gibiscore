@@ -1,5 +1,6 @@
 import 'server-only';
 import {basicScope, isFeaturedProviderId} from '@/lib/football/competitions';
+import {provides, type LeagueCoverage} from '@/lib/football/coverage';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {
     extractExtraMinute,
@@ -21,6 +22,7 @@ import {
     failSync,
     finishRun,
     footballClient,
+    leagueMap,
     startRun,
     type FootballClient,
     type IdMap,
@@ -75,6 +77,8 @@ export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?:
 
 /** Featured fixtures in play get their lineups, statistics and ratings refreshed this often. */
 const DETAIL_EVERY_MS = 60_000;
+/** Basic-tier fixtures in play, when the provider covers their detail: a slower beat, hundreds can be on at once. */
+const BASIC_DETAIL_EVERY_MS = 3 * 60_000;
 /** A featured fixture that should have kicked off but is not in the live feed is asked this often. */
 const DUE_EVERY_MS = 10 * 60_000;
 /** A basic-tier fixture out of the live feed for this long is asked whether it ended: a shorter gap is a feed hiccup. */
@@ -89,18 +93,22 @@ const BASIC_ENDED_MAX = 100;
  *    the database, no kick-off in the last 3 hours or the next 2 minutes).
  * 1. GET /fixtures?live=all: every match in play worldwide, with events.
  *    Scores, minute and events are stored for all of them. One request.
- * 2. Featured fixtures only, by id (20 per request), for lineups,
- *    statistics and player ratings: those in play, those the feed no
- *    longer lists (they just ended: the final detail), and those that
- *    should have kicked off in the last three hours but are not in the
- *    feed, asked every ten minutes.
+ * 2. Fixtures worth a request of their own, by id (20 per request), for
+ *    lineups, statistics and player ratings: the featured ones in play
+ *    every minute, the basic ones whose league the provider covers
+ *    (lib/football/coverage.ts) every three minutes; those the feed no
+ *    longer lists (they just ended: the final detail); the featured ones
+ *    that should have kicked off in the last three hours but are not in
+ *    the feed, asked every ten minutes.
  * 3. Basic-tier fixtures the database still marks as live but the feed
  *    has not listed for two minutes: they ended, and nothing else would
  *    say so before the hourly job (the page would keep counting their
- *    minutes). By id, events only, once per fixture.
+ *    minutes). By id, once per fixture: full detail when covered, the
+ *    final score and events otherwise.
  *
  * Budget: 1 request a minute while matches are on, plus one per 20
- * featured fixtures in play, plus one per 20 basic fixtures that end.
+ * featured fixtures in play, one per 60 covered basic fixtures in play,
+ * plus one per 20 basic fixtures that end.
  */
 export async function syncLive(): Promise<SyncRun> {
     const db = footballClient();
@@ -124,19 +132,29 @@ export async function syncLive(): Promise<SyncRun> {
         run.bump('inplay', inplay.length);
         const inplayIds = new Set(inplay.map((f) => f.fixture.id));
 
-        // Featured fixtures worth a request of their own.
+        // The leagues in play, with tier and coverage: a basic fixture is asked for its detail only when the provider has it.
+        const leaguesInPlay = await leagueMap(db, [...new Set(inplay.map((f) => f.league.id))]);
+        const covered = (leagueProviderId: number) => {
+            const league = leaguesInPlay.get(leagueProviderId);
+            return !!league && provides(league.tier, league.coverage, 'detail');
+        };
+
+        // Fixtures worth a request of their own: featured every minute, covered basic every three.
         const detailIds = new Set<number>();
         const featuredLive = inplay.filter((f) => isFeaturedProviderId(f.league.id)).map((f) => f.fixture.id);
-        if (featuredLive.length > 0) {
+        const basicLive = inplay.filter((f) => !isFeaturedProviderId(f.league.id) && covered(f.league.id)).map((f) => f.fixture.id);
+        for (const [ids, every] of [[featuredLive, DETAIL_EVERY_MS], [basicLive, BASIC_DETAIL_EVERY_MS]] as const) {
+            if (ids.length === 0) continue;
             const {data: fresh, error} = await db
                 .from('fixtures')
                 .select('provider_id')
-                .in('provider_id', featuredLive)
-                .gt('details_synced_at', new Date(now - DETAIL_EVERY_MS).toISOString());
+                .in('provider_id', ids)
+                .gt('details_synced_at', new Date(now - every).toISOString());
             if (error) failSync('fixtures.select', error);
             const freshIds = new Set((fresh ?? []).map((r) => r.provider_id as number));
-            for (const id of featuredLive) if (!freshIds.has(id)) detailIds.add(id);
+            for (const id of ids) if (!freshIds.has(id)) detailIds.add(id);
         }
+        run.bump('basic_covered_live', basicLive.length);
 
         // Featured fixtures our database still marks as live but the feed no longer lists: they just ended.
         const {data: staleRows, error: staleError} = await db
@@ -160,16 +178,22 @@ export async function syncLive(): Promise<SyncRun> {
         for (const r of dueRows ?? []) if (!inplayIds.has(r.provider_id as number)) detailIds.add(r.provider_id as number);
 
         // Basic-tier fixtures out of the feed for two minutes: their final state, or the feed's hiccup is over.
+        // Full detail for the covered ones (the final lineups and statistics), score and events for the rest.
         const {data: staleBasic, error: staleBasicError} = await db
             .from('fixtures')
-            .select('provider_id,league:leagues!inner(tier)')
+            .select('provider_id,league:leagues!inner(tier,season_coverage)')
             .in('state', ['live', 'half_time', 'extra_time', 'penalties'])
             .eq('leagues.tier', 'basic')
             .lt('last_synced_at', new Date(now - BASIC_ENDED_AFTER_MS).toISOString())
             .order('last_synced_at')
             .limit(BASIC_ENDED_MAX);
         if (staleBasicError) failSync('fixtures.select', staleBasicError);
-        const endedIds = (staleBasic ?? []).map((r) => r.provider_id as number).filter((id) => !inplayIds.has(id) && !detailIds.has(id));
+        const endedIds: number[] = [];
+        for (const r of (staleBasic ?? []) as unknown as Array<{provider_id: number; league: {season_coverage: LeagueCoverage | null}}>) {
+            if (inplayIds.has(r.provider_id) || detailIds.has(r.provider_id)) continue;
+            if (provides('basic', r.league.season_coverage, 'detail')) detailIds.add(r.provider_id);
+            else endedIds.push(r.provider_id);
+        }
 
         // Everything else in play: scores and events straight from the feed, no request.
         const fromFeed = inplay.filter((f) => !detailIds.has(f.fixture.id));

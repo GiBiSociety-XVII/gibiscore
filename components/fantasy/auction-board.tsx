@@ -1,6 +1,7 @@
 'use client';
 
-import {Activity, ArrowLeftRight, ChevronDown, ChevronUp, ClipboardList, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
+import {Activity, ArrowLeftRight, BookOpen, ChevronDown, ChevronUp, ClipboardList, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
+import {Tour} from "./tour";
 import {useEffect, useMemo, useRef, useState} from "react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
@@ -36,6 +37,9 @@ import {bargains, type Bargain} from "@/lib/fantasy/bargains";
 import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
+const TOUR_KEY = 'gibiscore:auction-tour:v1';
+/** The guide's stops, in order: each a `data-tour` on the board. */
+const TOUR_STEPS = ['toolbar', 'status', 'strategy', 'table', 'filters', 'list', 'roster'] as const;
 const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
 type SortKey = 'overall' | 'price' | 'fantaAvg' | 'bargain' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
@@ -174,6 +178,23 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const [showStrategies, setShowStrategies] = useState(false);
     const [showMarket, setShowMarket] = useState(false);
     const [rosterTab, setRosterTab] = useState<'roster' | 'targets'>('roster');
+    // The step-by-step guide: opens by itself the first time the board is seen on this browser, and from the button after.
+    const [tour, setTour] = useState(false);
+    useEffect(() => {
+        try {
+            if (!localStorage.getItem(TOUR_KEY)) queueMicrotask(() => setTour(true));
+        } catch {
+            // No storage: no guide by itself, the button stays.
+        }
+    }, []);
+    const closeTour = () => {
+        setTour(false);
+        try {
+            localStorage.setItem(TOUR_KEY, '1');
+        } catch {
+            // Shown again next time: no harm.
+        }
+    };
     // Phone: a second tap on "Compra" within a few seconds buys at the proposed price, no sheet.
     const [quick, setQuick] = useState<{id: number; at: number} | null>(null);
     const [teamsTab, setTeamsTab] = useState<TeamsTab | null>(null);
@@ -571,7 +592,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
         <div className="grid gap-3 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] items-start">
             <div className="flex flex-col gap-3 min-w-0">
                 {/* Toolbar */}
-                <div className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
+                <div data-tour="toolbar" className="bb-surface px-3 py-2 flex flex-wrap items-center gap-2">
                     <span className="text-[13px] font-extrabold truncate">{config.name || ts(`leagues.${config.league}`)}</span>
                     <span className="text-[11px] font-semibold text-muted-foreground">· {ts(`modes.${config.mode}`)} · {config.participants} × {config.credits} cr.</span>
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -579,11 +600,13 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         <CloudMenu config={config} purchases={purchases} />
                         <LegheImport players={importable} hasAuction={purchases.length > 0} onImport={importLeghe} variant="button" />
                         <button type="button" onClick={() => setEditing(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" aria-hidden="true" />{ta('changeSettings')}</button>
+                        <button type="button" onClick={() => setTour(true)} className="bb-btn bg-card px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5" title={t('tour.open')}><BookOpen className="w-3.5 h-3.5" aria-hidden="true" />{t('tour.button')}</button>
                     </span>
                 </div>
+                {tour && <Tour steps={TOUR_STEPS.map((key) => ({target: key, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} onClose={closeTour} />}
 
                 {/* Always on screen while the list scrolls: my credits, my slots, the formation, the strategy, the last purchase */}
-                <div className="sticky top-0 z-20 bb-surface bg-background px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                <div data-tour="status" className="sticky top-0 z-20 bb-surface bg-background px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
                     <span className="flex items-baseline gap-1.5">
                         <span className={cn("font-mono text-2xl font-extrabold tabular-nums leading-none", left < 0 && "text-red-700")}>{left}</span>
                         <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground leading-none">{tr('credits')} {tr('left')}</span>
@@ -614,7 +637,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                                 <span className="font-mono text-[11px] font-bold text-muted-foreground max-w-[120px] truncate">{byId.get(lastPurchase.playerId)!.name} {lastPurchase.price}</span>
                             </button>
                         )}
-                        <button type="button" onClick={() => setShowStrategies(true)} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", strategy ? "bg-accent" : "bg-card")}>
+                        <button type="button" data-tour="strategy" onClick={() => setShowStrategies(true)} className={cn("bb-btn px-2.5 h-8 text-[12px] font-extrabold inline-flex items-center gap-1.5", strategy ? "bg-accent" : "bg-card")}>
                             <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" />
                             {strategy ? strategyName(strategy) : ta('strategies')}
                         </button>
@@ -630,15 +653,15 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
                 {/* The table: every manager, credits and open slots */}
                 {managers.length > 1 && (
-                    <TableBar
+                    <div data-tour="table"><TableBar
                         managers={managers.map((name, manager) => ({manager, name, left: creditsLeftOf(manager), open: {P: blocks ? (roleCount(manager, 'P') > 0 ? 0 : 1) : Math.max(0, config.slots.P - roleCount(manager, 'P')), D: Math.max(0, config.slots.D - roleCount(manager, 'D')), C: Math.max(0, config.slots.C - roleCount(manager, 'C')), A: Math.max(0, config.slots.A - roleCount(manager, 'A'))}}))}
                         onOpen={(manager) => setTeamsTab(manager)}
                         me={me}
-                    />
+                    /></div>
                 )}
 
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div data-tour="filters" className="flex flex-wrap items-center gap-2">
                     <label className="flex items-center gap-2 bb-input px-2.5 h-8 min-w-[200px] flex-1">
                         <Search className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         <input
@@ -693,7 +716,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                 {view === 'list' && (<>
 
                 {/* List */}
-                <Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">{ta('updated')}<Help text={`${ta('intro')}\n\n${t('shortcuts')}`} /></span>}>
+                <div data-tour="list"><Panel title={`${t('showing', {shown: shown.length, total: players.length})}`} action={<span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">{ta('updated')}<Help text={`${ta('intro')}\n\n${t('shortcuts')}`} /></span>}>
                     {/* Phones: one card per player, the numbers that decide and a Buy button; no sideways scrolling */}
                     <ul className="md:hidden flex flex-col">
                         {shown.map((p) => {
@@ -820,7 +843,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                             <button type="button" onClick={() => setLimit((l) => l + PAGE)} className="bb-btn bg-card px-3 h-8 text-[12px] font-extrabold">{t('more')}</button>
                         </div>
                     )}
-                </Panel>
+                </Panel></div>
                 </>)}
                 {compare.length === 1 && byId.has(compare[0]) && (
                     <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bb-surface bg-background px-3 h-9 flex items-center gap-2 text-[12px] font-extrabold shadow-[4px_4px_0_rgb(var(--foreground))]">
@@ -833,7 +856,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
 
             {/* My roster and the strategies */}
             <div className="flex flex-col gap-3">
-                <Panel title={(
+                <div data-tour="roster"><Panel title={(
                     <span role="tablist" className="inline-flex items-center gap-1 normal-case tracking-normal">
                         {(['roster', 'targets'] as const).map((k) => (
                             <button key={k} type="button" role="tab" aria-selected={rosterTab === k} onClick={() => setRosterTab(k)} className={cn("bb-btn h-7 px-2 text-[11px] font-extrabold uppercase tracking-wide shrink-0", rosterTab === k ? "bg-foreground text-background" : "bg-card")}>{k === 'roster' ? tr('title') : tg('tab')}</button>
@@ -957,7 +980,7 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
                         </ul>
                     )}
                     </>)}
-                </Panel>
+                </Panel></div>
             </div>
 
             {/* Every roster, in full */}

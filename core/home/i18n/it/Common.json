@@ -31,7 +31,8 @@
         "injuries": "Infortunati e squalificati",
         "compare": "Confronto giocatori",
         "predictions": "Pronostici",
-        "fantasy": "Fantacalcio"
+        "fantasy": "Fantacalcio",
+        "record": "Bilancio dei pronostici"
       },
       "info": {
         "title": "Info",
@@ -65,5 +66,12 @@
     "myTeams": "Le mie squadre",
     "noMatches": "Nessuna partita in archivio.",
     "headToHeadHint": "Bilancio della squadra di casa negli ultimi precedenti"
+  },
+  "tour": {
+    "stepOf": "Passo {step} di {total}",
+    "next": "Avanti",
+    "back": "Indietro",
+    "done": "Fine",
+    "close": "Chiudi la guida"
   }
 }

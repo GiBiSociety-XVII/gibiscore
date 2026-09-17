@@ -1,12 +1,12 @@
 import type {PlayerMatchRow} from "@/lib/football/types";
-import {GOOD_VOTO, matchVoto, meanVoto, type VotoCalibration} from "@/lib/fantasy/voto";
+import {GOOD_VOTO, meanVoto, shownVoto, type VotoCalibration} from "@/lib/fantasy/voto";
 
 /**
  * Ratings match by match (oldest to newest) as a small line chart, with the
  * season average as a dashed line. Pure SVG, colours from the theme tokens.
  */
 export function RatingTrend({matches, average, label, position, scale}: {matches: PlayerMatchRow[]; average: number | null; label: string; position: string | null; scale: VotoCalibration}) {
-    const points = [...matches].reverse().filter((m) => m.rating !== null && (m.minutes ?? 0) > 0).map((m) => ({...m, voto: matchVoto(m.rating!, position, scale)}));
+    const points = [...matches].reverse().map((m) => ({...m, voto: shownVoto(m.rating, m.minutes, position, scale)})).filter((m): m is typeof m & {voto: number} => m.voto !== null);
     if (points.length < 2) return null;
     const mean = average !== null ? meanVoto(average, position, scale) : null;
     const w = 320;

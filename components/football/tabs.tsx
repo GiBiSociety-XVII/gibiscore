@@ -16,11 +16,11 @@ export interface TabItem {
  * one is visible), switched on the client without navigation: the page
  * stays cacheable and switching is instant.
  */
-export function Tabs({items, defaultId, className}: {items: TabItem[]; defaultId?: string; className?: string}) {
+export function Tabs({items, defaultId, className, tourId}: {items: TabItem[]; defaultId?: string; className?: string; /** A `data-tour` on the row of tabs, for a page guide. */ tourId?: string}) {
     const [active, setActive] = useState(defaultId && items.some((i) => i.id === defaultId) ? defaultId : items[0]?.id);
     return (
         <div className={cn("flex flex-col gap-3", className)}>
-            <div role="tablist" className="flex gap-1 overflow-x-auto md:overflow-visible md:flex-wrap border-b-2 border-foreground [scrollbar-width:none]">
+            <div role="tablist" data-tour={tourId} className="flex gap-1 overflow-x-auto md:overflow-visible md:flex-wrap border-b-2 border-foreground [scrollbar-width:none]">
                 {items.map((item) => {
                     const selected = item.id === active;
                     return (

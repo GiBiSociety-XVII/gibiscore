@@ -63,9 +63,9 @@ export async function ScoresRail({page}: {page: ScoresPage}) {
         .filter((c) => (seen.has(c.slug) ? false : (seen.add(c.slug), true)))
         .map((c) => ({slug: c.slug, name: c.name, logoUrl: c.logoUrl}));
     return (
-        <>
+        <div data-tour="rail" className="flex flex-col gap-3">
             <MyTeamsRail />
             <FavoritesRail defaults={defaults} catalog={catalog} />
-        </>
+        </div>
     );
 }

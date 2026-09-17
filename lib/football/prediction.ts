@@ -189,11 +189,10 @@ export function predictMatch(season: SeasonStudy | null, homeId: number, awayId:
     // A season not started yet is judged on the prior alone: last season's rates, nobody's matches.
     const study = season ?? (prior ? {...prior, seasonId: prior.seasonId, played: 0, teams: [], home: [], away: []} : null);
     if (!study || (study.played < 10 && !prior)) return null;
-    const known = (id: number) => study.teams.find((t) => t.team.id === id) ?? (prior?.teams.some((t) => t.team.id === id) ? blank(id) : undefined);
+    // A side with no match in this season: last season's line when it has one, else an average side (a newcomer in a cup): the study of the competition still says what a match there looks like.
+    const known = (id: number) => study.teams.find((t) => t.team.id === id) ?? blank(id);
     const home = known(homeId);
     const away = known(awayId);
-    if (!home || !away) return null;
-    if (!prior && (home.played === 0 || away.played === 0)) return null;
 
     const perTeam = study.goalsPerMatch / 2;
     // Home sides score more than away sides: the league's own split, last season's beside it early on.

@@ -14,7 +14,7 @@ import {isAdminId} from "@/lib/admin";
 import type {BookPlayer, BookRound, VotesBook} from "@/lib/fantasy/votes-data";
 import {roundNumber} from "@/lib/fantasy/matchday";
 import {readRoundVotes} from "@/lib/fantasy/round-votes";
-import {halfVoto, toVoto, type VotoCalibration} from "@/lib/fantasy/voto";
+import {halfVoto, toVoto, VOTE_MINUTES, type VotoCalibration} from "@/lib/fantasy/voto";
 import type {FantaRole} from "@/lib/fantasy/scores";
 import type {ManualVote} from "@/lib/fantasy/recap";
 import type {VotesFileResponse} from "@/app/api/admin/votes-file/route";
@@ -30,8 +30,6 @@ const NO_VOTE = new Set(['sv', 's.v.', 's.v', 'nv', '-', '–', '0']);
 const ROLE_ORDER: Record<FantaRole, number> = {P: 0, D: 1, C: 2, A: 3};
 /** Rows per request the votes route accepts. */
 const BATCH = 400;
-/** The provider's rating counts as a vote only from this many minutes on. */
-const VOTE_MINUTES = 10;
 
 const asText = (v: number | null | undefined) => (v === undefined || v === null ? '' : v === 0 ? 's.v.' : String(v));
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));

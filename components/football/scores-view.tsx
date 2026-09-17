@@ -24,7 +24,7 @@ async function DateStrip({page}: {page: ScoresPage}) {
     };
     const isLive = page.mode === 'live';
     return (
-        <div className="flex items-center gap-1 px-1.5 h-10 border-b-2 border-foreground bg-card">
+        <div data-tour="dates" className="flex items-center gap-1 px-1.5 h-10 border-b-2 border-foreground bg-card">
             <Link href={dayHref(shiftDay(page.date, -1), page.today)} aria-label={t('previousDay')} className="inline-flex w-7 h-7 items-center justify-center rounded-md hover:bg-muted">
                 <ChevronLeft className="w-4 h-4" />
             </Link>

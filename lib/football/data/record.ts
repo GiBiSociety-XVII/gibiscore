@@ -103,3 +103,20 @@ export const getAdviceRecord = unstable_cache(
     ['advice-record'],
     {revalidate: 600},
 );
+
+/** The site-wide tally of the slips users saved: how many, how many settled, how many won. */
+export const getSchedineTally = unstable_cache(
+    async (): Promise<{total: number; settled: number; won: number} | null> => {
+        try {
+            const {data, error} = await footballDb().rpc('schedine_record');
+            if (error) throw error;
+            const row = (Array.isArray(data) ? data[0] : data) as {total: number | string; settled: number | string; won: number | string} | undefined;
+            return row ? {total: Number(row.total), settled: Number(row.settled), won: Number(row.won)} : null;
+        } catch (error) {
+            logReadError('getSchedineTally', error);
+            return null;
+        }
+    },
+    ['schedine-tally'],
+    {revalidate: 600},
+);

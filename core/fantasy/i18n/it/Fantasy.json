@@ -288,6 +288,40 @@
       "target": "Obiettivo della strategia in uso. Clicca: escludilo, nessuna strategia lo proporrà più",
       "wanted": "Lo vuoi: entra in ogni piano al prezzo attuale. Clicca per togliere il vincolo",
       "avoided": "Escluso: nessuna strategia lo propone. Clicca per togliere il vincolo"
+    },
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo dell'asta",
+      "steps": {
+        "toolbar": {
+          "title": "La tua asta",
+          "text": "Qui c'è la lega con modalità, partecipanti e crediti. I bottoni: la formazione settimanale, il salvataggio nell'account (così l'asta ti segue su ogni dispositivo), l'import da Leghe Fantacalcio, le impostazioni."
+        },
+        "status": {
+          "title": "Sempre sott'occhio",
+          "text": "Questa barra resta fissa mentre scorri: i crediti che ti restano, i posti riempiti per ruolo, la strategia in uso e l'ultimo acquisto, che puoi annullare con un tocco."
+        },
+        "strategy": {
+          "title": "Scegli una strategia",
+          "text": "Tocca qui e scegli come spendere i crediti (equilibrata, attacco forte, blocco difesa...). La strategia ti dà gli obiettivi, il tetto massimo per ognuno e il piano B se te lo soffiano. Puoi anche costruirne una tua."
+        },
+        "table": {
+          "title": "Il tavolo",
+          "text": "Gli altri partecipanti con crediti rimasti e posti liberi per ruolo: sai chi può ancora rilanciare. Tocca un nome per vedere la sua rosa."
+        },
+        "filters": {
+          "title": "Trova un giocatore",
+          "text": "Cerca per nome o squadra (Invio compra il primo dei risultati), filtra per ruolo, squadra e fascia, nascondi gli acquistati. La vista Fasce raggruppa il listone per livello."
+        },
+        "list": {
+          "title": "Il listone",
+          "text": "Per ogni giocatore il voto totale su 100, i crediti consigliati, il tetto della tua strategia e lo stato: Prendilo, Prezzo giusto, Caro, Lascia. Tocca la riga per i dettagli, la stella per volerlo o escluderlo, Compra per registrare chi lo prende e a quanto, per qualsiasi squadra del tavolo. Il \"?\" in alto a destra elenca le scorciatoie da tastiera."
+        },
+        "roster": {
+          "title": "La tua rosa e gli obiettivi",
+          "text": "Rosa: chi hai preso, per ruolo, con i crediti spesi e la valutazione della squadra. Obiettivi: chi la strategia ti consiglia adesso, con il piano B per ognuno e i ballottaggi. Si aggiornano a ogni acquisto al tavolo."
+        }
+      }
     }
   },
   "targets": {
@@ -997,6 +1031,48 @@
         "ownGoal": "autogol",
         "yellow": "amm.",
         "red": "esp."
+      }
+    },
+    "tour": {
+      "button": "Guida",
+      "open": "Rivedi la guida passo passo della formazione",
+      "steps": {
+        "team": {
+          "title": "La tua squadra",
+          "text": "Scegli per quale rosa schierare: le squadre arrivano da sole dalle aste che hai registrato o importato. Accanto la modalità della lega e il modulo fissato, se c'è."
+        },
+        "status": {
+          "title": "La giornata",
+          "text": "Quando si gioca e quando la formazione si blocca (all'inizio della giornata resta fissata così com'era). Il contatore dice per quante delle tue squadre sono uscite le formazioni ufficiali, e l'ora dell'ultimo aggiornamento."
+        },
+        "fixtures": {
+          "title": "Le partite dei tuoi",
+          "text": "Le partite della giornata in cui giocano i tuoi giocatori, con orario, pronostico e quanti dei tuoi ci sono. Tocca una partita per l'analisi."
+        },
+        "pitch": {
+          "title": "L'undici consigliato",
+          "text": "Il modulo e gli undici che rendono di più secondo titolarità reale, formazioni ufficiali, infortuni e pronostico della partita. Tocca un giocatore per il perché, il pin per bloccarlo in campo, il divieto per escluderlo. Trascina un panchinaro sopra un titolare per lo scambio."
+        },
+        "bench": {
+          "title": "La panchina",
+          "text": "Ordinata come conviene: il primo entra per primo. Da qui trascini un giocatore in campo, oppure tocchi le frecce e scegli chi esce, o \"al posto migliore\" e decide il modello."
+        },
+        "pins": {
+          "title": "Le tue scelte",
+          "text": "Il riepilogo di chi hai bloccato, escluso o mandato in panchina a mano, e quanto ti costa rispetto alla formazione libera. \"Ripristina\" toglie tutto e torna al consiglio del modello."
+        },
+        "starters": {
+          "title": "I numeri dei titolari",
+          "text": "Per ogni titolare la probabilità di giocare, i punti attesi e i segnali dietro (ufficiale, ballottaggio, infortunio, partita facile o difficile). Il totale in alto è quello che il modello si aspetta dall'undici."
+        },
+        "formations": {
+          "title": "Gli altri moduli",
+          "text": "Ogni modulo valutato sulla tua rosa, il migliore in cima. Tocca un modulo per imporlo: l'undici si rifà su quello."
+        },
+        "how": {
+          "title": "Come funziona",
+          "text": "Qui trovi in breve come nascono i consigli: cosa pesa, quando si aggiorna e cosa succede al blocco della giornata."
+        }
       }
     }
   },
