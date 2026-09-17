@@ -1,6 +1,6 @@
 'use client';
 
-import {BarChart3, CalendarDays, Trophy, Sparkles} from "lucide-react";
+import {BarChart3, CalendarDays, TrendingUp, Trophy, Sparkles} from "lucide-react";
 import {useTranslations} from "next-intl";
 import {Link, usePathname} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -84,6 +84,7 @@ export default function AppBar() {
     ];
 
     const liveActive = path.startsWith('/live');
+    const predictionsActive = path.startsWith('/predictions');
     const fantaActive = path.startsWith('/fantacalcio');
     const tf = useTranslations('Fantasy');
 
@@ -124,6 +125,17 @@ export default function AppBar() {
                             columns={competitionColumns}
                             active={path.startsWith('/competitions')}
                         />
+                        <Link
+                            href="/predictions"
+                            aria-current={predictionsActive ? 'page' : undefined}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 h-9 md:h-10 px-2.5 md:px-3.5 rounded-lg text-[14px] md:text-[17px] font-bold whitespace-nowrap transition-colors",
+                                predictionsActive ? "text-foreground bg-accent/40 border-2 border-foreground" : "text-foreground/70 hover:text-foreground hover:bg-muted",
+                            )}
+                        >
+                            <TrendingUp className="w-5 h-5" aria-hidden="true" />
+                            {t('nav.predictions')}
+                        </Link>
                         <NavMegaMenu
                             label={t('nav.stats')}
                             icon={<BarChart3 className="w-5 h-5" />}

@@ -41,5 +41,24 @@
     "title": "Tutto gratis, per tutti.",
     "description": "Risultati, statistiche e xG senza abbonamento. Accedi con lo stesso account di GiBiArena per salvare le squadre preferite.",
     "cta": "Vai a GiBiArena"
+  },
+  "welcome": {
+    "title": "Benvenuto su GiBiScore",
+    "dismiss": "Ho capito",
+    "live": {
+      "title": "Risultati e live",
+      "text": "Le partite di oggi in tempo reale. Tocca una partita per cronaca, formazioni e statistiche; la stella salva squadre e competizioni preferite in cima.",
+      "cta": "Vai al live"
+    },
+    "predictions": {
+      "title": "Pronostici e schedine",
+      "text": "Per ogni partita tre giocate del modello, prudente, consigliata e audace, verificate sui risultati. Con un bottone generi una schedina con puntata divisa per colonna.",
+      "cta": "Vai ai pronostici"
+    },
+    "fantasy": {
+      "title": "Fantacalcio",
+      "text": "Asta guidata con voti e crediti consigliati, poi ogni settimana la formazione migliore per la tua rosa. Tre passi: configura, registra gli acquisti, schiera.",
+      "cta": "Vai al fantacalcio"
+    }
   }
 }

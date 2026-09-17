@@ -1,4 +1,4 @@
-import {HelpCircle} from "lucide-react";
+import {Help} from "@/components/fantasy/help";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
@@ -89,7 +89,7 @@ export function PredictionPanel({prediction, home, away, title}: {prediction: Ma
                     </ul>
                 </div>
             )}
-            <p className="px-3 py-1 flex justify-end border-t border-muted"><span title={t('hint')} className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-foreground/40 bg-card text-muted-foreground"><HelpCircle className="w-3.5 h-3.5" aria-hidden="true" /><span className="sr-only">{t('hint')}</span></span></p>
+            <p className="px-3 py-1 flex justify-end border-t border-muted"><Help boxed text={t('hint')} /></p>
         </Panel>
     );
 }

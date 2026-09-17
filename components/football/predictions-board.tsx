@@ -73,6 +73,7 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                 <span className="ml-auto font-mono text-[11px] font-bold text-muted-foreground">{t('filters.count', {count})}</span>
                 <button type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold" disabled={candidates.length === 0}>{t('schedina.open')}</button>
             </div>
+            <p className="text-[12px] font-semibold text-muted-foreground leading-snug px-0.5">{t('legendShort')}</p>
             {schedina && <SchedinaDialog candidates={candidates} days={dayOptions} competitions={blocks.map((b) => ({id: b.competition.id, name: b.competition.name}))} onClose={() => setSchedina(false)} />}
 
             {shown.length === 0 ? (

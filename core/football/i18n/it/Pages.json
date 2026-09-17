@@ -388,6 +388,7 @@
       "won": "Vinta",
       "lost": "Persa",
       "hits": "{hits}/{size} centrate"
-    }
+    },
+    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa."
   }
 }

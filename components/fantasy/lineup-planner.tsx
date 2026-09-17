@@ -7,6 +7,7 @@ import {Link, useRouter} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
+import {Help} from "./help";
 import {RoleBadge} from "./role-badge";
 import {DEFAULT_RULES, type AuctionConfig} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
@@ -721,7 +722,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                             </table>
                         </div>
                     </Panel>
-                    <Panel title={<span title={`${t('benchHint')}\n${t('dragHint')}`} className="inline-flex items-center gap-1.5">{t('benchTitle', {count: advice.bench.length})}<HelpCircle className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /></span>} action={<span className="hidden md:inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"><ArrowLeftRight className="w-3 h-3" aria-hidden="true" />{t('dragShort')}</span>}>
+                    <Panel title={<span className="inline-flex items-center gap-1.5">{t('benchTitle', {count: advice.bench.length})}<Help text={`${t('benchHint')}\n${t('dragHint')}`} /></span>} action={<span className="hidden md:inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"><ArrowLeftRight className="w-3 h-3" aria-hidden="true" />{t('dragShort')}</span>}>
                         <ul className="md:hidden flex flex-col">
                             {advice.bench.map((f, i) => <ForecastCard key={f.player.id} f={f} slot={advice.slots.get(f.player.id)} index={i + 1} byId={byId} teamById={teamById} reasonText={reasonText} muted={f.plays < 0.2} pinned={pinned.has(f.player.id)} onPin={() => togglePin(f.player.id)} out={outs.has(f.player.id)} onOut={() => toggleOut(f.player.id)} locked={!!frozen} swap={{benched: benched.has(f.player.id), onUnbench: () => unbench(f.player.id), onPlace: () => setPicking(picking === f.player.id ? null : f.player.id), picking: picking === f.player.id}} />)}
                         </ul>
@@ -737,7 +738,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                 </div>
 
                 <div className="flex flex-col gap-3 min-w-0">
-                    <Panel title={<span title={t('formationsHint')} className="inline-flex items-center gap-1.5">{t('formationsTitle')}<HelpCircle className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /></span>}>
+                    <Panel title={<span className="inline-flex items-center gap-1.5">{t('formationsTitle')}<Help text={t('formationsHint')} /></span>}>
                         <ul className="flex flex-col divide-y divide-muted">
                             {advice.formations.map((f, i) => (
                                 <li key={f.key}>

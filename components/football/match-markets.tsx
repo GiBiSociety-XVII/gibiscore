@@ -1,4 +1,4 @@
-import {HelpCircle} from "lucide-react";
+import {Help} from "@/components/fantasy/help";
 import {useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
@@ -149,7 +149,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
             </tbody>
         </table>
     );
-    const help = (text: string) => <span title={text} className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-foreground/40 bg-card text-muted-foreground"><HelpCircle className="w-3.5 h-3.5" aria-hidden="true" /><span className="sr-only">{text}</span></span>;
+    const help = (text: string) => <Help boxed text={text} />;
     const base = data ? t('base', {home: h?.played ?? 0, away: a?.played ?? 0, seasons: data.seasons.map((y) => `${y}/${String(y + 1).slice(-2)}`).join(', ')}) : '';
     const heads = (
         <div className="grid grid-cols-[1fr_auto_1fr] px-3 h-7 items-center text-[11px] font-extrabold uppercase tracking-wide border-b border-muted bg-muted/40">
