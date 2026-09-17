@@ -51,6 +51,9 @@ Progetto `gibiscore` → **Settings → Environment Variables**. Aggiungile per
 | `SUPABASE_SECRET_KEY` | `sb_secret_...` | dal passo 1.3, mai pubblica |
 | `API_FOOTBALL_KEY` | la chiave del passo 2.3 | mai pubblica |
 | `CRON_SECRET` | una stringa casuale lunga | vedi sotto |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | la chiave pubblica di Web Push | notifiche: vedi sotto |
+| `VAPID_PRIVATE_KEY` | la chiave privata di Web Push | mai pubblica |
+| `VAPID_SUBJECT` | `mailto:service@gibiscore.com` | contatto per i servizi push |
 
 Facoltative, utili con il piano Free durante i test:
 
@@ -58,6 +61,19 @@ Facoltative, utili con il piano Free durante i test:
 |---|---|---|
 | `API_FOOTBALL_SCOPE` | `featured` | segue solo le leghe in evidenza invece di tutte le ~1.100 |
 | `API_FOOTBALL_FEATURED_LEAGUE_IDS` | `135,2` | cambia la lista delle leghe in evidenza senza toccare il codice |
+
+Per le notifiche push (preferiti: calcio d'inizio, gol, finale...) serve una
+coppia di chiavi VAPID, generata una volta sola:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+La riga `Public Key` va in `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, la `Private Key` in
+`VAPID_PRIVATE_KEY`. Senza le chiavi il sito funziona lo stesso: il profilo
+dice che le notifiche non sono configurate e il job live non invia nulla.
+Cambiare le chiavi in seguito invalida le iscrizioni dei browser: gli utenti
+devono riattivare le notifiche dal profilo.
 
 Per generare `CRON_SECRET` da terminale:
 

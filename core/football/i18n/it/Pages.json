@@ -109,6 +109,12 @@
           "text": "Infortunati e squalificati di entrambe, con il motivo e da quando."
         }
       }
+    },
+    "mute": {
+      "notifications": "Notifiche",
+      "muted": "Silenziata",
+      "mute": "Silenzia le notifiche di questa partita: niente gol, niente finale, anche se segui la competizione o una delle squadre",
+      "unmute": "Riattiva le notifiche di questa partita"
     }
   },
   "team": {

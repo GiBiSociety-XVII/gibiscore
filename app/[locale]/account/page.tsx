@@ -5,6 +5,8 @@ import {Link, redirect} from "@/i18n/navigation";
 import {SiteShell} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
 import {MySchedine} from "@/components/football/my-schedine";
+import {FavoritesPanel} from "@/components/account/favorites-panel";
+import {NotificationsPanel} from "@/components/account/notifications-panel";
 import {currentUser} from "@/lib/auth/user";
 
 // Who is signed in decides the page: never cached, never indexed.
@@ -15,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     return {title: t('metaTitle'), robots: {index: false}};
 }
 
-/** The signed-in user's own page: who they are, the way to their things, their slips as tickets. */
+/** The signed-in user's own page: who they are, the way to their things, their favourites and notifications, their slips as tickets. */
 export default async function AccountPage({params}: PageProps<"/[locale]/account">) {
     const {locale} = await params;
     setRequestLocale(locale);
@@ -40,6 +42,12 @@ export default async function AccountPage({params}: PageProps<"/[locale]/account
                     <Link key={key} href={href} className="bb-btn bg-card h-9 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" aria-hidden="true" />{t(`links.${key}`)}</Link>
                 ))}
             </div>
+            <section className="flex flex-col gap-2">
+                <h2 className="text-[13px] font-extrabold uppercase tracking-wide px-0.5">{t('favorites.title')}</h2>
+                <FavoritesPanel />
+                <p className="text-[12px] font-semibold text-muted-foreground">{t('favorites.hint')}</p>
+            </section>
+            <NotificationsPanel />
             <MySchedine title={t('schedine')} />
             <p className="text-[12px] font-semibold text-muted-foreground">{t('schedineHint')}</p>
         </SiteShell>

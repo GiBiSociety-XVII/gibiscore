@@ -10,6 +10,7 @@ import {FormStrip} from "@/components/football/form-strip";
 import {Lineups} from "@/components/football/lineups";
 import {MatchStudy} from "@/components/football/match-study";
 import {MatchMarkets} from "@/components/football/match-markets";
+import {MuteBell} from "@/components/football/mute-bell";
 import {getMatchMarkets} from "@/lib/football/data/markets";
 import {getFixtureOdds} from "@/lib/football/data/odds";
 import {getPredictionTuning} from "@/lib/football/data/tuning";
@@ -191,7 +192,10 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
                         {fixture.competition.country ? `${fixture.competition.country} · ` : ''}{fixture.competition.name}
                     </Link>
                     {fixture.round && <span className="text-muted-foreground truncate">· {roundLabel(fixture.round)}</span>}
-                    <span className="ml-auto text-muted-foreground whitespace-nowrap">{format.dateTime(start, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}</span>
+                    <span className="ml-auto flex items-center gap-2">
+                        {fixture.state !== 'finished' && <MuteBell fixtureId={fixture.id} />}
+                        <span className="text-muted-foreground whitespace-nowrap">{format.dateTime(start, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}</span>
+                    </span>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-4">
                     <Link href={`/teams/${fixture.home.slug}`} className="flex flex-col items-center gap-2 min-w-0 group">

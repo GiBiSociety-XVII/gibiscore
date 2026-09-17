@@ -13,6 +13,8 @@ import {
     mapTeamStats,
 } from '@/lib/api-football/mappers';
 import type {AfFixtureResponse} from '@/lib/api-football/types';
+import {detectChanges, type MatchFacts, type Previous} from '@/lib/notifications/events';
+import {dispatchNotifications, type Outgoing} from '@/lib/notifications/dispatch';
 import {
     chunk,
     ensureLeagues,
@@ -197,7 +199,7 @@ export async function syncLive(): Promise<SyncRun> {
 
         // Everything else in play: scores and events straight from the feed, no request.
         const fromFeed = inplay.filter((f) => !detailIds.has(f.fixture.id));
-        await upsertFixtures(db, run, fromFeed, {withDetails: true, eventsOnly: true});
+        await upsertFixtures(db, run, fromFeed, {withDetails: true, eventsOnly: true, notify: true});
 
         const detailed: AfFixtureResponse[] = [];
         for (const group of chunk([...detailIds], 20)) {
@@ -206,7 +208,7 @@ export async function syncLive(): Promise<SyncRun> {
             detailed.push(...response.filter(inScope));
         }
         run.bump('detailed', detailed.length);
-        await upsertFixtures(db, run, detailed, {withDetails: true});
+        await upsertFixtures(db, run, detailed, {withDetails: true, notify: true});
 
         const ended: AfFixtureResponse[] = [];
         for (const group of chunk(endedIds, 20)) {
@@ -215,7 +217,7 @@ export async function syncLive(): Promise<SyncRun> {
             ended.push(...response.filter(inScope));
         }
         if (ended.length > 0) run.bump('ended_basic', ended.length);
-        await upsertFixtures(db, run, ended, {withDetails: true, eventsOnly: true});
+        await upsertFixtures(db, run, ended, {withDetails: true, eventsOnly: true, notify: true});
 
         // A fixture the API did not return either: not before the next check.
         const returned = new Set([...detailed, ...ended].map((f) => f.fixture.id));
@@ -257,6 +259,8 @@ export interface UpsertOptions {
     withDetails?: boolean;
     /** Only events are stored from the payload (live feed for basic leagues). */
     eventsOnly?: boolean;
+    /** Tell the fans: what changed against the stored state (kick-off, goals, cards, the end) goes out as push notifications. */
+    notify?: boolean;
 }
 
 export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures: AfFixtureResponse[], options: UpsertOptions = {}) {
@@ -323,13 +327,23 @@ export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures:
         run.warn(`skipped ${skipped.length} fixture(s) with unresolved league/season/teams: ${skipped.slice(0, 10).join(',')}`);
     }
 
+    // What was known before this pass, for the notifications: state and score per fixture.
+    const previous = new Map<number, Previous>();
+    if (options.notify) {
+        for (const ids of chunk(fixtureRows.map((r) => r.provider_id), 300)) {
+            const {data, error} = await db.from('fixtures').select('provider_id,state,home_score,away_score').in('provider_id', ids);
+            if (error) failSync('fixtures.select', error);
+            for (const r of data ?? []) previous.set(r.provider_id as number, {state: r.state as Previous['state'], homeScore: (r.home_score as number | null) ?? null, awayScore: (r.away_score as number | null) ?? null});
+        }
+    }
+
     for (const rows of chunk(fixtureRows, 300)) {
         const {error} = await db.from('fixtures').upsert(rows, {onConflict: 'provider_id'});
         if (error) failSync('fixtures.upsert', error);
     }
     run.bump('fixtures', fixtureRows.length);
 
-    if (!options.withDetails) return;
+    if (!options.withDetails && !options.notify) return;
 
     const fixtureIds: IdMap = new Map();
     for (const ids of chunk(fixtureRows.map((r) => r.provider_id), 500)) {
@@ -337,6 +351,30 @@ export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures:
         if (idError) failSync('fixtures.select', idError);
         for (const r of idRows ?? []) fixtureIds.set(r.provider_id as number, r.id as number);
     }
+
+    if (options.notify) {
+        const outgoing: Outgoing[] = [];
+        for (const f of fixtures) {
+            const id = fixtureIds.get(f.fixture.id);
+            if (!id) continue;
+            const state = mapFixtureState(f.fixture.status?.short);
+            const facts: MatchFacts = {
+                home: f.teams.home.name,
+                away: f.teams.away.name,
+                homeProviderId: f.teams.home.id,
+                league: f.league.name,
+                state,
+                minute: extractMinute(f.fixture.status, state),
+                homeScore: f.goals?.home ?? null,
+                awayScore: f.goals?.away ?? null,
+                events: mapEvents(f.events).map((e) => ({kind: e.type, teamProviderId: e.providerTeamId, minute: e.minute, extraMinute: e.extraMinute, player: e.playerName})),
+            };
+            outgoing.push({fixtureId: id, candidates: detectChanges(previous.get(f.fixture.id) ?? null, facts)});
+        }
+        await dispatchNotifications(db, run, outgoing);
+    }
+
+    if (!options.withDetails) return;
 
     // Details are written a batch of fixtures at a time: one call per table
     // per batch instead of eight per fixture, or a thousand fixtures take
