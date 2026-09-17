@@ -105,7 +105,7 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                             <li key={`${s.fixtureId}-${s.tier}`} className="px-3 py-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 text-[12px]">
                                 <span className={cn("inline-flex items-center justify-center w-14 h-6 rounded border-2 border-foreground font-mono text-[11px] font-extrabold", s.hit ? "bg-emerald-200" : "bg-red-100")}>{s.hit ? t('won') : t('lost')}</span>
                                 <span className="min-w-0 flex flex-col leading-tight">
-                                    <Link href={`/matches/${s.fixtureId}`} className="font-extrabold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">
+                                    <Link href={`/matches/${s.fixtureId}`} target="_blank" rel="noopener noreferrer" className="font-extrabold truncate hover:underline decoration-accent decoration-[2px] underline-offset-2">
                                         <TeamCrest team={s.home} size={14} /> {s.home.name} {s.homeScore}-{s.awayScore} {s.away.name} <TeamCrest team={s.away} size={14} />
                                     </Link>
                                     <span className="text-[11px] font-semibold text-muted-foreground truncate">{format.dateTime(new Date(s.startingAt), {day: '2-digit', month: '2-digit'})} · {s.league} · {tm(`advice.tiers.${s.tier}`)}</span>

@@ -65,7 +65,7 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
         const className = cn(teamClass(side, team.id), side === 'home' && "text-right");
         // Sits above the stretched match link, so the name opens the team page.
         return team.slug ? (
-            <Link href={`/teams/${team.slug}`} className={cn(className, "relative z-10 hover:underline decoration-accent decoration-[3px] underline-offset-2")} title={team.name}>{label}</Link>
+            <Link href={`/teams/${team.slug}`} target="_blank" rel="noopener noreferrer" className={cn(className, "relative z-10 hover:underline decoration-accent decoration-[3px] underline-offset-2")} title={team.name}>{label}</Link>
         ) : (
             <span className={className} title={team.name}>{label}</span>
         );
@@ -84,8 +84,8 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
                 isLive && "bg-accent/10",
             )}
         >
-            {/* Whole row opens the match; team names above it open the teams. */}
-            <Link href={`/matches/${fixture.id}`} className="absolute inset-0 z-0 rounded-sm focus-visible:outline-2 focus-visible:outline-accent" aria-label={`${fixture.home.name} - ${fixture.away.name}`} />
+            {/* Whole row opens the match, team names above it open the teams: both in a new tab, so the list stays where it was. */}
+            <Link href={`/matches/${fixture.id}`} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0 rounded-sm focus-visible:outline-2 focus-visible:outline-accent" aria-label={`${fixture.home.name} - ${fixture.away.name}`} />
             <span className="flex flex-col leading-tight text-[11px] min-w-0">
                 {showDate && <span className="text-[10px] font-semibold text-muted-foreground">{format.dateTime(new Date(fixture.startingAt), compact ? {day: '2-digit', month: '2-digit', year: '2-digit'} : {day: '2-digit', month: '2-digit'})}</span>}
                 <span className="inline-flex"><StatusCell fixture={fixture} /></span>

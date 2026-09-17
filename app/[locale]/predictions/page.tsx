@@ -62,7 +62,7 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
                                     };
                                     return (
                                         <li key={fixture.id} className="border-t border-muted first:border-t-0">
-                                            <Link href={`/matches/${fixture.id}`} className="block px-3 py-2 hover:bg-muted/50">
+                                            <Link href={`/matches/${fixture.id}`} target="_blank" rel="noopener noreferrer" className="block px-3 py-2 hover:bg-muted/50">
                                                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
                                                     <span className="flex items-center justify-end gap-2 min-w-0 text-[13px] font-extrabold">
                                                         <span className={cn("truncate", prediction?.pick === '1' && "underline decoration-accent decoration-[3px] underline-offset-2")}>{fixture.home.name}</span>
