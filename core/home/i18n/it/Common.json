@@ -66,5 +66,12 @@
     "myTeams": "Le mie squadre",
     "noMatches": "Nessuna partita in archivio.",
     "headToHeadHint": "Bilancio della squadra di casa negli ultimi precedenti"
+  },
+  "tour": {
+    "stepOf": "Passo {step} di {total}",
+    "next": "Avanti",
+    "back": "Indietro",
+    "done": "Fine",
+    "close": "Chiudi la guida"
   }
 }
