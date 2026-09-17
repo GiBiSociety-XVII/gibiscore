@@ -47,6 +47,14 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
     const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
     const available = useMemo(() => candidates.filter((c) => (pickedDays.length === 0 || pickedDays.includes(c.day)) && (pickedLeagues.length === 0 || pickedLeagues.includes(c.competitionId))).length, [candidates, pickedDays, pickedLeagues]);
+    // The ticket valued, once: what the blocks below show and what is saved with the slip.
+    const systemPlan = useMemo(() => {
+        if (!result || result.kind !== 'system') return null;
+        const groups = systemGroups(result.selections);
+        const stakes = lineStakes ?? suggestedStakes(groups, stake, stakeMode);
+        return {groups, stakes, plan: stakePlan(result.selections, groups, stakes)};
+    }, [result, lineStakes, stake, stakeMode]);
+    const ticket = useMemo(() => (result && result.kind !== 'system' ? ticketPlan(result, stake) : null), [result, stake]);
     const generate = () => {
         setSave('idle');
         setLineStakes(null);
@@ -56,7 +64,10 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
         if (!result || save === 'saving') return;
         setSave('saving');
         try {
-            const res = await fetch('/api/predictions/schedina', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(result)});
+            const saved = systemPlan
+                ? {...result, stake: systemPlan.plan.total, payout: systemPlan.plan.maxPayout, lines: systemPlan.plan.lines.map((l) => ({k: l.k, n: l.n, columns: l.columns.length, stake: l.stake}))}
+                : {...result, stake: ticket?.stake ?? null, payout: ticket?.payout ?? null, lines: null};
+            const res = await fetch('/api/predictions/schedina', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(saved)});
             if (res.status === 401) { setSignedIn(false); setSave('error'); return; }
             if (!res.ok) throw new Error(String(res.status));
             setSave('saved');
@@ -170,9 +181,9 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 ))}
                             </div>
                             {result.system && <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{result.system.bankers > 0 ? t('systemNoteBankers', {bankers: result.system.bankers, columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct}) : t('systemNote', {columns: result.system.columns, of: result.system.of, n: result.system.free, pct: result.system.atLeastPct})}</p>}
-                            {result.kind !== 'system' && (() => {
+                            {ticket && (() => {
                                 // A single or an accumulator: one stake, one payout, no lines.
-                                const plan = ticketPlan(result, stake);
+                                const plan = ticket;
                                 return (
                                     <div data-tour="schedina-stake" className="border-t-2 border-foreground">
                                         <div className="px-3 py-2 flex flex-wrap items-center gap-2">
@@ -199,10 +210,8 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                     </div>
                                 );
                             })()}
-                            {result.kind === 'system' && (() => {
-                                const groups = systemGroups(result.selections);
-                                const stakes = lineStakes ?? suggestedStakes(groups, stake, stakeMode);
-                                const plan = stakePlan(result.selections, groups, stakes);
+                            {systemPlan && (() => {
+                                const {stakes, plan} = systemPlan;
                                 const bankers = result.selections.filter((x) => x.banker).length;
                                 return (
                                     <div data-tour="schedina-stake" className="border-t-2 border-foreground">

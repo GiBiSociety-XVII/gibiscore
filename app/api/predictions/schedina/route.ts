@@ -4,6 +4,17 @@ import type {Schedina} from '@/lib/football/schedina';
 
 export const dynamic = 'force-dynamic';
 
+interface Line {
+    k: unknown;
+    n: unknown;
+    columns: unknown;
+    stake: unknown;
+}
+
+/** A non-negative amount to the cent, or null when absent or not a number. */
+const money = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : null);
+const int = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
+
 /**
  * Saves a slip the predictions page generated in the signed-in user's
  * account (table schedine, RLS): what was picked, at what chance and
@@ -12,9 +23,9 @@ export const dynamic = 'force-dynamic';
  * the outcome is read from the matches, never from the client.
  */
 export async function POST(request: NextRequest) {
-    let body: Partial<Schedina>;
+    let body: Partial<Schedina> & {stake?: unknown; payout?: unknown; lines?: unknown};
     try {
-        body = (await request.json()) as Partial<Schedina>;
+        body = (await request.json()) as typeof body;
     } catch {
         return NextResponse.json({error: 'bad json'}, {status: 400});
     }
@@ -38,6 +49,10 @@ export async function POST(request: NextRequest) {
         book: body.book === null || body.book === undefined ? null : Math.round(Number(body.book) * 100) / 100,
         first_kickoff: kickoffs[0],
         last_kickoff: kickoffs[kickoffs.length - 1],
+        // What was staked and what it pays, as the dialog showed them; the ticket in the account prints them.
+        stake: money(body.stake),
+        payout: money(body.payout),
+        lines: kind === 'system' && Array.isArray(body.lines) ? body.lines.slice(0, 12).map((l) => ({k: int((l as Line).k), n: int((l as Line).n), columns: int((l as Line).columns), stake: money((l as Line).stake) ?? 0})).filter((l) => l.k > 0 && l.n > 0 && l.columns > 0) : null,
     };
     const {data, error} = await db.from('schedine').insert(row).select('id').single();
     if (error) return NextResponse.json({error: error.message}, {status: 500});

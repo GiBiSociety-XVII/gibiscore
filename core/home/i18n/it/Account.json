@@ -45,5 +45,19 @@
     "weak": "La password è troppo debole",
     "rate": "Troppi tentativi: riprova tra qualche minuto",
     "generic": "Si è verificato un errore, riprova"
+  },
+  "profile": {
+    "menu": "Il mio profilo",
+    "title": "Il mio profilo",
+    "metaTitle": "Il mio profilo",
+    "intro": "Le tue schedine e le scorciatoie alle tue cose.",
+    "links": {
+      "auction": "La mia asta",
+      "lineup": "La mia formazione",
+      "predictions": "Pronostici",
+      "record": "Bilancio del modello"
+    },
+    "schedine": "Le mie schedine",
+    "schedineHint": "Ogni schedina generata dalla pagina Pronostici e salvata resta aperta finché le sue partite non sono finite, poi viene chiusa da sola sui risultati reali: vinta o persa, con quante selezioni hai centrato. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura."
   }
 }

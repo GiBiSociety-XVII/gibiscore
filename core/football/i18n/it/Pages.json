@@ -573,7 +573,16 @@
       "open": "Aperta",
       "won": "Vinta",
       "lost": "Persa",
-      "hits": "{hits}/{size} centrate"
+      "hits": "{hits}/{size} centrate",
+      "ticket": {
+        "number": "Schedina n. {id}",
+        "odds": "Quota",
+        "stake": "Puntata",
+        "payout": "Vincita",
+        "perColumn": "/col",
+        "settles": "Si chiude",
+        "settled": "Chiusa"
+      }
     },
     "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa.",
     "tour": {
