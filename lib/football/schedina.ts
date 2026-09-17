@@ -223,51 +223,92 @@ export function autoSystemOf(selections: SchedinaSelection[]): number {
     return best;
 }
 
-export type StakeMode = 'equal' | 'optimised';
-
-export interface StakePlan {
-    mode: StakeMode;
-    total: number;
-    columns: Array<SchedinaColumn & {stake: number; payout: number}>;
-    /** What comes back on average, and the profit it means, for the total staked. */
-    expectedReturn: number;
-    expectedProfit: number;
-    /** Every column wins. */
-    maxPayout: number;
-    /** Chance the payouts exceed the total staked. */
-    profitChance: number;
-    /** The prices are the bookmakers' for every column. */
+/** One line of a system ticket: every column of `k` free selections (with every banker), as the bookmakers list them. */
+export interface SystemGroup {
+    k: number;
+    /** Free selections in the slip. */
+    n: number;
+    columns: SchedinaColumn[];
+    /** Chance that every banker and at least k free selections win, percent. */
+    atLeastPct: number;
+    /** Expected return of a unit stake spread over the columns, at their prices, minus one (the edge of the line). */
+    edge: number;
     priced: boolean;
 }
 
-/**
- * The stake spread over the columns of a slip. Equal: the same on every
- * column, as a bookmaker's system ticket. Optimised: in proportion to
- * each column's edge (chance times price, minus one), so the columns the
- * model rates above the market get more and those it rates below get
- * nothing; equal when no column has an edge. Chance of profit counted
- * over every outcome of the selections.
- */
-export function stakePlan(slip: Schedina, total: number, mode: StakeMode): StakePlan | null {
-    if (!(total > 0) || slip.selections.length === 0) return null;
-    const columns = schedinaColumns(slip.selections, slip.system?.of ?? null);
-    const edges = columns.map((c) => Math.max(0, c.probability * c.odds - 1));
-    const edgeSum = edges.reduce((s, v) => s + v, 0);
-    const weights = mode === 'optimised' && edgeSum > 0 ? edges.map((e) => e / edgeSum) : columns.map(() => 1 / columns.length);
-    const staked = columns.map((c, i) => ({...c, stake: round2(total * weights[i]), payout: round2(total * weights[i] * c.odds)}));
-    const expectedReturn = round2(staked.reduce((s, c) => s + c.probability * c.payout, 0));
-    // Every outcome of the selections: which columns win, what comes back.
-    const n = slip.selections.length;
-    let profitChance = 0;
-    for (let mask = 0; mask < 1 << n; mask += 1) {
-        let p = 1;
-        for (let i = 0; i < n; i += 1) {
-            const q = slip.selections[i].slip.pct / 100;
-            p *= mask & (1 << i) ? q : 1 - q;
-        }
-        if (p === 0) continue;
-        const back = staked.reduce((s, c) => (c.indices.every((i) => mask & (1 << i)) ? s + c.payout : s), 0);
-        if (back > total + 1e-9) profitChance += p;
+/** The lines of a slip played as a system: k from every free selection down to one. A single is one line of one column. */
+export function systemGroups(selections: SchedinaSelection[]): SystemGroup[] {
+    const bankers = selections.filter((s) => s.banker);
+    const free = selections.filter((s) => !s.banker);
+    const n = free.length;
+    const bankersChance = bankers.reduce((p, s) => p * (s.slip.pct / 100), 1);
+    const out: SystemGroup[] = [];
+    for (let k = Math.max(1, n); k >= 1; k -= 1) {
+        const columns = schedinaColumns(selections, n === 0 ? null : k);
+        out.push({k, n, columns, atLeastPct: Math.round(bankersChance * (n === 0 ? 1 : atLeast(free.map((s) => s.slip.pct / 100), k)) * 100), edge: columns.reduce((sum, c) => sum + c.probability * c.odds, 0) / columns.length - 1, priced: columns.every((c) => c.priced)});
+        if (n === 0) break;
     }
-    return {mode, total, columns: staked, expectedReturn, expectedProfit: round2(expectedReturn - total), maxPayout: round2(staked.reduce((s, c) => s + c.payout, 0)), profitChance: Math.round(profitChance * 100), priced: columns.every((c) => c.priced)};
+    return out;
+}
+
+export type StakeMode = 'recommended' | 'full';
+
+/**
+ * How a total stake goes over the lines, per column. Recommended: in
+ * proportion to each line's edge, so the lines the model rates above
+ * the market get the money and the others none; when no line has an
+ * edge, everything on the best one. Full: the same stake on every
+ * column of every line (a full-cover system). Cents.
+ */
+export function suggestedStakes(groups: SystemGroup[], total: number, mode: StakeMode): number[] {
+    if (groups.length === 0 || !(total > 0)) return groups.map(() => 0);
+    if (mode === 'full') {
+        const columns = groups.reduce((sum, g) => sum + g.columns.length, 0);
+        return groups.map(() => Math.floor((total / columns) * 100) / 100);
+    }
+    const edges = groups.map((g) => Math.max(0, g.edge));
+    const edgeSum = edges.reduce((sum, v) => sum + v, 0);
+    if (edgeSum <= 0) {
+        const best = groups.reduce((m, g, i) => (g.edge > groups[m].edge + 1e-9 || (Math.abs(g.edge - groups[m].edge) <= 1e-9 && g.atLeastPct > groups[m].atLeastPct) ? i : m), 0);
+        return groups.map((g, i) => (i === best ? Math.floor((total / g.columns.length) * 100) / 100 : 0));
+    }
+    return groups.map((g, i) => Math.floor(((total * edges[i]) / edgeSum / g.columns.length) * 100) / 100);
+}
+
+export interface StakePlan {
+    /** Per line: the stake on each column and on the line, what comes back when every column of the line wins. */
+    lines: Array<SystemGroup & {stake: number; lineStake: number; linePayout: number}>;
+    total: number;
+    expectedReturn: number;
+    expectedProfit: number;
+    /** Every column of every line wins. */
+    maxPayout: number;
+    /** Chance the payouts exceed the total staked, over every outcome of the selections. */
+    profitChance: number;
+    priced: boolean;
+}
+
+/** The ticket valued: `stakes` is the stake per column of each line, in the order of `groups`. */
+export function stakePlan(selections: SchedinaSelection[], groups: SystemGroup[], stakes: number[]): StakePlan {
+    const lines = groups.map((g, i) => {
+        const stake = Math.max(0, stakes[i] ?? 0);
+        return {...g, stake, lineStake: round2(stake * g.columns.length), linePayout: round2(g.columns.reduce((sum, c) => sum + c.odds * stake, 0))};
+    });
+    const total = round2(lines.reduce((sum, l) => sum + l.lineStake, 0));
+    const expectedReturn = round2(lines.reduce((sum, l) => sum + l.columns.reduce((s2, c) => s2 + c.probability * c.odds * l.stake, 0), 0));
+    const n = selections.length;
+    let profitChance = 0;
+    if (total > 0) {
+        for (let mask = 0; mask < 1 << n; mask += 1) {
+            let p = 1;
+            for (let i = 0; i < n; i += 1) {
+                const q = selections[i].slip.pct / 100;
+                p *= mask & (1 << i) ? q : 1 - q;
+            }
+            if (p === 0) continue;
+            const back = lines.reduce((sum, l) => (l.stake > 0 ? sum + l.columns.reduce((s2, c) => (c.indices.every((i) => mask & (1 << i)) ? s2 + c.odds * l.stake : s2), 0) : sum), 0);
+            if (back > total + 1e-9) profitChance += p;
+        }
+    }
+    return {lines, total, expectedReturn, expectedProfit: round2(expectedReturn - total), maxPayout: round2(lines.reduce((sum, l) => sum + l.linePayout, 0)), profitChance: Math.round(profitChance * 100), priced: lines.every((l) => l.priced)};
 }

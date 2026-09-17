@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {BetSuggestion} from './markets';
-import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, type SchedinaCandidate} from './schedina';
+import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, suggestedStakes, systemGroups, type SchedinaCandidate} from './schedina';
 
 const slip = (tier: BetSuggestion['tier'], pct: number, odds: number | null = null): BetSuggestion => ({tier, legs: [{key: '1', pct, odds}], pct, fair: Math.round((100 / pct) * 100) / 100, odds});
 const match = (id: number, day: string, hour: string, competitionId: number, slips: BetSuggestion[]): SchedinaCandidate => ({fixtureId: id, competitionId, competition: `L${competitionId}`, home: `H${id}`, away: `A${id}`, startingAt: `${day}T${hour}:00Z`, day, slips});
@@ -104,22 +104,27 @@ describe('columns, automatic k and the stake plan', () => {
         const unpriced = buildSchedina(noPrices, {risk: 'medium', kind: 'system', size: 3, system: 'auto', bankers: 0, days: [], competitions: [], now: NOW})!;
         expect(unpriced.system!.of).toBe(2);
     });
-    it('spreads the stake, equal or by edge, and counts the chance of profit', () => {
-        const s = buildSchedina(priced, {risk: 'medium', kind: 'system', size: 4, system: 2, bankers: 0, days: [], competitions: [], now: NOW2})!;
-        const equal = stakePlan(s, 60, 'equal')!;
-        expect(equal.columns).toHaveLength(6);
-        expect(equal.columns.every((c) => c.stake === 10)).toBe(true);
-        expect(equal.maxPayout).toBeCloseTo(equal.columns.reduce((sum, c) => sum + c.payout, 0), 2);
-        expect(equal.profitChance).toBeGreaterThan(0);
-        expect(equal.profitChance).toBeLessThanOrEqual(100);
-        const optimised = stakePlan(s, 60, 'optimised')!;
-        expect(Math.round(optimised.columns.reduce((sum, c) => sum + c.stake, 0))).toBe(60);
-        // The column with the best edge gets the most.
-        const best = optimised.columns.reduce((m, c) => (c.probability * c.odds > m.probability * m.odds ? c : m));
-        expect(best.stake).toBe(Math.max(...optimised.columns.map((c) => c.stake)));
-        const single = stakePlan(buildSchedina(priced, {risk: 'medium', kind: 'single', size: 1, days: [], competitions: [], now: NOW2})!, 10, 'equal')!;
-        expect(single.columns).toHaveLength(1);
-        expect(single.columns[0].payout).toBe(14);
-        expect(stakePlan(s, 0, 'equal')).toBeNull();
+    it('lists the lines of a system ticket and values the stakes on them', () => {
+        const s = buildSchedina(priced, {risk: 'medium', kind: 'system', size: 4, system: 2, bankers: 1, days: [], competitions: [], now: NOW2})!;
+        const groups = systemGroups(s.selections);
+        // One banker, three free: lines 3 su 3 (1 column), 2 su 3 (3), 1 su 3 (3).
+        expect(groups.map((g) => [g.k, g.n, g.columns.length])).toEqual([[3, 3, 1], [2, 3, 3], [1, 3, 3]]);
+        expect(groups[0].atLeastPct).toBeLessThan(groups[2].atLeastPct);
+        const full = suggestedStakes(groups, 70, 'full');
+        expect(full.every((v) => v === 10)).toBe(true);
+        const recommended = suggestedStakes(groups, 70, 'recommended');
+        expect(recommended.some((v) => v > 0)).toBe(true);
+        const plan = stakePlan(s.selections, groups, full);
+        expect(plan.total).toBe(70);
+        expect(plan.lines[0].lineStake).toBe(10);
+        expect(plan.lines[1].lineStake).toBe(30);
+        expect(plan.maxPayout).toBeCloseTo(plan.lines.reduce((sum, l) => sum + l.linePayout, 0), 2);
+        expect(plan.profitChance).toBeGreaterThan(0);
+        expect(plan.profitChance).toBeLessThanOrEqual(100);
+        expect(stakePlan(s.selections, groups, [0, 0, 0]).total).toBe(0);
+        const single = buildSchedina(priced, {risk: 'medium', kind: 'single', size: 1, days: [], competitions: [], now: NOW2})!;
+        const one = systemGroups(single.selections);
+        expect(one).toHaveLength(1);
+        expect(stakePlan(single.selections, one, [10]).maxPayout).toBe(14);
     });
 });

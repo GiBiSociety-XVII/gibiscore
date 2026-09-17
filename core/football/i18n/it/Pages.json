@@ -358,12 +358,12 @@
       "systemAutoNote": "il modello sceglie il sistema con il miglior ritorno atteso alle quote dei bookmaker",
       "stake": "Puntata",
       "stakeModes": {
-        "equal": "Uguale per colonna",
-        "optimised": "Ottimizzata"
+        "recommended": "Consigliata",
+        "full": "Integrale"
       },
       "stakeModeHint": {
-        "equal": "La stessa cifra su ogni colonna, come in un sistema del bookmaker.",
-        "optimised": "Più soldi alle colonne che il modello valuta sopra la quota del bookmaker (probabilità × quota − 1), niente a quelle sotto; uguale se nessuna colonna ha vantaggio. Da giocare come biglietti separati."
+        "recommended": "Il modello mette la puntata sulle righe che valuta sopra le quote dei bookmaker (probabilità × quota − 1), in proporzione al vantaggio; se nessuna ha vantaggio, tutto sulla riga migliore.",
+        "full": "La stessa puntata su ogni colonna di ogni riga: sistema integrale."
       },
       "column": "Colonna",
       "payout": "Vincita",
@@ -371,8 +371,14 @@
       "expectedReturn": "Ritorno atteso",
       "expectedProfit": "Profitto atteso",
       "profitChance": "Chiudi in utile",
-      "stakeNote": "Vincita massima se tutte le colonne vincono; ritorno atteso = somma di probabilità × vincita di ogni colonna secondo il modello; \"chiudi in utile\" = probabilità che le vincite superino la puntata, contata su ogni esito possibile delle selezioni. Quote medie dei bookmaker: quelle reali del tuo bookmaker possono differire.",
-      "stakeNoteFair": "Alcune selezioni non hanno la quota dei bookmaker: dove manca vale la quota equa del modello (≈), quindi il ritorno atteso è quello di una giocata alla pari. Con le quote reali i numeri cambiano."
+      "stakeNote": "Ogni riga \"k su N\" è il sistema con colonne da k selezioni libere (le fisse in tutte); la puntata è per colonna, come sul bookmaker, e puoi cambiarla riga per riga. Probabilità = tutte le fisse e almeno k libere centrate. Vincita = se tutte le colonne della riga vincono. Ritorno atteso e \"chiudi in utile\" secondo il modello, su ogni esito possibile. Quote medie dei bookmaker: quelle del tuo possono differire.",
+      "stakeNoteFair": "Alcune selezioni non hanno la quota dei bookmaker: dove manca vale la quota equa del modello (≈), quindi il ritorno atteso è quello di una giocata alla pari. Con le quote reali i numeri cambiano.",
+      "line": "Riga",
+      "kOfN": "{k} su {n}",
+      "withBankers": "+ {count} fisse",
+      "perColumn": "Per colonna",
+      "lineTotal": "Riga",
+      "totalStake": "Puntata totale"
     },
     "mine": {
       "title": "Le mie schedine",
