@@ -5,6 +5,7 @@ import {X, Check, CloudOff} from "lucide-react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
+import {Help} from "@/components/fantasy/help";
 import {TourLauncher} from "./tour-launcher";
 import {cloudUser} from "@/lib/fantasy/cloud";
 import type {LegKey} from "@/lib/football/markets";
@@ -83,11 +84,11 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
             <div onClick={(e) => e.stopPropagation()} className="bb-surface w-full max-w-2xl my-4 bg-background flex flex-col">
                 <div className="flex items-center gap-2 px-3 h-11 border-b-2 border-foreground bg-card rounded-t-[calc(var(--radius-lg)-2px)]">
                     <h2 className="text-[14px] font-extrabold uppercase tracking-wide">{t('title')}</h2>
+                    <Help boxed text={t('introHelp')} />
                     <div className="ml-auto"><TourLauncher storageKey="gibiscore:schedina-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: `schedina-${key}`, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} /></div>
                     <button type="button" onClick={onClose} aria-label={t('close')} className="inline-flex items-center justify-center w-8 h-8 rounded-md border-2 border-foreground bg-background hover:bg-muted"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="px-3 py-3 flex flex-col gap-3 text-[13px]">
-                    <p className="text-[12px] font-semibold text-muted-foreground leading-snug">{t('intro')}</p>
                     <div data-tour="schedina-risk" className="flex flex-col gap-1">
                         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('risk')}</span>
                         <div className="flex flex-wrap gap-1">{RISKS.map((r) => <button key={r} type="button" onClick={() => setRisk(r)} className={chip(risk === r)} title={t(`riskHint.${r}`)}>{t(`risks.${r}`)}</button>)}</div>
@@ -281,7 +282,6 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                             </div>
                         </div>
                     )}
-                    <p className="text-[11px] font-semibold text-muted-foreground leading-snug">{t('disclaimer')}</p>
                 </div>
             </div>
         </div>

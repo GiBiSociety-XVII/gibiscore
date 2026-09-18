@@ -3,6 +3,7 @@
 import {useEffect, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Panel} from "@/components/shell/panel";
+import {Help} from "@/components/fantasy/help";
 import {createClient} from "@/lib/db/client";
 import {SchedinaTicket, type Ticket, type TicketLine, type TicketSelection} from "./schedina-ticket";
 
@@ -33,7 +34,7 @@ const num = (v: number | string | null): number | null => (v === null ? null : N
  * ticket: open until its matches are over, then won or lost. Read in the
  * browser: the page stays static. Nothing is drawn for a visitor.
  */
-export function MySchedine({title}: {title?: string} = {}) {
+export function MySchedine({title, help}: {title?: string; help?: string} = {}) {
     const t = useTranslations('Pages.predictions.mine');
     const [rows, setRows] = useState<Row[] | null | undefined>(undefined);
     useEffect(() => {
@@ -78,7 +79,7 @@ export function MySchedine({title}: {title?: string} = {}) {
     }));
     // The guide of the record page points at the whole panel (skipped while it is not on the page).
     return (
-        <div data-tour="mine"><Panel title={title ?? t('title')} action={settled.length > 0 ? <span className="font-mono text-[11px] text-muted-foreground">{t('tally', {won, settled: settled.length})}</span> : undefined}>
+        <div data-tour="mine"><Panel title={title ?? t('title')} action={<span className="flex items-center gap-2">{settled.length > 0 && <span className="font-mono text-[11px] text-muted-foreground">{t('tally', {won, settled: settled.length})}</span>}{help && <Help boxed text={help} />}</span>}>
             {tickets.length === 0 ? (
                 <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('empty')}</p>
             ) : (

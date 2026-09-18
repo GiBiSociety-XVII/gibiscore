@@ -87,10 +87,10 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
         >
             {/* Whole row opens the match, team names above it open the teams: both in a new tab, so the list stays where it was. */}
             <Link href={`/matches/${fixture.id}`} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0 rounded-sm focus-visible:outline-2 focus-visible:outline-accent" aria-label={`${fixture.home.name} - ${fixture.away.name}`} />
-            <span className="flex flex-col leading-tight text-[11px] min-w-0">
-                {showDate && <span className="text-[10px] font-semibold text-muted-foreground">{format.dateTime(new Date(fixture.startingAt), compact ? {day: '2-digit', month: '2-digit', year: '2-digit'} : {day: '2-digit', month: '2-digit'})}</span>}
+            <span className="flex flex-col leading-tight text-[12px] min-w-0">
+                {showDate && <span className="text-[11px] font-semibold text-muted-foreground">{format.dateTime(new Date(fixture.startingAt), compact ? {day: '2-digit', month: '2-digit', year: '2-digit'} : {day: '2-digit', month: '2-digit'})}</span>}
                 <span className="inline-flex"><StatusCell fixture={fixture} /></span>
-                {showCompetition && <span className="text-[10px] font-semibold text-muted-foreground truncate">{fixture.leagueName}</span>}
+                {showCompetition && <span className="text-[11px] font-semibold text-muted-foreground truncate">{fixture.leagueName}</span>}
             </span>
 
             <span className="flex items-center justify-end gap-1.5 min-w-0">
@@ -113,8 +113,8 @@ export function MatchRow({fixture, highlightTeamId, showDate = false, showCompet
                         const lowest = Math.min(fixture.odds!.home, fixture.odds!.draw, fixture.odds!.away);
                         return (
                             <span key={label} className={cn("relative z-10 inline-flex flex-col items-center justify-center w-[42px] h-7 rounded border leading-none", odd === lowest ? "border-foreground bg-accent" : "border-foreground/30 bg-card")}>
-                                <span className="text-[9px] font-extrabold text-muted-foreground">{label}</span>
-                                <span className="font-mono text-[11px] font-extrabold tabular-nums">{odd.toFixed(2)}</span>
+                                <span className="text-[10px] font-extrabold text-muted-foreground">{label}</span>
+                                <span className="font-mono text-[12px] font-extrabold tabular-nums">{odd.toFixed(2)}</span>
                             </span>
                         );
                     }))}

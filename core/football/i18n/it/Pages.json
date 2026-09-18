@@ -367,7 +367,7 @@
     "recordLink": "Il bilancio del modello",
     "record": {
       "title": "Bilancio del modello",
-      "metaTitle": "Bilancio dei pronostici",
+      "metaTitle": "Bilancio del modello",
       "metaDescription": "Quante giocate proposte dal modello sono andate a segno, fascia per fascia, e come il modello è tarato sulle stagioni in archivio.",
       "intro": "Ogni giocata proposta viene scritta prima del calcio d'inizio e verificata sul risultato finale: qui c'è quante ne vince ogni fascia contro quanto prometteva. Sotto, la taratura del modello sull'archivio delle competizioni principali.",
       "toPredictions": "Pronostici",
@@ -570,7 +570,8 @@
         }
       },
       "winChance": "Probabilità di vincita",
-      "ticketNote": "Vincita = puntata × quota della schedina (per la multipla il prodotto delle quote medie dei bookmaker). Ritorno e profitto atteso secondo il modello: vincita per la probabilità che tutte le selezioni siano centrate. Le quote del tuo bookmaker possono differire."
+      "ticketNote": "Vincita = puntata × quota della schedina (per la multipla il prodotto delle quote medie dei bookmaker). Ritorno e profitto atteso secondo il modello: vincita per la probabilità che tutte le selezioni siano centrate. Le quote del tuo bookmaker possono differire.",
+      "introHelp": "Scegli rischio, tipo e quante partite; il modello prende le giocate in cui crede di più per quel rischio tra le partite dei giorni e delle competizioni che indichi, e ti dice probabilità, quota e quando la schedina si chiude."
     },
     "mine": {
       "title": "Le mie schedine",

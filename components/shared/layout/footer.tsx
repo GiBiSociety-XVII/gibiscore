@@ -43,8 +43,8 @@ export default function Footer() {
 
     return (
         <footer className="mt-auto w-full bg-background border-t-[2.5px] border-foreground">
-            <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-10 md:py-14">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-10">
+            <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 md:py-14">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-8 md:mb-10">
                     <Link href="/" aria-label="GiBiScore" className="self-start">
                         <BrandLockup height={48} />
                     </Link>
@@ -54,7 +54,14 @@ export default function Footer() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-6 mb-10">
+                {/* On a phone the sections are in the bottom menu: only the legal links stay. */}
+                <div className="md:hidden flex flex-wrap gap-x-5 gap-y-2 mb-8">
+                    <a href="https://gibiarena.com/privacy" className={link}>{t('columns.info.privacy')}</a>
+                    <a href="https://gibiarena.com/terms" className={link}>{t('columns.info.terms')}</a>
+                    <a href="https://gibiarena.com" className={link}>{t('columns.info.gibiarena')}</a>
+                    <span className="text-[15px] text-muted-foreground">{t('columns.info.data')}</span>
+                </div>
+                <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-6 mb-10">
                     <Column title={t('columns.scores.title')}>
                         <Link href="/" className={link}>{t('columns.scores.today')}</Link>
                         <Link href="/live" className={link}>{t('columns.scores.live')}</Link>
@@ -85,6 +92,7 @@ export default function Footer() {
                     </Column>
                 </div>
 
+                <p className="text-[13px] text-muted-foreground mb-6">{t('legal')}</p>
                 <div className="h-[2px] bg-foreground/15 mb-6" />
 
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-[14px] text-muted-foreground">

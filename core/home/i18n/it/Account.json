@@ -58,14 +58,15 @@
       "record": "Bilancio del modello"
     },
     "schedine": "Le mie schedine",
-    "schedineHint": "Ogni schedina generata dalla pagina Pronostici e salvata resta aperta finché le sue partite non sono finite, poi viene chiusa da sola sui risultati reali: vinta o persa, con quante selezioni hai centrato. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
+    "schedineHint": "Ogni schedina salvata resta aperta finché le sue partite non sono finite, poi si chiude da sola sui risultati reali: vinta o persa, con l'esito di ogni selezione.",
     "favorites": {
       "title": "I miei preferiti",
       "competitions": "Competizioni",
       "teams": "Squadre",
       "emptyCompetitions": "Nessuna competizione tra i preferiti: usa la stella accanto a un campionato o a una coppa.",
       "emptyTeams": "Nessuna squadra tra i preferiti: usa la stella nella pagina di una squadra.",
-      "hint": "Le stelle sono le stesse di tutto il sito e seguono il tuo account su ogni dispositivo. Le partite di queste competizioni e squadre vengono prima nella lista, le loro classifiche nella colonna di destra, e sono quelle di cui ricevi le notifiche."
+      "hint": "Le stelle sono le stesse di tutto il sito e seguono il tuo account su ogni dispositivo. Le partite di queste competizioni e squadre vengono prima nella lista, le loro classifiche nella colonna di destra, e sono quelle di cui ricevi le notifiche.",
+      "help": "Le stelle sono le stesse di tutto il sito e seguono il tuo account su ogni dispositivo. Le partite di queste competizioni e squadre vengono prima nella lista, le loro classifiche nella colonna di destra, e sono quelle di cui ricevi le notifiche."
     },
     "notifications": {
       "title": "Notifiche",

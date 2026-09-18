@@ -119,7 +119,7 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                                                             const slip = slips.find((x) => x.tier === tier);
                                                             return (
                                                                 <span key={tier} className="flex flex-col items-center gap-0.5 min-w-0" title={slip ? slip.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ') : t('noAdvice')}>
-                                                                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${tier}`)}</span>
+                                                                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${tier}`)}</span>
                                                                     <span className={cn("inline-flex items-center justify-center gap-1.5 w-full rounded border-2 px-1.5 min-h-7 py-0.5 text-[11px] sm:text-[12px] font-extrabold leading-tight min-w-0", slip ? (tier === 'balanced' ? "border-foreground bg-accent" : "border-foreground bg-card") : "border-muted bg-card text-muted-foreground")}>
                                                                         <span className="text-center [text-wrap:balance]">{slip ? slip.legs.map((l) => legLabel(l.key)).join(' + ') : '–'}</span>
                                                                         {slip && <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground shrink-0">{slip.pct}%</span>}

@@ -26,7 +26,6 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
     const {locale} = await params;
     setRequestLocale(locale);
     const t = await getTranslations('Pages.predictions');
-    const tp = await getTranslations('Football.prediction');
     const blocks = await getUpcomingPredictions(DAYS);
     const today = romeDate(new Date());
     // The same slips the match page proposes, from the same prediction and odds.
@@ -44,7 +43,6 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
                     </div>
                 } />
             <PredictionsBoard blocks={board} today={today} tomorrow={shiftDay(today, 1)} />
-            <p className="text-[12px] font-semibold text-muted-foreground">{tp('listHint')} {t('adviceLegend')}</p>
         </SiteShell>
     );
 }
