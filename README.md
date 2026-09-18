@@ -31,6 +31,7 @@ homepage mostra dati di esempio (badge "Dati di esempio").
 | `pnpm build` | build di produzione |
 | `pnpm lint` | ESLint |
 | `pnpm test` | test unitari (vitest) dei mapper API-Football |
+| `pnpm smoke` | test di fumo (Playwright): apre le pagine in un browser vero e controlla che rispondano, siano nella lingua giusta e non urlino in console. Senza `BASE_URL` avvia da sé `pnpm dev`; con `BASE_URL=https://gibiscore.com pnpm smoke` prova il sito online. Il browser si scarica una volta con `pnpm exec playwright install chromium` |
 | `pnpm probe:api-football` | scarica payload grezzi da API-Football in `scratch/` per verificarne la forma (~8 richieste) |
 | `pnpm cron <job>` | lancia un job di sync (serve `CRON_SECRET`, opzionale `BASE_URL`) |
 
