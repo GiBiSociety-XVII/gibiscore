@@ -71,7 +71,7 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                     {blocks.map((b) => <option key={b.competition.id} value={b.competition.id}>{b.competition.country ? `${b.competition.country} · ` : ''}{b.competition.name}</option>)}
                 </select>
                 <span className="ml-auto font-mono text-[11px] font-bold text-muted-foreground">{t('filters.count', {count})}</span>
-                <button data-tour="schedina" type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold" disabled={candidates.length === 0}>{t('schedina.open')}</button>
+                <button data-tour="schedina" type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-9 sm:h-8 px-3 text-[12px] font-extrabold w-full sm:w-auto" disabled={candidates.length === 0}>{t('schedina.open')}</button>
             </div>
             <p data-tour="legend" className="text-[12px] font-semibold text-muted-foreground leading-snug px-0.5">{t('legendShort')}</p>
             {schedina && <SchedinaDialog candidates={candidates} days={dayOptions} competitions={blocks.map((b) => ({id: b.competition.id, name: b.competition.name}))} onClose={() => setSchedina(false)} />}
@@ -120,8 +120,8 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                                                             return (
                                                                 <span key={tier} className="flex flex-col items-center gap-0.5 min-w-0" title={slip ? slip.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ') : t('noAdvice')}>
                                                                     <span className="text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${tier}`)}</span>
-                                                                    <span className={cn("inline-flex items-center justify-center gap-1.5 w-full rounded border-2 px-1.5 h-7 text-[12px] font-extrabold leading-none min-w-0", slip ? (tier === 'balanced' ? "border-foreground bg-accent" : "border-foreground bg-card") : "border-muted bg-card text-muted-foreground")}>
-                                                                        <span className="truncate">{slip ? slip.legs.map((l) => legLabel(l.key)).join(' + ') : '–'}</span>
+                                                                    <span className={cn("inline-flex items-center justify-center gap-1.5 w-full rounded border-2 px-1.5 min-h-7 py-0.5 text-[11px] sm:text-[12px] font-extrabold leading-tight min-w-0", slip ? (tier === 'balanced' ? "border-foreground bg-accent" : "border-foreground bg-card") : "border-muted bg-card text-muted-foreground")}>
+                                                                        <span className="text-center [text-wrap:balance]">{slip ? slip.legs.map((l) => legLabel(l.key)).join(' + ') : '–'}</span>
                                                                         {slip && <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground shrink-0">{slip.pct}%</span>}
                                                                     </span>
                                                                 </span>

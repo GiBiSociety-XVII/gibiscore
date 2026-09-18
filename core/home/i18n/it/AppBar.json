@@ -9,7 +9,8 @@
     "stats": "Statistiche",
     "search": "Cerca",
     "fantasy": "Fanta",
-    "predictions": "Pronostici"
+    "predictions": "Pronostici",
+    "menu": "Menu"
   },
   "searchHint": "Invio per tutti i risultati",
   "searchTeams": "Squadre",
@@ -49,5 +50,21 @@
       "compare": "Confronto giocatori",
       "compareHint": "Due giocatori a confronto, stessa stagione"
     }
+  },
+  "mobileMenu": {
+    "title": "Menu",
+    "close": "Chiudi il menu",
+    "profile": "Il mio profilo",
+    "predictions": {
+      "list": "Pronostici e schedine",
+      "record": "Bilancio del modello"
+    },
+    "fantasy": {
+      "hub": "Tutto il fantacalcio",
+      "auction": "Asta",
+      "lineup": "Formazione",
+      "model": "Modello dei voti"
+    },
+    "footer": "Tutte le pagine del sito. Le più usate sono nella barra qui sotto."
   }
 }
