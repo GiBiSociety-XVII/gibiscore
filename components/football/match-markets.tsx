@@ -1,5 +1,5 @@
 import {Help} from "@/components/fantasy/help";
-import {useTranslations} from "next-intl";
+import {useLocale, useTranslations} from "next-intl";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {Link} from "@/i18n/navigation";
@@ -106,6 +106,7 @@ function GoalBands({profile, team, scale, heat}: {profile: TeamMarketProfile | n
  */
 export function MatchMarkets({data, prediction, odds, home, away, title}: {data: MatchMarketData | null; prediction: MatchPrediction | null; odds: OddsSummary | null; home: TeamSummary; away: TeamSummary; title: string}) {
     const t = useTranslations('Football.markets');
+    const locale = useLocale();
     const tp = useTranslations('Football.prediction');
     const markets = prediction ? matchMarkets(prediction) : null;
     const slips: BetSuggestion[] = prediction ? suggestBets(prediction, odds) : [];
@@ -215,7 +216,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                             </div>
                         )}
                         <p className="px-3 py-1.5 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">
-                            {t('legendFair')}{odds ? ` · ${t('legendBook', {books: odds.books, at: updated ? updated.toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'}) : '–'})}` : ` · ${t('noOdds')}`}
+                            {t('legendFair')}{odds ? ` · ${t('legendBook', {books: odds.books, at: updated ? updated.toLocaleString(locale, {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'}) : '–'})}` : ` · ${t('noOdds')}`}
                         </p>
                         {prediction.factors.length > 0 && (
                             <div className="border-t border-muted px-3 py-2">

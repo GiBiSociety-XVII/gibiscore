@@ -1,7 +1,9 @@
 import 'server-only';
 import type {FootballClient, SyncRun} from '@/lib/football/sync/context';
 import {chunk} from '@/lib/football/sync/context';
-import type {Candidate, NotificationKind} from './events';
+import {localePath} from '@/lib/auth/next';
+import {routing, type AppLocale} from '@/i18n/routing';
+import type {Candidate, Localized, NotificationKind} from './events';
 import {pushConfigured, sendPush, type PushPayload, type PushTarget} from './push';
 
 /** A match with what it owes: our fixture id and the candidates (events.ts). */
@@ -27,6 +29,17 @@ interface Subscription {
     p256dh: string;
     auth: string;
     failures: number;
+    /** The language of the page that subscribed this browser. */
+    locale: string;
+}
+
+/** The language of a browser, back to the default when it is one the site no longer has. */
+const localeOf = (sub: Subscription): AppLocale => (routing.locales as readonly string[]).includes(sub.locale) ? (sub.locale as AppLocale) : routing.defaultLocale;
+
+/** The notification as that browser reads it: its language, and the link in the same one. */
+function payloadFor(sub: Subscription, text: Localized, url: string, tag: string, kind: NotificationKind): PushPayload {
+    const locale = localeOf(sub);
+    return {...text[locale], url: localePath(locale, url), tag, kind};
 }
 
 interface Send {
@@ -38,7 +51,7 @@ const slugList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s i
 
 /** Every subscribed browser, and the switches of their users (defaults: everything on). */
 async function audience(db: FootballClient, userIds?: string[]): Promise<{subs: Subscription[]; settings: Map<string, Settings>}> {
-    let query = db.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth,failures').limit(20000);
+    let query = db.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth,failures,locale').limit(20000);
     if (userIds) query = query.in('user_id', userIds);
     const {data: subRows, error: subError} = await query;
     if (subError) throw subError;
@@ -143,7 +156,7 @@ export async function dispatchNotifications(db: FootballClient, run: SyncRun, ou
                 if (!follows || muted.has(`${sub.user_id}:${o.fixtureId}`)) continue;
                 for (const candidate of o.candidates) {
                     if (!wants(settings, sub.user_id, candidate.kind)) continue;
-                    sends.push({sub, payload: {title: candidate.title, body: candidate.body, url: `/matches/${o.fixtureId}`, tag: `match-${o.fixtureId}`, kind: candidate.kind}});
+                    sends.push({sub, payload: payloadFor(sub, candidate.text, `/matches/${o.fixtureId}`, `match-${o.fixtureId}`, candidate.kind)});
                 }
             }
         }
@@ -158,14 +171,14 @@ export async function dispatchNotifications(db: FootballClient, run: SyncRun, ou
  * digest): their switches decide, favourites and mutes do not apply.
  * The caller makes sure it is not sent twice. Never throws.
  */
-export async function notifyUsers(db: FootballClient, run: SyncRun, kind: NotificationKind, targets: Array<{userId: string; payload: Omit<PushPayload, 'kind'>}>): Promise<void> {
+export async function notifyUsers(db: FootballClient, run: SyncRun, kind: NotificationKind, targets: Array<{userId: string; text: Localized; url: string; tag: string}>): Promise<void> {
     try {
         if (targets.length === 0 || !pushConfigured()) return;
         const {subs, settings} = await audience(db, [...new Set(targets.map((t) => t.userId))]);
         const sends: Send[] = [];
         for (const target of targets) {
             if (!wants(settings, target.userId, kind)) continue;
-            for (const sub of subs) if (sub.user_id === target.userId) sends.push({sub, payload: {...target.payload, kind}});
+            for (const sub of subs) if (sub.user_id === target.userId) sends.push({sub, payload: payloadFor(sub, target.text, target.url, target.tag, kind)});
         }
         await deliver(db, run, sends);
     } catch (error) {

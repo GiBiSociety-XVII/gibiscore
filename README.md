@@ -37,7 +37,7 @@ homepage mostra dati di esempio (badge "Dati di esempio").
 ## Struttura
 
 ```
-app/[locale]/        route (solo `it` per ora, l'inglese si aggiunge in i18n/routing.ts)
+app/[locale]/        route (`it` all'indirizzo semplice, `en` sotto /en; le lingue stanno in i18n/routing.ts)
 app/api/             health check, cron e diagnostica (protetti da CRON_SECRET)
 components/shared/   primitivi UI "Bold Blocks" (button, card, badge, input), app bar, footer
 components/home/     componenti della homepage
@@ -171,7 +171,9 @@ e iPad solo con il sito aggiunto alla schermata Home.
   l'interruttore generale e i tipi scelti (`notification_settings`) e le
   partite silenziate (`muted_fixtures`), manda a ogni browser iscritto
   (`push_subscriptions`) e dimentica i browser che il servizio push dice
-  spariti.
+  spariti. Ogni notifica è scritta in tutte le lingue del sito e ogni
+  browser riceve la sua (`push_subscriptions.locale`, salvata quando si
+  iscrive), compreso il link che apre.
 - Il profilo (`/account`) attiva o disattiva il dispositivo, mette in pausa
   tutto, sceglie i tipi; la campanella nella pagina della partita silenzia
   quella sola partita (niente spoiler mentre la si guarda). Il service worker
@@ -189,7 +191,18 @@ variante ad accento pieno, iOS la tile nera, `theme-color` `#14131A`.
 
 Struttura alla Diretta/Sofascore: barra laterale con le competizioni
 principali e tutti i paesi, lista risultati al centro, classifiche nella
-colonna di destra. URL in inglese, testi in italiano.
+colonna di destra. URL in inglese.
+
+Il sito è in italiano e in inglese: l'italiano sta all'indirizzo semplice
+(`/predictions`), l'inglese sotto il prefisso (`/en/predictions`). Nella barra
+c'è il codice dell'altra lingua: porta alla stessa pagina, con la stessa query,
+e next-intl ricorda la scelta nel suo cookie. I testi stanno in
+`core/<area>/i18n/<lingua>/<Namespace>.json`, un file per namespace e per
+lingua, con le stesse chiavi. Fuori dai testi delle pagine: la pagina di
+errore, l'immagine della schedina condivisa e le notifiche push hanno il
+loro piccolo dizionario nel file (non possono usare next-intl); ogni browser
+salva la lingua con cui si è iscritto (`push_subscriptions.locale`) e riceve
+le notifiche, e il link che aprono, in quella.
 
 | URL | Contenuto |
 |---|---|

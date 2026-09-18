@@ -6,6 +6,7 @@ import {predictMatch} from '@/lib/football/prediction';
 import {schedinaLost, schedinaWon, type SchedinaKind} from '@/lib/football/schedina';
 import {chunk, failSync, type FootballClient, type SyncRun} from './context';
 import {notifyUsers} from '@/lib/notifications/dispatch';
+import {localize, type Localized} from '@/lib/notifications/events';
 
 /**
  * The record of the advice: what the model proposes for a match is
@@ -98,10 +99,20 @@ export async function settleSchedine(db: FootballClient, run: SyncRun): Promise<
     if (fixturesError) failSync('fixtures.select', fixturesError);
     const byId = new Map(((fixtures ?? []) as Array<{id: number; state: string; home_score: number | null; away_score: number | null}>).map((f) => [f.id, f]));
     let settled = 0;
-    const told: Array<{userId: string; payload: {title: string; body: string; url: string; tag: string}}> = [];
+    const told: Array<{userId: string; text: Localized; url: string; tag: string}> = [];
     const tell = (s: (typeof open)[number], won: boolean, hits: number) => {
         const payout = s.payout !== null ? Number(s.payout) : null;
-        told.push({userId: s.user_id, payload: {title: won ? `Schedina n. ${s.id}: vinta!` : `Schedina n. ${s.id}: persa`, body: `${hits}/${s.selections.length} centrate${won && payout ? ` · vincita ${payout.toFixed(2)} €` : ''}`, url: '/account', tag: `schedina-${s.id}`}});
+        const prize = won && payout ? ` · ${payout.toFixed(2)} €` : '';
+        told.push({
+            userId: s.user_id,
+            text: localize((_w, locale) =>
+                locale === 'en'
+                    ? {title: `Betting slip no. ${s.id}: ${won ? 'won!' : 'lost'}`, body: `${hits}/${s.selections.length} in${prize ? `${prize} payout` : ''}`}
+                    : {title: `Schedina n. ${s.id}: ${won ? 'vinta!' : 'persa'}`, body: `${hits}/${s.selections.length} centrate${prize ? `${prize} di vincita` : ''}`},
+            ),
+            url: '/account',
+            tag: `schedina-${s.id}`,
+        });
     };
     for (const s of open) {
         // Per selection: won, lost, or null while the match is not over (a postponed one waits with the calendar).

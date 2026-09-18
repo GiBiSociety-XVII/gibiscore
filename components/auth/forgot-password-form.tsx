@@ -2,17 +2,19 @@
 
 import {Loader2, Mail, MailCheck} from "lucide-react";
 import {useState} from "react";
-import {useTranslations} from "next-intl";
+import {useLocale, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {Button} from "@/components/shared/ui/button";
 import {createClient} from "@/lib/db/client";
 import {authErrorKey} from "@/lib/auth/errors";
+import {localePath} from "@/lib/auth/next";
 import {Divider, Field, FormError, outlineLink} from "./field";
 
 /** The e-mail, and Supabase sends the link; the link lands on the callback and continues to the new-password page. */
 export function ForgotPasswordForm() {
     const t = useTranslations('Account.password');
     const te = useTranslations('Account.errors');
+    const locale = useLocale();
     const [email, setEmail] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -23,7 +25,7 @@ export function ForgotPasswordForm() {
         setLoading(true);
         setError(null);
         try {
-            const redirectTo = `${window.location.origin}/api/auth/callback?next=${encodeURIComponent('/password/nuova')}`;
+            const redirectTo = `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(localePath(locale, '/password/nuova'))}`;
             const {error} = await createClient().auth.resetPasswordForEmail(email.trim(), {redirectTo});
             if (error) throw error;
             setSent(true);

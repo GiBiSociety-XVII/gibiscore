@@ -2,11 +2,12 @@
 
 import {Loader2, Lock} from "lucide-react";
 import {useEffect, useState} from "react";
-import {useTranslations} from "next-intl";
+import {useLocale, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {Button} from "@/components/shared/ui/button";
 import {createClient} from "@/lib/db/client";
 import {authErrorKey} from "@/lib/auth/errors";
+import {localePath} from "@/lib/auth/next";
 import {Divider, Field, FormError, outlineLink} from "./field";
 
 const MIN = 8;
@@ -15,6 +16,7 @@ const MIN = 8;
 export function NewPasswordForm() {
     const t = useTranslations('Account.password');
     const te = useTranslations('Account.errors');
+    const locale = useLocale();
     const [password, setPassword] = useState('');
     const [repeat, setRepeat] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function NewPasswordForm() {
             const {error} = await createClient().auth.updateUser({password});
             if (error) throw error;
             // A full load, so the server sees the session with the new password.
-            window.location.assign(`${window.location.origin}/account`);
+            window.location.assign(`${window.location.origin}${localePath(locale, '/account')}`);
         } catch (err) {
             setError(te(authErrorKey(err instanceof Error ? err.message : '')));
             setLoading(false);

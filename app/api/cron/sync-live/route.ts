@@ -5,6 +5,7 @@ import {sleep} from '@/lib/api-football/client';
 import {cronRoute} from '@/lib/football/sync/run-job';
 import {syncLive} from '@/lib/football/sync/fixtures';
 import {AUCTION_LEAGUES} from '@/lib/fantasy/config';
+import {everyLocalePath} from '@/lib/auth/next';
 
 /** The competitions a fantasy roster can be drawn from: a live match of theirs moves the lineup's live score. */
 const FANTASY_SLUGS = new Set(AUCTION_LEAGUES.flatMap((l) => l.slugs));
@@ -48,10 +49,9 @@ export async function GET(request: NextRequest) {
 async function refreshMoved(sinceIso: string): Promise<void> {
     try {
         const {data} = await createServiceClient().from('fixtures').select('id,league:leagues!inner(slug),home:teams!fixtures_home_team_id_fkey(slug),away:teams!fixtures_away_team_id_fkey(slug)').gte('last_synced_at', sinceIso).limit(200);
-        // The default locale has no prefix on the URL, the cache may know either form.
+        // The default locale has no prefix on the URL, the cache may know any form.
         const refresh = (path: string) => {
-            revalidatePath(path);
-            revalidatePath(`/it${path}`);
+            for (const p of everyLocalePath(path)) revalidatePath(p);
         };
         let fantasy = false;
         for (const row of (data ?? []) as unknown as Array<{id: number; league: {slug: string} | null; home: {slug: string} | null; away: {slug: string} | null}>) {

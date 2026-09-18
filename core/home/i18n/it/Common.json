@@ -3,6 +3,9 @@
   "tagline": "Tutto il calcio in numeri.",
   "sampleData": "Dati di esempio",
   "loading": "Caricamento…",
+  "meta": {
+    "description": "GiBiScore: risultati live, classifiche e statistiche di squadre e giocatori di tutte le competizioni di calcio del mondo."
+  },
   "notFound": {
     "title": "Pagina non trovata",
     "description": "La pagina che cerchi non esiste o è stata spostata.",
@@ -83,6 +86,10 @@
   "theme": {
     "toDark": "Passa al tema scuro",
     "toLight": "Passa al tema chiaro"
+  },
+  "locale": {
+    "label": "Lingua",
+    "switchTo": "Passa a {language}"
   },
   "share": {
     "share": "Condividi",

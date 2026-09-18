@@ -1,5 +1,6 @@
 import type {EventKind} from '@/lib/api-football/mappers';
 import {LIVE_STATES, type FixtureState} from '@/lib/football/types';
+import {routing, type AppLocale} from '@/i18n/routing';
 
 /**
  * What a match can tell a fan who follows its competition or one of its
@@ -13,12 +14,29 @@ export type NotificationKind = 'kickoff' | 'half_time' | 'full_time' | 'goal' | 
 
 export const NOTIFICATION_KINDS: readonly NotificationKind[] = ['reminder', 'lineups', 'kickoff', 'goal', 'red_card', 'half_time', 'full_time', 'digest', 'schedina'];
 
+/** The same notification in every language of the site: the browser's own is picked when it is sent. */
+export type Localized = Record<AppLocale, {title: string; body: string}>;
+
 export interface Candidate {
     kind: NotificationKind;
     /** Unique per fixture: the same key is never sent twice. */
     key: string;
-    title: string;
-    body: string;
+    text: Localized;
+}
+
+/** The words of the notifications, per language: they are built outside the pages, with no translation layer. */
+const WORDS = {
+    it: {kickoff: "Calcio d'inizio", halfTime: 'Fine primo tempo', fullTime: 'Finale', goal: 'Gol', penalty: ' su rigore', ownGoal: ' (autogol)', sentOff: 'Espulso', inAnHour: "Tra un'ora", lineups: 'Formazioni ufficiali'},
+    en: {kickoff: 'Kick-off', halfTime: 'Half time', fullTime: 'Full time', goal: 'Goal', penalty: ' (penalty)', ownGoal: ' (own goal)', sentOff: 'Sent off', inAnHour: 'In an hour', lineups: 'Official lineups'},
+} as const satisfies Record<AppLocale, Record<string, string>>;
+
+type Words = (typeof WORDS)[AppLocale];
+
+/** The same text written once per language. */
+export function localize(make: (w: Words, locale: AppLocale) => {title: string; body: string}): Localized {
+    const out = {} as Localized;
+    for (const locale of routing.locales) out[locale] = make(WORDS[locale], locale);
+    return out;
 }
 
 /** What the database knew of the match before this pass; null when it never saw it. */
@@ -69,9 +87,9 @@ const clock = (e: MatchEvent) => `${e.minute ?? 0}${e.extraMinute ? `+${e.extraM
 export function detectChanges(prev: Previous | null, f: MatchFacts): Candidate[] {
     if (!prev) return [];
     const out: Candidate[] = [];
-    if (prev.state === 'scheduled' && isLive(f.state)) out.push({kind: 'kickoff', key: 'kickoff', title: `Calcio d'inizio: ${f.home} – ${f.away}`, body: f.league});
-    if (f.state === 'half_time' && prev.state !== 'half_time') out.push({kind: 'half_time', key: 'half_time', title: `Fine primo tempo: ${score(f)}`, body: f.league});
-    if (f.state === 'finished' && isLive(prev.state)) out.push({kind: 'full_time', key: 'full_time', title: `Finale: ${score(f)}`, body: f.league});
+    if (prev.state === 'scheduled' && isLive(f.state)) out.push({kind: 'kickoff', key: 'kickoff', text: localize((w) => ({title: `${w.kickoff}: ${f.home} – ${f.away}`, body: f.league}))});
+    if (f.state === 'half_time' && prev.state !== 'half_time') out.push({kind: 'half_time', key: 'half_time', text: localize((w) => ({title: `${w.halfTime}: ${score(f)}`, body: f.league}))});
+    if (f.state === 'finished' && isLive(prev.state)) out.push({kind: 'full_time', key: 'full_time', text: localize((w) => ({title: `${w.fullTime}: ${score(f)}`, body: f.league}))});
 
     if (isLive(f.state) || f.state === 'finished') {
         const now = f.minute ?? (f.state === 'finished' ? 90 : 0);
@@ -81,19 +99,19 @@ export function detectChanges(prev: Previous | null, f: MatchFacts): Candidate[]
             const scorer = e.teamProviderId === f.homeProviderId ? f.home : f.away;
             const who = e.player ?? '';
             if (e.kind === 'goal' || e.kind === 'penalty' || e.kind === 'own_goal') {
-                const how = e.kind === 'penalty' ? ' su rigore' : e.kind === 'own_goal' ? ' (autogol)' : '';
                 out.push({
                     kind: 'goal',
                     key: `goal:${e.teamProviderId ?? 0}:${minute}+${e.extraMinute ?? 0}:${who}`,
-                    title: `⚽ Gol ${scorer}${how}! ${score(f)}`,
-                    body: `${clock(e)} ${who}${who ? ' · ' : ''}${f.league}`,
+                    text: localize((w) => ({
+                        title: `⚽ ${w.goal} ${scorer}${e.kind === 'penalty' ? w.penalty : e.kind === 'own_goal' ? w.ownGoal : ''}! ${score(f)}`,
+                        body: `${clock(e)} ${who}${who ? ' · ' : ''}${f.league}`,
+                    })),
                 });
             } else if (e.kind === 'red_card' || e.kind === 'yellow_red_card') {
                 out.push({
                     kind: 'red_card',
                     key: `red:${e.teamProviderId ?? 0}:${minute}:${who}`,
-                    title: `🟥 Espulso ${who || scorer}${who ? ` (${scorer})` : ''}`,
-                    body: `${clock(e)} · ${score(f)}`,
+                    text: localize((w) => ({title: `🟥 ${w.sentOff} ${who || scorer}${who ? ` (${scorer})` : ''}`, body: `${clock(e)} · ${score(f)}`})),
                 });
             }
         }
@@ -101,13 +119,19 @@ export function detectChanges(prev: Previous | null, f: MatchFacts): Candidate[]
     return out;
 }
 
-/** Kick-off in an hour: one notification per match, with the time. */
+/** Kick-off in an hour: one notification per match, with the time (always the Italian clock, where the matches are played). */
 export function reminderCandidate(f: Pick<MatchFacts, 'home' | 'away' | 'league'>, startingAt: string): Candidate {
-    const time = new Intl.DateTimeFormat('it-IT', {timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit'}).format(new Date(startingAt));
-    return {kind: 'reminder', key: 'reminder', title: `Tra un'ora: ${f.home} – ${f.away}`, body: `${time} · ${f.league}`};
+    return {
+        kind: 'reminder',
+        key: 'reminder',
+        text: localize((w, locale) => ({
+            title: `${w.inAnHour}: ${f.home} – ${f.away}`,
+            body: `${new Intl.DateTimeFormat(locale, {timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit'}).format(new Date(startingAt))} · ${f.league}`,
+        })),
+    };
 }
 
 /** The official lineups are out: one notification per match, an hour or so before kick-off. */
 export function lineupsCandidate(f: Pick<MatchFacts, 'home' | 'away' | 'league'>): Candidate {
-    return {kind: 'lineups', key: 'lineups', title: `Formazioni ufficiali: ${f.home} – ${f.away}`, body: f.league};
+    return {kind: 'lineups', key: 'lineups', text: localize((w) => ({title: `${w.lineups}: ${f.home} – ${f.away}`, body: f.league}))};
 }

@@ -48,7 +48,7 @@ export async function subscribePush(): Promise<'ok' | 'denied' | 'error'> {
         await navigator.serviceWorker.ready;
         const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: serverKey() as BufferSource}));
         const json = sub.toJSON();
-        const res = await fetch('/api/notifications/subscribe', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({endpoint: json.endpoint, keys: json.keys, userAgent: navigator.userAgent})});
+        const res = await fetch('/api/notifications/subscribe', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({endpoint: json.endpoint, keys: json.keys, userAgent: navigator.userAgent, locale: document.documentElement.lang})});
         return res.ok ? 'ok' : 'error';
     } catch {
         return 'error';

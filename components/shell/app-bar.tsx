@@ -9,6 +9,7 @@ import {NavMegaMenu} from "./nav-mega-menu";
 import {AccountButton} from "./account-button";
 import {SearchBox} from "./search-box";
 import {ThemeToggle} from "./theme-toggle";
+import {LocaleSwitch} from "./locale-switch";
 import {useNavColumns} from "./nav-sections";
 
 /** Same bar as gibiarena.com: lockup, dropdown sections, live link, search pill. */
@@ -93,6 +94,7 @@ export default function AppBar() {
                     </nav>
 
                     <SearchBox />
+                    <LocaleSwitch />
                     <ThemeToggle />
                     <AccountButton />
                 </div>

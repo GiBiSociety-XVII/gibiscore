@@ -2,11 +2,11 @@ import type {Metadata, Viewport} from "next";
 import {Geist, Geist_Mono} from "next/font/google";
 import "../globals.css";
 import {hasLocale, NextIntlClientProvider} from "next-intl";
-import {getMessages, setRequestLocale} from "next-intl/server";
+import {getMessages, getTranslations, setRequestLocale} from "next-intl/server";
 import {notFound} from "next/navigation";
 import {Analytics} from "@vercel/analytics/react";
 import {SpeedInsights} from "@vercel/speed-insights/react";
-import {routing} from "@/i18n/routing";
+import {ogLocales, routing, type AppLocale} from "@/i18n/routing";
 import {AccountFavoritesSync} from "@/components/shell/account-favorites-sync";
 import {IosInstallBanner} from "@/components/shell/ios-install-banner";
 
@@ -26,19 +26,28 @@ const geistMono = Geist_Mono({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://gibiscore.com";
 
-export const metadata: Metadata = {
+/** Title, description and Open Graph language follow the page's language; the icons are the same everywhere. */
+export async function generateMetadata({params}: LayoutProps<"/[locale]">): Promise<Metadata> {
+    const {locale} = await params;
+    const known = hasLocale(routing.locales, locale) ? locale : routing.defaultLocale;
+    const t = await getTranslations({locale: known, namespace: 'Common.meta'});
+    return {
+        ...metadata,
+        description: t('description'),
+        openGraph: {...metadata.openGraph, locale: ogLocales[known as AppLocale]},
+    };
+}
+
+const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
     title: {
         default: "GiBiScore",
         template: "%s | GiBiScore",
     },
-    description:
-        "GiBiScore: risultati live, classifiche e statistiche di squadre e giocatori di tutte le competizioni di calcio del mondo.",
     applicationName: "GiBiScore",
     openGraph: {
         type: "website",
         siteName: "GiBiScore",
-        locale: "it_IT",
     },
     // Identity GiBi: favicon in the full-accent variant, black tile for iOS.
     icons: {

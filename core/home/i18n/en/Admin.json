@@ -1,0 +1,47 @@
+{
+  "title": "Admin panel",
+  "intro": "Tools reserved for the site administrator.",
+  "deniedTitle": "Restricted access",
+  "deniedText": "This page is available to the site administrator only.",
+  "backHome": "Back to the home page",
+  "tools": {
+    "votes": {
+      "title": "Newspaper ratings",
+      "text": "The app's real ratings, matchday by matchday, to calibrate the estimates."
+    },
+    "model": {
+      "title": "How accurate it is",
+      "text": "Gap between real ratings and the site's estimates, by role and tier."
+    },
+    "names": {
+      "title": "Names as in Fantacalcio",
+      "text": "Renames Serie A players the way the official list spells them (Valde becomes Valdepenas). The ratings files do the same on their own.",
+      "run": "Align the names",
+      "running": "Aligning…",
+      "done": "{matched} players found on the list, {renamed} renamed, {unmatched} list entries without a player.",
+      "error": "Failed, try again."
+    },
+    "sync": {
+      "title": "Job status",
+      "text": "Last run of every sync job, errors of the last 24 hours and the API-Football quota."
+    }
+  },
+  "sync": {
+    "title": "Job status",
+    "intro": "Every sync job with its last run; failed runs in red, jobs idle for more than a day in grey.",
+    "toAdmin": "Admin panel",
+    "requestsToday": "Requests today (UTC)",
+    "quotaLeft": "API quota left",
+    "quotaRead": "Quota read at",
+    "errors24h": "Errors 24h",
+    "jobs": "Jobs",
+    "job": "Job",
+    "lastRun": "Last run",
+    "status": "Status",
+    "seconds": "Sec",
+    "requests": "Requests",
+    "runs24h": "Runs 24h",
+    "requests24h": "Requests 24h",
+    "counters": "Counters and warnings"
+  }
+}

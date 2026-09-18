@@ -2,6 +2,7 @@ import 'server-only';
 import {romeDate} from '@/lib/football/data/scores';
 import {chunk, getState, setState, type FootballClient, type SyncRun} from '@/lib/football/sync/context';
 import {notifyUsers} from './dispatch';
+import {localize, type Localized} from './events';
 
 /** The users already served today, so a second run of the day sends nothing twice. */
 const STATE_KEY = 'notifications_digest';
@@ -52,12 +53,18 @@ export async function sendDigest(db: FootballClient, run: SyncRun): Promise<void
         return;
     }
 
-    const targets: Array<{userId: string; payload: {title: string; body: string; url: string; tag: string}}> = [];
+    const targets: Array<{userId: string; text: Localized; url: string; tag: string}> = [];
     for (const userId of userIds) {
         const mine = favorites.get(userId) ?? [];
         const lines = results.filter((f) => mine.includes(f.home!.slug) || mine.includes(f.away!.slug)).map((f) => `${f.home!.name} ${f.home_score ?? 0}-${f.away_score ?? 0} ${f.away!.name}`);
         if (lines.length === 0) continue;
-        targets.push({userId, payload: {title: lines.length === 1 ? 'Oggi la tua squadra' : 'Oggi le tue squadre', body: lines.join(' · '), url: '/', tag: `digest-${today}`}});
+        const one = lines.length === 1;
+        targets.push({
+            userId,
+            text: localize((_w, locale) => ({title: locale === 'en' ? (one ? 'Your team today' : 'Your teams today') : one ? 'Oggi la tua squadra' : 'Oggi le tue squadre', body: lines.join(' · ')})),
+            url: '/',
+            tag: `digest-${today}`,
+        });
     }
     await notifyUsers(db, run, 'digest', targets);
     run.bump('digest_users', targets.length);
