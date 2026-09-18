@@ -16,7 +16,8 @@
     "noAccount": "Non hai un account?",
     "createAccount": "Crea un account",
     "footer": "Proteggi il tuo account con una password sicura",
-    "linkError": "Il link non è più valido: accedi o registrati di nuovo"
+    "linkError": "Il link non è più valido: accedi o registrati di nuovo",
+    "forgot": "Password dimenticata?"
   },
   "signUp": {
     "title": "Crea un account",
@@ -99,5 +100,30 @@
       "error": "Non salvato: riprova.",
       "unmute": "Riattiva"
     }
+  },
+  "password": {
+    "title": "Password dimenticata",
+    "subtitle": "Scrivi l'email dell'account: ti mandiamo un link per scegliere una password nuova.",
+    "email": "Email",
+    "emailPlaceholder": "tuo@email.com",
+    "send": "Mandami il link",
+    "sending": "Invio in corso...",
+    "sentTitle": "Controlla la posta",
+    "sentText": "Se {email} ha un account, tra poco arriva un'email con il link. Vale per un'ora; guarda anche nello spam.",
+    "remembered": "Te la ricordi?",
+    "toSignIn": "Accedi",
+    "footer": "Il link vale un'ora e una volta sola.",
+    "newTitle": "Nuova password",
+    "newSubtitle": "Scegline una che usi solo qui.",
+    "newPassword": "Nuova password",
+    "repeat": "Ripeti la password",
+    "hint": "Almeno {min} caratteri",
+    "tooShort": "La password deve avere almeno {min} caratteri",
+    "mismatch": "Le due password non coincidono",
+    "save": "Salva la password",
+    "saving": "Salvataggio...",
+    "expiredTitle": "Link scaduto",
+    "expiredText": "Il link non è più valido o è già stato usato: richiedine uno nuovo.",
+    "again": "Richiedi un nuovo link"
   }
 }

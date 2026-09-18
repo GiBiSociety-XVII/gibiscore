@@ -17,6 +17,7 @@ import {getStandingsBySlug} from "@/lib/football/data/competitions";
 import {getTeamPage} from "@/lib/football/data/teams";
 import {getVoteScale} from "@/lib/fantasy/calibration-data";
 import {GOOD_VOTO, meanVoto} from "@/lib/fantasy/voto";
+import {JsonLd, SITE_URL} from "@/components/seo/json-ld";
 
 // Refreshed by the live sync while the club plays; the timer catches the rest.
 // The live sync renders the page again whenever one of the club's matches moves; the timer only catches the rest.
@@ -48,6 +49,17 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
     }
 
     const {team} = page;
+    // What the search engines read of the club.
+    const structured = {
+        '@context': 'https://schema.org',
+        '@type': 'SportsTeam',
+        name: team.name,
+        sport: 'Soccer',
+        url: `${SITE_URL}/teams/${team.slug}`,
+        ...(team.logoUrl ? {logo: team.logoUrl} : {}),
+        ...(team.country ? {location: {'@type': 'Place', name: team.country}} : {}),
+        ...(team.founded ? {foundingDate: String(team.founded)} : {}),
+    };
     const tables = (await Promise.all(page.standings.slice(0, 4).map((s) => getStandingsBySlug(s.competition.slug)))).filter((x): x is NonNullable<typeof x> => x !== null && x.groups.length > 0);
     const squadByPosition = POSITIONS.map((pos) => ({pos, players: page.squad.filter((p) => p.position === pos)}));
     const others = page.squad.filter((p) => !POSITIONS.includes(p.position as (typeof POSITIONS)[number]));
@@ -216,6 +228,7 @@ export default async function TeamPage({params}: PageProps<"/[locale]/teams/[slu
 
     return (
         <SiteShell rail={rail}>
+            <JsonLd data={structured} />
             <PageHeader
                 visual={<TeamCrest team={team} size={48} />}
                 title={team.name}

@@ -42,6 +42,7 @@ export function SignInForm({next, initialError = null}: {next: string; /** Shown
                 <Field id="email" label={t('email')} icon={<Mail />} type="email" autoComplete="email" placeholder={t('emailPlaceholder')} required value={email} onChange={(e) => setEmail(e.target.value)} />
                 <Field id="password" label={t('password')} icon={<Lock />} type="password" autoComplete="current-password" placeholder="••••••••" required value={password} onChange={(e) => setPassword(e.target.value)} />
                 {error && <FormError>{error}</FormError>}
+                <p className="text-right -mt-2"><Link href="/password" className="text-sm font-bold text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-2">{t('forgot')}</Link></p>
                 <Button type="submit" disabled={loading} className="w-full">
                     {loading ? (
                         <>

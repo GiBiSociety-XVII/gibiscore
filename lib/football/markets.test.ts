@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandHeat, bandOf, BANDS, expectedTotals, fairOdds, legOdds, matchMarkets, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {bandHeat, bandOf, BANDS, expectedTotals, fairOdds, legOdds, matchMarkets, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts, isValueSlip, slipEdge} from './markets';
 import {scoreGrid} from './prediction';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
@@ -187,5 +187,16 @@ describe('suggestBets', () => {
         expect(legOdds(odds, '1X')).toBe(1.2);
         expect(legOdds(odds, 'under35')).toBe(1.33);
         expect(legOdds(null, '1')).toBeNull();
+    });
+});
+
+describe('slipEdge', () => {
+    it('measures the return at the book price and flags value from +3%', () => {
+        expect(slipEdge({pct: 50, odds: 2.2})).toBe(0.1);
+        expect(slipEdge({pct: 50, odds: 1.9})).toBe(-0.05);
+        expect(slipEdge({pct: 50, odds: null})).toBeNull();
+        expect(isValueSlip({pct: 50, odds: 2.06})).toBe(true);
+        expect(isValueSlip({pct: 50, odds: 2.04})).toBe(false);
+        expect(isValueSlip({pct: 50, odds: null})).toBe(false);
     });
 });

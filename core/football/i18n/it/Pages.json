@@ -442,7 +442,9 @@
       "all": "7 giorni",
       "competition": "Competizione",
       "allCompetitions": "Tutte le competizioni",
-      "count": "{count} partite"
+      "count": "{count} partite",
+      "value": "Solo valore",
+      "valueHint": "Solo le partite con almeno una giocata di valore: la quota media dei bookmaker paga più della quota equa del modello (ritorno atteso di almeno il +3%)."
     },
     "adviceLegend": "Sotto ogni partita le tre giocate del modello, le stesse dell'analisi partita: prudente (dal 78% di probabilità), consigliata (dal 62%), audace (dal 45%). Apri la partita per probabilità complete e quote. Non è un consiglio di gioco.",
     "noAdvice": "Nessuna giocata abbastanza probabile per questa fascia.",
@@ -598,7 +600,7 @@
         "shareText": "La mia schedina generata dal modello di GiBiScore"
       }
     },
-    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa.",
+    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Il bollino verde +N% segna una giocata di valore: i bookmaker pagano più della quota equa del modello. Tocca la partita per l'analisi completa.",
     "tour": {
       "button": "Guida",
       "open": "Rivedi la guida passo passo della pagina pronostici",
@@ -636,7 +638,8 @@
           "text": "Ogni giocata proposta viene scritta prima del calcio d'inizio e verificata sul risultato finale: qui vedi quante ne vince ogni livello contro quanto prometteva, la taratura del modello e le tue schedine salvate."
         }
       }
-    }
+    },
+    "valueBadge": "valore +{edge}%"
   },
   "schedinaShare": {
     "title": "Schedina condivisa",

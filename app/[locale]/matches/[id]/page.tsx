@@ -11,6 +11,7 @@ import {Lineups} from "@/components/football/lineups";
 import {MatchStudy} from "@/components/football/match-study";
 import {MatchMarkets} from "@/components/football/match-markets";
 import {MuteBell} from "@/components/football/mute-bell";
+import {eventStatus, JsonLd, SITE_URL} from "@/components/seo/json-ld";
 import {getMatchMarkets} from "@/lib/football/data/markets";
 import {getFixtureOdds} from "@/lib/football/data/odds";
 import {getPredictionTuning} from "@/lib/football/data/tuning";
@@ -77,6 +78,26 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     const {fixture} = page;
     const [study, prior, markets, odds, tuning] = fixture.seasonId ? await Promise.all([getSeasonStudy(fixture.seasonId), getPriorStudy(fixture.seasonId), getMatchMarkets(fixture.id, fixture.seasonId, fixture.home.id, fixture.away.id), getFixtureOdds(fixture.id), getPredictionTuning()]) : [null, null, null, null, undefined];
     const prediction = predictMatch(study, fixture.home.id, fixture.away.id, prior, tuning);
+    // What the search engines read of the match: teams, kick-off, ground, competition.
+    const structured = {
+        '@context': 'https://schema.org',
+        '@type': 'SportsEvent',
+        name: `${fixture.home.name} - ${fixture.away.name}`,
+        sport: 'Soccer',
+        startDate: fixture.startingAt,
+        eventStatus: eventStatus(fixture.state),
+        eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+        url: `${SITE_URL}/matches/${fixture.id}`,
+        ...(fixture.venue ? {location: {'@type': 'Place', name: fixture.venue}} : {}),
+        homeTeam: {'@type': 'SportsTeam', name: fixture.home.name, url: `${SITE_URL}/teams/${fixture.home.slug}`, ...(fixture.home.logoUrl ? {logo: fixture.home.logoUrl} : {})},
+        awayTeam: {'@type': 'SportsTeam', name: fixture.away.name, url: `${SITE_URL}/teams/${fixture.away.slug}`, ...(fixture.away.logoUrl ? {logo: fixture.away.logoUrl} : {})},
+        competitor: [
+            {'@type': 'SportsTeam', name: fixture.home.name, url: `${SITE_URL}/teams/${fixture.home.slug}`},
+            {'@type': 'SportsTeam', name: fixture.away.name, url: `${SITE_URL}/teams/${fixture.away.slug}`},
+        ],
+        organizer: {'@type': 'SportsOrganization', name: fixture.competition.name, url: `${SITE_URL}/competitions/${fixture.competition.slug}`},
+        description: t('metaDescription', {home: fixture.home.name, away: fixture.away.name, competition: fixture.competition.name}),
+    };
     const hasAbsences = page.absences.home.length > 0 || page.absences.away.length > 0;
     const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const isLive = LIVE_STATES.includes(fixture.state);
@@ -183,6 +204,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
     return (
         <SiteShell rail={rail}>
             <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
+            <JsonLd data={structured} />
             <AutoRefresh seconds={20} enabled={isLive} aroundIso={fixture.state === 'scheduled' ? fixture.startingAt : undefined} />
             {/* Scoreboard */}
             <section data-tour="score" className="bb-surface overflow-hidden">
