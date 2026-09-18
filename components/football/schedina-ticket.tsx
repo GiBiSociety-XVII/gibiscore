@@ -1,5 +1,6 @@
 'use client';
 
+import {Trash2} from "lucide-react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
@@ -62,7 +63,7 @@ const SETTLE_AFTER_MS = 2 * 3_600_000;
  * its number and date, the selections one under the other, the tear
  * line, the stake and what it pays, the stamp of how it went.
  */
-export function SchedinaTicket({ticket, shareToken}: {ticket: Ticket; /** With a token the ticket can be shared: /schedine/<token>. */ shareToken?: string | null}) {
+export function SchedinaTicket({ticket, shareToken, onDelete, deleting = false}: {ticket: Ticket; /** With a token the ticket can be shared: /schedine/<token>. */ shareToken?: string | null; /** Only its own owner gets this: the shared page passes nothing and no button is drawn. */ onDelete?: () => void; deleting?: boolean}) {
     const t = useTranslations('Pages.predictions.mine');
     const ts = useTranslations('Pages.predictions.schedina');
     const tm = useTranslations('Football.markets');
@@ -155,6 +156,18 @@ export function SchedinaTicket({ticket, shareToken}: {ticket: Ticket; /** With a
                         : `${t('ticket.settled')}${ticket.hits !== null ? ` · ${t('hits', {hits: ticket.hits, size: ticket.size})}` : ''}`}
                 </span>
                 <span className="flex items-center gap-2 shrink-0">
+                    {onDelete && (
+                        <button
+                            type="button"
+                            onClick={onDelete}
+                            disabled={deleting}
+                            aria-label={t('ticket.delete')}
+                            title={t('ticket.delete')}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded border border-foreground/40 bg-background hover:bg-red-100 hover:border-red-700 hover:text-red-700 disabled:opacity-40 transition-colors"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                        </button>
+                    )}
                     {shareToken && <ShareButton compact path={`/schedine/${shareToken}`} title={t('ticket.shareTitle', {id: ticket.id})} text={t('ticket.shareText')} label={t('ticket.share')} />}
                     <span className="font-mono text-[9px] font-extrabold tracking-[0.2em] text-foreground">GIBISCORE</span>
                     <span aria-hidden="true" className="flex items-end gap-px h-4">

@@ -59,7 +59,7 @@
       "record": "Model record"
     },
     "schedine": "My betting slips",
-    "schedineHint": "Every saved slip stays open until its matches are over, then settles itself on the real results: won or lost, with the outcome of every selection.",
+    "schedineHint": "Every saved slip stays open until its matches are over, then settles itself on the real results: won or lost, with the outcome of every selection. The bin on a slip deletes it: it leaves the record and its shared link stops working.",
     "favorites": {
       "title": "My favourites",
       "competitions": "Competitions",

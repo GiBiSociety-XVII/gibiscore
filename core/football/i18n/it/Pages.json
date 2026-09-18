@@ -598,7 +598,10 @@
         "settled": "Chiusa",
         "share": "Condividi",
         "shareTitle": "Schedina n. {id} · GiBiScore",
-        "shareText": "La mia schedina generata dal modello di GiBiScore"
+        "shareText": "La mia schedina generata dal modello di GiBiScore",
+        "delete": "Elimina",
+        "deleteConfirm": "Eliminare la schedina n. {id}? Sparisce dal bilancio e il link condiviso smette di funzionare. Non si può annullare.",
+        "deleteError": "Non eliminata: riprova."
       }
     },
     "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Il bollino verde +N% segna una giocata di valore: i bookmaker pagano più della quota equa del modello. Tocca la partita per l'analisi completa.",

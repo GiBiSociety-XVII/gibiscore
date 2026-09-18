@@ -38,6 +38,9 @@ const num = (v: number | string | null): number | null => (v === null ? null : N
 export function MySchedine({title, help}: {title?: string; help?: string} = {}) {
     const t = useTranslations('Pages.predictions.mine');
     const [rows, setRows] = useState<Row[] | null | undefined>(undefined);
+    /** The slip being deleted, and the last deletion that did not go through. */
+    const [deleting, setDeleting] = useState<number | null>(null);
+    const [failed, setFailed] = useState<number | null>(null);
     useEffect(() => {
         let alive = true;
         let supabase: ReturnType<typeof createClient>;
@@ -56,6 +59,22 @@ export function MySchedine({title, help}: {title?: string; help?: string} = {}) 
         }).catch(() => { if (alive) setRows(null); });
         return () => { alive = false; };
     }, []);
+    /** Deletes one of my own slips: the database only lets the owner through (policy schedine_own_delete). */
+    const remove = async (id: number) => {
+        if (!window.confirm(t('ticket.deleteConfirm', {id}))) return;
+        setDeleting(id);
+        setFailed(null);
+        try {
+            const {error} = await createClient().from('schedine').delete().eq('id', id);
+            if (error) throw error;
+            setRows((list) => (list ?? []).filter((r) => r.id !== id));
+        } catch {
+            setFailed(id);
+        } finally {
+            setDeleting(null);
+        }
+    };
+
     if (rows === undefined || rows === null) return null;
     const settled = rows.filter((r) => r.hit !== null);
     const won = settled.filter((r) => r.hit).length;
@@ -85,7 +104,12 @@ export function MySchedine({title, help}: {title?: string; help?: string} = {}) 
                 <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('empty')}</p>
             ) : (
                 <div className="p-3 grid gap-4 grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 items-start bg-muted/40">
-                    {tickets.map((ticket, i) => <SchedinaTicket key={ticket.id} ticket={ticket} shareToken={rows[i].share_token} />)}
+                    {tickets.map((ticket, i) => (
+                        <div key={ticket.id} className="flex flex-col gap-1">
+                            <SchedinaTicket ticket={ticket} shareToken={rows[i].share_token} onDelete={() => remove(ticket.id)} deleting={deleting === ticket.id} />
+                            {failed === ticket.id && <p role="alert" className="text-[11px] font-bold text-red-700">{t('ticket.deleteError')}</p>}
+                        </div>
+                    ))}
                 </div>
             )}
         </Panel></div>

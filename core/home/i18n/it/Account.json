@@ -59,7 +59,7 @@
       "record": "Bilancio del modello"
     },
     "schedine": "Le mie schedine",
-    "schedineHint": "Ogni schedina salvata resta aperta finché le sue partite non sono finite, poi si chiude da sola sui risultati reali: vinta o persa, con l'esito di ogni selezione.",
+    "schedineHint": "Ogni schedina salvata resta aperta finché le sue partite non sono finite, poi si chiude da sola sui risultati reali: vinta o persa, con l'esito di ogni selezione. Il cestino su una schedina la elimina: sparisce dal bilancio e il suo link condiviso smette di funzionare.",
     "favorites": {
       "title": "I miei preferiti",
       "competitions": "Competizioni",

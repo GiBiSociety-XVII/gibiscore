@@ -598,7 +598,10 @@
         "settled": "Settled",
         "share": "Share",
         "shareTitle": "Betting slip no. {id} · GiBiScore",
-        "shareText": "My betting slip built by the GiBiScore model"
+        "shareText": "My betting slip built by the GiBiScore model",
+        "delete": "Delete",
+        "deleteConfirm": "Delete betting slip no. {id}? It leaves the record and its shared link stops working. This cannot be undone.",
+        "deleteError": "Not deleted: try again."
       }
     },
     "legendShort": "Under every match the model's three picks: cautious from 78% probability, recommended from 62%, bold from 45%. The green +N% badge marks a value pick: the bookmakers pay more than the model's fair odds. Tap the match for the full analysis.",
