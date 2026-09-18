@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
-/* Force light mode globally — dark: variants never apply. */
-@variant dark (&:where(.dark, .dark *));
-
-/* Opt out of mobile browser auto-dark (Android Chrome/Brave "Darken websites"). */
+/* One theme, the paper one: the mobile browsers' own darkening is turned off
+   (Android Chrome/Brave "Darken websites") so the colours stay as drawn. */
 :root,
 html,
 body {

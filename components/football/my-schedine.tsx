@@ -3,6 +3,7 @@
 import {useEffect, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Panel} from "@/components/shell/panel";
+import {Help} from "@/components/fantasy/help";
 import {createClient} from "@/lib/db/client";
 import {SchedinaTicket, type Ticket, type TicketLine, type TicketSelection} from "./schedina-ticket";
 
@@ -23,6 +24,8 @@ interface Row {
     created_at: string;
     hits: number | null;
     hit: boolean | null;
+    results: Array<boolean | null> | null;
+    share_token: string | null;
 }
 
 const num = (v: number | string | null): number | null => (v === null ? null : Number(v));
@@ -32,9 +35,12 @@ const num = (v: number | string | null): number | null => (v === null ? null : N
  * ticket: open until its matches are over, then won or lost. Read in the
  * browser: the page stays static. Nothing is drawn for a visitor.
  */
-export function MySchedine({title}: {title?: string} = {}) {
+export function MySchedine({title, help}: {title?: string; help?: string} = {}) {
     const t = useTranslations('Pages.predictions.mine');
     const [rows, setRows] = useState<Row[] | null | undefined>(undefined);
+    /** The slip being deleted, and the last deletion that did not go through. */
+    const [deleting, setDeleting] = useState<number | null>(null);
+    const [failed, setFailed] = useState<number | null>(null);
     useEffect(() => {
         let alive = true;
         let supabase: ReturnType<typeof createClient>;
@@ -47,12 +53,28 @@ export function MySchedine({title}: {title?: string} = {}) {
         supabase.auth.getUser().then(({data}) => {
             if (!alive) return;
             if (!data.user) { setRows(null); return; }
-            Promise.resolve(supabase.from('schedine').select('id,kind,risk,size,system_of,selections,pct,fair,book,stake,payout,lines,last_kickoff,created_at,hits,hit').order('created_at', {ascending: false}).limit(50))
+            Promise.resolve(supabase.from('schedine').select('id,kind,risk,size,system_of,selections,pct,fair,book,stake,payout,lines,last_kickoff,created_at,hits,hit,results,share_token').order('created_at', {ascending: false}).limit(50))
                 .then(({data: list}) => { if (alive) setRows((list ?? []) as unknown as Row[]); })
                 .catch(() => { if (alive) setRows([]); });
         }).catch(() => { if (alive) setRows(null); });
         return () => { alive = false; };
     }, []);
+    /** Deletes one of my own slips: the database only lets the owner through (policy schedine_own_delete). */
+    const remove = async (id: number) => {
+        if (!window.confirm(t('ticket.deleteConfirm', {id}))) return;
+        setDeleting(id);
+        setFailed(null);
+        try {
+            const {error} = await createClient().from('schedine').delete().eq('id', id);
+            if (error) throw error;
+            setRows((list) => (list ?? []).filter((r) => r.id !== id));
+        } catch {
+            setFailed(id);
+        } finally {
+            setDeleting(null);
+        }
+    };
+
     if (rows === undefined || rows === null) return null;
     const settled = rows.filter((r) => r.hit !== null);
     const won = settled.filter((r) => r.hit).length;
@@ -73,15 +95,21 @@ export function MySchedine({title}: {title?: string} = {}) {
         createdAt: r.created_at,
         hits: r.hits,
         hit: r.hit,
+        results: r.results,
     }));
     // The guide of the record page points at the whole panel (skipped while it is not on the page).
     return (
-        <div data-tour="mine"><Panel title={title ?? t('title')} action={settled.length > 0 ? <span className="font-mono text-[11px] text-muted-foreground">{t('tally', {won, settled: settled.length})}</span> : undefined}>
+        <div data-tour="mine"><Panel title={title ?? t('title')} action={<span className="flex items-center gap-2">{settled.length > 0 && <span className="font-mono text-[11px] text-muted-foreground">{t('tally', {won, settled: settled.length})}</span>}{help && <Help boxed text={help} />}</span>}>
             {tickets.length === 0 ? (
                 <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('empty')}</p>
             ) : (
                 <div className="p-3 grid gap-4 grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 items-start bg-muted/40">
-                    {tickets.map((ticket) => <SchedinaTicket key={ticket.id} ticket={ticket} />)}
+                    {tickets.map((ticket, i) => (
+                        <div key={ticket.id} className="flex flex-col gap-1">
+                            <SchedinaTicket ticket={ticket} shareToken={rows[i].share_token} onDelete={() => remove(ticket.id)} deleting={deleting === ticket.id} />
+                            {failed === ticket.id && <p role="alert" className="text-[11px] font-bold text-red-700">{t('ticket.deleteError')}</p>}
+                        </div>
+                    ))}
                 </div>
             )}
         </Panel></div>

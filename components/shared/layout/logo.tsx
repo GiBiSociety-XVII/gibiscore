@@ -14,19 +14,14 @@ export function BrandIcon({site = 'gibiscore', size = 32, accent = false, classN
     return <img src={`/brand/svg/${site}-${variant}.svg`} alt={alt} width={size} height={size} className={cn("shrink-0 select-none", className)} draggable={false} />;
 }
 
-/** Icon + wordmark, for light (`dark={false}`) or dark backgrounds. Height in px, width follows the 925:232 ratio. */
+/**
+ * Icon + wordmark. Height in px, width follows the 925:232 ratio. `dark`
+ * picks the variant for a dark background (the wordmark in light ink).
+ */
 export function BrandLockup({site = 'gibiscore', height = 30, dark = false, className, alt}: {site?: GibiSite; height?: number; dark?: boolean; className?: string; alt?: string}) {
     const width = Math.round((height * 925) / 232);
-    return (
-        <img
-            src={`/brand/svg/${site}-lockup${dark ? '-dark' : ''}.svg`}
-            alt={alt ?? (site === 'gibiscore' ? 'GiBiScore' : site === 'gibiarena' ? 'GiBiArena' : 'GiBiSociety')}
-            width={width}
-            height={height}
-            className={cn("shrink-0 select-none", className)}
-            draggable={false}
-        />
-    );
+    const label = alt ?? (site === 'gibiscore' ? 'GiBiScore' : site === 'gibiarena' ? 'GiBiArena' : 'GiBiSociety');
+    return <img src={`/brand/svg/${site}-lockup${dark ? '-dark' : ''}.svg`} alt={label} width={width} height={height} className={cn("shrink-0 select-none", className)} draggable={false} />;
 }
 
 /** Kept for existing imports: the GiBiScore icon. */

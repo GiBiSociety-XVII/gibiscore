@@ -3,6 +3,9 @@
   "tagline": "Tutto il calcio in numeri.",
   "sampleData": "Dati di esempio",
   "loading": "Caricamento…",
+  "meta": {
+    "description": "GiBiScore: risultati live, classifiche e statistiche di squadre e giocatori di tutte le competizioni di calcio del mondo."
+  },
   "notFound": {
     "title": "Pagina non trovata",
     "description": "La pagina che cerchi non esiste o è stata spostata.",
@@ -32,7 +35,7 @@
         "compare": "Confronto giocatori",
         "predictions": "Pronostici",
         "fantasy": "Fantacalcio",
-        "record": "Bilancio dei pronostici"
+        "record": "Bilancio del modello"
       },
       "info": {
         "title": "Info",
@@ -46,7 +49,8 @@
     "society": "GiBiSociety",
     "discover": "Scopri anche",
     "arena": "GiBiArena",
-    "copyright": "GiBiSociety · Tutti i diritti riservati."
+    "copyright": "GiBiSociety · Tutti i diritti riservati.",
+    "legal": "Pronostici e schedine sono statistiche del modello, non consigli di gioco. Gioca solo se maggiorenne e con misura."
   },
   "sidebar": {
     "label": "Competizioni",
@@ -73,5 +77,19 @@
     "back": "Indietro",
     "done": "Fine",
     "close": "Chiudi la guida"
+  },
+  "iosBanner": {
+    "title": "Aggiungi GiBiScore alla schermata Home",
+    "text": "Tocca Condividi, poi \"Aggiungi alla schermata Home\": si apre a tutto schermo e arrivano le notifiche.",
+    "dismiss": "Chiudi"
+  },
+  "locale": {
+    "label": "Lingua",
+    "switchTo": "Passa a {language}"
+  },
+  "share": {
+    "share": "Condividi",
+    "copied": "Link copiato",
+    "copyPrompt": "Copia il link:"
   }
 }

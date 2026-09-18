@@ -88,7 +88,7 @@ export function Tour({steps, onClose}: {steps: TourStep[]; onClose: () => void})
         <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label={step.title}>
             {/* The dim, with the element's window cut out by a giant shadow. */}
             <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-            <div className="absolute rounded-lg border-2 border-accent shadow-[0_0_0_9999px_rgba(20,19,26,0.55)] pointer-events-none transition-all duration-200" style={{top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8}} aria-hidden="true" />
+            <div className="absolute rounded-lg border-2 border-accent shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] pointer-events-none transition-all duration-200" style={{top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8}} aria-hidden="true" />
             <div className="absolute bb-surface bg-background p-3 flex flex-col gap-2" style={{top, bottom, left, width}} onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">

@@ -71,10 +71,13 @@ const RECENT_MATCHES = 8;
 /** Rounds played kept for the history of the recaps (within the matches loaded). */
 const HISTORY_RESULTS = 6;
 const FINISHED = new Set(['finished']);
+/** A match on the pitch right now: its numbers so far go in the recap, flagged live. */
+const IN_PLAY = new Set(['live', 'half_time', 'extra_time', 'penalties']);
 
 interface StatRow {
     fixture_id: number;
     player_id: number;
+    team_id: number;
     minutes_played: number | null;
     rating: number | string | null;
     goals: number;
@@ -87,7 +90,7 @@ interface StatRow {
     goals_conceded: number | null;
 }
 
-const STAT_SELECT = 'fixture_id,player_id,minutes_played,rating,goals,assists,yellow_cards,red_cards';
+const STAT_SELECT = 'fixture_id,player_id,team_id,minutes_played,rating,goals,assists,yellow_cards,red_cards';
 const STAT_JSON = 'penalty_saved:stats->>penalty_saved,penalty_missed:stats->>penalty_missed,goals_conceded:stats->>goals_conceded';
 
 /** The players' lines of some fixtures, the penalties and goals conceded read out of the provider's json; without them if that read fails. */
@@ -112,6 +115,7 @@ interface FixtureRow {
     away_team_id: number;
     home_score: number | null;
     away_score: number | null;
+    minute: number | null;
     home: {id: number; name: string} | null;
     away: {id: number; name: string} | null;
 }
@@ -128,7 +132,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     if (!leagueRow || !season) return null;
 
     const rows = (await fetchAll(
-        (a, b) => db.from('fixtures').select('id,round,starting_at,state,home_team_id,away_team_id,home_score,away_score,home:teams!fixtures_home_team_id_fkey(id,name),away:teams!fixtures_away_team_id_fkey(id,name)').eq('season_id', season.id).order('starting_at').order('id').range(a, b),
+        (a, b) => db.from('fixtures').select('id,round,starting_at,state,home_team_id,away_team_id,home_score,away_score,minute,home:teams!fixtures_home_team_id_fkey(id,name),away:teams!fixtures_away_team_id_fkey(id,name)').eq('season_id', season.id).order('starting_at').order('id').range(a, b),
         {max: 1000},
     )) as unknown as FixtureRow[];
     const fixtures = rows.filter((r) => r.round && r.home && r.away);
@@ -186,10 +190,13 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         (voto === null ? typedEvents : typed).set(`${f.id}:${r.player_id}`, entry);
     }
     const typedFixtureIds = [...new Set([...typed.keys(), ...typedEvents.keys()].map((k) => Number(k.split(':')[0])))];
-    const statIds = [...new Set([...recentIds, ...typedFixtureIds])];
+    // The matches of the round on the pitch right now: their lines so far, for the live score of a lineup.
+    const inPlayIds = roundFixtures.filter((f) => IN_PLAY.has(f.state)).map((f) => f.id);
+    const statIds = [...new Set([...recentIds, ...typedFixtureIds, ...inPlayIds])];
+    const lineupIds = [...new Set([...recentIds, ...inPlayIds])];
     const [lineupRows, statRows, officialRows, sidelined] = await Promise.all([
-        recentIds.length > 0
-            ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', recentIds).eq('is_expected', false).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
+        lineupIds.length > 0
+            ? (fetchAll((a, b) => db.from('lineups').select('fixture_id,team_id,player_id,is_starter').in('fixture_id', lineupIds).eq('is_expected', false).order('fixture_id').order('player_id').range(a, b), {max: 20000}) as Promise<Array<{fixture_id: number; team_id: number; player_id: number; is_starter: boolean}>>)
             : Promise.resolve([]),
         statIds.length > 0 ? loadStats(db, statIds) : Promise.resolve([]),
         roundFixtures.length > 0
@@ -290,14 +297,17 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     }
     const teamRecent: MatchdayContext['teamRecent'] = {};
     for (const [teamId, list] of recentOf) teamRecent[teamId] = list.map((f) => f.id);
-    // The recap: the round begun (its matches already over) or, before the next one starts, the last one
-    // played. Everyone in a squad, with the official vote when the workbook is in, else the vote typed in,
-    // else the provider's numbers (a player typed in without a squad row counts too).
+    // The recap: the round begun (its matches over, and the ones on the pitch with their numbers so far) or,
+    // before the next one starts, the last one played. Everyone in a squad, with the official vote when the
+    // workbook is in, else the vote typed in, else the provider's numbers (a player typed in without a squad
+    // row counts too).
     const results: RoundResults[] = [];
     const lastPlayed = [...rounds].reverse().find((r) => r.state === 'played') ?? null;
-    // The current round counts as begun from its first match over, whether or not one is on the pitch right now.
+    // The current round counts as begun from its first kick-off.
     const current = rounds.find((r) => r.state === 'live' || r.state === 'next') ?? null;
-    const begun = current !== null && (byRound.get(current.round) ?? []).some((f) => FINISHED.has(f.state));
+    const begun = current !== null && (byRound.get(current.round) ?? []).some((f) => FINISHED.has(f.state) || IN_PLAY.has(f.state));
+    const statsByFixture = new Map<number, StatRow[]>();
+    for (const s of statRows) statsByFixture.set(s.fixture_id, [...(statsByFixture.get(s.fixture_id) ?? []), s]);
     const recap: Array<[MatchdayRound | null, RoundResults['state']]> = begun ? [[current, 'live']] : [[lastPlayed, 'played']];
     const resultsFor = (info: MatchdayRound, state: RoundResults['state']): RoundResults => {
         const officialRound = votesByRound.has(roundNumber(info.round) ?? -1);
@@ -306,12 +316,14 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
         const matches: RoundResults['matches'] = [];
         for (const f of byRound.get(info.round) ?? []) {
             const finished = FINISHED.has(f.state);
-            matches.push({home: {id: f.home!.id, name: f.home!.name}, away: {id: f.away!.id, name: f.away!.name}, finished, score: f.home_score !== null && f.away_score !== null ? [f.home_score, f.away_score] : null});
-            if (!finished) continue;
-            finishedTeams.push(f.home_team_id, f.away_team_id);
+            const live = !finished && IN_PLAY.has(f.state);
+            matches.push({home: {id: f.home!.id, name: f.home!.name}, away: {id: f.away!.id, name: f.away!.name}, finished, live, minute: live ? f.minute : null, score: f.home_score !== null && f.away_score !== null ? [f.home_score, f.away_score] : null});
+            if (!finished && !live) continue;
+            if (finished) finishedTeams.push(f.home_team_id, f.away_team_id);
             const inSquad = lineupRows.filter((l) => l.fixture_id === f.id);
+            const withStat = statsByFixture.get(f.id) ?? [];
             const typedHere = [...typed.keys(), ...typedEvents.keys()].filter((k) => k.startsWith(`${f.id}:`)).map((k) => Number(k.split(':')[1]));
-            const ids = [...new Set([...inSquad.map((l) => l.player_id), ...typedHere])];
+            const ids = [...new Set([...inSquad.map((l) => l.player_id), ...withStat.map((s) => s.player_id), ...typedHere])];
             for (const playerId of ids) {
                 const key = `${f.id}:${playerId}`;
                 const l = inSquad.find((x) => x.player_id === playerId);
@@ -319,7 +331,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
                 const voted = votoOf.get(key);
                 const entry = voted ?? typedEvents.get(key);
                 const source: RoundStat['source'] | undefined = voted ? (officialRound && !typed.has(key) ? 'official' : 'manual') : undefined;
-                const teamId = l?.team_id ?? teamOf.get(playerId)?.team ?? null;
+                const teamId = l?.team_id ?? stat?.team_id ?? teamOf.get(playerId)?.team ?? null;
                 const against = teamId === f.home_team_id ? f.away_score : teamId === f.away_team_id ? f.home_score : null;
                 const minutes = stat?.minutes_played ?? (voted && voted.voto !== null ? 90 : 0);
                 statsOf[playerId] = {

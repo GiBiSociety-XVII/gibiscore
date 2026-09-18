@@ -4,9 +4,11 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
+import {SectionNav} from "@/components/football/section-nav";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getAdviceRecord, getSchedineTally} from "@/lib/football/data/record";
 import {MySchedine} from "@/components/football/my-schedine";
+import {Help} from "@/components/fantasy/help";
 import {TourLauncher} from "@/components/football/tour-launcher";
 import {getModelFit} from "@/lib/football/data/tuning";
 import type {LegKey} from "@/lib/football/markets";
@@ -47,8 +49,9 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                         <Link data-tour="predictions" href="/predictions" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toPredictions')}</Link>
                     </div>
                 } />
+            <SectionNav current="record" />
 
-            <div data-tour="live"><Panel title={t('liveTitle')} action={record ? <span className="font-mono text-[11px] text-muted-foreground">{t('settled', {count: record.total})}</span> : undefined}>
+            <div data-tour="live"><Panel title={t('liveTitle')} action={<span className="flex items-center gap-2">{record && <span className="font-mono text-[11px] text-muted-foreground">{t('settled', {count: record.total})}</span>}<Help boxed text={t('liveHint')} /></span>}>
                 {!record || record.total === 0 ? (
                     <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('liveEmpty')}</p>
                 ) : (
@@ -71,10 +74,9 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                         })}
                     </div>
                 )}
-                <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('liveHint')}</p>
             </Panel></div>
 
-            <div data-tour="fit"><Panel title={t('fitTitle')} action={fit ? <span className="font-mono text-[11px] text-muted-foreground">{format.dateTime(new Date(fit.fittedAt), {day: '2-digit', month: '2-digit', year: 'numeric'})}</span> : undefined}>
+            <div data-tour="fit"><Panel title={t('fitTitle')} action={<span className="flex items-center gap-2">{fit && <span className="font-mono text-[11px] text-muted-foreground">{format.dateTime(new Date(fit.fittedAt), {day: '2-digit', month: '2-digit', year: 'numeric'})}</span>}<Help boxed text={t('fitHint')} /></span>}>
                 {!fit ? (
                     <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('fitEmpty')}</p>
                 ) : (
@@ -103,18 +105,16 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                             {cell(t('rho'), fit.tuning.rho.toFixed(2))}
                             {cell(t('logLoss'), `${fit.before.toFixed(3)} → ${fit.after.toFixed(3)}`)}
                         </div>
-                        <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('fitHint')}</p>
                     </>
                 )}
             </Panel></div>
 
-            <div data-tour="schedine"><Panel title={t('schedineTitle')}>
+            <div data-tour="schedine"><Panel title={t('schedineTitle')} action={<Help boxed text={t('schedineHint')} />}>
                 <div className="grid grid-cols-3">
                     {cell(t('schedineSaved'), schedine ? String(schedine.total) : '–')}
                     {cell(t('schedineSettled'), schedine ? String(schedine.settled) : '–')}
                     {cell(t('schedineWon'), schedine && schedine.settled > 0 ? `${Math.round((schedine.won / schedine.settled) * 100)}%` : '–', schedine ? t('hits', {hits: schedine.won, slips: schedine.settled}) : undefined)}
                 </div>
-                <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('schedineHint')}</p>
             </Panel></div>
             <MySchedine />
 
@@ -139,7 +139,6 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                     </ul>
                 </Panel></div>
             )}
-            <p className="text-[12px] font-semibold text-muted-foreground">{t('disclaimer')}</p>
         </SiteShell>
     );
 }

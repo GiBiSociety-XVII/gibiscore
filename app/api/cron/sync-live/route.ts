@@ -1,9 +1,14 @@
-import {revalidatePath} from 'next/cache';
+import {revalidatePath, revalidateTag} from 'next/cache';
 import type {NextRequest} from 'next/server';
 import {createServiceClient} from '@/lib/db/server';
 import {sleep} from '@/lib/api-football/client';
 import {cronRoute} from '@/lib/football/sync/run-job';
 import {syncLive} from '@/lib/football/sync/fixtures';
+import {AUCTION_LEAGUES} from '@/lib/fantasy/config';
+import {everyLocalePath} from '@/lib/auth/next';
+
+/** The competitions a fantasy roster can be drawn from: a live match of theirs moves the lineup's live score. */
+const FANTASY_SLUGS = new Set(AUCTION_LEAGUES.flatMap((l) => l.slugs));
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -37,21 +42,25 @@ export async function GET(request: NextRequest) {
 /**
  * The pages of the matches this pass touched, and of the two clubs of
  * each, are rendered again on their next request: they no longer expire
- * on a short timer, so a match that does not move costs nothing.
+ * on a short timer, so a match that does not move costs nothing. A match
+ * of a fantasy competition also refreshes the matchday, where the live
+ * score of a lineup reads the players' lines.
  */
 async function refreshMoved(sinceIso: string): Promise<void> {
     try {
-        const {data} = await createServiceClient().from('fixtures').select('id,home:teams!fixtures_home_team_id_fkey(slug),away:teams!fixtures_away_team_id_fkey(slug)').gte('last_synced_at', sinceIso).limit(200);
-        // The default locale has no prefix on the URL, the cache may know either form.
+        const {data} = await createServiceClient().from('fixtures').select('id,league:leagues!inner(slug),home:teams!fixtures_home_team_id_fkey(slug),away:teams!fixtures_away_team_id_fkey(slug)').gte('last_synced_at', sinceIso).limit(200);
+        // The default locale has no prefix on the URL, the cache may know any form.
         const refresh = (path: string) => {
-            revalidatePath(path);
-            revalidatePath(`/it${path}`);
+            for (const p of everyLocalePath(path)) revalidatePath(p);
         };
-        for (const row of (data ?? []) as unknown as Array<{id: number; home: {slug: string} | null; away: {slug: string} | null}>) {
+        let fantasy = false;
+        for (const row of (data ?? []) as unknown as Array<{id: number; league: {slug: string} | null; home: {slug: string} | null; away: {slug: string} | null}>) {
             refresh(`/matches/${row.id}`);
             if (row.home) refresh(`/teams/${row.home.slug}`);
             if (row.away) refresh(`/teams/${row.away.slug}`);
+            if (row.league && FANTASY_SLUGS.has(row.league.slug)) fantasy = true;
         }
+        if (fantasy) revalidateTag('fantasy-matchday', 'max');
     } catch {
         // Not worth failing the sync for: the timers still refresh the pages.
     }

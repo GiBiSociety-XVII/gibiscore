@@ -1,0 +1,64 @@
+{
+  "liveBadge": "{count, plural, =0 {No match in play} one {# match in play} other {# matches in play}}",
+  "heroPrefix": "All of ",
+  "heroAccent": "football",
+  "heroSuffix": ", in numbers.",
+  "subtitle": "Live scores, standings and statistics of teams and players. Study the league, not just the score.",
+  "matchday": "Matchday {round}",
+  "status": {
+    "live": "LIVE {minute}'",
+    "halfTime": "HALF TIME",
+    "finished": "FULL TIME",
+    "today": "TODAY {time}",
+    "scheduled": "{date} {time}"
+  },
+  "stats": {
+    "possession": "Possession {value}%",
+    "shots": "Shots {home} – {away}",
+    "xg": "xG {home} – {away}",
+    "form": "Last 5: {form}"
+  },
+  "standings": {
+    "title": "{league} standings",
+    "full": "Full table",
+    "played": "P",
+    "won": "W",
+    "drawn": "D",
+    "lost": "L",
+    "goalDiff": "GD",
+    "points": "PTS",
+    "team": "Team"
+  },
+  "spotlight": {
+    "title": "Player of the week",
+    "goals": "Goals",
+    "assists": "Assists",
+    "rating": "Average rating",
+    "age": "{age} years old"
+  },
+  "adSlot": "Ad space (optional)",
+  "freeBand": {
+    "title": "All free, for everyone.",
+    "description": "Scores, statistics and xG with no subscription. Sign in with the same GiBiArena account to save your favourite teams.",
+    "cta": "Go to GiBiArena"
+  },
+  "welcome": {
+    "title": "Welcome to GiBiScore",
+    "dismiss": "Got it",
+    "live": {
+      "title": "Scores and live",
+      "text": "Today's matches in real time. Tap a match for the commentary, lineups and statistics; the star keeps your favourite teams and competitions at the top.",
+      "cta": "Go live"
+    },
+    "predictions": {
+      "title": "Predictions and betting slips",
+      "text": "For every match three picks from the model, cautious, recommended and bold, checked against the results. One button builds a betting slip with the stake split by column.",
+      "cta": "Go to the predictions"
+    },
+    "fantasy": {
+      "title": "Fantasy football",
+      "text": "A guided auction with recommended ratings and credits, then every week the best lineup for your squad. Three steps: set up, record the purchases, field the team.",
+      "cta": "Go to fantasy football"
+    }
+  }
+}

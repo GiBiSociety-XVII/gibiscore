@@ -4,13 +4,14 @@ import {cn} from "@/components/shared/ui/cn";
 /** Entity header (competition, team, player): visual, title, one line of facts, optional right side. */
 export function PageHeader({visual, title, meta, aside, className}: {visual?: ReactNode; title: ReactNode; meta?: ReactNode; aside?: ReactNode; className?: string}) {
     return (
-        <header className={cn("bb-surface px-3 py-2.5 flex items-center gap-3", className)}>
+        <header className={cn("bb-surface px-3 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2", className)}>
             {visual && <span className="shrink-0">{visual}</span>}
-            <div className="flex flex-col min-w-0 gap-0.5">
+            <div className="flex flex-col min-w-0 flex-1 gap-0.5">
                 <h1 className="text-lg md:text-xl font-extrabold tracking-tight leading-tight truncate">{title}</h1>
-                {meta && <div className="text-[12px] font-semibold text-muted-foreground truncate flex items-center gap-1.5 flex-wrap">{meta}</div>}
+                {meta && <div className="text-[12px] font-semibold text-muted-foreground flex items-center gap-1.5 flex-wrap">{meta}</div>}
             </div>
-            {aside && <div className="ml-auto shrink-0">{aside}</div>}
+            {/* On a phone the right side takes its own line, so the title never shrinks to make room. */}
+            {aside && <div className="basis-full sm:basis-auto sm:ml-auto shrink-0 flex flex-wrap items-center gap-2">{aside}</div>}
         </header>
     );
 }

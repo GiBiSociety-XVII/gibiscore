@@ -1,0 +1,659 @@
+{
+  "competitions": {
+    "title": "Competitions",
+    "metaTitle": "Competitions",
+    "metaDescription": "Standings, fixtures and results of every competition: Serie A, European cups, leagues and cups from all over the world.",
+    "open": "Open",
+    "season": "Season {season}",
+    "featured": "Featured",
+    "byCountry": "By country",
+    "count": "{count, plural, one {# competition} other {# competitions}}",
+    "empty": "Competitions appear after the first data sync.",
+    "searchTitle": "Results for “{query}”",
+    "noResults": "No competition or country matches the search."
+  },
+  "competition": {
+    "tabs": {
+      "matches": "Matches",
+      "standings": "Standings",
+      "players": "Players",
+      "teams": "Teams",
+      "study": "Statistics"
+    },
+    "standings": "Standings",
+    "results": "Results",
+    "upcoming": "Upcoming matches",
+    "live": "In play",
+    "scorers": "Top scorers",
+    "assists": "Assists",
+    "previousRound": "Previous",
+    "nextRound": "Next",
+    "allRounds": "All matchdays",
+    "notFound": "Competition not found",
+    "backToList": "All competitions",
+    "metaDescription": "{name}: up-to-date standings, results and fixtures of the {season} season.",
+    "round": "Matchday",
+    "season": "Season"
+  },
+  "match": {
+    "notFound": "Match not found",
+    "backToCompetition": "Back to {name}",
+    "events": "Commentary",
+    "lineups": "Lineups",
+    "stats": "Statistics",
+    "players": "Player ratings and statistics",
+    "metaTitle": "{home} – {away}",
+    "metaDescription": "{home} vs {away}, {competition}: score, commentary, lineups, statistics and player ratings.",
+    "tabs": {
+      "summary": "Commentary",
+      "lineups": "Lineups",
+      "stats": "Statistics",
+      "players": "Players",
+      "markets": "Match analysis"
+    },
+    "info": "Information",
+    "headToHead": "Head to head",
+    "comparison": "Comparison",
+    "form": "Form",
+    "position": "Position",
+    "points": "Points",
+    "goals": "Goals scored / conceded",
+    "bestPlayer": "Man of the match",
+    "noForm": "No previous meetings on record.",
+    "scorers": "Scorers",
+    "absences": "Unavailable",
+    "prediction": "Prediction",
+    "markets": "Match analysis: prediction, markets and odds",
+    "tour": {
+      "button": "Guide",
+      "open": "Replay the step-by-step guide of the match page",
+      "steps": {
+        "score": {
+          "title": "The match",
+          "text": "Competition, matchday, status and score with the scorers; in play the minute moves on its own and the page refreshes. Tap a team's name for its page, the star to follow it."
+        },
+        "timeline": {
+          "title": "The commentary",
+          "text": "Goals, cards and substitutions minute by minute, from kick-off. It appears as soon as there is a first event."
+        },
+        "tabs": {
+          "title": "The tabs",
+          "text": "Before kick-off the page opens on Match analysis; from kick-off on the commentary. The others: lineups with ratings, match statistics, the players with ratings and numbers."
+        },
+        "analysis": {
+          "title": "Match analysis",
+          "text": "The model's prediction (1X2 bar, expected goals, reliability) and every market with the probability, the fair odds and the bookmakers' average: in green when they pay more than the fair odds. The \"?\" explains where the numbers come from."
+        },
+        "advice": {
+          "title": "What the model would play",
+          "text": "Three picks, one per level of risk: cautious, recommended, bold. The same ones you find on the Predictions page and that are checked in the model record."
+        },
+        "bands": {
+          "title": "When the goals come",
+          "text": "Goals scored and conceded per quarter of an hour by each team; the blue background marks the quarters in which, adding the two, more goals than average arrive."
+        },
+        "lines": {
+          "title": "Over, under and BTTS",
+          "text": "How often each team's matches go over each line, end with both teams scoring or with a clean sheet, and the record at this match's venue."
+        },
+        "setpieces": {
+          "title": "Corners and cards",
+          "text": "Averages per match won and conceded, and the ones expected in this match."
+        },
+        "comparison": {
+          "title": "The comparison",
+          "text": "Standings and recent form of the two teams, side by side."
+        },
+        "absences": {
+          "title": "The unavailable",
+          "text": "Injured and suspended players of both sides, with the reason and since when."
+        }
+      }
+    },
+    "mute": {
+      "notifications": "Notifications",
+      "muted": "Muted",
+      "mute": "Mute the notifications of this match: no goals, no final whistle, even if you follow the competition or one of the teams",
+      "unmute": "Unmute the notifications of this match"
+    }
+  },
+  "team": {
+    "notFound": "Team not found",
+    "standings": "League position",
+    "recent": "Latest matches",
+    "upcoming": "Upcoming matches",
+    "live": "On the pitch now",
+    "squad": "Squad",
+    "sidelined": "Unavailable",
+    "position": "{position} of {total}",
+    "founded": "Founded in {year}",
+    "metaDescription": "{name}: results, upcoming matches, standings, squad and unavailable players.",
+    "tabs": {
+      "matches": "Matches",
+      "squad": "Squad",
+      "standings": "Standings",
+      "stats": "Statistics",
+      "players": "Players",
+      "calendar": "Fixtures"
+    },
+    "statsTitle": "Season statistics",
+    "played": "Matches",
+    "record": "W · D · L",
+    "goals": "Goals scored / conceded",
+    "cleanSheets": "Clean sheets",
+    "avgPossession": "Average possession",
+    "avgShots": "Shots per match",
+    "avgShotsOn": "Shots on target per match",
+    "avgCorners": "Corners per match",
+    "avgXg": "xG per match",
+    "noStats": "Statistics not available yet for this season.",
+    "playersTitle": "Player statistics · current season",
+    "noPlayers": "Player statistics not available yet for this season.",
+    "playerCols": {
+      "apps": "Apps",
+      "lineups": "Starts",
+      "minutes": "Min",
+      "goals": "Goals",
+      "assists": "Ast",
+      "rating": "Rating",
+      "cards": "Cards"
+    },
+    "month": "Month"
+  },
+  "player": {
+    "notFound": "Player not found",
+    "totals": "Totals {season}",
+    "matches": "Match by match",
+    "matchesPlayed": "Appearances",
+    "minutes": "Minutes",
+    "goals": "Goals",
+    "assists": "Assists",
+    "cards": "Cards",
+    "averageRating": "Average rating",
+    "years": "{age} years old",
+    "height": "{cm} cm",
+    "noMatches": "No match with statistics this season.",
+    "metaDescription": "{name}: match-by-match statistics, ratings and estimated fantasy score.",
+    "seasonPicker": "Season",
+    "seasonStats": "Statistics by season",
+    "noSeasonStats": "Season statistics not downloaded yet.",
+    "seasonHint": "Data aggregated by the provider per league and season: appearances, starts, minutes, average rating, goals, assists, shots (on target), key passes, pass accuracy, cards and penalties. Past seasons arrive with the sync-player-seasons job.",
+    "injured": "Injured",
+    "seasonTable": {
+      "season": "Season",
+      "team": "Team",
+      "competition": "Competition",
+      "apps": "Apps",
+      "lineups": "Starts",
+      "minutes": "Min",
+      "rating": "Rating",
+      "goals": "Goals",
+      "assists": "Ast",
+      "shots": "Shots",
+      "keyPasses": "KP",
+      "passAccuracy": "Pass %",
+      "cards": "Cards",
+      "penalties": "Pen.",
+      "conceded": "Conceded",
+      "saves": "Saves"
+    },
+    "tabs": {
+      "seasons": "Seasons",
+      "matches": "Matches"
+    },
+    "ratingTrend": "Rating trend",
+    "compare": "Compare",
+    "noVote": "n/r"
+  },
+  "scores": {
+    "metaTitle": "Live football scores",
+    "metaDescription": "Live scores and schedule of all of today's matches: leagues, national cups and international competitions from all over the world.",
+    "dayMetaTitle": "Matches of {date}",
+    "liveMetaTitle": "Live matches",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow",
+    "previousDay": "Previous day",
+    "nextDay": "Next day",
+    "pickDate": "Pick a date",
+    "go": "Go",
+    "filters": {
+      "all": "All",
+      "live": "Live",
+      "finished": "Finished",
+      "scheduled": "Scheduled"
+    },
+    "liveHint": "{count, plural, =0 {No match in play right now.} one {# match in play.} other {# matches in play.}}",
+    "emptyLive": "No match is in play right now. Pick a day to see the schedule.",
+    "emptyDay": "No matches for this filter.",
+    "favoritesGroup": "Favourites",
+    "refresh": "Automatic refresh",
+    "tour": {
+      "button": "Guide",
+      "open": "Replay the step-by-step guide of the home page",
+      "steps": {
+        "welcome": {
+          "title": "Welcome",
+          "text": "The three doors of the site: scores and live, predictions and betting slips, fantasy football. \"Got it\" closes it for good on this browser; every page then has its own guide behind the \"Guide\" button."
+        },
+        "dates": {
+          "title": "The day",
+          "text": "The matches of the chosen day: the arrows move one day, the calendar takes you to any date, today stays underlined. LIVE shows only the matches in play right now, with their number."
+        },
+        "filters": {
+          "title": "The filters",
+          "text": "All, in play, finished or still to play, with the count of each. The list below changes at once."
+        },
+        "list": {
+          "title": "The matches",
+          "text": "First the competitions you starred as favourites, then the main ones, then all the others by country. Scores and minutes refresh on their own, without reloading the page."
+        },
+        "competition": {
+          "title": "A competition",
+          "text": "Tap the name for the competition's standings, fixtures and statistics. The star makes it a favourite: it rises to the top of the list and its standings appear in the right-hand column."
+        },
+        "match": {
+          "title": "A match",
+          "text": "Time or minute, teams and score; the teams of your favourites are highlighted. Tap the match to open, in a new tab, commentary, lineups, statistics and the analysis with the odds. Tap a team for its page. Before kick-off, on the right, the bookmakers' 1X2 odds."
+        },
+        "sidebar": {
+          "title": "The competitions",
+          "text": "The main competitions and all the others by country: from here you reach any league or cup."
+        },
+        "chips": {
+          "title": "The main competitions",
+          "text": "Scroll the row to jump to a league or a cup; all the others are in the Competitions menu."
+        },
+        "rail": {
+          "title": "Your things",
+          "text": "The teams you follow with their next match and the standings of your favourite competitions, up to date. It fills up with the stars you set around the site."
+        },
+        "sections": {
+          "title": "The sections",
+          "text": "Scores, live, competitions, predictions, statistics and fantasy football: every entry opens a menu with its pages. The logo always brings you back here."
+        },
+        "search": {
+          "title": "The search",
+          "text": "Search a team, a competition or a player by name: the results appear as you type."
+        },
+        "mobileTabs": {
+          "title": "The bottom bar",
+          "text": "The main sections always within thumb's reach: scores, live, competitions, predictions and fantasy football."
+        }
+      }
+    }
+  },
+  "search": {
+    "title": "Results for “{query}”",
+    "metaTitle": "Search",
+    "placeholder": "Team, player or competition",
+    "button": "Search",
+    "teams": "Teams",
+    "players": "Players",
+    "competitions": "Competitions",
+    "empty": "No results for “{query}”. Try a shorter name.",
+    "tooShort": "Type at least 2 letters."
+  },
+  "stats": {
+    "title": "Statistics",
+    "metaTitle": "Player statistics",
+    "metaDescription": "Top scorers, assists and best ratings of the main competitions: Serie A, Premier League, La Liga, Bundesliga, Ligue 1, Champions League and more.",
+    "intro": "Season rankings for every main competition, updated after every matchday.",
+    "scorers": "Top scorers",
+    "assists": "Assists",
+    "empty": "Data not available yet for this competition.",
+    "seasonPicker": "Season",
+    "nav": {
+      "label": "Statistics pages",
+      "stats": "Scorers",
+      "predictions": "Predictions",
+      "record": "Record",
+      "injuries": "Injuries",
+      "compare": "Compare",
+      "search": "Search"
+    }
+  },
+  "injuries": {
+    "title": "Injured and suspended",
+    "metaTitle": "Injured and suspended",
+    "metaDescription": "Injured and suspended players of the main competitions: how long they have been out and how many matches they missed, team by team.",
+    "intro": "Who is missing, since when and when they should be back, team by team. Updated every six hours.",
+    "empty": "No unavailable players on record at the moment.",
+    "category": {
+      "injury": "Injury",
+      "suspension": "Suspension",
+      "doubtful": "Doubtful",
+      "other": "Unavailable"
+    }
+  },
+  "compare": {
+    "title": "Compare players",
+    "metaTitle": "Compare players",
+    "metaDescription": "Compare two players over the same season: appearances, goals, assists, shots, key passes and per-90 values.",
+    "intro": "Pick two players: the numbers are those of the same season, added up across all competitions.",
+    "pickA": "First player",
+    "pickB": "Second player",
+    "noResults": "No player found.",
+    "notFound": "One of the two players was not found.",
+    "seasonTitle": "Season {season}",
+    "hint": "\"Per 90\" values computed on the minutes played. In blue the better value of the row.",
+    "rows": {
+      "apps": "Appearances",
+      "minutes": "Minutes",
+      "goals": "Goals",
+      "assists": "Assists",
+      "goals90": "Goals per 90",
+      "assists90": "Assists per 90",
+      "shots90": "Shots per 90",
+      "shotsOn": "Shots on target",
+      "keyPasses90": "Key passes per 90",
+      "passAccuracy": "Pass accuracy",
+      "rating": "Average rating",
+      "cards": "Cards"
+    },
+    "selected": "Selected",
+    "change": "Change",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "pickOther": "{name} is selected: now pick the player to compare with.",
+    "seasonPicker": "Season",
+    "seasonOneOnly": "Only one of the two players has data in this season"
+  },
+  "predictions": {
+    "title": "Predictions",
+    "metaTitle": "Match predictions",
+    "metaDescription": "Statistical predictions of the upcoming matches: 1-X-2 probabilities, expected goals, over and both teams to score computed on the season study, with the bookmakers' odds alongside.",
+    "intro": "The upcoming matches of the main competitions with the picks the model suggests. Open the match for the full analysis.",
+    "days": "Next {count} days",
+    "recordLink": "The model record",
+    "record": {
+      "title": "Model record",
+      "metaTitle": "Model record",
+      "metaDescription": "How many of the picks suggested by the model came in, tier by tier, and how the model is calibrated on the seasons on record.",
+      "intro": "Every suggested pick is written before kick-off and checked against the final result: here is how many each tier wins against what it promised. Below, the calibration of the model on the archive of the main competitions.",
+      "toPredictions": "Predictions",
+      "liveTitle": "The suggested picks, checked",
+      "liveEmpty": "No pick checked yet: the first ones come with the next matches.",
+      "liveHint": "Won = picks that came in over the total; promised = the average probability the model gave. If the two are close the model is well calibrated. Return = a flat stake on every pick at the bookmakers' average odds, only for the picks that had odds.",
+      "settled": "{count} picks checked",
+      "slips": "{count} picks",
+      "hitRate": "Won",
+      "hits": "{hits} of {slips}",
+      "promised": "Promised",
+      "roi": "Return",
+      "priced": "of {count} with odds",
+      "fitTitle": "The calibration on the archive",
+      "fitEmpty": "Calibration not run yet: the model runs with its starting parameters.",
+      "fitHint": "Every match of the last two seasons was predicted with what was known the day before; on the real results the model tuned three knobs (expected goals, home advantage, correlation of low scores) and checked the picks it would have suggested. Log-loss: how much the model misses the exact score, the lower the better. The pages' data does not change: only the prediction does.",
+      "samples": "Matches replayed",
+      "seasons": "{count} seasons",
+      "goalScale": "Expected goals",
+      "homeEdge": "Home advantage",
+      "rho": "Correlation",
+      "logLoss": "Log-loss",
+      "latestTitle": "Latest picks checked",
+      "won": "Won",
+      "lost": "Lost",
+      "disclaimer": "Statistical record of the model's suggestions, not betting advice. Bet only if you are of age, and in moderation.",
+      "schedineTitle": "The betting slips built by users",
+      "schedineSaved": "Saved",
+      "schedineSettled": "Settled",
+      "schedineWon": "Won",
+      "schedineHint": "The betting slips built on the predictions page and saved in the account: every selection is a pick of the model, settled on the real results by the same record. Sign in to see yours.",
+      "tour": {
+        "button": "Guide",
+        "open": "Replay the step-by-step guide of the model record",
+        "steps": {
+          "live": {
+            "title": "The checked picks",
+            "text": "Every suggested pick (cautious, recommended, bold) is written before kick-off and settled on the final result. Won = how many came in; promised = the average probability the model gave. If the two are close the model is well calibrated. Return = a flat stake on every pick at the bookmakers' average odds."
+          },
+          "fit": {
+            "title": "The calibration",
+            "text": "Every match of the last seasons on record was predicted with what was known the day before and compared with the real result: here you see how the three picks would have done on those matches. The calibration runs on its own every week; the date at the top right is the latest."
+          },
+          "knobs": {
+            "title": "The model's knobs",
+            "text": "Matches replayed and seasons used, then the three knobs tuned on the results: expected goals, home advantage and correlation of low scores. Log-loss: how much the model misses the exact score, before and after the calibration, the lower the better. Only the prediction changes, never the pages' data."
+          },
+          "schedine": {
+            "title": "Everyone's betting slips",
+            "text": "The betting slips built on the Predictions page and saved by users: how many saved, how many settled on the real results and how many won."
+          },
+          "mine": {
+            "title": "My betting slips",
+            "text": "The slips you saved, latest first: open until its matches are over, then won or lost, with how many selections you got right. Tap a match to open its analysis."
+          },
+          "latest": {
+            "title": "The latest checked",
+            "text": "The latest settled picks, with the match result, the tier, the probability the model gave and the odds. Tap the match to review the analysis."
+          },
+          "predictions": {
+            "title": "Back to the predictions",
+            "text": "The upcoming matches with the model's three picks and the betting slip builder."
+          }
+        }
+      }
+    },
+    "filters": {
+      "days": "Days",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "both": "Today and tomorrow",
+      "all": "7 days",
+      "competition": "Competition",
+      "allCompetitions": "All competitions",
+      "count": "{count} matches",
+      "value": "Value only",
+      "valueHint": "Only the matches with at least one value pick: the bookmakers' average odds pay more than the model's fair odds (expected return of at least +3%)."
+    },
+    "adviceLegend": "Under every match the model's three picks, the same as in the match analysis: cautious (from 78% probability), recommended (from 62%), bold (from 45%). Open the match for full probabilities and odds. Not betting advice.",
+    "noAdvice": "No pick likely enough for this tier.",
+    "schedina": {
+      "open": "Build a betting slip",
+      "title": "Build a betting slip",
+      "close": "Close",
+      "intro": "Choose risk, type and how many matches; the model takes the picks it believes in most for that risk among the matches of the days and competitions you indicate, and tells you probability, odds and when the slip settles.",
+      "risk": "Risk",
+      "risks": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "riskHint": {
+        "low": "Cautious picks: every selection at least 78%.",
+        "medium": "Recommended picks: every selection at least 62% (cautious when the match has none).",
+        "high": "Bold picks: every selection at least 45% (recommended when the match has none)."
+      },
+      "kind": "Type",
+      "kinds": {
+        "single": "Single",
+        "multiple": "Accumulator",
+        "system": "System"
+      },
+      "kindHint": {
+        "single": "One match only, the most likely.",
+        "multiple": "Every selection must win: the odds are the product.",
+        "system": "Bankers in every column, the others combined k at a time: it wins if all the bankers and at least k of the others come in."
+      },
+      "size": "Matches",
+      "systemOf": "Columns of",
+      "systemOfN": "of {n}",
+      "days": "Days",
+      "anyDay": "Any",
+      "competitions": "Competitions",
+      "anyCompetition": "All",
+      "generate": "Build",
+      "available": "{count} matches available with the chosen filters",
+      "none": "Not enough matches with a pick for this risk in the chosen days and competitions: widen the filters or lower the number of matches.",
+      "selections": "{count} selections",
+      "chance": "Probability",
+      "settles": "Settles",
+      "systemNote": "{columns} columns of {of} selections out of {n}: probability that at least {of} come in {pct}%.",
+      "save": "Save and follow",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveError": "Not saved: try again.",
+      "signIn": "Sign in to save the slip and follow its outcome.",
+      "toRecord": "Go to the record",
+      "disclaimer": "The selections are the same picks checked in the model record: every saved slip is settled on the real results. Not betting advice: bet only if you are of age, and in moderation.",
+      "bankers": "Bankers",
+      "bankersAuto": "Automatic",
+      "bankersHint": "How many selections sit in every column. Automatic: the model makes bankers of the selections at 75% or more, leaving at least two free selections.",
+      "bankersCount": "{count} bankers",
+      "banker": "Banker",
+      "systemOfFree": "free selections: system {k} of {n}, wins with at least {k} free selections in",
+      "systemNoteBankers": "{bankers} bankers in every column and {columns} columns of {of} selections out of the {n} free ones: probability that all the bankers and at least {of} of the free ones come in {pct}%.",
+      "systemOfHint": "How many free selections go in every column. The bankers sit in every column and do not count here: with 2 bankers and 4 free selections, \"2\" is the 2 of 4 system (6 columns), which pays if the bankers come in and at least 2 free selections out of 4 do. Automatic: for every k the model computes the expected return of an equal stake on every column at the bookmakers' odds and takes the best (at equal return, the most likely); without odds, the classic N-1.",
+      "systemAuto": "Automatic",
+      "systemAutoNote": "the model chooses the system with the best expected return at the bookmakers' odds",
+      "stake": "Stake",
+      "stakeModes": {
+        "recommended": "Recommended",
+        "full": "Full cover"
+      },
+      "stakeModeHint": {
+        "recommended": "The model puts the stake on the lines it rates above the bookmakers' odds (probability × odds − 1), in proportion to the edge; if none has an edge, all on the best line.",
+        "full": "The same stake on every column of every line: full-cover system."
+      },
+      "column": "Column",
+      "payout": "Payout",
+      "maxPayout": "Maximum payout",
+      "expectedReturn": "Expected return",
+      "expectedProfit": "Expected profit",
+      "profitChance": "Ends in profit",
+      "stakeNote": "Every \"k of N\" line is the system with columns of k free selections (the bankers in all of them); the stake is per column, as at the bookmaker, and you can change it line by line. Probability = all the bankers and at least k free selections in. Payout = if every column of the line wins. Expected return and \"ends in profit\" according to the model, over every possible outcome. Bookmakers' average odds: yours may differ.",
+      "stakeNoteFair": "Some selections have no bookmakers' odds: where missing, the model's fair odds apply (≈), so the expected return is that of an even-value bet. With real odds the numbers change.",
+      "line": "Line",
+      "kOfN": "{k} of {n}",
+      "withBankers": "+ {count} bankers",
+      "perColumn": "Per column",
+      "lineTotal": "Line",
+      "totalStake": "Total stake",
+      "tour": {
+        "button": "Guide",
+        "open": "Replay the step-by-step guide of the betting slip builder",
+        "steps": {
+          "risk": {
+            "title": "The risk",
+            "text": "Low takes only cautious picks (at least 78%), medium the recommended ones (from 62%), high the bold ones (from 45%). When a match has no pick at that tier, the model steps down to the safer one."
+          },
+          "kind": {
+            "title": "Single, accumulator or system",
+            "text": "Single: one match only, the most likely. Accumulator: every selection must win, the odds are the product. System: choose how many matches, how many bankers (which must always come in) and the columns of k free selections; with \"auto\" the model picks bankers and k with the best return."
+          },
+          "days": {
+            "title": "The days",
+            "text": "Any day or only the ones you tap: the selections are taken among the matches of those days."
+          },
+          "competitions": {
+            "title": "The competitions",
+            "text": "All or only the ones you tap. Below you see how many matches are left to choose from."
+          },
+          "generate": {
+            "title": "Build",
+            "text": "The model takes the picks it believes in most for the chosen risk, one per match, never two from the same. You can rebuild as many times as you like, changing the settings."
+          },
+          "result": {
+            "title": "The selections",
+            "text": "Every row is a match with the chosen pick, its probability and the bookmakers' odds. In a system the \"Banker\" badge marks the selections that go in every column. Tap the match to open its analysis."
+          },
+          "summary": {
+            "title": "Probability and odds",
+            "text": "Probability that the whole slip wins, the model's fair odds, the bookmakers' odds (≈ when estimated) and when the slip settles: two hours after the last kick-off."
+          },
+          "stake": {
+            "title": "The stake",
+            "text": "Type how much you want to stake. Single and accumulator: payout if every selection comes in, expected return and profit according to the model. System: the stake is split by line, k of N, as on the bookmaker's ticket, in multiples of 5 cents; \"Recommended\" puts more on the lines with the best return, \"Full cover\" spreads it over every line; you can correct every amount by hand."
+          },
+          "save": {
+            "title": "Save",
+            "text": "Once signed in the slip is saved in your account and settled on its own on the real results: you find it again in the model record, under \"My betting slips\", won or lost."
+          }
+        }
+      },
+      "winChance": "Chance of winning",
+      "ticketNote": "Payout = stake × odds of the slip (for an accumulator the product of the bookmakers' average odds). Expected return and profit according to the model: the payout times the probability that every selection comes in. Your bookmaker's odds may differ.",
+      "introHelp": "Choose risk, type and how many matches; the model takes the picks it believes in most for that risk among the matches of the days and competitions you indicate, and tells you probability, odds and when the slip settles.",
+      "share": "Share",
+      "shareTitle": "My betting slip · GiBiScore",
+      "shareText": "My betting slip built by the GiBiScore model",
+      "toProfile": "Go to the profile"
+    },
+    "mine": {
+      "title": "My betting slips",
+      "empty": "No saved slip: build one from the predictions page.",
+      "tally": "{won} won of {settled} settled",
+      "open": "Open",
+      "won": "Won",
+      "lost": "Lost",
+      "hits": "{hits}/{size} in",
+      "ticket": {
+        "number": "Betting slip no. {id}",
+        "odds": "Odds",
+        "stake": "Stake",
+        "payout": "Payout",
+        "perColumn": "/col",
+        "settles": "Settles",
+        "settled": "Settled",
+        "share": "Share",
+        "shareTitle": "Betting slip no. {id} · GiBiScore",
+        "shareText": "My betting slip built by the GiBiScore model",
+        "delete": "Delete",
+        "deleteConfirm": "Delete betting slip no. {id}? It leaves the record and its shared link stops working. This cannot be undone.",
+        "deleteError": "Not deleted: try again."
+      }
+    },
+    "legendShort": "Under every match the model's three picks: cautious from 78% probability, recommended from 62%, bold from 45%. The green +N% badge marks a value pick: the bookmakers pay more than the model's fair odds. Tap the match for the full analysis.",
+    "tour": {
+      "button": "Guide",
+      "open": "Replay the step-by-step guide of the predictions page",
+      "steps": {
+        "days": {
+          "title": "Which days",
+          "text": "Today, tomorrow, both or the next seven days: the list below shows only the matches of those days."
+        },
+        "competition": {
+          "title": "Which competition",
+          "text": "All the main competitions or just one. The counter on the right says how many matches are left with the chosen filters."
+        },
+        "schedina": {
+          "title": "Build a betting slip",
+          "text": "Opens the builder: choose risk, single, accumulator or system, days and competitions, and the model composes the slip with its best picks, splits the stake like a bookmaker and, if you are signed in, saves it and settles it on the real results. The builder has its own guide too."
+        },
+        "legend": {
+          "title": "The three tiers",
+          "text": "For every match the model suggests three picks: cautious (at least 78% probability), recommended (from 62%) and bold (from 45%). They are the same as in the match analysis and are all checked in the record."
+        },
+        "list": {
+          "title": "The matches",
+          "text": "One card per competition, with the matches in kick-off order. Tap the competition's name for its page."
+        },
+        "match": {
+          "title": "A match",
+          "text": "Time and day in the middle; the underlined team is the one the model sees as favourite. Tap the match to open the full analysis in a new tab: probabilities, odds and markets."
+        },
+        "tiers": {
+          "title": "The match's picks",
+          "text": "The model's three picks for this match with their probability; the recommended one is highlighted. A dash means there is no pick safe enough for that tier. Press and hold to see the probabilities of every outcome."
+        },
+        "record": {
+          "title": "The model record",
+          "text": "Every suggested pick is written before kick-off and checked against the final result: here you see how many each tier wins against what it promised, the model's calibration and your saved slips."
+        }
+      }
+    },
+    "valueBadge": "value +{edge}%"
+  },
+  "schedinaShare": {
+    "title": "Shared betting slip",
+    "metaTitle": "Betting slip no. {id} · {status}",
+    "metaDescription": "A betting slip generated by the GiBiScore model: the selections, the probability, the odds and how it went.",
+    "intro": "Generated by the GiBiScore model and settled on its own on the real results.",
+    "cta": "Build your own",
+    "notFound": "This betting slip does not exist or the link is no longer valid.",
+    "statusOpen": "open",
+    "statusWon": "won",
+    "statusLost": "lost"
+  }
+}

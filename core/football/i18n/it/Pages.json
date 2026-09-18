@@ -303,13 +303,14 @@
     "assists": "Assist",
     "empty": "Dati non ancora disponibili per questa competizione.",
     "seasonPicker": "Stagione",
-    "tools": {
-      "label": "Strumenti",
-      "predictions": "Pronostici e schedine",
-      "record": "Bilancio del modello",
-      "injuries": "Infortunati e squalificati",
-      "compare": "Confronta giocatori",
-      "search": "Cerca squadra o giocatore"
+    "nav": {
+      "label": "Pagine delle statistiche",
+      "stats": "Marcatori",
+      "predictions": "Pronostici",
+      "record": "Bilancio",
+      "injuries": "Infortunati",
+      "compare": "Confronto",
+      "search": "Cerca"
     }
   },
   "injuries": {
@@ -367,7 +368,7 @@
     "recordLink": "Il bilancio del modello",
     "record": {
       "title": "Bilancio del modello",
-      "metaTitle": "Bilancio dei pronostici",
+      "metaTitle": "Bilancio del modello",
       "metaDescription": "Quante giocate proposte dal modello sono andate a segno, fascia per fascia, e come il modello è tarato sulle stagioni in archivio.",
       "intro": "Ogni giocata proposta viene scritta prima del calcio d'inizio e verificata sul risultato finale: qui c'è quante ne vince ogni fascia contro quanto prometteva. Sotto, la taratura del modello sull'archivio delle competizioni principali.",
       "toPredictions": "Pronostici",
@@ -442,7 +443,9 @@
       "all": "7 giorni",
       "competition": "Competizione",
       "allCompetitions": "Tutte le competizioni",
-      "count": "{count} partite"
+      "count": "{count} partite",
+      "value": "Solo valore",
+      "valueHint": "Solo le partite con almeno una giocata di valore: la quota media dei bookmaker paga più della quota equa del modello (ritorno atteso di almeno il +3%)."
     },
     "adviceLegend": "Sotto ogni partita le tre giocate del modello, le stesse dell'analisi partita: prudente (dal 78% di probabilità), consigliata (dal 62%), audace (dal 45%). Apri la partita per probabilità complete e quote. Non è un consiglio di gioco.",
     "noAdvice": "Nessuna giocata abbastanza probabile per questa fascia.",
@@ -570,7 +573,12 @@
         }
       },
       "winChance": "Probabilità di vincita",
-      "ticketNote": "Vincita = puntata × quota della schedina (per la multipla il prodotto delle quote medie dei bookmaker). Ritorno e profitto atteso secondo il modello: vincita per la probabilità che tutte le selezioni siano centrate. Le quote del tuo bookmaker possono differire."
+      "ticketNote": "Vincita = puntata × quota della schedina (per la multipla il prodotto delle quote medie dei bookmaker). Ritorno e profitto atteso secondo il modello: vincita per la probabilità che tutte le selezioni siano centrate. Le quote del tuo bookmaker possono differire.",
+      "introHelp": "Scegli rischio, tipo e quante partite; il modello prende le giocate in cui crede di più per quel rischio tra le partite dei giorni e delle competizioni che indichi, e ti dice probabilità, quota e quando la schedina si chiude.",
+      "share": "Condividi",
+      "shareTitle": "La mia schedina · GiBiScore",
+      "shareText": "La mia schedina generata dal modello di GiBiScore",
+      "toProfile": "Vai al profilo"
     },
     "mine": {
       "title": "Le mie schedine",
@@ -587,10 +595,16 @@
         "payout": "Vincita",
         "perColumn": "/col",
         "settles": "Si chiude",
-        "settled": "Chiusa"
+        "settled": "Chiusa",
+        "share": "Condividi",
+        "shareTitle": "Schedina n. {id} · GiBiScore",
+        "shareText": "La mia schedina generata dal modello di GiBiScore",
+        "delete": "Elimina",
+        "deleteConfirm": "Eliminare la schedina n. {id}? Sparisce dal bilancio e il link condiviso smette di funzionare. Non si può annullare.",
+        "deleteError": "Non eliminata: riprova."
       }
     },
-    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa.",
+    "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Il bollino verde +N% segna una giocata di valore: i bookmaker pagano più della quota equa del modello. Tocca la partita per l'analisi completa.",
     "tour": {
       "button": "Guida",
       "open": "Rivedi la guida passo passo della pagina pronostici",
@@ -628,6 +642,18 @@
           "text": "Ogni giocata proposta viene scritta prima del calcio d'inizio e verificata sul risultato finale: qui vedi quante ne vince ogni livello contro quanto prometteva, la taratura del modello e le tue schedine salvate."
         }
       }
-    }
+    },
+    "valueBadge": "valore +{edge}%"
+  },
+  "schedinaShare": {
+    "title": "Schedina condivisa",
+    "metaTitle": "Schedina n. {id} · {status}",
+    "metaDescription": "Una schedina generata dal modello di GiBiScore: le selezioni, la probabilità, la quota e come è andata.",
+    "intro": "Generata dal modello di GiBiScore e chiusa da sola sui risultati reali.",
+    "cta": "Genera la tua",
+    "notFound": "Questa schedina non esiste o il link non è più valido.",
+    "statusOpen": "aperta",
+    "statusWon": "vinta",
+    "statusLost": "persa"
   }
 }

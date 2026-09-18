@@ -1,0 +1,70 @@
+{
+  "sectionsLabel": "Site sections",
+  "search": "Search",
+  "login": "Sign in",
+  "nav": {
+    "scores": "Scores",
+    "live": "Live",
+    "competitions": "Competitions",
+    "stats": "Statistics",
+    "search": "Search",
+    "fantasy": "Fantasy",
+    "predictions": "Predictions",
+    "menu": "Menu"
+  },
+  "searchHint": "Enter for all results",
+  "searchTeams": "Teams",
+  "searchPlayers": "Players",
+  "searchCompetitions": "Competitions",
+  "searchNone": "No results",
+  "menus": {
+    "scores": {
+      "matchesTitle": "Matches",
+      "today": "Today's matches",
+      "live": "Live matches",
+      "yesterday": "Yesterday's results",
+      "tomorrow": "Tomorrow's schedule",
+      "toolsTitle": "Tools",
+      "search": "Find a team or player",
+      "searchHint": "Teams, players, competitions",
+      "favorites": "Favourites and my teams",
+      "favoritesHint": "Use the star to follow them on the home page",
+      "overview": "All of today's matches"
+    },
+    "competitions": {
+      "italyTitle": "Italy",
+      "europeTitle": "European cups",
+      "topTitle": "Top leagues",
+      "overview": "All competitions"
+    },
+    "stats": {
+      "playersTitle": "Players",
+      "scorers": "Top scorers",
+      "assists": "Assists",
+      "squadsTitle": "Teams and squads",
+      "injuries": "Injured and suspended",
+      "injuriesHint": "By competition, team by team",
+      "teamStats": "Team statistics",
+      "teamStatsHint": "Find a team and open the Statistics tab",
+      "overview": "All statistics",
+      "compare": "Compare players",
+      "compareHint": "Two players side by side, same season"
+    }
+  },
+  "mobileMenu": {
+    "title": "Menu",
+    "close": "Close the menu",
+    "profile": "My profile",
+    "predictions": {
+      "list": "Predictions and betting slips",
+      "record": "Model record"
+    },
+    "fantasy": {
+      "hub": "All of fantasy football",
+      "auction": "Auction",
+      "lineup": "Lineup",
+      "model": "Ratings model"
+    },
+    "footer": "Every page of the site. The most used ones are in the bar below."
+  }
+}

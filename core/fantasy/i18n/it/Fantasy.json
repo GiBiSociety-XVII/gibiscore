@@ -1072,8 +1072,42 @@
         "how": {
           "title": "Come funziona",
           "text": "Qui trovi in breve come nascono i consigli: cosa pesa, quando si aggiorna e cosa succede al blocco della giornata."
+        },
+        "liveScore": {
+          "title": "Punteggio live",
+          "text": "Da quando la giornata inizia, qui vedi i punti della formazione bloccata partita per partita: chi ha finito, chi è in campo col minuto, chi deve ancora giocare. Voti stimati dal rating finché non arrivano quelli ufficiali; le sostituzioni dalla panchina scattano a fine partita."
         }
       }
+    },
+    "liveScore": {
+      "title": "Punteggio live · giornata {round}",
+      "titleOver": "Punteggio giornata {round}",
+      "liveBadge": "LIVE",
+      "officialBadge": "voti ufficiali",
+      "provisionalBadge": "provvisorio",
+      "estimatedBadge": "stima",
+      "officialHint": "I voti ufficiali di questa giornata sono caricati: i punti sono quelli veri, con bonus e malus secondo le regole della tua lega.",
+      "estimateHint": "La formazione è quella bloccata all'inizio della giornata. Per ogni giocatore il voto è il rating del provider riportato sulla scala dei voti, aggiornato minuto per minuto finché la partita è in corso; gol, assist, cartellini, rigori e gol subiti arrivano dal provider. Le sostituzioni automatiche (stesso ruolo, ordine di panchina) scattano solo quando la partita del titolare è finita senza voto. Con i voti ufficiali il punteggio diventa quello vero.",
+      "breakdown": "voti e bonus {points}",
+      "defence": "modificatore difesa {points}",
+      "counts": {
+        "done": "{count, plural, =0 {nessuna finita} one {# finita} other {# finite}}",
+        "live": "{count, plural, =0 {nessuno in campo} one {# in campo} other {# in campo}}",
+        "pending": "{count, plural, =0 {nessuno da giocare} one {# da giocare} other {# da giocare}}"
+      },
+      "subs": "{count, plural, one {# sostituzione automatica} other {# sostituzioni automatiche}}",
+      "holes": "{count, plural, one {# titolare senza voto e senza riserva} other {# titolari senza voto e senza riserva}}",
+      "autoRefresh": "Si aggiorna da solo ogni minuto",
+      "voto": "voto",
+      "final": "finale",
+      "toPlay": "da giocare",
+      "inPlay": "in corso",
+      "noMatch": "non gioca in questa giornata",
+      "noVote": "senza voto",
+      "replacedBy": "sostituito da {name}",
+      "cameIn": "entra per {name}",
+      "benchTitle": "Panchina ({count})",
+      "benchOpen": "apri"
     }
   },
   "votes": {

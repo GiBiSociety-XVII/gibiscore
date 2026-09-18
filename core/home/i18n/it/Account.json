@@ -16,7 +16,8 @@
     "noAccount": "Non hai un account?",
     "createAccount": "Crea un account",
     "footer": "Proteggi il tuo account con una password sicura",
-    "linkError": "Il link non è più valido: accedi o registrati di nuovo"
+    "linkError": "Il link non è più valido: accedi o registrati di nuovo",
+    "forgot": "Password dimenticata?"
   },
   "signUp": {
     "title": "Crea un account",
@@ -58,18 +59,19 @@
       "record": "Bilancio del modello"
     },
     "schedine": "Le mie schedine",
-    "schedineHint": "Ogni schedina generata dalla pagina Pronostici e salvata resta aperta finché le sue partite non sono finite, poi viene chiusa da sola sui risultati reali: vinta o persa, con quante selezioni hai centrato. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
+    "schedineHint": "Ogni schedina salvata resta aperta finché le sue partite non sono finite, poi si chiude da sola sui risultati reali: vinta o persa, con l'esito di ogni selezione. Il cestino su una schedina la elimina: sparisce dal bilancio e il suo link condiviso smette di funzionare.",
     "favorites": {
       "title": "I miei preferiti",
       "competitions": "Competizioni",
       "teams": "Squadre",
       "emptyCompetitions": "Nessuna competizione tra i preferiti: usa la stella accanto a un campionato o a una coppa.",
       "emptyTeams": "Nessuna squadra tra i preferiti: usa la stella nella pagina di una squadra.",
-      "hint": "Le stelle sono le stesse di tutto il sito e seguono il tuo account su ogni dispositivo. Le partite di queste competizioni e squadre vengono prima nella lista, le loro classifiche nella colonna di destra, e sono quelle di cui ricevi le notifiche."
+      "hint": "Le stelle sono le stesse di tutto il sito e seguono il tuo account su ogni dispositivo. Le partite di queste competizioni e squadre vengono prima nella lista, le loro classifiche nella colonna di destra, e sono quelle di cui ricevi le notifiche.",
+      "help": "Le stelle sono le stesse di tutto il sito e seguono il tuo account su ogni dispositivo. Le partite di queste competizioni e squadre vengono prima nella lista, le loro classifiche nella colonna di destra, e sono quelle di cui ricevi le notifiche."
     },
     "notifications": {
       "title": "Notifiche",
-      "intro": "Per le partite delle competizioni e delle squadre tra i preferiti: calcio d'inizio, fine primo tempo, finale, ogni gol con chi ha segnato, espulsioni e formazioni ufficiali. Arrivano sul telefono o sul computer anche a sito chiuso.",
+      "intro": "Per le partite delle competizioni e delle squadre tra i preferiti: promemoria un'ora prima, formazioni ufficiali, calcio d'inizio, ogni gol con chi ha segnato, espulsioni, fine primo tempo e finale; la sera il riepilogo delle tue squadre; e l'esito delle tue schedine. Arrivano anche a sito chiuso.",
       "devices": "{count, plural, one {# dispositivo} other {# dispositivi}}",
       "deviceOn": "Attiva su questo dispositivo",
       "deviceOff": "Disattiva su questo dispositivo",
@@ -83,16 +85,45 @@
       "masterOff": "Notifiche in pausa",
       "masterHint": "In pausa non ricevi nulla su nessun dispositivo, senza perdere le impostazioni: riattivi quando vuoi.",
       "kinds": {
+        "reminder": "Partita tra un'ora",
+        "lineups": "Formazioni ufficiali",
         "kickoff": "Calcio d'inizio",
-        "half_time": "Fine primo tempo",
-        "full_time": "Finale",
         "goal": "Gol",
         "red_card": "Espulsioni",
-        "lineups": "Formazioni ufficiali"
+        "half_time": "Fine primo tempo",
+        "full_time": "Finale",
+        "digest": "Riepilogo serale",
+        "schedina": "Schedina chiusa"
       },
-      "muteHint": "Stai guardando una partita e non vuoi spoiler? Nella pagina della partita tocca la campanella per silenziare solo quella.",
+      "muteHint": "Stai guardando una partita e non vuoi spoiler? Nella pagina della partita tocca la campanella per silenziare solo quella. Le partite silenziate sono qui sotto.",
       "saving": "Salvataggio…",
-      "error": "Non salvato: riprova."
+      "error": "Non salvato: riprova.",
+      "unmute": "Riattiva"
     }
+  },
+  "password": {
+    "title": "Password dimenticata",
+    "subtitle": "Scrivi l'email dell'account: ti mandiamo un link per scegliere una password nuova.",
+    "email": "Email",
+    "emailPlaceholder": "tuo@email.com",
+    "send": "Mandami il link",
+    "sending": "Invio in corso...",
+    "sentTitle": "Controlla la posta",
+    "sentText": "Se {email} ha un account, tra poco arriva un'email con il link. Vale per un'ora; guarda anche nello spam.",
+    "remembered": "Te la ricordi?",
+    "toSignIn": "Accedi",
+    "footer": "Il link vale un'ora e una volta sola.",
+    "newTitle": "Nuova password",
+    "newSubtitle": "Scegline una che usi solo qui.",
+    "newPassword": "Nuova password",
+    "repeat": "Ripeti la password",
+    "hint": "Almeno {min} caratteri",
+    "tooShort": "La password deve avere almeno {min} caratteri",
+    "mismatch": "Le due password non coincidono",
+    "save": "Salva la password",
+    "saving": "Salvataggio...",
+    "expiredTitle": "Link scaduto",
+    "expiredText": "Il link non è più valido o è già stato usato: richiedine uno nuovo.",
+    "again": "Richiedi un nuovo link"
   }
 }

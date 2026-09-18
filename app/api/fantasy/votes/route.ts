@@ -3,6 +3,7 @@ import {NextResponse, type NextRequest} from 'next/server';
 import {createClient} from '@/lib/db/server';
 import {parseManualVote} from '@/lib/fantasy/recap';
 import {isAdminId} from '@/lib/admin';
+import {everyLocalePath} from '@/lib/auth/next';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,6 @@ export async function POST(request: NextRequest) {
     }
     // Read your own writes: the next request renders fresh instead of serving the stale copy while it refreshes.
     for (const tag of ['fantasy-votes', 'fantasy-matchday', 'fantasy-pool']) revalidateTag(tag, {expire: 0});
-    for (const path of ['/fantacalcio/formazione', '/it/fantacalcio/formazione', '/admin/voti', '/it/admin/voti', '/fantacalcio/modello', '/it/fantacalcio/modello']) revalidatePath(path);
+    for (const path of ['/fantacalcio/formazione', '/admin/voti', '/fantacalcio/modello'].flatMap(everyLocalePath)) revalidatePath(path);
     return NextResponse.json({saved: rows.length, removed: remove.length});
 }

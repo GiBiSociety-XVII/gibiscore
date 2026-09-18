@@ -3,6 +3,7 @@ import {getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {SiteShell} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
+import {SectionNav} from "@/components/football/section-nav";
 import {PredictionsBoard, type BoardBlock} from "@/components/football/predictions-board";
 import {TourLauncher} from "@/components/football/tour-launcher";
 import {getUpcomingPredictions} from "@/lib/football/data/predictions";
@@ -26,7 +27,6 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
     const {locale} = await params;
     setRequestLocale(locale);
     const t = await getTranslations('Pages.predictions');
-    const tp = await getTranslations('Football.prediction');
     const blocks = await getUpcomingPredictions(DAYS);
     const today = romeDate(new Date());
     // The same slips the match page proposes, from the same prediction and odds.
@@ -43,8 +43,8 @@ export default async function PredictionsPage({params}: PageProps<"/[locale]/pre
                         <Link data-tour="record" href="/predictions/record" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('recordLink')}</Link>
                     </div>
                 } />
+            <SectionNav current="predictions" />
             <PredictionsBoard blocks={board} today={today} tomorrow={shiftDay(today, 1)} />
-            <p className="text-[12px] font-semibold text-muted-foreground">{tp('listHint')} {t('adviceLegend')}</p>
         </SiteShell>
     );
 }

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke": "playwright test",
     "cron": "node scripts/run-cron.mjs",
     "probe:api-football": "node scripts/api-football-probe.mjs"
   },
@@ -27,6 +28,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

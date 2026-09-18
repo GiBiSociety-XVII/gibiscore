@@ -1,5 +1,7 @@
 import 'server-only';
 import {createPublicClient} from '@/lib/db/server';
+import {after} from 'next/server';
+import {recordError} from '@/lib/errors/record';
 import type {CompetitionSummary, FixtureState, FixtureSummary, StandingRow, StandingZone, TeamSummary} from '../types';
 import {normalizeCountryCode} from '../flags';
 
@@ -194,5 +196,15 @@ export function roundNumber(round: string | null): number | null {
 
 /** Log and swallow read errors: pages degrade to empty states, never crash. */
 export function logReadError(where: string, error: unknown) {
-    console.error(`[football/data] ${where}:`, (error as Error)?.message ?? error);
+    const message = (error as Error)?.message ?? String(error);
+    console.error(`[football/data] ${where}:`, message);
+    // Written down for the administrator's dashboard, after the page has gone out: a
+    // fire-and-forget promise can be torn down with the invocation and never reach the
+    // database. Outside a request (a script, a job) `after` is not there: then fire it.
+    const note = {source: 'read' as const, message: `${where}: ${message}`};
+    try {
+        after(() => recordError(note));
+    } catch {
+        void recordError(note);
+    }
 }

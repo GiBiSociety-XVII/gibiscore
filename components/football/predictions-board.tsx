@@ -6,7 +6,7 @@ import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
-import type {BetSuggestion, LegKey} from "@/lib/football/markets";
+import {isValueSlip, slipEdge, type BetSuggestion, type LegKey} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {CompetitionSummary, FixtureSummary} from "@/lib/football/types";
 import {Flag} from "./flag";
@@ -44,15 +44,16 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
     const [day, setDay] = useState<DayFilter>('all');
     const [league, setLeague] = useState<number | 'all'>('all');
     const [schedina, setSchedina] = useState(false);
+    const [valueOnly, setValueOnly] = useState(false);
     // Everything the slip generator needs, from the blocks already on the page.
     const candidates: SchedinaCandidate[] = useMemo(() => blocks.flatMap((b) => b.fixtures.filter((f) => f.fixture.state === 'scheduled' && f.slips.length > 0).map((f) => ({fixtureId: f.fixture.id, competitionId: b.competition.id, competition: b.competition.name, home: f.fixture.home.name, away: f.fixture.away.name, startingAt: f.fixture.startingAt, day: f.day, slips: f.slips}))), [blocks]);
     const dayOptions = useMemo(() => [...new Set(candidates.map((c) => c.day))].sort().map((d) => ({day: d, label: d === today ? t('filters.today') : d === tomorrow ? t('filters.tomorrow') : format.dateTime(new Date(`${d}T12:00:00Z`), {weekday: 'short', day: 'numeric', month: 'numeric'})})), [candidates, today, tomorrow, format, t]);
     const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
     const inDay = (d: string) => (day === 'all' ? true : day === 'today' ? d === today : day === 'tomorrow' ? d === tomorrow : d === today || d === tomorrow);
     const shown = useMemo(
-        () => blocks.map((b) => ({...b, fixtures: b.fixtures.filter((f) => inDay(f.day))})).filter((b) => b.fixtures.length > 0 && (league === 'all' || b.competition.id === league)),
+        () => blocks.map((b) => ({...b, fixtures: b.fixtures.filter((f) => inDay(f.day) && (!valueOnly || f.slips.some(isValueSlip)))})).filter((b) => b.fixtures.length > 0 && (league === 'all' || b.competition.id === league)),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [blocks, day, league, today, tomorrow],
+        [blocks, day, league, today, tomorrow, valueOnly],
     );
     const count = shown.reduce((s, b) => s + b.fixtures.length, 0);
 
@@ -70,8 +71,12 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                     <option value="all">{t('filters.allCompetitions')}</option>
                     {blocks.map((b) => <option key={b.competition.id} value={b.competition.id}>{b.competition.country ? `${b.competition.country} · ` : ''}{b.competition.name}</option>)}
                 </select>
+                <button type="button" onClick={() => setValueOnly((v) => !v)} aria-pressed={valueOnly} title={t('filters.valueHint')} className={cn("bb-btn h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1", valueOnly ? "bg-foreground text-background" : "bg-card")}>
+                    <span className={cn("inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black", valueOnly ? "bg-background text-foreground" : "bg-emerald-200 text-emerald-800")}>€</span>
+                    {t('filters.value')}
+                </button>
                 <span className="ml-auto font-mono text-[11px] font-bold text-muted-foreground">{t('filters.count', {count})}</span>
-                <button data-tour="schedina" type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-8 px-3 text-[12px] font-extrabold" disabled={candidates.length === 0}>{t('schedina.open')}</button>
+                <button data-tour="schedina" type="button" onClick={() => setSchedina(true)} className="bb-btn bg-accent h-9 sm:h-8 px-3 text-[12px] font-extrabold w-full sm:w-auto" disabled={candidates.length === 0}>{t('schedina.open')}</button>
             </div>
             <p data-tour="legend" className="text-[12px] font-semibold text-muted-foreground leading-snug px-0.5">{t('legendShort')}</p>
             {schedina && <SchedinaDialog candidates={candidates} days={dayOptions} competitions={blocks.map((b) => ({id: b.competition.id, name: b.competition.name}))} onClose={() => setSchedina(false)} />}
@@ -117,11 +122,16 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
                                                     <div data-tour={first ? 'tiers' : undefined} className="mt-1.5 grid grid-cols-3 gap-1.5">
                                                         {(['safe', 'balanced', 'bold'] as const).map((tier) => {
                                                             const slip = slips.find((x) => x.tier === tier);
+                                                            const edge = slip ? slipEdge(slip) : null;
+                                                            const value = !!slip && isValueSlip(slip);
                                                             return (
-                                                                <span key={tier} className="flex flex-col items-center gap-0.5 min-w-0" title={slip ? slip.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ') : t('noAdvice')}>
-                                                                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-muted-foreground">{tm(`advice.tiers.${tier}`)}</span>
-                                                                    <span className={cn("inline-flex items-center justify-center gap-1.5 w-full rounded border-2 px-1.5 h-7 text-[12px] font-extrabold leading-none min-w-0", slip ? (tier === 'balanced' ? "border-foreground bg-accent" : "border-foreground bg-card") : "border-muted bg-card text-muted-foreground")}>
-                                                                        <span className="truncate">{slip ? slip.legs.map((l) => legLabel(l.key)).join(' + ') : '–'}</span>
+                                                                <span key={tier} className="flex flex-col items-center gap-0.5 min-w-0" title={slip ? `${slip.legs.map((l) => `${legLabel(l.key)} ${l.pct}%`).join(' · ')}${slip.odds !== null ? ` · ${tm('book')} ${slip.odds.toFixed(2)}` : ''}${value ? ` · ${t('valueBadge', {edge: Math.round((edge ?? 0) * 100)})}` : ''}` : t('noAdvice')}>
+                                                                    <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">
+                                                                        {tm(`advice.tiers.${tier}`)}
+                                                                        {value && <span className="inline-flex items-center h-3.5 px-1 rounded bg-emerald-200 text-emerald-800 normal-case tracking-normal font-mono">+{Math.round((edge ?? 0) * 100)}%</span>}
+                                                                    </span>
+                                                                    <span className={cn("inline-flex items-center justify-center gap-1.5 w-full rounded border-2 px-1.5 min-h-7 py-0.5 text-[11px] sm:text-[12px] font-extrabold leading-tight min-w-0", slip ? (tier === 'balanced' ? "border-foreground bg-accent" : "border-foreground bg-card") : "border-muted bg-card text-muted-foreground")}>
+                                                                        <span className="text-center [text-wrap:balance]">{slip ? slip.legs.map((l) => legLabel(l.key)).join(' + ') : '–'}</span>
                                                                         {slip && <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground shrink-0">{slip.pct}%</span>}
                                                                     </span>
                                                                 </span>

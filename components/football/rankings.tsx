@@ -17,7 +17,7 @@ export function Rankings({kind, players, limit}: {kind: RankingKind; players: Ra
     return (
         <table className="w-full text-[13px]">
             <thead>
-                <tr className="text-muted-foreground text-[10px] font-extrabold tracking-wider uppercase">
+                <tr className="text-muted-foreground text-[11px] font-extrabold tracking-wider uppercase">
                     <th className="px-1 py-1 w-7 text-left">#</th>
                     <th className="px-1 py-1 text-left">{t('player')}</th>
                     <th className="px-1 py-1 text-right font-mono">{t('apps')}</th>
@@ -28,7 +28,7 @@ export function Rankings({kind, players, limit}: {kind: RankingKind; players: Ra
             <tbody>
                 {rows.map((p, i) => (
                     <tr key={`${p.player.id}-${p.team.id}`} className="border-t border-muted">
-                        <td className="px-1 py-1 font-mono text-[11px] font-bold text-muted-foreground">{i + 1}</td>
+                        <td className="px-1 py-1 font-mono text-[12px] font-bold text-muted-foreground">{i + 1}</td>
                         <td className="px-1 py-1">
                             <Link href={`/players/${p.player.slug}`} className="flex items-center gap-2 min-w-0 hover:underline decoration-accent decoration-[3px] underline-offset-2">
                                 <span className="inline-flex w-6 h-6 rounded-full bg-muted overflow-hidden shrink-0">

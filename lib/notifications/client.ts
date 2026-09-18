@@ -13,7 +13,7 @@ export type PushSupport =
     /** No public key on the site: nothing to subscribe to. */
     | 'not-configured';
 
-export const KINDS = ['kickoff', 'half_time', 'full_time', 'goal', 'red_card', 'lineups'] as const;
+export const KINDS = ['reminder', 'lineups', 'kickoff', 'goal', 'red_card', 'half_time', 'full_time', 'digest', 'schedina'] as const;
 
 export function pushSupport(): PushSupport {
     if (typeof window === 'undefined') return 'unsupported';
@@ -48,7 +48,7 @@ export async function subscribePush(): Promise<'ok' | 'denied' | 'error'> {
         await navigator.serviceWorker.ready;
         const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: serverKey() as BufferSource}));
         const json = sub.toJSON();
-        const res = await fetch('/api/notifications/subscribe', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({endpoint: json.endpoint, keys: json.keys, userAgent: navigator.userAgent})});
+        const res = await fetch('/api/notifications/subscribe', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({endpoint: json.endpoint, keys: json.keys, userAgent: navigator.userAgent, locale: document.documentElement.lang})});
         return res.ok ? 'ok' : 'error';
     } catch {
         return 'error';

@@ -15,6 +15,7 @@ import {
 import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {detectChanges, type MatchFacts, type Previous} from '@/lib/notifications/events';
 import {dispatchNotifications, type Outgoing} from '@/lib/notifications/dispatch';
+import {settleAdvice, settleSchedine} from './advice';
 import {
     chunk,
     ensureLeagues,
@@ -69,6 +70,9 @@ export async function syncFixtures(options: {fromDaysAgo?: number; toDaysAhead?:
         run.bump('fetched', fixtures.length);
 
         await upsertFixtures(db, run, fixtures);
+        // The day's results are in: the model's advice and the saved slips are settled within the hour.
+        await settleAdvice(db, run);
+        await settleSchedine(db, run);
         await finishRun(db, run, 'ok');
         return run;
     } catch (error) {

@@ -19,7 +19,7 @@ function ZoneLegend({rows, labels}: {rows: StandingGroup['rows']; labels: (zone:
     for (const r of rows) if (r.zone && !seen.includes(r.zone)) seen.push(r.zone);
     if (seen.length === 0) return null;
     return (
-        <ul className="flex flex-wrap gap-x-3 gap-y-1 px-2 py-1.5 text-[10px] font-bold text-muted-foreground border-t border-muted">
+        <ul className="flex flex-wrap gap-x-3 gap-y-1 px-2 py-1.5 text-[11px] font-bold text-muted-foreground border-t border-muted">
             {seen.map((zone) => (
                 <li key={zone} className="inline-flex items-center gap-1">
                     <span className={cn("inline-block w-2 h-2 rounded-sm", ZONE_CLASS[zone])} />
@@ -75,7 +75,7 @@ export function StandingsTable({groups, highlightTeamIds = [], compact = false, 
                     <div className="overflow-x-auto">
                         <table className={cn("w-full", compact ? "text-[12px]" : "text-[13px]")}>
                             <thead>
-                                <tr className="text-muted-foreground text-[10px] font-extrabold tracking-wider uppercase">
+                                <tr className="text-muted-foreground text-[11px] font-extrabold tracking-wider uppercase">
                                     <th className="px-1 py-1 w-7 text-left">{t('position')}</th>
                                     <th className="px-1 py-1 text-left">{t('team')}</th>
                                     <th className="px-1 py-1 text-right font-mono">{t('played')}</th>

@@ -5,8 +5,14 @@
   "deniedText": "Questa pagina è disponibile solo per l'amministratore del sito.",
   "backHome": "Torna alla home",
   "tools": {
-    "votes": {"title": "Voti in pagella", "text": "I voti veri dell'app, giornata per giornata, per tarare le stime."},
-    "model": {"title": "Quanto ci azzecca", "text": "Scarto tra voti reali e stime del sito, per ruolo e fascia."},
+    "votes": {
+      "title": "Voti in pagella",
+      "text": "I voti veri dell'app, giornata per giornata, per tarare le stime."
+    },
+    "model": {
+      "title": "Quanto ci azzecca",
+      "text": "Scarto tra voti reali e stime del sito, per ruolo e fascia."
+    },
     "names": {
       "title": "Nomi come nel Fantacalcio",
       "text": "Rinomina i giocatori di Serie A come li scrive il listone (Valde diventa Valdepenas). I file dei voti fanno lo stesso da soli.",
@@ -14,6 +20,37 @@
       "running": "Allineo…",
       "done": "{matched} giocatori trovati nel listone, {renamed} rinominati, {unmatched} voci del listone senza giocatore.",
       "error": "Non riuscito, riprova."
+    },
+    "sync": {
+      "title": "Stato dei job",
+      "text": "Ultimo giro di ogni job di sincronizzazione, errori delle ultime 24 ore e quota API-Football."
     }
+  },
+  "sync": {
+    "title": "Stato dei job",
+    "intro": "Ogni job di sincronizzazione con il suo ultimo giro; in rosso i giri falliti, in grigio i job fermi da più di un giorno.",
+    "toAdmin": "Pannello admin",
+    "requestsToday": "Richieste oggi (UTC)",
+    "quotaLeft": "Quota API rimasta",
+    "quotaRead": "Quota letta alle",
+    "errors24h": "Errori 24h",
+    "jobs": "Job",
+    "job": "Job",
+    "lastRun": "Ultimo giro",
+    "status": "Stato",
+    "seconds": "Sec",
+    "requests": "Richieste",
+    "runs24h": "Giri 24h",
+    "requests24h": "Richieste 24h",
+    "counters": "Contatori e avvisi",
+    "siteErrors24h": "Errori sito 24h",
+    "errorsTitle": "Errori del sito",
+    "errorsHint": "Ultimi 40, i più recenti in cima",
+    "errorsEmpty": "Nessun errore registrato.",
+    "errorWhen": "Quando",
+    "errorSource": "Da dove",
+    "errorHits": "Volte",
+    "errorPath": "Pagina",
+    "errorMessage": "Errore"
   }
 }

@@ -1,9 +1,11 @@
 'use client';
 
+import {Trash2} from "lucide-react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import type {LegKey} from "@/lib/football/markets";
+import {ShareButton} from "./share-button";
 
 export interface TicketSelection {
     fixtureId: number;
@@ -43,6 +45,8 @@ export interface Ticket {
     createdAt: string;
     hits: number | null;
     hit: boolean | null;
+    /** Per selection: won, lost, or null while its match is not over. */
+    results: Array<boolean | null> | null;
 }
 
 /** The pick of a leg in words, from the markets' labels. */
@@ -59,7 +63,7 @@ const SETTLE_AFTER_MS = 2 * 3_600_000;
  * its number and date, the selections one under the other, the tear
  * line, the stake and what it pays, the stamp of how it went.
  */
-export function SchedinaTicket({ticket}: {ticket: Ticket}) {
+export function SchedinaTicket({ticket, shareToken, onDelete, deleting = false}: {ticket: Ticket; /** With a token the ticket can be shared: /schedine/<token>. */ shareToken?: string | null; /** Only its own owner gets this: the shared page passes nothing and no button is drawn. */ onDelete?: () => void; deleting?: boolean}) {
     const t = useTranslations('Pages.predictions.mine');
     const ts = useTranslations('Pages.predictions.schedina');
     const tm = useTranslations('Football.markets');
@@ -97,8 +101,10 @@ export function SchedinaTicket({ticket}: {ticket: Ticket}) {
                 <span className="ml-auto font-mono text-[10px] font-bold text-muted-foreground">{ts('selections', {count: ticket.size})}</span>
             </div>
             <ul className="flex flex-col divide-y divide-dashed divide-foreground/25">
-                {ticket.selections.map((s) => (
-                    <li key={s.fixtureId} className="px-3 py-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+                {ticket.selections.map((s, i) => {
+                    const result = ticket.results?.[i] ?? null;
+                    return (
+                    <li key={s.fixtureId} className={cn("px-3 py-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2", result === false && "bg-red-50/60", result === true && "bg-emerald-50/60")}>
                         <span className="w-11 flex flex-col leading-tight font-mono text-[10px] font-bold tabular-nums text-muted-foreground">
                             <span className="uppercase">{format.dateTime(new Date(s.startingAt), {weekday: 'short', day: 'numeric'})}</span>
                             <span>{format.dateTime(new Date(s.startingAt), {hour: '2-digit', minute: '2-digit'})}</span>
@@ -114,8 +120,12 @@ export function SchedinaTicket({ticket}: {ticket: Ticket}) {
                             <span className="block text-[13px] font-extrabold whitespace-nowrap">{s.legs.map((l) => legLabel(l.key)).join(' + ')}</span>
                             <span className="block font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{s.pct}%</span>
                         </span>
+                        <span aria-label={result === true ? t('won') : result === false ? t('lost') : t('open')} className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full border-2 font-mono text-[11px] font-black leading-none", result === true ? "border-emerald-700 text-emerald-700" : result === false ? "border-red-700 text-red-700" : "border-foreground/25 text-foreground/30")}>
+                            {result === true ? '✓' : result === false ? '✗' : '·'}
+                        </span>
                     </li>
-                ))}
+                    );
+                })}
             </ul>
             {/* The tear line. */}
             <div className="relative h-5 shrink-0" aria-hidden="true">
@@ -146,6 +156,19 @@ export function SchedinaTicket({ticket}: {ticket: Ticket}) {
                         : `${t('ticket.settled')}${ticket.hits !== null ? ` · ${t('hits', {hits: ticket.hits, size: ticket.size})}` : ''}`}
                 </span>
                 <span className="flex items-center gap-2 shrink-0">
+                    {onDelete && (
+                        <button
+                            type="button"
+                            onClick={onDelete}
+                            disabled={deleting}
+                            aria-label={t('ticket.delete')}
+                            title={t('ticket.delete')}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded border border-foreground/40 bg-background hover:bg-red-100 hover:border-red-700 hover:text-red-700 disabled:opacity-40 transition-colors"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                        </button>
+                    )}
+                    {shareToken && <ShareButton compact path={`/schedine/${shareToken}`} title={t('ticket.shareTitle', {id: ticket.id})} text={t('ticket.shareText')} label={t('ticket.share')} />}
                     <span className="font-mono text-[9px] font-extrabold tracking-[0.2em] text-foreground">GIBISCORE</span>
                     <span aria-hidden="true" className="flex items-end gap-px h-4">
                         {Array.from({length: 24}, (_, i) => <span key={i} className="bg-foreground h-full" style={{width: ((ticket.id * 31 + i * 7) % 3) + 1}} />)}

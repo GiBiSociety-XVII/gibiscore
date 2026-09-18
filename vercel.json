@@ -55,6 +55,14 @@
     {
       "path": "/api/cron/fit-model",
       "schedule": "30 3 * * 1"
+    },
+    {
+      "path": "/api/cron/notify-digest",
+      "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/cron/prune",
+      "schedule": "20 5 * * *"
     }
   ]
 }

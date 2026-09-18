@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         payout: money(body.payout),
         lines: kind === 'system' && Array.isArray(body.lines) ? body.lines.slice(0, 12).map((l) => ({k: int((l as Line).k), n: int((l as Line).n), columns: int((l as Line).columns), stake: money((l as Line).stake) ?? 0})).filter((l) => l.k > 0 && l.n > 0 && l.columns > 0) : null,
     };
-    const {data, error} = await db.from('schedine').insert(row).select('id').single();
+    const {data, error} = await db.from('schedine').insert(row).select('id,share_token').single();
     if (error) return NextResponse.json({error: error.message}, {status: 500});
-    return NextResponse.json({id: data.id});
+    return NextResponse.json({id: data.id, shareToken: data.share_token});
 }

@@ -5,6 +5,7 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
+import {SectionNav} from "@/components/football/section-nav";
 import {PlayerPicker} from "@/components/football/player-picker";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getPlayerBrief, getPlayerCompare, type CompareSide} from "@/lib/football/data/compare";
@@ -85,6 +86,7 @@ export default async function ComparePage({params, searchParams}: PageProps<"/[l
     return (
         <SiteShell wide>
             <PageHeader title={t('title')} meta={t('intro')} />
+            <SectionNav current="compare" />
             <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
                 <PlayerPicker param="a" other={b} otherParam="b" placeholder={t('pickA')} selected={picked(briefA)} season={yearRaw} />
                 <PlayerPicker param="b" other={a} otherParam="a" placeholder={t('pickB')} selected={picked(briefB)} season={yearRaw} />

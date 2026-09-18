@@ -31,13 +31,14 @@ homepage mostra dati di esempio (badge "Dati di esempio").
 | `pnpm build` | build di produzione |
 | `pnpm lint` | ESLint |
 | `pnpm test` | test unitari (vitest) dei mapper API-Football |
+| `pnpm smoke` | test di fumo (Playwright): apre le pagine in un browser vero e controlla che rispondano, siano nella lingua giusta e non urlino in console. Senza `BASE_URL` avvia da sé `pnpm dev`; con `BASE_URL=https://gibiscore.com pnpm smoke` prova il sito online. Il browser si scarica una volta con `pnpm exec playwright install chromium` |
 | `pnpm probe:api-football` | scarica payload grezzi da API-Football in `scratch/` per verificarne la forma (~8 richieste) |
 | `pnpm cron <job>` | lancia un job di sync (serve `CRON_SECRET`, opzionale `BASE_URL`) |
 
 ## Struttura
 
 ```
-app/[locale]/        route (solo `it` per ora, l'inglese si aggiunge in i18n/routing.ts)
+app/[locale]/        route (`it` all'indirizzo semplice, `en` sotto /en; le lingue stanno in i18n/routing.ts)
 app/api/             health check, cron e diagnostica (protetti da CRON_SECRET)
 components/shared/   primitivi UI "Bold Blocks" (button, card, badge, input), app bar, footer
 components/home/     componenti della homepage
@@ -109,6 +110,7 @@ rose e cessioni restano ferme.
 | `sync-player-seasons` | ogni ora | 0 senza giornate giocate, ~35 per lega-stagione dopo (budget 1.500 a giro) | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`: leghe in evidenza con le stagioni passate (una volta sola), poi le leghe base coperte (~500), solo stagione corrente e senza il payload grezzo |
 | `sync-lineups` | ogni 5 minuti | 0 senza calci d'inizio vicini, 1 ogni 20 partite | formazioni ufficiali delle partite che iniziano entro 90 minuti (leghe in evidenza e base coperte), salvate come formazioni attese per la giornata del fantacalcio |
 | `sync-odds` | ogni 3 ore | 1 per partita: in evidenza dei prossimi 3 giorni a ogni giro, base coperte dei prossimi 2 giorni una volta al giorno (fino a 600 a giro) | quote pre-partita dei bookmaker (`fixture_odds`); nello stesso giro scrive le giocate del modello per le partite in evidenza e chiude quelle finite |
+| `prune` | ogni notte | 0 | pulizia del database: payload grezzi del provider oltre due stagioni, giri dei job oltre 30 giorni, registro delle notifiche mandate oltre 14 giorni, errori del sito oltre 30 giorni |
 
 Consumo tipico a regime: 10.000-20.000 richieste al giorno nei weekend
 (live di ~1.500 partite base e formazioni/statistiche di quelle coperte,
@@ -117,6 +119,29 @@ leghe base (calendari, squadre, rose, statistiche stagionali, dettaglio
 delle partite già giocate) costa qualche decina di migliaia di richieste
 spalmate su alcuni giorni. L'archivio storico delle leghe in evidenza si
 completa in un giorno.
+
+### Cosa il database dimentica
+
+Il job `prune`, una volta a notte, toglie solo ciò che nel sito non legge
+nessuno:
+
+- i payload grezzi del provider (`player_season_raw`) più vecchi delle
+  statistiche che ne sono state ricavate: li scrive il job delle stagioni
+  e non li apre nessuna pagina;
+- la contabilità che invecchia: giri dei job oltre 30 giorni, registro
+  delle notifiche già mandate oltre 14, errori del sito oltre 30.
+
+Il dettaglio delle partite vecchie (eventi, voti e statistiche dei
+giocatori, statistiche squadra, formazioni) **non** si tocca, in nessuna
+lega e in nessuna stagione: la pagina partita lo disegna per qualsiasi
+partita, e la pagina giocatore ci costruisce sopra l'elenco delle
+stagioni e la tabella partita per partita. Toglierlo ai campionati minori
+svuoterebbe quelle pagine per le loro partite vecchie, e riscaricarle
+costa richieste al provider.
+
+Cancellare non restringe il disco da solo: Postgres riusa lo spazio per
+quello che arriva, ed è esattamente lo scopo. Le soglie stanno in cima a
+`lib/football/sync/prune.ts`.
 
 ### Archivio storico
 
@@ -171,7 +196,15 @@ e iPad solo con il sito aggiunto alla schermata Home.
   l'interruttore generale e i tipi scelti (`notification_settings`) e le
   partite silenziate (`muted_fixtures`), manda a ogni browser iscritto
   (`push_subscriptions`) e dimentica i browser che il servizio push dice
-  spariti.
+  spariti. Ogni notifica è scritta in tutte le lingue del sito e ogni
+  browser riceve la sua (`push_subscriptions.locale`, salvata quando si
+  iscrive), compreso il link che apre.
+- Gli errori del sito finiscono in `error_log` (tabella riservata alla
+  chiave di servizio): le letture fallite del livello dati e quello che
+  il confine d'errore di una pagina cattura nel browser, mandato da
+  `/api/errors`. Lo stesso messaggio ripetuto nel minuto conta una volta
+  sola con un contatore. Si leggono in `/admin/sync`, sotto i job, e il
+  job `prune` li tiene a 30 giorni.
 - Il profilo (`/account`) attiva o disattiva il dispositivo, mette in pausa
   tutto, sceglie i tipi; la campanella nella pagina della partita silenzia
   quella sola partita (niente spoiler mentre la si guarda). Il service worker
@@ -189,7 +222,18 @@ variante ad accento pieno, iOS la tile nera, `theme-color` `#14131A`.
 
 Struttura alla Diretta/Sofascore: barra laterale con le competizioni
 principali e tutti i paesi, lista risultati al centro, classifiche nella
-colonna di destra. URL in inglese, testi in italiano.
+colonna di destra. URL in inglese.
+
+Il sito è in italiano e in inglese: l'italiano sta all'indirizzo semplice
+(`/predictions`), l'inglese sotto il prefisso (`/en/predictions`). Nella barra
+c'è il codice dell'altra lingua: porta alla stessa pagina, con la stessa query,
+e next-intl ricorda la scelta nel suo cookie. I testi stanno in
+`core/<area>/i18n/<lingua>/<Namespace>.json`, un file per namespace e per
+lingua, con le stesse chiavi. Fuori dai testi delle pagine: la pagina di
+errore, l'immagine della schedina condivisa e le notifiche push hanno il
+loro piccolo dizionario nel file (non possono usare next-intl); ogni browser
+salva la lingua con cui si è iscritto (`push_subscriptions.locale`) e riceve
+le notifiche, e il link che aprono, in quella.
 
 | URL | Contenuto |
 |---|---|

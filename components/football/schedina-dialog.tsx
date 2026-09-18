@@ -5,7 +5,9 @@ import {X, Check, CloudOff} from "lucide-react";
 import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
+import {Help} from "@/components/fantasy/help";
 import {TourLauncher} from "./tour-launcher";
+import {ShareButton} from "./share-button";
 import {cloudUser} from "@/lib/fantasy/cloud";
 import type {LegKey} from "@/lib/football/markets";
 import {buildSchedina, stakePlan, STAKE_STEP, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
@@ -39,6 +41,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const [result, setResult] = useState<Schedina | null | undefined>(undefined);
     const [signedIn, setSignedIn] = useState<boolean | null>(null);
     const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [shareToken, setShareToken] = useState<string | null>(null);
     useEffect(() => {
         let alive = true;
         cloudUser().then((u) => { if (alive) setSignedIn(!!u); }).catch(() => { if (alive) setSignedIn(false); });
@@ -57,6 +60,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const ticket = useMemo(() => (result && result.kind !== 'system' ? ticketPlan(result, stake) : null), [result, stake]);
     const generate = () => {
         setSave('idle');
+        setShareToken(null);
         setLineStakes(null);
         setResult(buildSchedina(candidates, {risk, kind, size, system, bankers, days: pickedDays, competitions: pickedLeagues, now: new Date().toISOString()}));
     };
@@ -70,6 +74,8 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
             const res = await fetch('/api/predictions/schedina', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(saved)});
             if (res.status === 401) { setSignedIn(false); setSave('error'); return; }
             if (!res.ok) throw new Error(String(res.status));
+            const body = (await res.json()) as {id: number; shareToken?: string};
+            setShareToken(typeof body.shareToken === 'string' ? body.shareToken : null);
             setSave('saved');
         } catch {
             setSave('error');
@@ -83,11 +89,11 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
             <div onClick={(e) => e.stopPropagation()} className="bb-surface w-full max-w-2xl my-4 bg-background flex flex-col">
                 <div className="flex items-center gap-2 px-3 h-11 border-b-2 border-foreground bg-card rounded-t-[calc(var(--radius-lg)-2px)]">
                     <h2 className="text-[14px] font-extrabold uppercase tracking-wide">{t('title')}</h2>
+                    <Help boxed text={t('introHelp')} />
                     <div className="ml-auto"><TourLauncher storageKey="gibiscore:schedina-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: `schedina-${key}`, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} /></div>
                     <button type="button" onClick={onClose} aria-label={t('close')} className="inline-flex items-center justify-center w-8 h-8 rounded-md border-2 border-foreground bg-background hover:bg-muted"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="px-3 py-3 flex flex-col gap-3 text-[13px]">
-                    <p className="text-[12px] font-semibold text-muted-foreground leading-snug">{t('intro')}</p>
                     <div data-tour="schedina-risk" className="flex flex-col gap-1">
                         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('risk')}</span>
                         <div className="flex flex-wrap gap-1">{RISKS.map((r) => <button key={r} type="button" onClick={() => setRisk(r)} className={chip(risk === r)} title={t(`riskHint.${r}`)}>{t(`risks.${r}`)}</button>)}</div>
@@ -277,11 +283,11 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 </button>
                                 {signedIn === false && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700"><CloudOff className="w-3.5 h-3.5" aria-hidden="true" />{t('signIn')}</span>}
                                 {save === 'error' && signedIn !== false && <span className="text-[11px] font-semibold text-red-700">{t('saveError')}</span>}
-                                {save === 'saved' && <Link href="/predictions/record" className="text-[11px] font-extrabold hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('toRecord')}</Link>}
+                                {save === 'saved' && shareToken && <ShareButton path={`/schedine/${shareToken}`} title={t('shareTitle')} text={t('shareText')} label={t('share')} />}
+                                {save === 'saved' && <Link href="/account" className="text-[11px] font-extrabold hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('toProfile')}</Link>}
                             </div>
                         </div>
                     )}
-                    <p className="text-[11px] font-semibold text-muted-foreground leading-snug">{t('disclaimer')}</p>
                 </div>
             </div>
         </div>

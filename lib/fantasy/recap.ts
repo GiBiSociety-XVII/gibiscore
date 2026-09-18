@@ -40,7 +40,7 @@ export interface RoundStat {
 
 export interface RoundResults {
     round: string;
-    /** Played: over. Live: only the matches already finished are in. */
+    /** Played: over. Live: the matches finished are in, and the ones on the pitch with their numbers so far. */
     state: 'played' | 'live';
     /** True when the official votes of the round are in. */
     official: boolean;
@@ -55,6 +55,10 @@ export interface RoundMatch {
     home: {id: number; name: string};
     away: {id: number; name: string};
     finished: boolean;
+    /** On the pitch right now: the score and the players' lines are the ones so far. */
+    live?: boolean;
+    /** The minute of a match on the pitch, when the feed gives it. */
+    minute?: number | null;
     score: [number, number] | null;
 }
 

@@ -8,79 +8,15 @@ import {BrandIcon, BrandLockup} from "@/components/shared/layout/logo";
 import {NavMegaMenu} from "./nav-mega-menu";
 import {AccountButton} from "./account-button";
 import {SearchBox} from "./search-box";
-
-function romeDay(offset: number): string {
-    return new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Rome'}).format(new Date(Date.now() + offset * 86_400_000));
-}
+import {LocaleSwitch} from "./locale-switch";
+import {useNavColumns} from "./nav-sections";
 
 /** Same bar as gibiarena.com: lockup, dropdown sections, live link, search pill. */
 export default function AppBar() {
     const path = usePathname();
     const t = useTranslations("AppBar");
     const m = useTranslations("AppBar.menus");
-
-    const scoresColumns = [
-        {
-            title: m('scores.matchesTitle'),
-            items: [
-                {label: m('scores.today'), href: '/'},
-                {label: m('scores.live'), href: '/live'},
-                {label: m('scores.yesterday'), href: `/scores/${romeDay(-1)}`},
-                {label: m('scores.tomorrow'), href: `/scores/${romeDay(1)}`},
-            ],
-        },
-        {
-            title: m('scores.toolsTitle'),
-            items: [
-                {label: m('scores.search'), href: '/search', hint: m('scores.searchHint')},
-                {label: m('scores.favorites'), href: '/', hint: m('scores.favoritesHint')},
-            ],
-        },
-    ];
-    const competitionColumns = [
-        {
-            title: m('competitions.italyTitle'),
-            items: [
-                {label: 'Serie A', href: '/competitions/serie-a'},
-                {label: 'Serie B', href: '/competitions/serie-b'},
-                {label: 'Coppa Italia', href: '/competitions/coppa-italia'},
-            ],
-        },
-        {
-            title: m('competitions.europeTitle'),
-            items: [
-                {label: 'Champions League', href: '/competitions/champions-league'},
-                {label: 'Europa League', href: '/competitions/europa-league'},
-                {label: 'Conference League', href: '/competitions/conference-league'},
-            ],
-        },
-        {
-            title: m('competitions.topTitle'),
-            items: [
-                {label: 'Premier League', href: '/competitions/premier-league'},
-                {label: 'La Liga', href: '/competitions/la-liga'},
-                {label: 'Bundesliga', href: '/competitions/bundesliga'},
-                {label: 'Ligue 1', href: '/competitions/ligue-1'},
-            ],
-        },
-    ];
-    const statsColumns = [
-        {
-            title: m('stats.playersTitle'),
-            items: [
-                {label: m('stats.scorers'), href: '/stats'},
-                {label: m('stats.assists'), href: '/stats'},
-                {label: m('stats.compare'), href: '/compare', hint: m('stats.compareHint')},
-            ],
-        },
-        {
-            title: m('stats.squadsTitle'),
-            items: [
-                {label: m('stats.injuries'), href: '/injuries', hint: m('stats.injuriesHint')},
-                {label: m('stats.teamStats'), href: '/search', hint: m('stats.teamStatsHint')},
-            ],
-        },
-    ];
+    const {scoresColumns, competitionColumns, statsColumns} = useNavColumns();
 
     const liveActive = path.startsWith('/live');
     const predictionsActive = path.startsWith('/predictions');
@@ -157,6 +93,7 @@ export default function AppBar() {
                     </nav>
 
                     <SearchBox />
+                    <LocaleSwitch />
                     <AccountButton />
                 </div>
             </div>

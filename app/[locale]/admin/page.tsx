@@ -1,5 +1,5 @@
 import type {Metadata} from "next";
-import {BarChart3, PenLine} from "lucide-react";
+import {Activity, BarChart3, PenLine} from "lucide-react";
 import {getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {SiteShell} from "@/components/shell/site-shell";
@@ -16,6 +16,7 @@ export default async function AdminPage({params}: PageProps<"/[locale]/admin">) 
     const tools = [
         {href: '/admin/voti', Icon: PenLine, title: t('tools.votes.title'), text: t('tools.votes.text')},
         {href: '/fantacalcio/modello', Icon: BarChart3, title: t('tools.model.title'), text: t('tools.model.text')},
+        {href: '/admin/sync', Icon: Activity, title: t('tools.sync.title'), text: t('tools.sync.text')},
     ] as const;
     return (
         <SiteShell wide sidebar={false}>

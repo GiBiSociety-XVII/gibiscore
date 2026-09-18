@@ -316,6 +316,18 @@ export interface BetSuggestion {
     odds: number | null;
 }
 
+/** A slip is "value" when the bookmakers' price beats the model's fair odds by at least this much (expected return, e.g. 0.03 = +3%). */
+export const VALUE_MIN_EDGE = 0.03;
+
+/** The expected return of a slip at the bookmakers' price, as a fraction (0.08 = +8%); null without a price. */
+export function slipEdge(slip: Pick<BetSuggestion, 'pct' | 'odds'>): number | null {
+    if (slip.odds === null || !(slip.odds > 1)) return null;
+    return Math.round(((slip.pct / 100) * slip.odds - 1) * 1000) / 1000;
+}
+
+/** Whether the slip is worth flagging as value. */
+export const isValueSlip = (slip: Pick<BetSuggestion, 'pct' | 'odds'>): boolean => (slipEdge(slip) ?? -1) >= VALUE_MIN_EDGE;
+
 /** The chance a slip of each tier must keep, in percent. */
 export const SUGGESTION_TIERS: Array<{tier: BetSuggestion['tier']; min: number}> = [
     {tier: 'safe', min: 78},

@@ -5,6 +5,11 @@ export function localePath(locale: string, path: string): string {
     return locale === routing.defaultLocale ? path : `/${locale}${path}`;
 }
 
+/** Every form the cache may know a page under: the plain path and one per locale prefix. */
+export function everyLocalePath(path: string): string[] {
+    return [path, ...routing.locales.map((locale) => `/${locale}${path}`)];
+}
+
 /** Where to go after signing in: a same-site path from `?next=`, or the auction. */
 export function safeNext(raw: string | string[] | undefined, locale: string): string {
     const n = typeof raw === 'string' ? raw : '';

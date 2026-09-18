@@ -1,0 +1,95 @@
+{
+  "siteName": "GiBiScore",
+  "tagline": "All of football, in numbers.",
+  "sampleData": "Sample data",
+  "loading": "Loading…",
+  "meta": {
+    "description": "GiBiScore: live scores, standings and statistics of teams and players from every football competition in the world."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The page you are looking for does not exist or has moved.",
+    "backHome": "Back to the home page"
+  },
+  "footer": {
+    "email": "service@gibiscore.com",
+    "instagram": "@gibiarena",
+    "columns": {
+      "scores": {
+        "title": "Scores",
+        "today": "Today's matches",
+        "live": "Live matches",
+        "yesterday": "Yesterday's results",
+        "tomorrow": "Tomorrow's schedule"
+      },
+      "competitions": {
+        "title": "Competitions",
+        "all": "All competitions"
+      },
+      "stats": {
+        "title": "Statistics",
+        "players": "Player statistics",
+        "scorers": "Top scorers",
+        "search": "Find a team or player",
+        "injuries": "Injured and suspended",
+        "compare": "Compare players",
+        "predictions": "Predictions",
+        "fantasy": "Fantasy football",
+        "record": "Model record"
+      },
+      "info": {
+        "title": "Info",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service",
+        "data": "Data provided by API-Football",
+        "gibiarena": "GiBiArena"
+      }
+    },
+    "productOf": "A product of",
+    "society": "GiBiSociety",
+    "discover": "Also discover",
+    "arena": "GiBiArena",
+    "copyright": "GiBiSociety · All rights reserved.",
+    "legal": "Predictions and betting slips are statistics of the model, not betting advice. Bet only if you are of age, and in moderation."
+  },
+  "sidebar": {
+    "label": "Competitions",
+    "pinned": "Main competitions",
+    "countries": "Countries",
+    "all": "All"
+  },
+  "rail": {
+    "standings": "Standings",
+    "fullStandings": "Full table",
+    "scorers": "Top scorers",
+    "headToHead": "Head to head",
+    "favorites": "Favourite standings",
+    "noFavorites": "No competition yet: use the star next to a league to see its standings here.",
+    "addFavorite": "Add to favourites",
+    "removeFavorite": "Remove from favourites",
+    "myTeams": "My teams",
+    "noMatches": "No matches on record.",
+    "headToHeadHint": "The home side's record in the latest meetings"
+  },
+  "tour": {
+    "stepOf": "Step {step} of {total}",
+    "next": "Next",
+    "back": "Back",
+    "done": "Done",
+    "close": "Close the guide"
+  },
+  "iosBanner": {
+    "title": "Add GiBiScore to your Home Screen",
+    "text": "Tap Share, then \"Add to Home Screen\": it opens full screen and notifications come through.",
+    "dismiss": "Close"
+  },
+  "locale": {
+    "label": "Language",
+    "switchTo": "Switch to {language}"
+  },
+  "share": {
+    "share": "Share",
+    "copied": "Link copied",
+    "copyPrompt": "Copy the link:"
+  }
+}

@@ -7,6 +7,7 @@ import {PageHeader} from "@/components/football/page-header";
 import {MySchedine} from "@/components/football/my-schedine";
 import {FavoritesPanel} from "@/components/account/favorites-panel";
 import {NotificationsPanel} from "@/components/account/notifications-panel";
+import {Help} from "@/components/fantasy/help";
 import {currentUser} from "@/lib/auth/user";
 
 // Who is signed in decides the page: never cached, never indexed.
@@ -43,13 +44,11 @@ export default async function AccountPage({params}: PageProps<"/[locale]/account
                 ))}
             </div>
             <section className="flex flex-col gap-2">
-                <h2 className="text-[13px] font-extrabold uppercase tracking-wide px-0.5">{t('favorites.title')}</h2>
+                <h2 className="flex items-center gap-2 text-[13px] font-extrabold uppercase tracking-wide px-0.5">{t('favorites.title')}<Help boxed text={t('favorites.help')} /></h2>
                 <FavoritesPanel />
-                <p className="text-[12px] font-semibold text-muted-foreground">{t('favorites.hint')}</p>
             </section>
             <NotificationsPanel />
-            <MySchedine title={t('schedine')} />
-            <p className="text-[12px] font-semibold text-muted-foreground">{t('schedineHint')}</p>
+            <MySchedine title={t('schedine')} help={t('schedineHint')} />
         </SiteShell>
     );
 }

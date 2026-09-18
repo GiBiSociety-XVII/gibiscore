@@ -5,6 +5,7 @@ import type {AfFixtureResponse} from '@/lib/api-football/types';
 import {provides, type LeagueCoverage} from '@/lib/football/coverage';
 import {lineupsCandidate} from '@/lib/notifications/events';
 import {dispatchNotifications} from '@/lib/notifications/dispatch';
+import {sendReminders} from '@/lib/notifications/reminders';
 import {chunk, ensurePlayers, failSync, finishRun, footballClient, idMap, startRun, type MinimalPlayer, type SyncRun} from './context';
 
 /** Fixtures kicking off within this many minutes are asked for their official lineups. */
@@ -29,6 +30,8 @@ export async function syncUpcomingLineups(options: {withinMinutes?: number} = {}
     const db = footballClient();
     const run = await startRun(db, 'sync-lineups');
     try {
+        // "Kick-off in an hour" for the followed matches rides on this job's five-minute beat.
+        await sendReminders(db, run);
         const now = Date.now();
         const to = new Date(now + (options.withinMinutes ?? WINDOW_MINUTES) * 60_000).toISOString();
         const {data: soon, error} = await db
