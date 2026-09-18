@@ -8,7 +8,6 @@ import {BrandIcon, BrandLockup} from "@/components/shared/layout/logo";
 import {NavMegaMenu} from "./nav-mega-menu";
 import {AccountButton} from "./account-button";
 import {SearchBox} from "./search-box";
-import {ThemeToggle} from "./theme-toggle";
 import {LocaleSwitch} from "./locale-switch";
 import {useNavColumns} from "./nav-sections";
 
@@ -95,7 +94,6 @@ export default function AppBar() {
 
                     <SearchBox />
                     <LocaleSwitch />
-                    <ThemeToggle />
                     <AccountButton />
                 </div>
             </div>

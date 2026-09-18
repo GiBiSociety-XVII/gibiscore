@@ -83,10 +83,6 @@
     "text": "Tocca Condividi, poi \"Aggiungi alla schermata Home\": si apre a tutto schermo e arrivano le notifiche.",
     "dismiss": "Chiudi"
   },
-  "theme": {
-    "toDark": "Passa al tema scuro",
-    "toLight": "Passa al tema chiaro"
-  },
   "locale": {
     "label": "Lingua",
     "switchTo": "Passa a {language}"

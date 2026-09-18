@@ -51,7 +51,7 @@ function Row({s, byId, kickoff, stripe}: {s: LiveSlot; byId: Map<number, Auction
                 <span className={cn("font-extrabold truncate", replaced && "line-through text-muted-foreground")}>{name}</span>
                 <span className="text-[11px] font-semibold text-muted-foreground truncate">{line}{note ? ` · ${note}` : ''}</span>
             </div>
-            <span className={cn("shrink-0 inline-flex items-center gap-1 h-5 px-1.5 rounded border font-mono text-[10px] font-extrabold tabular-nums whitespace-nowrap", s.state === 'live' ? "border-red-700 text-red-700 bg-red-50 dark:bg-red-950/40" : s.state === 'done' ? "border-foreground/40 bg-card" : "border-muted text-muted-foreground")}>
+            <span className={cn("shrink-0 inline-flex items-center gap-1 h-5 px-1.5 rounded border font-mono text-[10px] font-extrabold tabular-nums whitespace-nowrap", s.state === 'live' ? "border-red-700 text-red-700 bg-red-50" : s.state === 'done' ? "border-foreground/40 bg-card" : "border-muted text-muted-foreground")}>
                 {s.state === 'live' && <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" aria-hidden="true" />}
                 {s.state === 'live' ? (s.minute !== null ? `${s.minute}'` : t('inPlay')) : s.state === 'done' ? t('final') : t('toPlay')}
             </span>
@@ -76,7 +76,7 @@ export function LiveScorePanel({score, byId, fixtures, official, roundLabel}: {s
     return (
         <Panel
             title={<span className="inline-flex items-center gap-1.5">{t(score.state === 'over' ? 'titleOver' : 'title', {round: roundLabel})}<Help text={t(official ? 'officialHint' : 'estimateHint')} /></span>}
-            action={live ? <span className="inline-flex items-center gap-1 h-6 px-2 rounded-md border-2 border-red-700 bg-red-50 dark:bg-red-950/40 text-red-700 font-mono text-[11px] font-extrabold"><Radio className="w-3.5 h-3.5 animate-pulse" aria-hidden="true" />{t('liveBadge')}</span> : <span className="text-[11px] font-semibold text-muted-foreground">{official ? t('officialBadge') : score.provisional ? t('provisionalBadge') : t('estimatedBadge')}</span>}
+            action={live ? <span className="inline-flex items-center gap-1 h-6 px-2 rounded-md border-2 border-red-700 bg-red-50 text-red-700 font-mono text-[11px] font-extrabold"><Radio className="w-3.5 h-3.5 animate-pulse" aria-hidden="true" />{t('liveBadge')}</span> : <span className="text-[11px] font-semibold text-muted-foreground">{official ? t('officialBadge') : score.provisional ? t('provisionalBadge') : t('estimatedBadge')}</span>}
         >
             <div className="px-3 py-2 flex flex-wrap items-end gap-x-4 gap-y-1 border-b-2 border-foreground bg-card">
                 <span className="font-mono text-[40px] leading-none font-extrabold tabular-nums">{fmt(score.total)}</span>

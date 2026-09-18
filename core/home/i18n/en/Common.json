@@ -83,10 +83,6 @@
     "text": "Tap Share, then \"Add to Home Screen\": it opens full screen and notifications come through.",
     "dismiss": "Close"
   },
-  "theme": {
-    "toDark": "Switch to the dark theme",
-    "toLight": "Switch to the light theme"
-  },
   "locale": {
     "label": "Language",
     "switchTo": "Switch to {language}"
