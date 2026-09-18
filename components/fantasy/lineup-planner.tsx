@@ -24,12 +24,15 @@ import {hashOf} from "@/lib/fantasy/hash";
 import {keepSpots, sameSpots, type Spot} from "@/lib/fantasy/spots";
 import {lineupPath} from "@/lib/fantasy/routes";
 import {AccountTeamsBadge, useAccountTeams} from "./account-teams";
+import {LiveScorePanel} from "./live-score";
+import {AutoRefresh} from "@/components/football/auto-refresh";
+import {liveScore} from "@/lib/fantasy/live-score";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const ROME = 'Europe/Rome';
 const TOUR_KEY = 'gibiscore:lineup-tour:v1';
 /** The guide's stops, in order: each a `data-tour` on the page. */
-const TOUR_STEPS = ['team', 'status', 'fixtures', 'pitch', 'bench', 'pins', 'starters', 'formations', 'how'] as const;
+const TOUR_STEPS = ['team', 'status', 'liveScore', 'fixtures', 'pitch', 'bench', 'pins', 'starters', 'formations', 'how'] as const;
 /** Bumped when the forecast changes scale or meaning: a frozen snapshot from before is drawn again. 2: votes on the fantasy scale. */
 const LINEUP_MODEL = 2;
 
@@ -648,6 +651,14 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
     const advice = recommendLineup(forecasts, {...options, force: forcedNow, pinned, benched});
     // What the pins cost: the same roster left to the numbers alone.
     const free = pinned.size > 0 || benched.size > 0 ? recommendLineup(forecasts, options) : advice;
+    // The score of the round begun (or, before the next kicks off, of the last one played): the lineup as it
+    // was frozen at that round's lock, scored on the matches over and the ones on the pitch.
+    const results = context.results[0] ?? null;
+    const pastLock = results && frozen?.round !== results.round ? (history[current.id] ?? []).find((l) => l.round === results.round && l.model === LINEUP_MODEL) ?? null : null;
+    const scoredAdvice = results ? (frozen && frozen.round === results.round ? advice : pastLock ? recommendLineup((pastLock.forecasts as PlayerForecast[]).filter((f) => rosterIds.has(f.player.id)), {...options, force: pastLock.forced as FormationKey | null, pinned: new Set(pastLock.pinned), benched: new Set(pastLock.benched ?? [])}) : null) : null;
+    const asLineup = (f: PlayerForecast) => ({id: f.player.id, role: f.player.role, teamId: f.player.team.id});
+    const score = results && scoredAdvice ? liveScore(scoredAdvice.starters.map(asLineup), scoredAdvice.bench.map(asLineup), results, current.rules, context.calibration, defenceOption(current)) : null;
+    const roundMatches = results?.round === context.round ? results.matches : [];
     const pickingPlayer = picking !== null ? byId.get(picking) ?? null : null;
     const pinCost = Math.round((free.total - advice.total) * 10) / 10;
     const rosterTeams = [...new Set(roster.map((p) => p.team.id))];
@@ -680,19 +691,30 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
 
             <div className="grid gap-3 grid-cols-1 xl:grid-cols-3 items-start">
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">
+                    {score && results && (
+                        <div data-tour="liveScore">
+                            <AutoRefresh seconds={60} enabled={score.state === 'live'} />
+                            <LiveScorePanel score={score} byId={byId} fixtures={results.round === context.round ? context.fixtures : []} official={results.official} roundLabel={roundName(results.round)} />
+                        </div>
+                    )}
                     {fixturesOfRoster.length > 0 && (
                         <ul data-tour="fixtures" aria-label={t('fixturesTitle')} className="bb-surface px-2 py-1.5 flex gap-1.5 overflow-x-auto [scrollbar-width:thin]">
                             {fixturesOfRoster.map((f) => {
                                 const mine = roster.filter((p) => p.team.id === f.home.id || p.team.id === f.away.id);
                                 const official = context.officialTeams.includes(f.home.id) || context.officialTeams.includes(f.away.id);
                                 const starting = mine.filter((p) => advice.starters.some((s) => s.player.id === p.id)).length;
+                                const match = roundMatches.find((m) => m.home.id === f.home.id && m.away.id === f.away.id);
+                                const played = match && (match.finished || match.live) ? match : null;
                                 return (
                                     <li key={f.id} title={`${when(f.startingAt)}${f.prediction ? ` · ${Math.round(f.prediction.home)}% · ${Math.round(f.prediction.draw)}% · ${Math.round(f.prediction.away)}% · xG ${f.prediction.lambdaHome.toFixed(1)}-${f.prediction.lambdaAway.toFixed(1)}` : ''}\n${mine.map((p) => p.name).join(', ')}`} className="shrink-0 inline-flex flex-col gap-0.5 px-2 py-1 rounded-md border border-foreground/40 bg-card text-[11px] font-bold leading-tight">
                                         <span className="inline-flex items-center gap-1 whitespace-nowrap">
                                             <span className={cn(rosterTeams.includes(f.home.id) && "underline decoration-accent decoration-2 underline-offset-2")}>{f.home.name}</span>
                                             <span className="text-muted-foreground">–</span>
                                             <span className={cn(rosterTeams.includes(f.away.id) && "underline decoration-accent decoration-2 underline-offset-2")}>{f.away.name}</span>
-                                            {official && <span className="bb-badge bg-emerald-200 text-[9px] h-4 px-1">{t('officialBadge')}</span>}
+                                            {played?.score && <span className="font-mono tabular-nums">{played.score[0]}-{played.score[1]}</span>}
+                                            {played?.live && <span className="inline-flex items-center gap-1 font-mono text-[10px] text-red-700"><span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" aria-hidden="true" />{played.minute !== null && played.minute !== undefined ? `${played.minute}'` : t('live')}</span>}
+                                            {played?.finished && <span className="bb-badge bg-card text-[9px] h-4 px-1">{t('played')}</span>}
+                                            {official && !played && <span className="bb-badge bg-emerald-200 text-[9px] h-4 px-1">{t('officialBadge')}</span>}
                                         </span>
                                         <span className="text-[10px] font-semibold text-muted-foreground whitespace-nowrap">{when(f.startingAt)} · {t('fixtureMine', {count: mine.length, starting})}</span>
                                     </li>

@@ -79,6 +79,7 @@ body {
 .dark .border-amber-700 { border-color: rgb(251 191 36); }
 .dark .bg-sky-100 { background-color: rgb(12 74 110 / 0.5); }
 .dark .bg-sky-200 { background-color: rgb(7 89 133 / 0.65); }
+.dark .bg-rose-200 { background-color: rgb(159 18 57 / 0.65); }
 .dark .bg-sky-300 { background-color: rgb(3 105 161 / 0.75); }
 .dark .bg-orange-200 { background-color: rgb(154 52 18 / 0.65); }
 .dark .bg-white { background-color: rgb(var(--card)); }
