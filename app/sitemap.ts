@@ -42,7 +42,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
     // Every page in every language: the default one at the plain address, the others under their prefix.
     return entries.map((e) => {
-        const path = e.url.slice(siteUrl.length);
+        // The home page's url ends with the slash: its alternates must not, or they redirect.
+        const path = e.url.slice(siteUrl.length).replace(/\/$/, '');
         const languages: Record<string, string> = {};
         for (const locale of routing.locales) languages[locale] = locale === routing.defaultLocale ? e.url : `${siteUrl}/${locale}${path}`;
         languages['x-default'] = e.url;

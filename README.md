@@ -110,7 +110,7 @@ rose e cessioni restano ferme.
 | `sync-player-seasons` | ogni ora | 0 senza giornate giocate, ~35 per lega-stagione dopo (budget 1.500 a giro) | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`: leghe in evidenza con le stagioni passate (una volta sola), poi le leghe base coperte (~500), solo stagione corrente e senza il payload grezzo |
 | `sync-lineups` | ogni 5 minuti | 0 senza calci d'inizio vicini, 1 ogni 20 partite | formazioni ufficiali delle partite che iniziano entro 90 minuti (leghe in evidenza e base coperte), salvate come formazioni attese per la giornata del fantacalcio |
 | `sync-odds` | ogni 3 ore | 1 per partita: in evidenza dei prossimi 3 giorni a ogni giro, base coperte dei prossimi 2 giorni una volta al giorno (fino a 600 a giro) | quote pre-partita dei bookmaker (`fixture_odds`); nello stesso giro scrive le giocate del modello per le partite in evidenza e chiude quelle finite |
-| `prune` | ogni notte | 0 | pulizia del database: dettaglio delle partite delle leghe base più vecchie di due stagioni, payload grezzi del provider oltre due stagioni, giri dei job oltre 30 giorni, registro delle notifiche mandate oltre 14 giorni, errori del sito oltre 30 giorni |
+| `prune` | ogni notte | 0 | pulizia del database: payload grezzi del provider oltre due stagioni, giri dei job oltre 30 giorni, registro delle notifiche mandate oltre 14 giorni, errori del sito oltre 30 giorni |
 
 Consumo tipico a regime: 10.000-20.000 richieste al giorno nei weekend
 (live di ~1.500 partite base e formazioni/statistiche di quelle coperte,
@@ -122,24 +122,25 @@ completa in un giorno.
 
 ### Cosa il database dimentica
 
-Calendario, risultati e classifiche di ogni competizione restano per
-sempre: sono piccoli e sono quello di cui sono fatte le pagine. Il job
-`prune`, una volta a notte, toglie solo ciò che non viene più letto:
+Il job `prune`, una volta a notte, toglie solo ciò che nel sito non legge
+nessuno:
 
-- il dettaglio delle partite delle leghe base (eventi, voti e statistiche
-  dei giocatori, statistiche squadra, formazioni) da due stagioni
-  indietro in giù. La stagione in corso e quella prima restano intere, e
-  le leghe in evidenza non vengono mai toccate: pagine giocatore, studio
-  e modello del fantacalcio leggono tre stagioni.
 - i payload grezzi del provider (`player_season_raw`) più vecchi delle
-  statistiche che ne sono state ricavate: nel sito non li legge nessuno.
-- la contabilità che invecchia: giri dei job, registro delle notifiche
-  già mandate, errori del sito.
+  statistiche che ne sono state ricavate: li scrive il job delle stagioni
+  e non li apre nessuna pagina;
+- la contabilità che invecchia: giri dei job oltre 30 giorni, registro
+  delle notifiche già mandate oltre 14, errori del sito oltre 30.
+
+Il dettaglio delle partite vecchie (eventi, voti e statistiche dei
+giocatori, statistiche squadra, formazioni) **non** si tocca, in nessuna
+lega e in nessuna stagione: la pagina partita lo disegna per qualsiasi
+partita, e la pagina giocatore ci costruisce sopra l'elenco delle
+stagioni e la tabella partita per partita. Toglierlo ai campionati minori
+svuoterebbe quelle pagine per le loro partite vecchie, e riscaricarle
+costa richieste al provider.
 
 Cancellare non restringe il disco da solo: Postgres riusa lo spazio per
-quello che arriva, ed è esattamente lo scopo. Ogni giro ha un tetto di
-4.000 partite, così un arretrato di anni si spalma su qualche notte
-invece di martellare il database. Le soglie stanno in cima a
+quello che arriva, ed è esattamente lo scopo. Le soglie stanno in cima a
 `lib/football/sync/prune.ts`.
 
 ### Archivio storico

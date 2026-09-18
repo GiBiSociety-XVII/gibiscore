@@ -2,12 +2,13 @@
 
 import {Cloud, CloudOff} from "lucide-react";
 import {useEffect, useRef, useState} from "react";
-import {useTranslations} from "next-intl";
+import {useLocale, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {cloudUser, type CloudUser} from "@/lib/fantasy/cloud";
 import {deleteAccountTeam, listAccountTeams, saveAccountTeam} from "@/lib/fantasy/cloud-teams";
 import {hashOf} from "@/lib/fantasy/hash";
+import {localePath} from "@/lib/auth/next";
 import {benchedStore, HISTORY_ROUNDS, historyStore, locksStore, outsStore, pinsStore, teamsStore, type LineupLock} from "@/lib/fantasy/store";
 
 /** A change on the device is written to the account this long after the last one. */
@@ -149,10 +150,12 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
 /** A word on where the teams live: the account, or this device only (with a way in). */
 export function AccountTeamsBadge({status, next}: {status: AccountStatus; next: string}) {
     const t = useTranslations('Fantasy.cloud');
+    // Where to come back to after signing in, in the language of the page you are on.
+    const back = localePath(useLocale(), next);
     if (status === 'checking') return null;
     if (status === 'anonymous') {
         return (
-            <Link href={{pathname: '/signin', query: {next}}} className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-foreground hover:underline decoration-accent decoration-2 underline-offset-2">
+            <Link href={{pathname: '/signin', query: {next: back}}} className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-foreground hover:underline decoration-accent decoration-2 underline-offset-2">
                 <CloudOff className="w-3.5 h-3.5" aria-hidden="true" />
                 {t('teamsSignIn')}
             </Link>

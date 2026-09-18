@@ -4,6 +4,7 @@
 -- prune_old_detail deletes the detail of old matches, bump_error_hits counts
 -- an error again — so they belong to the service role alone, which is what
 -- the jobs and the read layer use.
+-- (prune_old_detail is dropped again in 0026: the detail of old matches stays.)
 revoke execute on function public.prune_old_detail(int, int) from public, anon, authenticated;
 revoke execute on function public.bump_error_hits(bigint) from public, anon, authenticated;
 grant execute on function public.prune_old_detail(int, int) to service_role;

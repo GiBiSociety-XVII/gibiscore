@@ -116,7 +116,6 @@ interface FixtureRow {
     home_score: number | null;
     away_score: number | null;
     minute: number | null;
-    extra_minute: number | null;
     home: {id: number; name: string} | null;
     away: {id: number; name: string} | null;
 }
@@ -133,7 +132,7 @@ async function buildMatchday(league: AuctionLeague): Promise<MatchdayContext | n
     if (!leagueRow || !season) return null;
 
     const rows = (await fetchAll(
-        (a, b) => db.from('fixtures').select('id,round,starting_at,state,home_team_id,away_team_id,home_score,away_score,minute,extra_minute,home:teams!fixtures_home_team_id_fkey(id,name),away:teams!fixtures_away_team_id_fkey(id,name)').eq('season_id', season.id).order('starting_at').order('id').range(a, b),
+        (a, b) => db.from('fixtures').select('id,round,starting_at,state,home_team_id,away_team_id,home_score,away_score,minute,home:teams!fixtures_home_team_id_fkey(id,name),away:teams!fixtures_away_team_id_fkey(id,name)').eq('season_id', season.id).order('starting_at').order('id').range(a, b),
         {max: 1000},
     )) as unknown as FixtureRow[];
     const fixtures = rows.filter((r) => r.round && r.home && r.away);

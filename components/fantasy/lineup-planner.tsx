@@ -294,7 +294,7 @@ function LineupBoard({current, context, roster, byId, teamById, toolbar, roundIn
                 <div className="xl:col-span-2 flex flex-col gap-3 min-w-0">
                     {score && results && (
                         <div data-tour="liveScore">
-                            <AutoRefresh seconds={60} enabled={score.state === 'live'} />
+                            <AutoRefresh seconds={60} enabled={score.state !== 'over'} />
                             <LiveScorePanel score={score} byId={byId} fixtures={results.round === context.round ? context.fixtures : []} official={results.official} roundLabel={roundName(results.round)} />
                         </div>
                     )}
