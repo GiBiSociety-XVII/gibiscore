@@ -70,8 +70,13 @@ export default async function LocaleLayout({children, params}: LayoutProps<"/[lo
     setRequestLocale(locale);
     const messages = await getMessages();
 
+    // The theme before the first paint: the browser's memory, else the system. Kept tiny and inline on purpose.
+    const themeScript = `(function(){try{var t=localStorage.getItem('gibiscore:theme');if(t!=='dark'&&t!=='light'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}}catch(e){}})();`;
     return (
-        <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+        <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+            <head>
+                <script dangerouslySetInnerHTML={{__html: themeScript}} />
+            </head>
             <body className="min-h-full flex flex-col bg-background text-foreground">
                 <NextIntlClientProvider messages={messages}>
                     {children}

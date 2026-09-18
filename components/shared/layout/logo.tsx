@@ -14,18 +14,24 @@ export function BrandIcon({site = 'gibiscore', size = 32, accent = false, classN
     return <img src={`/brand/svg/${site}-${variant}.svg`} alt={alt} width={size} height={size} className={cn("shrink-0 select-none", className)} draggable={false} />;
 }
 
-/** Icon + wordmark, for light (`dark={false}`) or dark backgrounds. Height in px, width follows the 925:232 ratio. */
-export function BrandLockup({site = 'gibiscore', height = 30, dark = false, className, alt}: {site?: GibiSite; height?: number; dark?: boolean; className?: string; alt?: string}) {
+/**
+ * Icon + wordmark. Height in px, width follows the 925:232 ratio. Without
+ * `dark` the lockup follows the page's theme (light wordmark on the dark
+ * theme); `dark={true}` forces the dark-background variant, `dark={false}`
+ * the light one.
+ */
+export function BrandLockup({site = 'gibiscore', height = 30, dark, className, alt}: {site?: GibiSite; height?: number; dark?: boolean; className?: string; alt?: string}) {
     const width = Math.round((height * 925) / 232);
+    const label = alt ?? (site === 'gibiscore' ? 'GiBiScore' : site === 'gibiarena' ? 'GiBiArena' : 'GiBiSociety');
+    if (dark !== undefined) {
+        return <img src={`/brand/svg/${site}-lockup${dark ? '-dark' : ''}.svg`} alt={label} width={width} height={height} className={cn("shrink-0 select-none", className)} draggable={false} />;
+    }
+    // Two images, one shown per theme; the wrappers carry the switch so the caller's classes stay on the image.
     return (
-        <img
-            src={`/brand/svg/${site}-lockup${dark ? '-dark' : ''}.svg`}
-            alt={alt ?? (site === 'gibiscore' ? 'GiBiScore' : site === 'gibiarena' ? 'GiBiArena' : 'GiBiSociety')}
-            width={width}
-            height={height}
-            className={cn("shrink-0 select-none", className)}
-            draggable={false}
-        />
+        <>
+            <span className="contents dark:hidden"><img src={`/brand/svg/${site}-lockup.svg`} alt={label} width={width} height={height} className={cn("shrink-0 select-none", className)} draggable={false} /></span>
+            <span className="hidden dark:contents"><img src={`/brand/svg/${site}-lockup-dark.svg`} alt={label} width={width} height={height} className={cn("shrink-0 select-none", className)} draggable={false} /></span>
+        </>
     );
 }
 

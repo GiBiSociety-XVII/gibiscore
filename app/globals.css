@@ -1,13 +1,19 @@
 @import "tailwindcss";
 
-/* Force light mode globally — dark: variants never apply. */
+/* The dark theme is a class on <html> (put there before the first paint by the
+   head script in app/[locale]/layout.tsx, from the user's choice or the system),
+   so dark: variants follow the class, never the system alone. */
 @variant dark (&:where(.dark, .dark *));
 
-/* Opt out of mobile browser auto-dark (Android Chrome/Brave "Darken websites"). */
+/* Opt out of mobile browser auto-dark (Android Chrome/Brave "Darken websites"): the site draws its own dark. */
 :root,
 html,
 body {
   color-scheme: light only;
+}
+.dark,
+.dark body {
+  color-scheme: dark only;
 }
 
 /* "Bold Blocks" design tokens — shared with GiBiArena.
@@ -33,6 +39,52 @@ body {
   --radius: 0.75rem;
   --radius-lg: 1rem;
 }
+
+/* Dark: the same Bold Blocks, ink and paper swapped. Borders and hard shadows
+   turn light, the accent stays, text on a light chip stays ink. */
+.dark {
+  --background: 20 19 26;
+  --foreground: 240 238 232;
+  --card: 30 29 38;
+  --card-foreground: 240 238 232;
+  --muted: 46 45 56;
+  --muted-foreground: 168 166 178;
+  --accent: 59 201 255;
+  --accent-foreground: 20 19 26;
+  --accent-text: 110 216 255;
+  --brand-arena-text: 182 255 60;
+  --brand-society-text: 255 150 110;
+  --border: 240 238 232;
+  --ring: 240 238 232;
+}
+
+/* The semantic colours (won, lost, warning, live) are Tailwind's light-tuned
+   shades in the components; in the dark theme they are remapped here, once,
+   instead of a dark: twin on every use. Plain rules win over the utilities layer. */
+.dark .bg-emerald-50, .dark [class*="bg-emerald-50/"] { background-color: rgb(6 78 59 / 0.45); }
+.dark .bg-emerald-100 { background-color: rgb(6 78 59 / 0.55); }
+.dark .bg-emerald-200 { background-color: rgb(6 95 70 / 0.75); }
+.dark .bg-emerald-300 { background-color: rgb(4 120 87 / 0.8); }
+.dark .text-emerald-700, .dark .text-emerald-800 { color: rgb(110 231 183); }
+.dark .border-emerald-700 { border-color: rgb(52 211 153); }
+.dark .bg-red-50, .dark [class*="bg-red-50/"] { background-color: rgb(127 29 29 / 0.45); }
+.dark .bg-red-100 { background-color: rgb(127 29 29 / 0.55); }
+.dark .bg-red-200 { background-color: rgb(153 27 27 / 0.7); }
+.dark .text-red-700, .dark .text-red-800 { color: rgb(252 165 165); }
+.dark .border-red-700 { border-color: rgb(248 113 113); }
+.dark .bg-amber-100 { background-color: rgb(120 53 15 / 0.5); }
+.dark .bg-amber-200 { background-color: rgb(146 64 14 / 0.65); }
+.dark .bg-amber-300 { background-color: rgb(180 83 9 / 0.75); }
+.dark .text-amber-700, .dark .text-amber-800 { color: rgb(252 211 77); }
+.dark .border-amber-700 { border-color: rgb(251 191 36); }
+.dark .bg-sky-100 { background-color: rgb(12 74 110 / 0.5); }
+.dark .bg-sky-200 { background-color: rgb(7 89 133 / 0.65); }
+.dark .bg-sky-300 { background-color: rgb(3 105 161 / 0.75); }
+.dark .bg-orange-200 { background-color: rgb(154 52 18 / 0.65); }
+.dark .bg-white { background-color: rgb(var(--card)); }
+/* Anything on the accent keeps ink text in the dark theme: the accent is the same bright blue on both. */
+.dark .bg-accent { color: rgb(var(--accent-foreground)); }
+.dark .bg-accent .text-muted-foreground { color: rgb(var(--accent-foreground) / 0.7); }
 
 @theme inline {
   --color-background: rgb(var(--background));

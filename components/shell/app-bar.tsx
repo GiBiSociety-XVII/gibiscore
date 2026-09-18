@@ -8,6 +8,7 @@ import {BrandIcon, BrandLockup} from "@/components/shared/layout/logo";
 import {NavMegaMenu} from "./nav-mega-menu";
 import {AccountButton} from "./account-button";
 import {SearchBox} from "./search-box";
+import {ThemeToggle} from "./theme-toggle";
 import {useNavColumns} from "./nav-sections";
 
 /** Same bar as gibiarena.com: lockup, dropdown sections, live link, search pill. */
@@ -92,6 +93,7 @@ export default function AppBar() {
                     </nav>
 
                     <SearchBox />
+                    <ThemeToggle />
                     <AccountButton />
                 </div>
             </div>

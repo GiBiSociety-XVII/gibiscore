@@ -79,5 +79,14 @@
     "title": "Aggiungi GiBiScore alla schermata Home",
     "text": "Tocca Condividi, poi \"Aggiungi alla schermata Home\": si apre a tutto schermo e arrivano le notifiche.",
     "dismiss": "Chiudi"
+  },
+  "theme": {
+    "toDark": "Passa al tema scuro",
+    "toLight": "Passa al tema chiaro"
+  },
+  "share": {
+    "share": "Condividi",
+    "copied": "Link copiato",
+    "copyPrompt": "Copia il link:"
   }
 }

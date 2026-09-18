@@ -571,7 +571,11 @@
       },
       "winChance": "Probabilità di vincita",
       "ticketNote": "Vincita = puntata × quota della schedina (per la multipla il prodotto delle quote medie dei bookmaker). Ritorno e profitto atteso secondo il modello: vincita per la probabilità che tutte le selezioni siano centrate. Le quote del tuo bookmaker possono differire.",
-      "introHelp": "Scegli rischio, tipo e quante partite; il modello prende le giocate in cui crede di più per quel rischio tra le partite dei giorni e delle competizioni che indichi, e ti dice probabilità, quota e quando la schedina si chiude."
+      "introHelp": "Scegli rischio, tipo e quante partite; il modello prende le giocate in cui crede di più per quel rischio tra le partite dei giorni e delle competizioni che indichi, e ti dice probabilità, quota e quando la schedina si chiude.",
+      "share": "Condividi",
+      "shareTitle": "La mia schedina · GiBiScore",
+      "shareText": "La mia schedina generata dal modello di GiBiScore",
+      "toProfile": "Vai al profilo"
     },
     "mine": {
       "title": "Le mie schedine",
@@ -588,7 +592,10 @@
         "payout": "Vincita",
         "perColumn": "/col",
         "settles": "Si chiude",
-        "settled": "Chiusa"
+        "settled": "Chiusa",
+        "share": "Condividi",
+        "shareTitle": "Schedina n. {id} · GiBiScore",
+        "shareText": "La mia schedina generata dal modello di GiBiScore"
       }
     },
     "legendShort": "Sotto ogni partita le tre giocate del modello: prudente dal 78% di probabilità, consigliata dal 62%, audace dal 45%. Tocca la partita per l'analisi completa.",
@@ -630,5 +637,16 @@
         }
       }
     }
+  },
+  "schedinaShare": {
+    "title": "Schedina condivisa",
+    "metaTitle": "Schedina n. {id} · {status}",
+    "metaDescription": "Una schedina generata dal modello di GiBiScore: le selezioni, la probabilità, la quota e come è andata.",
+    "intro": "Generata dal modello di GiBiScore e chiusa da sola sui risultati reali.",
+    "cta": "Genera la tua",
+    "notFound": "Questa schedina non esiste o il link non è più valido.",
+    "statusOpen": "aperta",
+    "statusWon": "vinta",
+    "statusLost": "persa"
   }
 }

@@ -25,6 +25,7 @@ interface Row {
     hits: number | null;
     hit: boolean | null;
     results: Array<boolean | null> | null;
+    share_token: string | null;
 }
 
 const num = (v: number | string | null): number | null => (v === null ? null : Number(v));
@@ -49,7 +50,7 @@ export function MySchedine({title, help}: {title?: string; help?: string} = {}) 
         supabase.auth.getUser().then(({data}) => {
             if (!alive) return;
             if (!data.user) { setRows(null); return; }
-            Promise.resolve(supabase.from('schedine').select('id,kind,risk,size,system_of,selections,pct,fair,book,stake,payout,lines,last_kickoff,created_at,hits,hit,results').order('created_at', {ascending: false}).limit(50))
+            Promise.resolve(supabase.from('schedine').select('id,kind,risk,size,system_of,selections,pct,fair,book,stake,payout,lines,last_kickoff,created_at,hits,hit,results,share_token').order('created_at', {ascending: false}).limit(50))
                 .then(({data: list}) => { if (alive) setRows((list ?? []) as unknown as Row[]); })
                 .catch(() => { if (alive) setRows([]); });
         }).catch(() => { if (alive) setRows(null); });
@@ -84,7 +85,7 @@ export function MySchedine({title, help}: {title?: string; help?: string} = {}) 
                 <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('empty')}</p>
             ) : (
                 <div className="p-3 grid gap-4 grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 items-start bg-muted/40">
-                    {tickets.map((ticket) => <SchedinaTicket key={ticket.id} ticket={ticket} />)}
+                    {tickets.map((ticket, i) => <SchedinaTicket key={ticket.id} ticket={ticket} shareToken={rows[i].share_token} />)}
                 </div>
             )}
         </Panel></div>

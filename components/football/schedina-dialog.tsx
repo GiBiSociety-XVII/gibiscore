@@ -7,6 +7,7 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Help} from "@/components/fantasy/help";
 import {TourLauncher} from "./tour-launcher";
+import {ShareButton} from "./share-button";
 import {cloudUser} from "@/lib/fantasy/cloud";
 import type {LegKey} from "@/lib/football/markets";
 import {buildSchedina, stakePlan, STAKE_STEP, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
@@ -40,6 +41,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const [result, setResult] = useState<Schedina | null | undefined>(undefined);
     const [signedIn, setSignedIn] = useState<boolean | null>(null);
     const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [shareToken, setShareToken] = useState<string | null>(null);
     useEffect(() => {
         let alive = true;
         cloudUser().then((u) => { if (alive) setSignedIn(!!u); }).catch(() => { if (alive) setSignedIn(false); });
@@ -58,6 +60,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const ticket = useMemo(() => (result && result.kind !== 'system' ? ticketPlan(result, stake) : null), [result, stake]);
     const generate = () => {
         setSave('idle');
+        setShareToken(null);
         setLineStakes(null);
         setResult(buildSchedina(candidates, {risk, kind, size, system, bankers, days: pickedDays, competitions: pickedLeagues, now: new Date().toISOString()}));
     };
@@ -71,6 +74,8 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
             const res = await fetch('/api/predictions/schedina', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(saved)});
             if (res.status === 401) { setSignedIn(false); setSave('error'); return; }
             if (!res.ok) throw new Error(String(res.status));
+            const body = (await res.json()) as {id: number; shareToken?: string};
+            setShareToken(typeof body.shareToken === 'string' ? body.shareToken : null);
             setSave('saved');
         } catch {
             setSave('error');
@@ -278,7 +283,8 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 </button>
                                 {signedIn === false && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700"><CloudOff className="w-3.5 h-3.5" aria-hidden="true" />{t('signIn')}</span>}
                                 {save === 'error' && signedIn !== false && <span className="text-[11px] font-semibold text-red-700">{t('saveError')}</span>}
-                                {save === 'saved' && <Link href="/predictions/record" className="text-[11px] font-extrabold hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('toRecord')}</Link>}
+                                {save === 'saved' && shareToken && <ShareButton path={`/schedine/${shareToken}`} title={t('shareTitle')} text={t('shareText')} label={t('share')} />}
+                                {save === 'saved' && <Link href="/account" className="text-[11px] font-extrabold hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('toProfile')}</Link>}
                             </div>
                         </div>
                     )}

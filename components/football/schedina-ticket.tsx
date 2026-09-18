@@ -4,6 +4,7 @@ import {useFormatter, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import type {LegKey} from "@/lib/football/markets";
+import {ShareButton} from "./share-button";
 
 export interface TicketSelection {
     fixtureId: number;
@@ -61,7 +62,7 @@ const SETTLE_AFTER_MS = 2 * 3_600_000;
  * its number and date, the selections one under the other, the tear
  * line, the stake and what it pays, the stamp of how it went.
  */
-export function SchedinaTicket({ticket}: {ticket: Ticket}) {
+export function SchedinaTicket({ticket, shareToken}: {ticket: Ticket; /** With a token the ticket can be shared: /schedine/<token>. */ shareToken?: string | null}) {
     const t = useTranslations('Pages.predictions.mine');
     const ts = useTranslations('Pages.predictions.schedina');
     const tm = useTranslations('Football.markets');
@@ -154,6 +155,7 @@ export function SchedinaTicket({ticket}: {ticket: Ticket}) {
                         : `${t('ticket.settled')}${ticket.hits !== null ? ` · ${t('hits', {hits: ticket.hits, size: ticket.size})}` : ''}`}
                 </span>
                 <span className="flex items-center gap-2 shrink-0">
+                    {shareToken && <ShareButton compact path={`/schedine/${shareToken}`} title={t('ticket.shareTitle', {id: ticket.id})} text={t('ticket.shareText')} label={t('ticket.share')} />}
                     <span className="font-mono text-[9px] font-extrabold tracking-[0.2em] text-foreground">GIBISCORE</span>
                     <span aria-hidden="true" className="flex items-end gap-px h-4">
                         {Array.from({length: 24}, (_, i) => <span key={i} className="bg-foreground h-full" style={{width: ((ticket.id * 31 + i * 7) % 3) + 1}} />)}
