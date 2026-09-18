@@ -6,7 +6,10 @@ Tempo stimato: 20-30 minuti, di cui la maggior parte in attesa dei job.
 ## 0. Prerequisiti gia' fatti
 
 - Repo `GiBiSociety-XVII/gibiscore` collegato al progetto Vercel, branch `master` = produzione.
-- Progetto Supabase "GiBiScore" creato, migrazione `0001_public_schema` applicata.
+- Progetto Supabase "GiBiScore" creato, migrazioni di `supabase/migrations`
+  applicate in ordine (la `0001_public_schema` crea lo schema, le altre lo
+  fanno crescere: schedine, notifiche, lingua dei browser iscritti,
+  registro errori, funzione di pulizia).
 
 ## 1. Supabase (5 minuti)
 
