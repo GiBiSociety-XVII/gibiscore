@@ -29,4 +29,5 @@ set search_path = public
 as $$
     update public.error_log set hits = hits + 1, at = now() where id = row_id;
 $$;
+-- Not enough on its own (see 0025): a new function is granted to PUBLIC.
 revoke all on function public.bump_error_hits(bigint) from anon, authenticated;

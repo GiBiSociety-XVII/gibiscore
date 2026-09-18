@@ -35,4 +35,5 @@ begin
     return coalesce(array_length(ids, 1), 0);
 end;
 $$;
+-- Not enough on its own (see 0025): a new function is granted to PUBLIC.
 revoke all on function public.prune_old_detail(int, int) from anon, authenticated;
