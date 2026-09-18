@@ -74,5 +74,10 @@
     "back": "Indietro",
     "done": "Fine",
     "close": "Chiudi la guida"
+  },
+  "iosBanner": {
+    "title": "Aggiungi GiBiScore alla schermata Home",
+    "text": "Tocca Condividi, poi \"Aggiungi alla schermata Home\": si apre a tutto schermo e arrivano le notifiche.",
+    "dismiss": "Chiudi"
   }
 }

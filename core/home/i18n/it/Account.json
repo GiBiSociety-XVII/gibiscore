@@ -70,7 +70,7 @@
     },
     "notifications": {
       "title": "Notifiche",
-      "intro": "Per le partite delle competizioni e delle squadre tra i preferiti: calcio d'inizio, fine primo tempo, finale, ogni gol con chi ha segnato, espulsioni e formazioni ufficiali. Arrivano sul telefono o sul computer anche a sito chiuso.",
+      "intro": "Per le partite delle competizioni e delle squadre tra i preferiti: promemoria un'ora prima, formazioni ufficiali, calcio d'inizio, ogni gol con chi ha segnato, espulsioni, fine primo tempo e finale; la sera il riepilogo delle tue squadre; e l'esito delle tue schedine. Arrivano anche a sito chiuso.",
       "devices": "{count, plural, one {# dispositivo} other {# dispositivi}}",
       "deviceOn": "Attiva su questo dispositivo",
       "deviceOff": "Disattiva su questo dispositivo",
@@ -84,16 +84,20 @@
       "masterOff": "Notifiche in pausa",
       "masterHint": "In pausa non ricevi nulla su nessun dispositivo, senza perdere le impostazioni: riattivi quando vuoi.",
       "kinds": {
+        "reminder": "Partita tra un'ora",
+        "lineups": "Formazioni ufficiali",
         "kickoff": "Calcio d'inizio",
-        "half_time": "Fine primo tempo",
-        "full_time": "Finale",
         "goal": "Gol",
         "red_card": "Espulsioni",
-        "lineups": "Formazioni ufficiali"
+        "half_time": "Fine primo tempo",
+        "full_time": "Finale",
+        "digest": "Riepilogo serale",
+        "schedina": "Schedina chiusa"
       },
-      "muteHint": "Stai guardando una partita e non vuoi spoiler? Nella pagina della partita tocca la campanella per silenziare solo quella.",
+      "muteHint": "Stai guardando una partita e non vuoi spoiler? Nella pagina della partita tocca la campanella per silenziare solo quella. Le partite silenziate sono qui sotto.",
       "saving": "Salvataggio…",
-      "error": "Non salvato: riprova."
+      "error": "Non salvato: riprova.",
+      "unmute": "Riattiva"
     }
   }
 }

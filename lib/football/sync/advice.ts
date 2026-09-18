@@ -5,6 +5,7 @@ import {settleLegs, suggestBets, summarizeOdds, type LegKey, type OddsMarkets} f
 import {predictMatch} from '@/lib/football/prediction';
 import {schedinaLost, schedinaWon, type SchedinaKind} from '@/lib/football/schedina';
 import {chunk, failSync, type FootballClient, type SyncRun} from './context';
+import {notifyUsers} from '@/lib/notifications/dispatch';
 
 /**
  * The record of the advice: what the model proposes for a match is
@@ -88,15 +89,20 @@ export async function settleAdvice(db: FootballClient, run: SyncRun): Promise<vo
 /** Every saved slip whose matches are all over: won or lost on their scores. */
 export async function settleSchedine(db: FootballClient, run: SyncRun): Promise<void> {
     // Every open slip whose first match has started: each finished selection is judged as it ends.
-    const {data, error} = await db.from('schedine').select('id,kind,system_of,selections,results').is('hit', null).lte('first_kickoff', new Date(Date.now() - 90 * 60_000).toISOString()).limit(500);
+    const {data, error} = await db.from('schedine').select('id,user_id,kind,system_of,selections,results,payout').is('hit', null).lte('first_kickoff', new Date(Date.now() - 90 * 60_000).toISOString()).limit(500);
     if (error) failSync('schedine.select', error);
-    const open = (data ?? []) as Array<{id: number; kind: SchedinaKind; system_of: number | null; selections: Array<{fixtureId: number; banker?: boolean; legs: Array<{key: LegKey}>}>; results: Array<boolean | null> | null}>;
+    const open = (data ?? []) as Array<{id: number; user_id: string; kind: SchedinaKind; system_of: number | null; selections: Array<{fixtureId: number; banker?: boolean; legs: Array<{key: LegKey}>}>; results: Array<boolean | null> | null; payout: number | string | null}>;
     if (open.length === 0) return;
     const ids = [...new Set(open.flatMap((s) => s.selections.map((x) => x.fixtureId)))];
     const {data: fixtures, error: fixturesError} = await db.from('fixtures').select('id,state,home_score,away_score').in('id', ids);
     if (fixturesError) failSync('fixtures.select', fixturesError);
     const byId = new Map(((fixtures ?? []) as Array<{id: number; state: string; home_score: number | null; away_score: number | null}>).map((f) => [f.id, f]));
     let settled = 0;
+    const told: Array<{userId: string; payload: {title: string; body: string; url: string; tag: string}}> = [];
+    const tell = (s: (typeof open)[number], won: boolean, hits: number) => {
+        const payout = s.payout !== null ? Number(s.payout) : null;
+        told.push({userId: s.user_id, payload: {title: won ? `Schedina n. ${s.id}: vinta!` : `Schedina n. ${s.id}: persa`, body: `${hits}/${s.selections.length} centrate${won && payout ? ` · vincita ${payout.toFixed(2)} €` : ''}`, url: '/account', tag: `schedina-${s.id}`}});
+    };
     for (const s of open) {
         // Per selection: won, lost, or null while the match is not over (a postponed one waits with the calendar).
         const results = s.selections.map((x) => {
@@ -108,18 +114,22 @@ export async function settleSchedine(db: FootballClient, run: SyncRun): Promise<
         const hits = results.filter((r) => r === true).length;
         const complete = results.every((r) => r !== null);
         if (complete) {
-            const {error: updateError} = await db.from('schedine').update({results, hits, hit: schedinaWon(s.kind, results.map((r) => r === true), s.system_of, bankers), settled_at: new Date().toISOString()}).eq('id', s.id);
+            const won = schedinaWon(s.kind, results.map((r) => r === true), s.system_of, bankers);
+            const {error: updateError} = await db.from('schedine').update({results, hits, hit: won, settled_at: new Date().toISOString()}).eq('id', s.id);
             if (updateError) failSync('schedine.update', updateError);
             settled += 1;
+            tell(s, won, hits);
         } else if (schedinaLost(s.kind, results, s.system_of, bankers)) {
             // Lost already: no need to wait for the matches still to play.
             const {error: updateError} = await db.from('schedine').update({results, hits, hit: false, settled_at: new Date().toISOString()}).eq('id', s.id);
             if (updateError) failSync('schedine.update', updateError);
             settled += 1;
+            tell(s, false, hits);
         } else if (JSON.stringify(results) !== JSON.stringify(s.results ?? [])) {
             const {error: updateError} = await db.from('schedine').update({results, hits}).eq('id', s.id);
             if (updateError) failSync('schedine.update', updateError);
         }
     }
     if (settled > 0) run.bump('schedine_settled', settled);
+    await notifyUsers(db, run, 'schedina', told);
 }

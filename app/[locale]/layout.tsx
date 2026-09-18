@@ -8,6 +8,7 @@ import {Analytics} from "@vercel/analytics/react";
 import {SpeedInsights} from "@vercel/speed-insights/react";
 import {routing} from "@/i18n/routing";
 import {AccountFavoritesSync} from "@/components/shell/account-favorites-sync";
+import {IosInstallBanner} from "@/components/shell/ios-install-banner";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -75,6 +76,7 @@ export default async function LocaleLayout({children, params}: LayoutProps<"/[lo
                 <NextIntlClientProvider messages={messages}>
                     {children}
                     <AccountFavoritesSync />
+                    <IosInstallBanner />
                 </NextIntlClientProvider>
                 <Analytics />
                 <SpeedInsights />

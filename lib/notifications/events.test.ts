@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {detectChanges, lineupsCandidate, type MatchEvent, type MatchFacts} from './events';
+import {detectChanges, lineupsCandidate, reminderCandidate, type MatchEvent, type MatchFacts} from './events';
 
 const facts = (over: Partial<MatchFacts> = {}): MatchFacts => ({home: 'Juventus', away: 'Inter', homeProviderId: 496, league: 'Serie A', state: 'live', minute: 30, homeScore: 1, awayScore: 0, events: [], ...over});
 const goal = (over: Partial<MatchEvent> = {}): MatchEvent => ({kind: 'goal', teamProviderId: 496, minute: 28, extraMinute: null, player: 'Vlahović', ...over});
@@ -45,5 +45,11 @@ describe('detectChanges', () => {
 describe('lineupsCandidate', () => {
     it('announces the lineups', () => {
         expect(lineupsCandidate(facts())).toMatchObject({kind: 'lineups', key: 'lineups', title: 'Formazioni ufficiali: Juventus – Inter', body: 'Serie A'});
+    });
+});
+
+describe('reminderCandidate', () => {
+    it('says the hour in Rome time', () => {
+        expect(reminderCandidate(facts(), '2026-09-19T18:45:00Z')).toMatchObject({kind: 'reminder', key: 'reminder', title: "Tra un'ora: Juventus – Inter", body: '20:45 · Serie A'});
     });
 });

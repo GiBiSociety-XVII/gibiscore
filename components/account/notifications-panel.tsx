@@ -2,7 +2,7 @@
 
 import {useEffect, useState} from "react";
 import {Bell, BellOff, BellRing, Smartphone} from "lucide-react";
-import {useTranslations} from "next-intl";
+import {useFormatter, useTranslations} from "next-intl";
 import {Panel} from "@/components/shell/panel";
 import {cn} from "@/components/shared/ui/cn";
 import {Help} from "@/components/fantasy/help";
@@ -27,6 +27,8 @@ export function NotificationsPanel() {
     const [denied, setDenied] = useState(false);
     const [settings, setSettings] = useState<Settings | null>(null);
     const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle');
+    const [muted, setMuted] = useState<Array<{fixtureId: number; home: string; away: string; startingAt: string}>>([]);
+    const format = useFormatter();
 
     useEffect(() => {
         let alive = true;
@@ -34,6 +36,7 @@ export function NotificationsPanel() {
         queueMicrotask(() => setSupport(support));
         if (support === 'ok') currentSubscription().then((sub) => { if (alive) setDevice(sub ? 'on' : 'off'); }).catch(() => undefined);
         fetch('/api/notifications/settings').then((r) => (r.ok ? (r.json() as Promise<Settings>) : null)).then((s) => { if (alive && s) setSettings(s); }).catch(() => undefined);
+        fetch('/api/notifications/mute').then((r) => (r.ok ? (r.json() as Promise<{muted: typeof muted}>) : null)).then((m) => { if (alive && m) setMuted(m.muted); }).catch(() => undefined);
         return () => { alive = false; };
     }, []);
 
@@ -66,6 +69,11 @@ export function NotificationsPanel() {
         } catch {
             setState('error');
         }
+    };
+
+    const unmute = async (fixtureId: number) => {
+        const res = await fetch('/api/notifications/mute', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({fixtureId, muted: false})});
+        if (res.ok) setMuted((list) => list.filter((m) => m.fixtureId !== fixtureId));
     };
 
     const switchClass = (on: boolean) => cn("bb-btn h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5", on ? "bg-foreground text-background" : "bg-card");
@@ -111,6 +119,18 @@ export function NotificationsPanel() {
                             ))}
                         </div>
                         <p className="text-[11px] font-semibold text-muted-foreground leading-snug">{t('muteHint')}</p>
+                        {muted.length > 0 && (
+                            <ul className="flex flex-col divide-y divide-muted border-t border-muted pt-1">
+                                {muted.map((m) => (
+                                    <li key={m.fixtureId} className="flex items-center gap-2 py-1.5 text-[12px]">
+                                        <BellOff className="w-3.5 h-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                        <span className="font-extrabold truncate">{m.home} – {m.away}</span>
+                                        {m.startingAt && <span className="font-mono text-[11px] text-muted-foreground shrink-0">{format.dateTime(new Date(m.startingAt), {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>}
+                                        <button type="button" onClick={() => unmute(m.fixtureId)} className="ml-auto bb-btn bg-card h-7 px-2 text-[11px] font-extrabold shrink-0">{t('unmute')}</button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 )}
             </div>

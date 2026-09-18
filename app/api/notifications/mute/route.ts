@@ -3,13 +3,26 @@ import {createClient} from '@/lib/db/server';
 
 export const dynamic = 'force-dynamic';
 
-/** Whether the signed-in user muted this match (table muted_fixtures). */
+export interface MutedMatch {
+    fixtureId: number;
+    home: string;
+    away: string;
+    startingAt: string;
+}
+
+/** With `fixtureId`: whether the signed-in user muted this match. Without: every match muted, with names (table muted_fixtures). */
 export async function GET(request: NextRequest) {
-    const fixtureId = Number(request.nextUrl.searchParams.get('fixtureId'));
-    if (!Number.isInteger(fixtureId) || fixtureId <= 0) return NextResponse.json({error: 'bad fixture'}, {status: 400});
+    const raw = request.nextUrl.searchParams.get('fixtureId');
     const db = await createClient();
     const {data: who} = await db.auth.getUser();
     if (!who.user) return NextResponse.json({error: 'signed out'}, {status: 401});
+    if (raw === null) {
+        const {data} = await db.from('muted_fixtures').select('fixture_id,fixture:fixtures(starting_at,home:teams!fixtures_home_team_id_fkey(name),away:teams!fixtures_away_team_id_fkey(name))').order('created_at', {ascending: false}).limit(50);
+        const list: MutedMatch[] = ((data ?? []) as unknown as Array<{fixture_id: number; fixture: {starting_at: string; home: {name: string} | null; away: {name: string} | null} | null}>).map((r) => ({fixtureId: r.fixture_id, home: r.fixture?.home?.name ?? '?', away: r.fixture?.away?.name ?? '?', startingAt: r.fixture?.starting_at ?? ''}));
+        return NextResponse.json({muted: list});
+    }
+    const fixtureId = Number(raw);
+    if (!Number.isInteger(fixtureId) || fixtureId <= 0) return NextResponse.json({error: 'bad fixture'}, {status: 400});
     const {data} = await db.from('muted_fixtures').select('fixture_id').eq('fixture_id', fixtureId).maybeSingle();
     return NextResponse.json({muted: !!data});
 }

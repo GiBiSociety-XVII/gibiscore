@@ -9,9 +9,9 @@ import {LIVE_STATES, type FixtureState} from '@/lib/football/types';
  * said, and gets back the notifications to send, each with a key the
  * ledger (table notified) uses so nothing goes out twice.
  */
-export type NotificationKind = 'kickoff' | 'half_time' | 'full_time' | 'goal' | 'red_card' | 'lineups';
+export type NotificationKind = 'kickoff' | 'half_time' | 'full_time' | 'goal' | 'red_card' | 'lineups' | 'reminder' | 'schedina' | 'digest';
 
-export const NOTIFICATION_KINDS: readonly NotificationKind[] = ['kickoff', 'half_time', 'full_time', 'goal', 'red_card', 'lineups'];
+export const NOTIFICATION_KINDS: readonly NotificationKind[] = ['reminder', 'lineups', 'kickoff', 'goal', 'red_card', 'half_time', 'full_time', 'digest', 'schedina'];
 
 export interface Candidate {
     kind: NotificationKind;
@@ -99,6 +99,12 @@ export function detectChanges(prev: Previous | null, f: MatchFacts): Candidate[]
         }
     }
     return out;
+}
+
+/** Kick-off in an hour: one notification per match, with the time. */
+export function reminderCandidate(f: Pick<MatchFacts, 'home' | 'away' | 'league'>, startingAt: string): Candidate {
+    const time = new Intl.DateTimeFormat('it-IT', {timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit'}).format(new Date(startingAt));
+    return {kind: 'reminder', key: 'reminder', title: `Tra un'ora: ${f.home} – ${f.away}`, body: `${time} · ${f.league}`};
 }
 
 /** The official lineups are out: one notification per match, an hour or so before kick-off. */

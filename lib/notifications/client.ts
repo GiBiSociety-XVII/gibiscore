@@ -13,7 +13,7 @@ export type PushSupport =
     /** No public key on the site: nothing to subscribe to. */
     | 'not-configured';
 
-export const KINDS = ['kickoff', 'half_time', 'full_time', 'goal', 'red_card', 'lineups'] as const;
+export const KINDS = ['reminder', 'lineups', 'kickoff', 'goal', 'red_card', 'half_time', 'full_time', 'digest', 'schedina'] as const;
 
 export function pushSupport(): PushSupport {
     if (typeof window === 'undefined') return 'unsupported';

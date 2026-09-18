@@ -2,7 +2,7 @@ import 'server-only';
 import type {FootballClient, SyncRun} from '@/lib/football/sync/context';
 import {chunk} from '@/lib/football/sync/context';
 import type {Candidate, NotificationKind} from './events';
-import {pushConfigured, sendPush, type PushTarget} from './push';
+import {pushConfigured, sendPush, type PushPayload, type PushTarget} from './push';
 
 /** A match with what it owes: our fixture id and the candidates (events.ts). */
 export interface Outgoing {
@@ -18,6 +18,73 @@ const CONCURRENCY = 20;
 interface Settings {
     enabled: boolean;
     kinds: Partial<Record<NotificationKind, boolean>>;
+}
+
+interface Subscription {
+    id: number;
+    user_id: string;
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+    failures: number;
+}
+
+interface Send {
+    sub: Subscription;
+    payload: PushPayload;
+}
+
+const slugList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
+
+/** Every subscribed browser, and the switches of their users (defaults: everything on). */
+async function audience(db: FootballClient, userIds?: string[]): Promise<{subs: Subscription[]; settings: Map<string, Settings>}> {
+    let query = db.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth,failures').limit(20000);
+    if (userIds) query = query.in('user_id', userIds);
+    const {data: subRows, error: subError} = await query;
+    if (subError) throw subError;
+    const subs = (subRows ?? []) as Subscription[];
+    const settings = new Map<string, Settings>();
+    for (const ids of chunk([...new Set(subs.map((s) => s.user_id))], 300)) {
+        const {data, error} = await db.from('notification_settings').select('user_id,enabled,kinds').in('user_id', ids);
+        if (error) throw error;
+        for (const r of data ?? []) settings.set(r.user_id as string, {enabled: r.enabled !== false, kinds: (r.kinds as Settings['kinds']) ?? {}});
+    }
+    return {subs, settings};
+}
+
+const wants = (settings: Map<string, Settings>, userId: string, kind: NotificationKind): boolean => {
+    const s = settings.get(userId) ?? {enabled: true, kinds: {}};
+    return s.enabled && s.kinds[kind] !== false;
+};
+
+/** The sends, twenty at a time; browsers gone or failing for too long are forgotten. */
+async function deliver(db: FootballClient, run: SyncRun, sends: Send[]): Promise<void> {
+    if (sends.length === 0) return;
+    const subs = new Map(sends.map((s) => [s.sub.id, s.sub]));
+    const gone = new Set<number>();
+    const failed = new Map<number, number>();
+    let delivered = 0;
+    for (const group of chunk(sends, CONCURRENCY)) {
+        const results = await Promise.all(group.map(({sub, payload}) => sendPush(sub as PushTarget, payload)));
+        results.forEach((result, i) => {
+            const sub = group[i].sub;
+            if (result === 'ok') delivered += 1;
+            else if (result === 'gone') gone.add(sub.id);
+            else failed.set(sub.id, (failed.get(sub.id) ?? 0) + 1);
+        });
+    }
+    run.bump('notifications', delivered);
+    for (const [id, n] of failed) if ((subs.get(id)?.failures ?? 0) + n >= MAX_FAILURES) gone.add(id);
+    if (gone.size > 0) {
+        await db.from('push_subscriptions').delete().in('id', [...gone]);
+        run.bump('subscriptions_dropped', gone.size);
+    }
+    for (const [id, n] of failed) {
+        if (gone.has(id)) continue;
+        await db.from('push_subscriptions').update({failures: (subs.get(id)?.failures ?? 0) + n}).eq('id', id);
+    }
+    const ok = [...subs.keys()].filter((id) => !failed.has(id) && !gone.has(id));
+    if (ok.length > 0) await db.from('push_subscriptions').update({failures: 0, last_used_at: new Date().toISOString()}).in('id', ok);
 }
 
 /**
@@ -42,7 +109,7 @@ export async function dispatchNotifications(db: FootballClient, run: SyncRun, ou
         const news = pending.map((o) => ({fixtureId: o.fixtureId, candidates: o.candidates.filter((c) => fresh.has(`${o.fixtureId}:${c.key}`))})).filter((o) => o.candidates.length > 0);
         if (news.length === 0) return;
 
-        // 2. Who could care: the slugs of the match, the users with a subscribed browser.
+        // 2. Who could care: the slugs of the match, the users with a subscribed browser and their favourites.
         const {data: fixtureRows, error: fixtureError} = await db
             .from('fixtures')
             .select('id,league:leagues(slug),home:teams!fixtures_home_team_id_fkey(slug),away:teams!fixtures_away_team_id_fkey(slug)')
@@ -52,30 +119,20 @@ export async function dispatchNotifications(db: FootballClient, run: SyncRun, ou
         for (const r of (fixtureRows ?? []) as unknown as Array<{id: number; league: {slug: string} | null; home: {slug: string} | null; away: {slug: string} | null}>) {
             slugsOf.set(r.id, {league: r.league?.slug ?? null, home: r.home?.slug ?? null, away: r.away?.slug ?? null});
         }
-        const {data: subRows, error: subError} = await db.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth,failures').limit(20000);
-        if (subError) throw subError;
-        const subs = (subRows ?? []) as Array<{id: number; user_id: string; endpoint: string; p256dh: string; auth: string; failures: number}>;
+        const {subs, settings} = await audience(db);
         if (subs.length === 0) return;
-        const userIds = [...new Set(subs.map((s) => s.user_id))];
-
         const favorites = new Map<string, {competitions: string[]; teams: string[]}>();
-        const settings = new Map<string, Settings>();
-        for (const ids of chunk(userIds, 300)) {
-            const [{data: favRows, error: favError}, {data: setRows, error: setError}] = await Promise.all([
-                db.from('user_favorites').select('user_id,competitions,teams').in('user_id', ids),
-                db.from('notification_settings').select('user_id,enabled,kinds').in('user_id', ids),
-            ]);
-            if (favError) throw favError;
-            if (setError) throw setError;
-            for (const r of favRows ?? []) favorites.set(r.user_id as string, {competitions: slugList(r.competitions), teams: slugList(r.teams)});
-            for (const r of setRows ?? []) settings.set(r.user_id as string, {enabled: r.enabled !== false, kinds: (r.kinds as Settings['kinds']) ?? {}});
+        for (const ids of chunk([...new Set(subs.map((s) => s.user_id))], 300)) {
+            const {data, error} = await db.from('user_favorites').select('user_id,competitions,teams').in('user_id', ids);
+            if (error) throw error;
+            for (const r of data ?? []) favorites.set(r.user_id as string, {competitions: slugList(r.competitions), teams: slugList(r.teams)});
         }
         const {data: mutedRows, error: mutedError} = await db.from('muted_fixtures').select('user_id,fixture_id').in('fixture_id', news.map((o) => o.fixtureId));
         if (mutedError) throw mutedError;
         const muted = new Set((mutedRows ?? []).map((r) => `${r.user_id}:${r.fixture_id}`));
 
         // 3. The sends: one per candidate per subscribed browser of a user who follows the match.
-        const sends: Array<{sub: (typeof subs)[number]; fixtureId: number; candidate: Candidate}> = [];
+        const sends: Send[] = [];
         for (const o of news) {
             const slugs = slugsOf.get(o.fixtureId);
             if (!slugs) continue;
@@ -84,47 +141,34 @@ export async function dispatchNotifications(db: FootballClient, run: SyncRun, ou
                 if (!fav) continue;
                 const follows = (slugs.league !== null && fav.competitions.includes(slugs.league)) || (slugs.home !== null && fav.teams.includes(slugs.home)) || (slugs.away !== null && fav.teams.includes(slugs.away));
                 if (!follows || muted.has(`${sub.user_id}:${o.fixtureId}`)) continue;
-                const s = settings.get(sub.user_id) ?? {enabled: true, kinds: {}};
-                if (!s.enabled) continue;
                 for (const candidate of o.candidates) {
-                    if (s.kinds[candidate.kind] === false) continue;
-                    sends.push({sub, fixtureId: o.fixtureId, candidate});
+                    if (!wants(settings, sub.user_id, candidate.kind)) continue;
+                    sends.push({sub, payload: {title: candidate.title, body: candidate.body, url: `/matches/${o.fixtureId}`, tag: `match-${o.fixtureId}`, kind: candidate.kind}});
                 }
             }
         }
-        if (sends.length === 0) return;
-
-        const gone = new Set<number>();
-        const failed = new Map<number, number>();
-        let delivered = 0;
-        for (const group of chunk(sends, CONCURRENCY)) {
-            const results = await Promise.all(
-                group.map(({sub, fixtureId, candidate}) => sendPush(sub as PushTarget, {title: candidate.title, body: candidate.body, url: `/matches/${fixtureId}`, tag: `match-${fixtureId}`, kind: candidate.kind})),
-            );
-            results.forEach((result, i) => {
-                const sub = group[i].sub;
-                if (result === 'ok') delivered += 1;
-                else if (result === 'gone') gone.add(sub.id);
-                else failed.set(sub.id, (failed.get(sub.id) ?? 0) + 1);
-            });
-        }
-        run.bump('notifications', delivered);
-        // Browsers that left, and the ones failing for too long, are forgotten.
-        for (const [id, n] of failed) if ((subs.find((s) => s.id === id)?.failures ?? 0) + n >= MAX_FAILURES) gone.add(id);
-        if (gone.size > 0) {
-            await db.from('push_subscriptions').delete().in('id', [...gone]);
-            run.bump('subscriptions_dropped', gone.size);
-        }
-        const stillFailing = [...failed.keys()].filter((id) => !gone.has(id));
-        for (const id of stillFailing) {
-            const sub = subs.find((s) => s.id === id);
-            if (sub) await db.from('push_subscriptions').update({failures: sub.failures + (failed.get(id) ?? 0)}).eq('id', id);
-        }
-        const ok = [...new Set(sends.map((s) => s.sub.id))].filter((id) => !failed.has(id) && !gone.has(id));
-        if (ok.length > 0) await db.from('push_subscriptions').update({failures: 0, last_used_at: new Date().toISOString()}).in('id', ok);
+        await deliver(db, run, sends);
     } catch (error) {
         run.warn(`notifications: ${(error as Error).message}`);
     }
 }
 
-const slugList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
+/**
+ * One notification straight to some users (a slip settled, the evening
+ * digest): their switches decide, favourites and mutes do not apply.
+ * The caller makes sure it is not sent twice. Never throws.
+ */
+export async function notifyUsers(db: FootballClient, run: SyncRun, kind: NotificationKind, targets: Array<{userId: string; payload: Omit<PushPayload, 'kind'>}>): Promise<void> {
+    try {
+        if (targets.length === 0 || !pushConfigured()) return;
+        const {subs, settings} = await audience(db, [...new Set(targets.map((t) => t.userId))]);
+        const sends: Send[] = [];
+        for (const target of targets) {
+            if (!wants(settings, target.userId, kind)) continue;
+            for (const sub of subs) if (sub.user_id === target.userId) sends.push({sub, payload: {...target.payload, kind}});
+        }
+        await deliver(db, run, sends);
+    } catch (error) {
+        run.warn(`notifications (${kind}): ${(error as Error).message}`);
+    }
+}
