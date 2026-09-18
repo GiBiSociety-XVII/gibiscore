@@ -303,13 +303,14 @@
     "assists": "Assists",
     "empty": "Data not available yet for this competition.",
     "seasonPicker": "Season",
-    "tools": {
-      "label": "Tools",
-      "predictions": "Predictions and betting slips",
-      "record": "Model record",
-      "injuries": "Injured and suspended",
-      "compare": "Compare players",
-      "search": "Find a team or player"
+    "nav": {
+      "label": "Statistics pages",
+      "stats": "Scorers",
+      "predictions": "Predictions",
+      "record": "Record",
+      "injuries": "Injuries",
+      "compare": "Compare",
+      "search": "Search"
     }
   },
   "injuries": {

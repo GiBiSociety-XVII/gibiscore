@@ -6,6 +6,7 @@ import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {AbsenceList} from "@/components/football/absences";
 import {Flag} from "@/components/football/flag";
 import {PageHeader} from "@/components/football/page-header";
+import {SectionNav} from "@/components/football/section-nav";
 import {Tabs} from "@/components/football/tabs";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getSidelined} from "@/lib/football/data/injuries";
@@ -27,6 +28,7 @@ export default async function InjuriesPage({params}: PageProps<"/[locale]/injuri
     return (
         <SiteShell wide>
             <PageHeader title={t('title')} meta={t('intro')} />
+            <SectionNav current="injuries" />
             {blocks.length > 0 && <p className="text-[12px] font-semibold text-muted-foreground -mt-1">{tAbs('hint')}</p>}
             {blocks.length === 0 ? (
                 <p className="text-sm font-semibold text-muted-foreground">{t('empty')}</p>

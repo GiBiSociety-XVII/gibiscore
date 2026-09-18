@@ -4,6 +4,7 @@ import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
 import {PageHeader} from "@/components/football/page-header";
+import {SectionNav} from "@/components/football/section-nav";
 import {TeamCrest} from "@/components/football/team-crest";
 import {getAdviceRecord, getSchedineTally} from "@/lib/football/data/record";
 import {MySchedine} from "@/components/football/my-schedine";
@@ -48,6 +49,7 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                         <Link data-tour="predictions" href="/predictions" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toPredictions')}</Link>
                     </div>
                 } />
+            <SectionNav current="record" />
 
             <div data-tour="live"><Panel title={t('liveTitle')} action={<span className="flex items-center gap-2">{record && <span className="font-mono text-[11px] text-muted-foreground">{t('settled', {count: record.total})}</span>}<Help boxed text={t('liveHint')} /></span>}>
                 {!record || record.total === 0 ? (

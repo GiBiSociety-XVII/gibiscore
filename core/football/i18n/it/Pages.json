@@ -303,13 +303,14 @@
     "assists": "Assist",
     "empty": "Dati non ancora disponibili per questa competizione.",
     "seasonPicker": "Stagione",
-    "tools": {
-      "label": "Strumenti",
-      "predictions": "Pronostici e schedine",
-      "record": "Bilancio del modello",
-      "injuries": "Infortunati e squalificati",
-      "compare": "Confronta giocatori",
-      "search": "Cerca squadra o giocatore"
+    "nav": {
+      "label": "Pagine delle statistiche",
+      "stats": "Marcatori",
+      "predictions": "Pronostici",
+      "record": "Bilancio",
+      "injuries": "Infortunati",
+      "compare": "Confronto",
+      "search": "Cerca"
     }
   },
   "injuries": {
