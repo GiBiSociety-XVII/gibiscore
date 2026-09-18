@@ -2,10 +2,9 @@
 
 import {Activity, ArrowLeftRight, BookOpen, ChevronDown, ChevronUp, ClipboardList, Lightbulb, Pencil, Search, Settings2, Undo2, X} from "lucide-react";
 import {Tour} from "./tour";
-import {useEffect, useMemo, useRef, useState} from "react";
-import {useFormatter, useTranslations} from "next-intl";
+import {useEffect, useMemo, useState} from "react";
+import {useTranslations} from "next-intl";
 import {Link, useRouter} from "@/i18n/navigation";
-import {Badge} from "@/components/shared/ui/badge";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {TeamCrest} from "@/components/football/team-crest";
@@ -20,143 +19,28 @@ import {TableBar} from "./table-bar";
 import {TargetsPanel} from "./targets-panel";
 import {useAccountTeams} from "./account-teams";
 import {TierBadge, TierList, TierWhy} from "./tier-list";
-import {keeperBlocks} from "@/lib/fantasy/block";
-import {creditsLeft, customStrategyKey, DEFAULT_RULES, ledgerOf, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
+import {creditsLeft, customStrategyKey, ledgerOf, ROLE_SHARE, sameSavedTeam, savedTeamOf, totalSlots, type AuctionConfig, type CustomStrategy, type Purchase} from "@/lib/fantasy/config";
 import type {AuctionPlayer, AuctionPool} from "@/lib/fantasy/data";
-import {fantaAvgFor, suggestPrices, type FantaRole, type FantaScores} from "@/lib/fantasy/scores";
+import type {FantaRole, FantaScores} from "@/lib/fantasy/scores";
 import {teamReport} from "@/lib/fantasy/report";
-import {playerMatches} from "@/lib/fantasy/search";
 import {cloudStore, configStore, purchasesStore, teamsStore, useHydrated} from "@/lib/fantasy/store";
 import {LegheImport} from "./leghe-import";
 import {MarketDialog} from "./market-dialog";
 import {Help} from "./help";
 import {auctionPath} from "@/lib/fantasy/routes";
-import {bestLineup, defenceOption, planBFor, planStrategy, rankStrategies, slotCeiling, strategyHealth, type StrategyKey, type StrategyPick} from "@/lib/fantasy/strategies";
-import {completionReserve, dynamicPrices, marketState} from "@/lib/fantasy/dynamic";
-import {bargains, type Bargain} from "@/lib/fantasy/bargains";
-import {TIERS, explainTiers, type Tier, type TierInfo} from "@/lib/fantasy/tiers";
+import {bestLineup, defenceOption, planStrategy, rankStrategies, slotCeiling, strategyHealth, type StrategyKey} from "@/lib/fantasy/strategies";
+import {completionReserve} from "@/lib/fantasy/dynamic";
+import {TIERS, type Tier} from "@/lib/fantasy/tiers";
+import {FragmentRow, Hotkeys, Notes, PlanStar, ScoreCell, Status, VERDICT_CLASS, verdictOf} from "./board/bits";
+import {SCORE_KEYS, useBoardData, useFilteredPlayers, type SortKey} from "./board/use-board-data";
 
 const ROLES: FantaRole[] = ['P', 'D', 'C', 'A'];
 const TOUR_KEY = 'gibiscore:auction-tour:v1';
 /** The guide's stops, in order: each a `data-tour` on the board. */
 const TOUR_STEPS = ['toolbar', 'status', 'strategy', 'table', 'filters', 'list', 'roster'] as const;
-const SCORE_KEYS = ['starter', 'bonus', 'rating', 'discipline', 'fitness', 'team', 'form'] as const;
-type SortKey = 'overall' | 'price' | 'fantaAvg' | 'bargain' | (typeof SCORE_KEYS)[number] | 'name';
 const PAGE = 80;
 /** How long the phone's "Compra" stays armed for its second tap. */
 const QUICK_MS = 4_000;
-
-
-function ScoreCell({value}: {value: number}) {
-    return (
-        <span className="relative inline-flex items-center justify-center w-9 h-6 rounded overflow-hidden border border-foreground/30 bg-muted/40 font-mono text-[12px] font-extrabold tabular-nums">
-            <span className={cn("absolute inset-y-0 left-0", value >= 70 ? "bg-accent" : value >= 45 ? "bg-accent/45" : "bg-foreground/10")} style={{width: `${value}%`}} aria-hidden="true" />
-            <span className="relative">{value}</span>
-        </span>
-    );
-}
-
-const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
-
-/** Absence badge (no return date: nobody can tell one), plus the small flags that matter at the auction. */
-type Verdict = 'great' | 'ok' | 'pricey' | 'avoid';
-const VERDICT_CLASS: Record<Verdict, string> = {great: "bg-emerald-200 border-emerald-700", ok: "bg-emerald-100 border-emerald-700/60", pricey: "bg-amber-200 border-amber-700", avoid: "bg-red-200 border-red-700"};
-
-/**
- * One word on whether to buy him at the live price: with a strategy, the
- * ceiling it would pay against the price; without, where the site ranks
- * him against where the list does.
- */
-function verdictOf(price: number, maxBid: number | null, deal: Bargain | undefined): Verdict | null {
-    if (maxBid !== null) {
-        const ratio = maxBid / Math.max(1, price);
-        return ratio >= 1.15 ? 'great' : ratio >= 0.95 ? 'ok' : ratio >= 0.75 ? 'pricey' : 'avoid';
-    }
-    if (!deal) return null;
-    return deal.index >= 1.3 ? 'great' : deal.index <= 0.75 ? 'pricey' : null;
-}
-
-function Status({p, rivals, rivalsTaken = [], deal, verdict}: {p: AuctionPlayer; rivals: AuctionPlayer['rivals']; rivalsTaken?: string[]; deal?: Bargain; verdict?: Verdict | null}) {
-    const t = useTranslations('Fantasy.board');
-    return (
-        <span className="inline-flex items-center gap-1 flex-wrap justify-end">
-            {verdict && <Badge variant="outline" className={cn("text-[9px] h-4 px-1 font-extrabold", VERDICT_CLASS[verdict])} title={t(`verdict.${verdict}Hint`)}>{t(`verdict.${verdict}`)}</Badge>}
-            {deal?.bargain && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-emerald-700 border-emerald-700" title={t('bargain.hint', {quote: deal.quote, equiv: deal.equivQuote, rank: deal.rank, role: p.role})}>{t('bargain.badge')}</Badge>}
-            {p.contested && rivalsTaken.length > 0 && <Badge variant="ink" className="text-[9px] h-4 px-1 bg-red-700 border-red-700" title={t('rivalTakenHint', {names: rivalsTaken.join(', ')})}>{t('rivalTakenBadge')}</Badge>}
-            {p.injury && (() => {
-                const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
-                return (
-                    <span className="inline-flex items-center gap-1" title={`${p.injury.description ?? label} · ${t('daysOut', {count: p.injury.daysOut})}`}>
-                        <Badge variant={p.injury.category === 'suspension' ? 'ink' : 'outline'} className="text-[9px] h-4 px-1">{label}</Badge>
-                        {p.injury.longTerm && <Badge variant="ink" className="text-[9px] h-4 px-1">{t('longTerm')}</Badge>}
-                    </span>
-                );
-            })()}
-            {p.contested && rivals.length > 0 && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.rivals', {names: rivals.map((r) => r.name).join(', ')})}>{t('info.rivalsBadge')}</Badge>}
-            {p.newSigning && <Badge variant="outline" className="text-[9px] h-4 px-1" title={t('info.newSigning', {club: p.newSigning})}>{t('info.newSigningBadge')}</Badge>}
-            {p.penaltyTaker && <Badge variant="accent" className="text-[9px] h-4 px-1" title={t('info.penaltyTaker')}>{t('info.penaltyBadge')}</Badge>}
-        </span>
-    );
-}
-
-/** The notes of the detail row: absence in full, rivals for the spot, new signing, penalties, European cups. */
-function Notes({p}: {p: AuctionPlayer}) {
-    const t = useTranslations('Fantasy.board');
-    const ts = useTranslations('Fantasy.setup');
-    const format = useFormatter();
-    const short = (iso: string) => format.dateTime(day(iso), {day: 'numeric', month: 'short'});
-    const lines: Array<{key: string; text: string; tone?: string}> = [];
-    const breakdown = (['P', 'D', 'C', 'A'] as const).filter((r) => (p.roleBreakdown[r] ?? 0) > 0).map((r) => `${Math.round(p.roleBreakdown[r]!)} ${ts(`roles.${r}`).toLowerCase()}`).join(', ');
-    if (p.roleSource === 'manual') lines.push({key: 'role', text: t('info.roleManual', {role: p.role})});
-    else if (p.roleSource === 'listone') lines.push({key: 'role', text: (p.listQuote !== null ? t('info.roleListoneQuote', {role: p.role, quote: p.listQuote}) : t('info.roleListone', {role: p.role})) + (p.listFvm !== null ? ` · ${t('info.fvm', {fvm: p.listFvm})}` : '') + (p.mantraRoles ? ` · ${t('info.mantra', {roles: p.mantraRoles.replace(/;/g, ', ')})}` : '')});
-    else if (p.roleSource === 'lineups') lines.push({key: 'role', text: t('info.roleLineups', {role: p.role, breakdown})});
-    else lines.push({key: 'role', text: t('info.roleProfile', {role: p.role})});
-    if (p.injury) {
-        const label = p.injury.category === 'suspension' ? t('suspended') : p.injury.category === 'doubtful' ? t('doubtful') : p.injury.category === 'injury' ? t('injured') : t('unavailable');
-        lines.push({key: 'injury', text: t('info.injury', {label, description: p.injury.description ? ` (${p.injury.description})` : '', since: short(p.injury.since), days: t('info.injuryDays', {count: p.injury.daysOut})}) + (p.injury.longTerm ? ` · ${t('longTerm')}` : ''), tone: 'text-red-800'});
-    }
-    const avail = p.availability.starts + p.availability.benches;
-    if (p.contested && p.rivals.length > 0) lines.push({key: 'rivals', text: t('info.contested', {benches: Math.round(p.availability.benches), total: Math.round(avail), names: p.rivals.map((r) => t('info.rivalOne', {name: r.name, shared: r.shared})).join(', ')}), tone: 'text-amber-800'});
-    else if (p.contested) lines.push({key: 'rivals', text: t('info.contestedUnknown', {benches: Math.round(p.availability.benches), total: Math.round(avail)}), tone: 'text-amber-800'});
-    else if (avail >= 3) lines.push({key: 'rivals', text: t('info.fixedStarter', {starts: Math.round(p.availability.starts), total: Math.round(avail)}) + (p.rivals.length > 0 ? ` ${t('info.backup', {names: p.rivals.map((r) => r.name).join(', ')})}` : '')});
-    if (p.newSigning) lines.push({key: 'new', text: t('info.newSigning', {club: p.newSigning})});
-    if (p.penaltyTaker) lines.push({key: 'pen', text: t('info.penaltyTaker')});
-    if (p.europe) lines.push({key: 'europe', text: t('info.europe', {competition: p.europe})});
-    return (
-        <div className="flex flex-col gap-1 min-w-0">
-            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('info.title')}</span>
-            {lines.length === 0 ? (
-                <span className="text-[12px] font-semibold text-muted-foreground">{t('info.none')}</span>
-            ) : (
-                <ul className="flex flex-col gap-1 text-[12px] font-semibold">
-                    {lines.map((l) => <li key={l.key} className={cn("rounded-md border border-foreground/20 bg-card px-2 py-1 leading-snug", l.tone)}>{l.text}</li>)}
-                </ul>
-            )}
-        </div>
-    );
-}
-
-/**
- * One star for the plan on a player's row. Grey: nobody proposes him, a
- * click makes him a wanted target the strategies plan in whatever the
- * marks say. Blue: the strategy in use proposes him, a click excludes him
- * so no strategy proposes him again. Black (wanted) or crossed (excluded):
- * a click clears it.
- */
-function PlanStar({wanted, avoided, target, onClick, size = 5}: {wanted: boolean; avoided: boolean; target: boolean; onClick: () => void; size?: 5 | 7}) {
-    const t = useTranslations('Fantasy.board');
-    const box = size === 7 ? "w-7 h-7 text-[13px]" : "w-5 h-5 text-[11px]";
-    const state = wanted ? 'wanted' : avoided ? 'avoided' : target ? 'target' : 'none';
-    const look = {
-        wanted: "border-foreground bg-foreground text-background",
-        avoided: "border-foreground/40 bg-muted text-muted-foreground",
-        target: "border-foreground bg-accent text-foreground",
-        none: "border-foreground/40 bg-card text-muted-foreground hover:text-foreground",
-    }[state];
-    return (
-        <button type="button" onClick={onClick} aria-pressed={wanted || avoided} title={t(`plan.${state}`)} className={cn("inline-flex items-center justify-center rounded border shrink-0 font-extrabold leading-none", box, look)}>{state === 'avoided' ? '✕' : '★'}</button>
-    );
-}
 
 /** The auction: settings gate, filters, the list with marks and suggested credits, my roster. */
 export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
@@ -216,77 +100,12 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
     const [compare, setCompare] = useState<number[]>([]);
     const [cursor, setCursor] = useState<number | null>(null);
 
-    // The marks the league wants: with the cups, or the main leagues only.
-    const pool = useMemo(() => {
-        if (!rawPool || !config) return rawPool;
-        const overrides = config.roleOverrides;
-        const fixed = Object.keys(overrides).length > 0 ? rawPool.players.map((p) => (overrides[String(p.id)] && overrides[String(p.id)] !== p.role ? {...p, role: overrides[String(p.id)], roleSource: 'manual' as const} : p)) : rawPool.players;
-        const chosen = config.cupsCount ? fixed : fixed.map((p) => ({...p, scores: p.scoresLeagueOnly, seasons: p.seasons.filter((l) => !l.cup)}));
-        // The league's own bonus and malus: the fantasy average follows them.
-        const classic = (Object.keys(DEFAULT_RULES) as Array<keyof typeof DEFAULT_RULES>).every((k) => config.rules[k] === DEFAULT_RULES[k]);
-        const players = classic ? chosen : chosen.map((p) => (p.scores.events ? {...p, scores: {...p.scores, fantaAvg: fantaAvgFor(p.scores.events, p.role, config.rules)}} : p));
-        return players === rawPool.players ? rawPool : {...rawPool, players};
-    }, [rawPool, config]);
-    // Keepers by block (a league rule): the club's first keeper carries the block, the others are not on
-    // the market by themselves. Prices, market and strategies then see one keeper slot and no backups.
-    const board = useMemo(() => {
-        if (!pool || !config) return null;
-        const blocks = config.keeperBlock ? keeperBlocks(pool.players) : null;
-        return {
-            blocks,
-            players: blocks ? pool.players.filter((p) => !blocks.backups.has(p.id)) : pool.players,
-            config: blocks ? {...config, slots: {...config.slots, P: 1}} : config,
-            purchases: blocks ? purchases.filter((p) => !blocks.backups.has(p.playerId)) : purchases,
-        };
-    }, [pool, config, purchases]);
-    // List prices assume a full market; the live prices follow what has been bought and paid.
-    const listPrices = useMemo(() => {
-        if (!board) return new Map<number, number>();
-        return suggestPrices(board.players, {credits: board.config.credits, participants: board.config.participants, slots: board.config.slots, roleShare: ROLE_SHARE, level: board.config.priceLevel / 100});
-    }, [board]);
-    // Cheap on Fantacalcio.it, worth much more to the site: ranked on the list prices, so the auction does not move them.
-    const deals = useMemo(() => (board ? bargains(board.players.map((p) => ({id: p.id, role: p.role, listQuote: p.listQuote, value: p.scores.overall})), listPrices) : new Map<number, Bargain>()), [board, listPrices]);
-    // Live prices follow the purchases: the plans below hang on them, so they are drawn once per purchase.
-    const prices = useMemo(() => (board ? dynamicPrices(board.players, listPrices, board.config, board.purchases) : listPrices), [board, listPrices]);
-    const market = board ? marketState(board.players, listPrices, board.config, board.purchases) : null;
-    const bought = useMemo(() => new Map(purchases.map((p) => [p.playerId, p])), [purchases]);
-    const tierInfos = useMemo(() => (pool && config ? explainTiers(pool.players, config) : new Map<number, TierInfo>()), [pool, config]);
-    const tiers = useMemo(() => new Map<number, Tier>([...tierInfos].map(([id, info]) => [id, info.tier])), [tierInfos]);
-    // Strategies simulated on what is still on the market at live prices, starting from what I already own.
-    const plans = useMemo(() => {
-        if (!board) return [];
-        const byId = new Map(board.players.map((p) => [p.id, p]));
-        const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
-        const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-        return rankStrategies(board.players, prices, {...board.config, credits: board.config.credits + ledgerOf(board.config.ledger, board.config.me)}, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies);
-    }, [board, prices]);
-    // Plan B of every target of the strategy in use: drawn by the strategy itself without him (see planBFor).
-    const planB = useMemo(() => {
-        const plan = board ? plans.find((p) => p.key === board.config.strategy) : undefined;
-        if (!board || !plan) return new Map<number, StrategyPick[]>();
-        const byId = new Map(board.players.map((p) => [p.id, p]));
-        const taken = new Set(board.purchases.filter((p) => p.manager !== board.config.me).map((p) => p.playerId));
-        const mine = board.purchases.filter((p) => p.manager === board.config.me && byId.has(p.playerId)).map((p) => ({playerId: p.playerId, role: byId.get(p.playerId)!.role, price: p.price}));
-        const targets = ROLES.flatMap((r) => plan.picks[r]).filter((p) => !mine.some((m) => m.playerId === p.id));
-        return planBFor(plan.strategy, board.players, prices, {...board.config, credits: board.config.credits + ledgerOf(board.config.ledger, board.config.me)}, taken, mine, {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, targets);
-    }, [board, plans, prices]);
+    const {pool, board, listPrices, deals, prices, market, bought, tierInfos, tiers, plans, planB} = useBoardData(rawPool, config, purchases);
     // A warning in words; a custom strategy has no translation, so it is named from the plans.
     const healthReason = useHealthReason((key) => plans.find((p) => p.key === key)?.name ?? tst(`${key}.name`));
     // The same strategies on the full list at list prices: what each was worth when the auction started.
     const baseline = useMemo(() => (board ? rankStrategies(board.players, listPrices, board.config, new Set(), [], {want: new Set(board.config.want), avoid: new Set(board.config.avoid)}, board.config.strategies) : []), [board, listPrices]);
-    const players = useMemo(() => {
-        if (!pool) return [];
-        const needle = q.trim().toLowerCase();
-        const list = pool.players.filter((p) => (role === 'all' || p.role === role) && (tier === 'all' || tiers.get(p.id) === tier) && (teamId === 'all' || p.team.id === teamId) && (!hideBought || !bought.has(p.id)) && (!needle || playerMatches(p, needle)));
-        const value = (p: AuctionPlayer): number | string => (sort === 'price' ? (prices.get(p.id) ?? 0) : sort === 'fantaAvg' ? (p.scores.fantaAvg ?? -1) : sort === 'bargain' ? (deals.has(p.id) ? (deals.get(p.id)!.bargain ? 100 : 0) + deals.get(p.id)!.index : 0) : sort === 'name' ? p.name : p.scores[sort]);
-        return list.sort((a, b) => {
-            const va = value(a);
-            const vb = value(b);
-            if (typeof va === 'string' && typeof vb === 'string') return va.localeCompare(vb);
-            return (vb as number) - (va as number) || b.scores.overall - a.scores.overall;
-        });
-    }, [pool, q, role, tier, tiers, teamId, hideBought, bought, sort, prices, deals]);
-
+    const players = useFilteredPlayers(pool, {q, role, tier, teamId, hideBought, sort}, tiers, bought, prices, deals);
     useEffect(() => {
         if (!quick) return;
         const id = window.setTimeout(() => setQuick(null), QUICK_MS);
@@ -1108,24 +927,6 @@ export function AuctionBoard({pool: rawPool}: {pool: AuctionPool | null}) {
             )}
         </div>
     );
-}
-
-/** One window listener for the board's keys; the handler is the latest render's, through a ref. */
-function Hotkeys({onKey}: {onKey: (e: KeyboardEvent) => void}) {
-    const latest = useRef(onKey);
-    useEffect(() => {
-        latest.current = onKey;
-    });
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => latest.current(e);
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, []);
-    return null;
-}
-
-function FragmentRow({children}: {children: React.ReactNode}) {
-    return <>{children}</>;
 }
 
 export type {FantaScores};
