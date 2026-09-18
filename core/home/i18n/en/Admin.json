@@ -42,6 +42,15 @@
     "requests": "Requests",
     "runs24h": "Runs 24h",
     "requests24h": "Requests 24h",
-    "counters": "Counters and warnings"
+    "counters": "Counters and warnings",
+    "siteErrors24h": "Site errors 24h",
+    "errorsTitle": "Site errors",
+    "errorsHint": "Last 40, the most recent on top",
+    "errorsEmpty": "No error recorded.",
+    "errorWhen": "When",
+    "errorSource": "From",
+    "errorHits": "Times",
+    "errorPath": "Page",
+    "errorMessage": "Error"
   }
 }

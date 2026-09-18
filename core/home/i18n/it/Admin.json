@@ -42,6 +42,15 @@
     "requests": "Richieste",
     "runs24h": "Giri 24h",
     "requests24h": "Richieste 24h",
-    "counters": "Contatori e avvisi"
+    "counters": "Contatori e avvisi",
+    "siteErrors24h": "Errori sito 24h",
+    "errorsTitle": "Errori del sito",
+    "errorsHint": "Ultimi 40, i più recenti in cima",
+    "errorsEmpty": "Nessun errore registrato.",
+    "errorWhen": "Quando",
+    "errorSource": "Da dove",
+    "errorHits": "Volte",
+    "errorPath": "Pagina",
+    "errorMessage": "Errore"
   }
 }

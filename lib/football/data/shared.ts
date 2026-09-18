@@ -1,5 +1,6 @@
 import 'server-only';
 import {createPublicClient} from '@/lib/db/server';
+import {recordError} from '@/lib/errors/record';
 import type {CompetitionSummary, FixtureState, FixtureSummary, StandingRow, StandingZone, TeamSummary} from '../types';
 import {normalizeCountryCode} from '../flags';
 
@@ -194,5 +195,8 @@ export function roundNumber(round: string | null): number | null {
 
 /** Log and swallow read errors: pages degrade to empty states, never crash. */
 export function logReadError(where: string, error: unknown) {
-    console.error(`[football/data] ${where}:`, (error as Error)?.message ?? error);
+    const message = (error as Error)?.message ?? String(error);
+    console.error(`[football/data] ${where}:`, message);
+    // Written down for the administrator's dashboard; it never waits, never throws.
+    void recordError({source: 'read', message: `${where}: ${message}`});
 }

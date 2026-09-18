@@ -34,13 +34,25 @@ interface JobRow {
     stale: boolean;
 }
 
-/** The last run of every job, with the day's tally, plus the API quota as the jobs last saw it. */
-async function loadDashboard(): Promise<{jobs: JobRow[]; quota: {dayRemaining: number | null; dayLimit: number | null; readAt: number} | null; requestsToday: number}> {
+interface ErrorRow {
+    id: number;
+    at: string;
+    source: string;
+    message: string;
+    digest: string | null;
+    path: string | null;
+    locale: string | null;
+    hits: number;
+}
+
+/** The last run of every job, with the day's tally, the API quota as the jobs last saw it, and what broke while serving pages. */
+async function loadDashboard(): Promise<{jobs: JobRow[]; quota: {dayRemaining: number | null; dayLimit: number | null; readAt: number} | null; requestsToday: number; errors: ErrorRow[]; errorsToday: number}> {
     const db = createServiceClient();
     const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
-    const [{data: recent}, {data: quotaRow}] = await Promise.all([
+    const [{data: recent}, {data: quotaRow}, {data: errorRows}] = await Promise.all([
         db.from('sync_runs').select('id,job,started_at,finished_at,status,requests_used,details').gte('started_at', since).order('started_at', {ascending: false}).limit(5000),
         db.from('sync_state').select('value').eq('key', 'api_football_quota').maybeSingle(),
+        db.from('error_log').select('id,at,source,message,digest,path,locale,hits').order('at', {ascending: false}).limit(40),
     ]);
     const runs = (recent ?? []) as unknown as Run[];
     const byJob = new Map<string, JobRow>();
@@ -57,7 +69,14 @@ async function loadDashboard(): Promise<{jobs: JobRow[]; quota: {dayRemaining: n
     const dayStart = new Date();
     dayStart.setUTCHours(0, 0, 0, 0);
     const requestsToday = runs.filter((r) => r.started_at >= dayStart.toISOString()).reduce((s, r) => s + (r.requests_used ?? 0), 0);
-    return {jobs: [...byJob.values()].sort((a, b) => a.job.localeCompare(b.job)), quota: (quotaRow?.value as {dayRemaining: number | null; dayLimit: number | null; readAt: number} | null) ?? null, requestsToday};
+    const errors = (errorRows ?? []) as unknown as ErrorRow[];
+    return {
+        jobs: [...byJob.values()].sort((a, b) => a.job.localeCompare(b.job)),
+        quota: (quotaRow?.value as {dayRemaining: number | null; dayLimit: number | null; readAt: number} | null) ?? null,
+        requestsToday,
+        errors,
+        errorsToday: errors.filter((e) => e.at >= since).reduce((s, e) => s + e.hits, 0),
+    };
 }
 
 export default async function AdminSyncPage({params}: PageProps<"/[locale]/admin/sync">) {
@@ -76,12 +95,13 @@ export default async function AdminSyncPage({params}: PageProps<"/[locale]/admin
                 <PageHeader title={t('title')} meta={t('intro')} aside={<Link href="/admin" className="bb-btn bg-card px-3 h-8 inline-flex items-center text-[12px] font-extrabold">{t('toAdmin')}</Link>} />
                 {data && (
                     <>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                             {[
                                 [t('requestsToday'), String(data.requestsToday)],
                                 [t('quotaLeft'), data.quota?.dayRemaining !== null && data.quota?.dayRemaining !== undefined ? `${data.quota.dayRemaining} / ${data.quota.dayLimit ?? '?'}` : '–'],
                                 [t('quotaRead'), data.quota ? format.dateTime(new Date(data.quota.readAt), {hour: '2-digit', minute: '2-digit'}) : '–'],
                                 [t('errors24h'), String(data.jobs.reduce((s, j) => s + j.errors24h, 0))],
+                                [t('siteErrors24h'), String(data.errorsToday)],
                             ].map(([label, value]) => (
                                 <div key={label} className="bb-surface px-3 py-2 flex flex-col">
                                     <span className="font-mono text-lg font-extrabold tabular-nums">{value}</span>
@@ -132,6 +152,36 @@ export default async function AdminSyncPage({params}: PageProps<"/[locale]/admin
                                     </tbody>
                                 </table>
                             </div>
+                        </Panel>
+                        <Panel title={t('errorsTitle')} action={<span className="text-[11px] font-semibold text-muted-foreground">{t('errorsHint')}</span>}>
+                            {data.errors.length === 0 ? (
+                                <p className="px-3 py-3 text-[13px] font-semibold text-muted-foreground">{t('errorsEmpty')}</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-[12px]">
+                                        <thead>
+                                            <tr className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground border-b border-muted">
+                                                <th className={cn(cell, "text-left")}>{t('errorWhen')}</th>
+                                                <th className={cn(cell, "text-left")}>{t('errorSource')}</th>
+                                                <th className={cn(cell, "text-right")}>{t('errorHits')}</th>
+                                                <th className={cn(cell, "text-left")}>{t('errorPath')}</th>
+                                                <th className="px-2 py-1.5 text-left">{t('errorMessage')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {data.errors.map((e) => (
+                                                <tr key={e.id} className="border-t border-muted align-top">
+                                                    <td className={cn(cell, "font-mono tabular-nums")}>{format.dateTime(new Date(e.at), {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</td>
+                                                    <td className={cell}><span className="inline-flex items-center h-5 px-1.5 rounded border-2 border-foreground/40 text-[10px] font-extrabold uppercase">{e.source}</span></td>
+                                                    <td className={cn(cell, "text-right font-mono tabular-nums", e.hits > 1 && "font-extrabold")}>{e.hits}</td>
+                                                    <td className={cn(cell, "font-mono text-[11px] text-muted-foreground")}>{e.path ?? '–'}{e.locale ? ` · ${e.locale}` : ''}</td>
+                                                    <td className="px-2 py-1.5 whitespace-normal break-words font-semibold text-red-700">{e.message}{e.digest ? <span className="ml-1 font-mono text-[10px] text-muted-foreground">#{e.digest}</span> : null}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </Panel>
                     </>
                 )}

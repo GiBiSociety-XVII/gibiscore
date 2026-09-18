@@ -19,6 +19,13 @@ export default function LocaleError({error, reset}: {error: Error & {digest?: st
         // The language is the one on <html>, written by the layout.
         const found = document.documentElement.lang;
         if (found in WORDS) queueMicrotask(() => setLang(found as keyof typeof WORDS));
+        // Told to the site, so the administrator sees it without the platform's logs.
+        void fetch('/api/errors', {
+            method: 'POST',
+            headers: {'content-type': 'application/json'},
+            body: JSON.stringify({message: error.message, digest: error.digest ?? null, path: window.location.pathname, locale: found}),
+            keepalive: true,
+        }).catch(() => undefined);
     }, [error]);
     const w = WORDS[lang];
     return (
