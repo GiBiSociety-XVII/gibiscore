@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {BetSuggestion} from './markets';
-import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaWon, stakePlan, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type SchedinaCandidate} from './schedina';
+import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaLost, schedinaWon, stakePlan, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type SchedinaCandidate} from './schedina';
 
 const slip = (tier: BetSuggestion['tier'], pct: number, odds: number | null = null): BetSuggestion => ({tier, legs: [{key: '1', pct, odds}], pct, fair: Math.round((100 / pct) * 100) / 100, odds});
 const match = (id: number, day: string, hour: string, competitionId: number, slips: BetSuggestion[]): SchedinaCandidate => ({fixtureId: id, competitionId, competition: `L${competitionId}`, home: `H${id}`, away: `A${id}`, startingAt: `${day}T${hour}:00Z`, day, slips});
@@ -159,5 +159,20 @@ describe('ticketPlan', () => {
     });
     it('never stakes below zero', () => {
         expect(ticketPlan({pct: 50, fair: 2, book: 2}, -5).stake).toBe(0);
+    });
+});
+
+describe('schedinaLost', () => {
+    it('kills an accumulator with the first lost selection, and waits otherwise', () => {
+        expect(schedinaLost('multiple', [true, false, null, null], null)).toBe(true);
+        expect(schedinaLost('multiple', [true, null, null], null)).toBe(false);
+        expect(schedinaLost('single', [null], null)).toBe(false);
+    });
+    it('kills a system with a lost banker or too few free selections left', () => {
+        expect(schedinaLost('system', [false, null, null, null], 2, [true, false, false, false])).toBe(true);
+        expect(schedinaLost('system', [true, false, false, null], 2, [true, false, false, false])).toBe(true);
+        expect(schedinaLost('system', [true, false, null, null], 2, [true, false, false, false])).toBe(false);
+        expect(schedinaLost('system', [false, false, null], 1, undefined)).toBe(false);
+        expect(schedinaLost('system', [false, false, false], 1, undefined)).toBe(true);
     });
 });

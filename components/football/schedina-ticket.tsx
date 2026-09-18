@@ -43,6 +43,8 @@ export interface Ticket {
     createdAt: string;
     hits: number | null;
     hit: boolean | null;
+    /** Per selection: won, lost, or null while its match is not over. */
+    results: Array<boolean | null> | null;
 }
 
 /** The pick of a leg in words, from the markets' labels. */
@@ -97,8 +99,10 @@ export function SchedinaTicket({ticket}: {ticket: Ticket}) {
                 <span className="ml-auto font-mono text-[10px] font-bold text-muted-foreground">{ts('selections', {count: ticket.size})}</span>
             </div>
             <ul className="flex flex-col divide-y divide-dashed divide-foreground/25">
-                {ticket.selections.map((s) => (
-                    <li key={s.fixtureId} className="px-3 py-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+                {ticket.selections.map((s, i) => {
+                    const result = ticket.results?.[i] ?? null;
+                    return (
+                    <li key={s.fixtureId} className={cn("px-3 py-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2", result === false && "bg-red-50/60", result === true && "bg-emerald-50/60")}>
                         <span className="w-11 flex flex-col leading-tight font-mono text-[10px] font-bold tabular-nums text-muted-foreground">
                             <span className="uppercase">{format.dateTime(new Date(s.startingAt), {weekday: 'short', day: 'numeric'})}</span>
                             <span>{format.dateTime(new Date(s.startingAt), {hour: '2-digit', minute: '2-digit'})}</span>
@@ -114,8 +118,12 @@ export function SchedinaTicket({ticket}: {ticket: Ticket}) {
                             <span className="block text-[13px] font-extrabold whitespace-nowrap">{s.legs.map((l) => legLabel(l.key)).join(' + ')}</span>
                             <span className="block font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{s.pct}%</span>
                         </span>
+                        <span aria-label={result === true ? t('won') : result === false ? t('lost') : t('open')} className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full border-2 font-mono text-[11px] font-black leading-none", result === true ? "border-emerald-700 text-emerald-700" : result === false ? "border-red-700 text-red-700" : "border-foreground/25 text-foreground/30")}>
+                            {result === true ? '✓' : result === false ? '✗' : '·'}
+                        </span>
                     </li>
-                ))}
+                    );
+                })}
             </ul>
             {/* The tear line. */}
             <div className="relative h-5 shrink-0" aria-hidden="true">

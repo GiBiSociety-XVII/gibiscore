@@ -162,6 +162,23 @@ export function schedinaWon(kind: SchedinaKind, hits: boolean[], of: number | nu
     return free.filter(Boolean).length >= Math.max(1, Math.min(free.length, of ?? free.length));
 }
 
+/**
+ * Whether a slip is already lost with some matches still to play:
+ * `results` per selection, true won, false lost, null not yet decided.
+ * A single or an accumulator dies with its first lost selection; a
+ * system with a lost banker, or when the free selections that can still
+ * win are fewer than the k it needs.
+ */
+export function schedinaLost(kind: SchedinaKind, results: Array<boolean | null>, of: number | null | undefined, bankers?: boolean[]): boolean {
+    if (results.length === 0) return false;
+    if (kind !== 'system') return results.some((r) => r === false);
+    const isBanker = (i: number) => bankers?.[i] === true;
+    if (results.some((r, i) => isBanker(i) && r === false)) return true;
+    const free = results.filter((_, i) => !isBanker(i));
+    const stillPossible = free.filter((r) => r !== false).length;
+    return stillPossible < Math.max(1, Math.min(free.length, of ?? free.length));
+}
+
 /** One column of a system: which selections (indices), its chance and its price (the bookmakers' when every selection has one, else the fair). */
 export interface SchedinaColumn {
     indices: number[];

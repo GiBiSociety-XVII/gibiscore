@@ -23,6 +23,7 @@ interface Row {
     created_at: string;
     hits: number | null;
     hit: boolean | null;
+    results: Array<boolean | null> | null;
 }
 
 const num = (v: number | string | null): number | null => (v === null ? null : Number(v));
@@ -47,7 +48,7 @@ export function MySchedine({title}: {title?: string} = {}) {
         supabase.auth.getUser().then(({data}) => {
             if (!alive) return;
             if (!data.user) { setRows(null); return; }
-            Promise.resolve(supabase.from('schedine').select('id,kind,risk,size,system_of,selections,pct,fair,book,stake,payout,lines,last_kickoff,created_at,hits,hit').order('created_at', {ascending: false}).limit(50))
+            Promise.resolve(supabase.from('schedine').select('id,kind,risk,size,system_of,selections,pct,fair,book,stake,payout,lines,last_kickoff,created_at,hits,hit,results').order('created_at', {ascending: false}).limit(50))
                 .then(({data: list}) => { if (alive) setRows((list ?? []) as unknown as Row[]); })
                 .catch(() => { if (alive) setRows([]); });
         }).catch(() => { if (alive) setRows(null); });
@@ -73,6 +74,7 @@ export function MySchedine({title}: {title?: string} = {}) {
         createdAt: r.created_at,
         hits: r.hits,
         hit: r.hit,
+        results: r.results,
     }));
     // The guide of the record page points at the whole panel (skipped while it is not on the page).
     return (
