@@ -40,7 +40,9 @@
     "var": "VAR",
     "assist": "assist {name}",
     "subIn": "entra {name}",
-    "subOut": "esce {name}"
+    "subOut": "esce {name}",
+    "penaltyShort": "rig.",
+    "ownGoalShort": "aut."
   },
   "stats": {
     "possession": "Possesso palla",

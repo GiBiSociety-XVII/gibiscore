@@ -1,44 +1,39 @@
 'use client';
 
-import {useEffect, useState} from "react";
+import {useCallback, useMemo, useRef} from "react";
 import {useTranslations} from "next-intl";
 import {useRouter} from "@/i18n/navigation";
 import type {ScoresPage} from "@/lib/football/data/scores";
+import {liveOf, type LiveFixture} from "@/lib/football/live";
 import {LIVE_STATES, type FixtureState, type FixtureSummary} from "@/lib/football/types";
 import {useFavoriteTeams, useFavorites} from "@/lib/favorites";
+import {useLiveFixtures} from "./use-live";
 import {CompetitionBlock} from "./competition-block";
 import {ScoreFilters, type ScoreFilter} from "./score-filters";
 
-/** How often the page asks for the live state of its rows, while visible. */
-const POLL_LIVE_MS = 15_000;
-const POLL_DAY_MS = 20_000;
-/** A poll that failed (network, a 503) is tried again this soon, once: coming back to the tab must not wait a whole period. */
-const RETRY_MS = 4_000;
-
-interface Update {
-    id: number;
-    state: string;
-    minute: number | null;
-    extraMinute: number | null;
-    syncedAt: string | null;
-    homeScore: number | null;
-    awayScore: number | null;
-}
+/** How often the page asks the server for the state of its rows, while it is in front. */
+const POLL_LIVE_MS = 10_000;
+const POLL_DAY_MS = 15_000;
+/** The whole page is rendered again no more often than this, and only when the list itself must change. */
+const RENDER_AGAIN_MS = 30_000;
 
 const isLive = (state: string) => (LIVE_STATES as readonly string[]).includes(state);
 
-function apply(f: FixtureSummary, u: Update | undefined): FixtureSummary {
-    if (!u) return f;
-    if (u.state === f.state && u.minute === f.minute && u.extraMinute === (f.extraMinute ?? null) && u.homeScore === f.homeScore && u.awayScore === f.awayScore && u.syncedAt === (f.syncedAt ?? null)) return f;
-    return {...f, state: u.state as FixtureState, minute: u.minute, extraMinute: u.extraMinute, syncedAt: u.syncedAt, homeScore: u.homeScore, awayScore: u.awayScore};
+/** Every row of the page, in no particular order. */
+function allFixtures(page: ScoresPage): FixtureSummary[] {
+    return [...page.pinned, ...page.countries.flatMap((c) => c.competitions)].flatMap((g) => g.fixtures);
 }
 
 /**
- * The scores list, kept moving: the server renders the day (or the
- * matches in play), the client then polls a light endpoint for the state,
- * minute and score of every row and patches them in place, without a
- * page reload. In live mode a match that starts or ends changes the list
- * itself: the page is refreshed from the server then.
+ * The scores list, kept moving.
+ *
+ * The server renders the day (or the matches in play); the browser then
+ * asks a small endpoint every few seconds for the state, minute and
+ * score of the same rows and lays over whatever is later than what it
+ * is showing (components/football/use-live.ts). Nothing on a row ever
+ * goes backwards, so the page is never fetched again just to move a
+ * score: that only happens when the list itself must change — a match
+ * kicks off, one comes off the live page — and at most twice a minute.
  */
 export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: ScoresPage; labels: Record<ScoreFilter, string>; emptyText: string; favoritesLabel: string}) {
     const t = useTranslations('Pages.scores');
@@ -46,78 +41,42 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
     const {favorites: favoriteCompetitions} = useFavorites();
     const {favorites: favoriteTeamSlugs} = useFavoriteTeams();
     const favoriteTeams = new Set(favoriteTeamSlugs);
-    // The patches of the polls, tied to the page they were fetched for: a page rendered again by the
-    // server (a refresh on coming back to the tab, say) is newer than any patch kept from before, so
-    // patches from an earlier page are dropped rather than laid over the fresh rows.
-    const [polled, setPolled] = useState<{page: ScoresPage; updates: Map<number, Update>}>(() => ({page, updates: new Map()}));
-    const updates = polled.page === page ? polled.updates : new Map<number, Update>();
     const live = page.mode === 'live';
     // Only while something can still change: a live list, or today with matches open or in play.
     const active = live || (page.date === page.today && (page.total === 0 || page.liveCount + page.scheduledCount > 0));
 
-    useEffect(() => {
-        if (!active) return;
-        let stopped = false;
-        let refreshing = false;
-        let retry: number | null = null;
-        const again = () => {
-            if (stopped || retry !== null) return;
-            retry = window.setTimeout(() => {
-                retry = null;
-                void tick();
-            }, RETRY_MS);
-        };
-        const known = new Set([...page.pinned, ...page.countries.flatMap((c) => c.competitions)].flatMap((g) => g.fixtures.map((f) => f.id)));
-        const wasLive = new Set([...page.pinned, ...page.countries.flatMap((c) => c.competitions)].flatMap((g) => g.fixtures.filter((f) => isLive(f.state)).map((f) => f.id)));
-        const tick = async () => {
-            if (stopped || document.visibilityState !== 'visible') return;
-            try {
-                const url = live ? '/api/scores?mode=live' : `/api/scores?date=${page.date}`;
-                const res = await fetch(url, {cache: 'no-store'});
-                if (!res.ok) {
-                    again();
-                    return;
-                }
-                const body = (await res.json()) as {fixtures: Update[]};
-                if (stopped) return;
-                const next = new Map<number, Update>();
-                for (const u of body.fixtures) next.set(u.id, u);
-                setPolled({page, updates: next});
-                // The server page came out empty (a database hiccup at render) while the day has matches: refresh it.
-                if (!live && known.size === 0 && body.fixtures.length > 0 && !refreshing) {
-                    refreshing = true;
-                    router.refresh();
-                    return;
-                }
-                // Live mode: the list itself changed (a match kicked off, one ended): the server knows the rows.
-                if (live && !refreshing) {
-                    const nowLive = body.fixtures.filter((u) => isLive(u.state)).map((u) => u.id);
-                    const changed = nowLive.some((id) => !known.has(id)) || [...wasLive].some((id) => !nowLive.includes(id));
-                    if (changed) {
-                        refreshing = true;
-                        router.refresh();
-                    }
-                }
-            } catch {
-                // Network hiccup: tried again shortly, then on the next tick.
-                again();
-            }
-        };
-        const id = window.setInterval(tick, live ? POLL_LIVE_MS : POLL_DAY_MS);
-        const onVisible = () => {
-            if (document.visibilityState === 'visible') void tick();
-        };
-        document.addEventListener('visibilitychange', onVisible);
-        void tick();
-        return () => {
-            stopped = true;
-            window.clearInterval(id);
-            if (retry !== null) window.clearTimeout(retry);
-            document.removeEventListener('visibilitychange', onVisible);
-        };
-    }, [active, live, page, router]);
+    const seed = useMemo(() => allFixtures(page).map(liveOf), [page]);
+    const renderedAt = useRef(0);
 
-    const patch = (fixtures: FixtureSummary[]) => fixtures.map((f) => apply(f, updates.get(f.id)));
+    /**
+     * What the merge cannot carry: a row that is not on the page at all.
+     * A match kicks off and belongs on the live page; one ends and comes
+     * off it; the day came out empty because a read failed. Only then is
+     * the page rendered again, and never twice within half a minute.
+     */
+    const onAnswer = useCallback(
+        (fixtures: LiveFixture[]) => {
+            const known = new Set(seed.map((f) => f.id));
+            const missing = fixtures.some((f) => isLive(f.state) && !known.has(f.id));
+            const settled = live && seed.some((f) => isLive(f.state) && fixtures.some((u) => u.id === f.id && !isLive(u.state)));
+            const emptied = !live && known.size === 0 && fixtures.length > 0;
+            if (!missing && !settled && !emptied) return;
+            const now = Date.now();
+            if (now - renderedAt.current < RENDER_AGAIN_MS) return;
+            renderedAt.current = now;
+            router.refresh();
+        },
+        [live, router, seed],
+    );
+
+    const over = useLiveFixtures({url: active ? (live ? '/api/scores?mode=live' : `/api/scores?date=${page.date}`) : null, seed, everyMs: live ? POLL_LIVE_MS : POLL_DAY_MS, onAnswer});
+
+    const patch = (fixtures: FixtureSummary[]) =>
+        fixtures.map((f) => {
+            const u = over.get(f.id);
+            return u ? {...f, state: u.state as FixtureState, minute: u.minute, extraMinute: u.extraMinute, syncedAt: u.syncedAt, homeScore: u.homeScore, awayScore: u.awayScore} : f;
+        });
+
     // The starred competitions come first, in a group of their own, in the order they were starred.
     const isFavorite = (slug: string) => favoriteCompetitions.includes(slug);
     const everyGroup = [...page.pinned, ...page.countries.flatMap((c) => c.competitions)];

@@ -1,10 +1,8 @@
 import type {Metadata} from "next";
 import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
-import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";
-import {AutoRefresh} from "@/components/football/auto-refresh";
-import {EventsTimeline} from "@/components/football/events-timeline";
+import {LiveScoreline, LiveScorers, LiveTimeline, MatchLive} from "@/components/football/match-live";
 import {Flag} from "@/components/football/flag";
 import {FormStrip} from "@/components/football/form-strip";
 import {Lineups} from "@/components/football/lineups";
@@ -21,7 +19,6 @@ import {getPriorStudy, getSeasonStudy} from "@/lib/football/data/study";
 import {NotFoundBox} from "@/components/football/page-header";
 import {PlayerMatchTable} from "@/components/football/player-match-table";
 import {HeadToHeadPanel, StandingsPanel} from "@/components/football/rail";
-import {StatusBadge} from "@/components/football/status-badge";
 import {Tabs} from "@/components/football/tabs";
 import {TourLauncher} from "@/components/football/tour-launcher";
 import {TeamCrest} from "@/components/football/team-crest";
@@ -99,28 +96,10 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
         description: t('metaDescription', {home: fixture.home.name, away: fixture.away.name, competition: fixture.competition.name}),
     };
     const hasAbsences = page.absences.home.length > 0 || page.absences.away.length > 0;
-    const hasScore = fixture.homeScore !== null && fixture.awayScore !== null && fixture.state !== 'scheduled';
     const isLive = LIVE_STATES.includes(fixture.state);
     const start = new Date(fixture.startingAt);
     const teamIds = [fixture.home.id, fixture.away.id];
 
-    // Goal lines under the scoreboard: "Lautaro 23', 67' (rig.)".
-    const goalEvents = page.events.filter((e) => e.type === 'goal' || e.type === 'penalty' || e.type === 'own_goal');
-    const scorersOf = (side: 'home' | 'away') => {
-        const map = new Map<string, {name: string; slug: string | null; minutes: string[]}>();
-        for (const e of goalEvents) {
-            // An own goal counts for the other side.
-            const creditedSide = e.type === 'own_goal' ? (e.side === 'home' ? 'away' : 'home') : e.side;
-            if (creditedSide !== side) continue;
-            const name = e.player.name ?? '?';
-            const key = e.player.id ? String(e.player.id) : name;
-            if (!map.has(key)) map.set(key, {name, slug: e.player.slug, minutes: []});
-            map.get(key)!.minutes.push(`${e.minute ?? ''}${e.extraMinute ? `+${e.extraMinute}` : ''}'${e.type === 'penalty' ? ' rig.' : e.type === 'own_goal' ? ' aut.' : ''}`);
-        }
-        return [...map.values()];
-    };
-    const homeScorers = scorersOf('home');
-    const awayScorers = scorersOf('away');
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'SportsEvent',
@@ -201,99 +180,81 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
         </>
     );
 
+    // The half of the page that moves while the ball rolls, read from the server every few seconds.
+    const live = {
+        at: new Date().toISOString(),
+        fixture: {id: fixture.id, state: fixture.state, minute: fixture.minute, extraMinute: fixture.extraMinute ?? null, syncedAt: fixture.syncedAt ?? null, homeScore: fixture.homeScore, awayScore: fixture.awayScore, homeScoreHt: fixture.homeScoreHt, awayScoreHt: fixture.awayScoreHt},
+        events: page.events,
+    };
+
     return (
-        <SiteShell rail={rail}>
-            <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
-            <JsonLd data={structured} />
-            <AutoRefresh seconds={20} enabled={isLive} aroundIso={fixture.state === 'scheduled' ? fixture.startingAt : undefined} />
-            {/* Scoreboard */}
-            <section data-tour="score" className="bb-surface overflow-hidden">
-                <div className="flex items-center gap-2 px-3 h-8 border-b-2 border-foreground bg-muted/60 text-[12px] font-extrabold">
-                    <Flag code={fixture.competition.countryCode} logoUrl={fixture.competition.logoUrl} size={14} />
-                    <Link href={`/competitions/${fixture.competition.slug}`} className="hover:underline decoration-accent decoration-[3px] underline-offset-2 truncate">
-                        {fixture.competition.country ? `${fixture.competition.country} · ` : ''}{fixture.competition.name}
-                    </Link>
-                    {fixture.round && <span className="text-muted-foreground truncate">· {roundLabel(fixture.round)}</span>}
-                    <span className="ml-auto flex items-center gap-2">
-                        {fixture.state !== 'finished' && <MuteBell fixtureId={fixture.id} />}
-                        <span className="text-muted-foreground whitespace-nowrap">{format.dateTime(start, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}</span>
-                    </span>
-                </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-4">
-                    <Link href={`/teams/${fixture.home.slug}`} className="flex flex-col items-center gap-2 min-w-0 group">
-                        <TeamCrest team={fixture.home} size={52} />
-                        <span className="text-[13px] md:text-base font-extrabold text-center leading-tight group-hover:underline decoration-accent decoration-[3px] underline-offset-2">{fixture.home.name}</span>
-                    </Link>
-                    <div className="flex flex-col items-center gap-1 px-2">
-                        <span className={cn("font-mono text-[40px] md:text-5xl font-bold tracking-tight tabular-nums leading-none px-2 rounded-lg", isLive && "bg-accent")}>
-                            {hasScore ? `${fixture.homeScore}-${fixture.awayScore}` : <span className="text-muted-foreground text-3xl">{format.dateTime(start, {hour: '2-digit', minute: '2-digit'})}</span>}
+        <MatchLive seed={live} startingAt={fixture.startingAt}>
+            <SiteShell rail={rail}>
+                <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(jsonLd)}} />
+                <JsonLd data={structured} />
+                {/* Scoreboard */}
+                <section data-tour="score" className="bb-surface overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 h-8 border-b-2 border-foreground bg-muted/60 text-[12px] font-extrabold">
+                        <Flag code={fixture.competition.countryCode} logoUrl={fixture.competition.logoUrl} size={14} />
+                        <Link href={`/competitions/${fixture.competition.slug}`} className="hover:underline decoration-accent decoration-[3px] underline-offset-2 truncate">
+                            {fixture.competition.country ? `${fixture.competition.country} · ` : ''}{fixture.competition.name}
+                        </Link>
+                        {fixture.round && <span className="text-muted-foreground truncate">· {roundLabel(fixture.round)}</span>}
+                        <span className="ml-auto flex items-center gap-2">
+                            {fixture.state !== 'finished' && <MuteBell fixtureId={fixture.id} />}
+                            <span className="text-muted-foreground whitespace-nowrap">{format.dateTime(start, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}</span>
                         </span>
-                        <StatusBadge fixture={fixture} />
-                        {fixture.homeScoreHt !== null && fixture.awayScoreHt !== null && (
-                            <span className="text-[11px] font-bold text-muted-foreground">{tFootball('labels.halfTimeScore', {home: fixture.homeScoreHt, away: fixture.awayScoreHt})}</span>
-                        )}
                     </div>
-                    <Link href={`/teams/${fixture.away.slug}`} className="flex flex-col items-center gap-2 min-w-0 group">
-                        <TeamCrest team={fixture.away} size={52} />
-                        <span className="text-[13px] md:text-base font-extrabold text-center leading-tight group-hover:underline decoration-accent decoration-[3px] underline-offset-2">{fixture.away.name}</span>
-                    </Link>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-4">
+                        <Link href={`/teams/${fixture.home.slug}`} className="flex flex-col items-center gap-2 min-w-0 group">
+                            <TeamCrest team={fixture.home} size={52} />
+                            <span className="text-[13px] md:text-base font-extrabold text-center leading-tight group-hover:underline decoration-accent decoration-[3px] underline-offset-2">{fixture.home.name}</span>
+                        </Link>
+                        <LiveScoreline />
+                        <Link href={`/teams/${fixture.away.slug}`} className="flex flex-col items-center gap-2 min-w-0 group">
+                            <TeamCrest team={fixture.away} size={52} />
+                            <span className="text-[13px] md:text-base font-extrabold text-center leading-tight group-hover:underline decoration-accent decoration-[3px] underline-offset-2">{fixture.away.name}</span>
+                        </Link>
+                    </div>
+                    <LiveScorers />
+                    {(page.form.home.length > 0 || page.form.away.length > 0 || page.bestPlayer) && (
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 px-3 pb-2.5 -mt-1">
+                            <span className="flex justify-center"><FormStrip entries={page.form.home} /></span>
+                            <span className="flex justify-center md:order-3"><FormStrip entries={page.form.away} /></span>
+                            {page.bestPlayer && (
+                                <span className="col-span-2 md:col-span-1 md:order-2 text-[11px] font-bold text-muted-foreground text-center leading-snug min-w-0">
+                                    <Link href={`/players/${page.bestPlayer.player.slug}`} className="inline-flex flex-wrap items-center justify-center gap-x-1 hover:underline decoration-accent decoration-[2px] underline-offset-2">
+                                        <span className="whitespace-nowrap">{t('bestPlayer')}:</span>
+                                        <span className="text-foreground">{page.bestPlayer.player.name}</span>
+                                        <span className="font-mono bg-accent px-1 rounded text-foreground">{shownVoto(page.bestPlayer.rating, page.bestPlayer.minutes, page.bestPlayer.position, scale)?.toFixed(1) ?? ''}</span>
+                                    </Link>
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </section>
+
+                {/* What happened comes first: the timeline sits above the tabs as soon as there is one. */}
+                <LiveTimeline title={t('tabs.summary')} />
+
+                <div className="flex justify-end -mb-1">
+                    <TourLauncher storageKey="gibiscore:match-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: key, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} />
                 </div>
-                {(homeScorers.length > 0 || awayScorers.length > 0) && (
-                    <div className="grid grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] gap-2 px-3 pb-2 -mt-1 text-[11px] font-semibold text-muted-foreground">
-                        <ul className="flex flex-col items-end text-right">
-                            {homeScorers.map((s) => (
-                                <li key={s.name} className="truncate max-w-full">
-                                    {s.slug ? <Link href={`/players/${s.slug}`} className="text-foreground hover:underline decoration-accent decoration-2 underline-offset-2">{s.name}</Link> : <span className="text-foreground">{s.name}</span>} <span className="font-mono">{s.minutes.join(', ')}</span>
-                                </li>
-                            ))}
-                        </ul>
-                        <span className="text-center" aria-hidden="true">⚽︎</span>
-                        <ul className="flex flex-col items-start">
-                            {awayScorers.map((s) => (
-                                <li key={s.name} className="truncate max-w-full">
-                                    <span className="font-mono">{s.minutes.join(', ')}</span> {s.slug ? <Link href={`/players/${s.slug}`} className="text-foreground hover:underline decoration-accent decoration-2 underline-offset-2">{s.name}</Link> : <span className="text-foreground">{s.name}</span>}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-                {(page.form.home.length > 0 || page.form.away.length > 0 || page.bestPlayer) && (
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 px-3 pb-2.5 -mt-1">
-                        <span className="flex justify-center"><FormStrip entries={page.form.home} /></span>
-                        <span className="flex justify-center md:order-3"><FormStrip entries={page.form.away} /></span>
-                        {page.bestPlayer && (
-                            <span className="col-span-2 md:col-span-1 md:order-2 text-[11px] font-bold text-muted-foreground text-center leading-snug min-w-0">
-                                <Link href={`/players/${page.bestPlayer.player.slug}`} className="inline-flex flex-wrap items-center justify-center gap-x-1 hover:underline decoration-accent decoration-[2px] underline-offset-2">
-                                    <span className="whitespace-nowrap">{t('bestPlayer')}:</span>
-                                    <span className="text-foreground">{page.bestPlayer.player.name}</span>
-                                    <span className="font-mono bg-accent px-1 rounded text-foreground">{shownVoto(page.bestPlayer.rating, page.bestPlayer.minutes, page.bestPlayer.position, scale)?.toFixed(1) ?? ''}</span>
-                                </Link>
-                            </span>
-                        )}
-                    </div>
-                )}
-            </section>
 
-            {/* What happened comes first: the timeline sits above the tabs as soon as there is one. */}
-            {page.events.length > 0 && <div data-tour="timeline"><EventsTimeline events={page.events} title={t('tabs.summary')} /></div>}
-
-            <div className="flex justify-end -mb-1">
-                <TourLauncher storageKey="gibiscore:match-tour:v1" label={t('tour.button')} hint={t('tour.open')} steps={TOUR_STEPS.map((key) => ({target: key, title: t(`tour.steps.${key}.title`), text: t(`tour.steps.${key}.text`)}))} />
-            </div>
-
-            {/* Before kick-off the page opens on the pre-match reading; once the ball rolls, on what happened. */}
-            <Tabs
-                tourId="tabs"
-                defaultId={fixture.state === 'scheduled' ? 'markets' : 'summary'}
-                items={[
-                    ...(fixture.state === 'scheduled' ? [marketsTab] : []),
-                    {id: 'summary', label: t('tabs.summary'), content: summaryTab, count: page.events.length},
-                    {id: 'lineups', label: t('tabs.lineups'), content: <Lineups home={page.lineups.home} away={page.lineups.away} title={t('tabs.lineups')} scale={scale} />},
-                    {id: 'stats', label: t('tabs.stats'), content: <TeamStats home={page.stats.home} away={page.stats.away} title={t('tabs.stats')} />},
-                    {id: 'players', label: t('tabs.players'), content: <PlayerMatchTable home={page.players.home} away={page.players.away} homeTeam={fixture.home} awayTeam={fixture.away} title={t('players')} scale={scale} />},
-                    ...(fixture.state === 'scheduled' ? [] : [marketsTab]),
-                ]}
-            />
-        </SiteShell>
+                {/* Before kick-off the page opens on the pre-match reading; once the ball rolls, on what happened. */}
+                <Tabs
+                    tourId="tabs"
+                    defaultId={fixture.state === 'scheduled' ? 'markets' : 'summary'}
+                    items={[
+                        ...(fixture.state === 'scheduled' ? [marketsTab] : []),
+                        {id: 'summary', label: t('tabs.summary'), content: summaryTab, count: page.events.length},
+                        {id: 'lineups', label: t('tabs.lineups'), content: <Lineups home={page.lineups.home} away={page.lineups.away} title={t('tabs.lineups')} scale={scale} />},
+                        {id: 'stats', label: t('tabs.stats'), content: <TeamStats home={page.stats.home} away={page.stats.away} title={t('tabs.stats')} />},
+                        {id: 'players', label: t('tabs.players'), content: <PlayerMatchTable home={page.players.home} away={page.players.away} homeTeam={fixture.home} awayTeam={fixture.away} title={t('players')} scale={scale} />},
+                        ...(fixture.state === 'scheduled' ? [] : [marketsTab]),
+                    ]}
+                />
+            </SiteShell>
+        </MatchLive>
     );
 }

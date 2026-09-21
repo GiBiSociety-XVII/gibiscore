@@ -2,7 +2,7 @@ import {cachedSeasonStandings} from './competitions';
 import 'server-only';
 import {VOTE_MINUTES} from '@/lib/fantasy/voto';
 import {withRetry} from '@/lib/db/retry';
-import type {EventKind, LineupPlayer, MatchEvent, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
+import type {EventKind, LineupPlayer, MatchEvent, MatchLive, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
 import type {FormEntry, StandingGroup} from '../types';
 import {loadTeamSidelined} from './sidelined';
 import {FIXTURE_LIST_SELECT, FIXTURE_SELECT, LEAGUE_SELECT, TEAM_SELECT, footballDb, logReadError, toCompetition, toFixture, toFixtures, toTeam, toStandingRow, type FixtureRow, type LeagueRow, type StandingQueryRow, type TeamRow} from './shared';
@@ -19,6 +19,78 @@ interface EventRow {
     related_player_name: string | null;
     player: {id: number; name: string; slug: string} | null;
     related: {id: number; name: string; slug: string} | null;
+}
+
+/** What the match page and the live endpoint both read out of fixture_events. */
+const EVENT_SELECT =
+    'events:fixture_events(id,team_id,type,minute,extra_minute,info,sort_order,player_name,related_player_name,' +
+    'player:players!fixture_events_player_id_fkey(id,name,slug),related:players!fixture_events_related_player_id_fkey(id,name,slug))';
+
+/** The rows of a match in the order they happened, with the goals the video review took back left out. */
+export function toMatchEvents(rows: EventRow[] | null | undefined, homeId: number, awayId: number): MatchEvent[] {
+    const side = (teamId: number | null): 'home' | 'away' | null => (teamId === homeId ? 'home' : teamId === awayId ? 'away' : null);
+    // A goal the VAR took back: the provider usually replaces it, but when both are listed the goal is dropped.
+    const disallowed = (rows ?? []).filter((e) => e.type === 'var' && /goal/i.test(e.info ?? '') && /(disallow|cancel|annul)/i.test(e.info ?? ''));
+    const cancelled = (e: EventRow) => (e.type === 'goal' || e.type === 'penalty' || e.type === 'own_goal') && disallowed.some((v) => v.team_id === e.team_id && Math.abs((v.minute ?? -99) - (e.minute ?? 99)) <= 1 && (!v.player_name || !e.player_name || v.player_name === e.player_name));
+    return [...(rows ?? [])]
+        .filter((e) => !cancelled(e))
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.minute ?? 0) - (b.minute ?? 0))
+        .map((e) => ({
+            id: e.id,
+            teamId: e.team_id,
+            side: side(e.team_id),
+            type: e.type,
+            minute: e.minute,
+            extraMinute: e.extra_minute,
+            player: {id: e.player?.id ?? null, name: e.player?.name ?? e.player_name, slug: e.player?.slug ?? null},
+            related: {id: e.related?.id ?? null, name: e.related?.name ?? e.related_player_name, slug: e.related?.slug ?? null},
+            info: e.info,
+        }));
+}
+
+/**
+ * The half of a match that moves while it is on: state, minute, score
+ * and what has happened. Read by /api/matches/[id]/live every few
+ * seconds, so it stays a single row and its events, nothing else.
+ */
+export async function getMatchLive(id: number): Promise<MatchLive | null> {
+    const db = footballDb();
+    const {data, error} = await db
+        .from('fixtures')
+        .select(`id,state,minute,extra_minute,last_synced_at,home_score,away_score,home_score_ht,away_score_ht,home_team_id,away_team_id,${EVENT_SELECT}`)
+        .eq('id', id)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as {
+        id: number;
+        state: string;
+        minute: number | null;
+        extra_minute: number | null;
+        last_synced_at: string | null;
+        home_score: number | null;
+        away_score: number | null;
+        home_score_ht: number | null;
+        away_score_ht: number | null;
+        home_team_id: number;
+        away_team_id: number;
+        events: EventRow[];
+    };
+    return {
+        at: new Date().toISOString(),
+        fixture: {
+            id: row.id,
+            state: row.state,
+            minute: row.minute,
+            extraMinute: row.extra_minute,
+            syncedAt: row.last_synced_at,
+            homeScore: row.home_score,
+            awayScore: row.away_score,
+            homeScoreHt: row.home_score_ht,
+            awayScoreHt: row.away_score_ht,
+        },
+        events: toMatchEvents(row.events, row.home_team_id, row.away_team_id),
+    };
 }
 
 interface LineupRow {
@@ -85,9 +157,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
             const {data, error} = await db
             .from('fixtures')
             .select(
-                `${FIXTURE_SELECT},season_id,venue_name,referee,home_score_ht,away_score_ht,` +
-                    'events:fixture_events(id,team_id,type,minute,extra_minute,info,sort_order,player_name,related_player_name,' +
-                    'player:players!fixture_events_player_id_fkey(id,name,slug),related:players!fixture_events_related_player_id_fkey(id,name,slug)),' +
+                `${FIXTURE_SELECT},season_id,venue_name,referee,home_score_ht,away_score_ht,${EVENT_SELECT},` +
                     'lineups(team_id,is_starter,is_expected,formation,formation_position,jersey_number,player:players(id,name,slug,position)),' +
                     'team_stats:fixture_team_stats(team_id,possession,shots_total,shots_on_target,corners,fouls,yellow_cards,red_cards,passes_total,pass_accuracy,xg),' +
                     'player_stats:fixture_player_stats(team_id,minutes_played,rating,goals,assists,shots_total,shots_on_target,key_passes,yellow_cards,red_cards,stat_position:stats->>position,' +
@@ -118,27 +188,7 @@ export async function getMatchPage(id: number): Promise<MatchPage | null> {
         if (!base || !row.league || !row.home || !row.away) return null;
         const homeId = row.home.id;
         const awayId = row.away.id;
-        const side = (teamId: number | null): 'home' | 'away' | null => (teamId === homeId ? 'home' : teamId === awayId ? 'away' : null);
-
-        // A goal the VAR took back: the provider usually replaces it, but when both are listed the goal is dropped.
-        const disallowed = (row.events ?? []).filter((e) => e.type === 'var' && /goal/i.test(e.info ?? '') && /(disallow|cancel|annul)/i.test(e.info ?? ''));
-        const cancelled = (e: EventRow) => (e.type === 'goal' || e.type === 'penalty' || e.type === 'own_goal') && disallowed.some((v) => v.team_id === e.team_id && Math.abs((v.minute ?? -99) - (e.minute ?? 99)) <= 1 && (!v.player_name || !e.player_name || v.player_name === e.player_name));
-        const events: MatchEvent[] = [...(row.events ?? [])]
-            .filter((e) => !cancelled(e))
-            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.minute ?? 0) - (b.minute ?? 0))
-            .map((e) => {
-                return {
-                    id: e.id,
-                    teamId: e.team_id,
-                    side: side(e.team_id),
-                    type: e.type,
-                    minute: e.minute,
-                    extraMinute: e.extra_minute,
-                    player: {id: e.player?.id ?? null, name: e.player?.name ?? e.player_name, slug: e.player?.slug ?? null},
-                    related: {id: e.related?.id ?? null, name: e.related?.name ?? e.related_player_name, slug: e.related?.slug ?? null},
-                    info: e.info,
-                };
-            });
+        const events = toMatchEvents(row.events, homeId, awayId);
 
         const ratingOf = new Map<number, number | null>();
         const playerLines = (teamId: number): PlayerMatchLine[] =>
