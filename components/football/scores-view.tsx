@@ -3,7 +3,6 @@ import {getFormatter, getTranslations} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {shiftDay, type ScoresPage} from "@/lib/football/data/scores";
-import {AutoRefresh} from "./auto-refresh";
 import {DatePicker} from "./date-picker";
 import {LiveScores} from "./live-scores";
 
@@ -69,11 +68,10 @@ export async function ScoresView({page}: {page: ScoresPage}) {
     const t = await getTranslations('Pages.scores');
     const isLive = page.mode === 'live';
     const labels = {all: t('filters.all'), live: t('filters.live'), finished: t('filters.finished'), scheduled: t('filters.scheduled')};
-    // The rows move on their own (LiveScores polls); the rest of the page (date strip, rail) follows every two minutes.
-    const refresh = isLive || (page.date === page.today && page.liveCount + page.scheduledCount > 0);
+    // The rows move on their own: LiveScores polls the server and patches them, and asks for the
+    // page again only when the list itself must change. Nothing here is on a timer.
     return (
         <div className="bb-surface overflow-hidden">
-            <AutoRefresh seconds={120} enabled={refresh} />
             <DateStrip page={page} />
             <div className="p-1.5 md:p-2 flex flex-col gap-2">
                 <LiveScores page={page} labels={labels} emptyText={isLive ? t('emptyLive') : t('emptyDay')} favoritesLabel={t('favoritesGroup')} />

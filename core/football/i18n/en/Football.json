@@ -40,7 +40,9 @@
     "var": "VAR",
     "assist": "assist {name}",
     "subIn": "{name} on",
-    "subOut": "{name} off"
+    "subOut": "{name} off",
+    "penaltyShort": "pen.",
+    "ownGoalShort": "o.g."
   },
   "stats": {
     "possession": "Ball possession",

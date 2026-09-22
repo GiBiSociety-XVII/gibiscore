@@ -99,7 +99,7 @@ rose e cessioni restano ferme.
 
 | Job | Frequenza | Richieste | Cosa fa |
 |---|---|---|---|
-| `sync-live` | ogni minuto | 0 se nessuna partita può essere in corso; altrimenti 1, più 1 ogni 20 partite in evidenza in corso, più 1 ogni 60 partite base coperte in corso | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) per le partite in evidenza a ogni giro, per quelle base coperte ogni tre minuti, per tutte a fine gara |
+| `sync-live` | ogni minuto, tre giri da 20 secondi | 0 se nessuna partita può essere in corso; altrimenti 1 per giro, più 1 ogni 20 partite in evidenza in corso, più 1 ogni 60 partite base coperte in corso | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) per le partite in evidenza una volta al minuto, per quelle base coperte ogni tre minuti, per tutte a fine gara |
 | `sync-fixtures` | ogni ora | 3 | tutte le partite di ieri, oggi e domani (una richiesta per giorno) |
 | `sync-fixtures?window=month` | ogni giorno | 32 | finestra estesa a +30 giorni |
 | `sync-standings` | ogni ora | 0-13 in evidenza, fino a 300 base | classifiche delle stagioni con un risultato da quando la tabella è stata salvata: prima le leghe in evidenza (comunque una volta al giorno), poi quelle base coperte |
@@ -119,6 +119,44 @@ leghe base (calendari, squadre, rose, statistiche stagionali, dettaglio
 delle partite già giocate) costa qualche decina di migliaia di richieste
 spalmate su alcuni giorni. L'archivio storico delle leghe in evidenza si
 completa in un giorno.
+
+### Come il live arriva al browser
+
+Il provider lo interroga solo il server: `sync-live` gira tre volte al
+minuto, a venti secondi l'una dall'altra, e scrive punteggi, minuto,
+stato ed eventi nel database. Nel database, quindi, nessun risultato è
+mai indietro di più di venti secondi.
+
+Le pagine non aspettano di essere ridisegnate per mostrarlo. Il server
+rende la pagina (la lista del giorno, la pagina partita); il browser poi
+chiede ogni pochi secondi un endpoint piccolo — `/api/scores` per una
+giornata o per le partite in corso, `/api/matches/[id]/live` per una
+sola partita — e sovrascrive quello che ha già sotto gli occhi:
+punteggio, stato, minuto, marcatori, cronologia.
+
+La regola che tiene ferma l'immagine sta in `lib/football/live.ts`: **una
+lettura viene sostituita solo da una più recente**, per il momento in cui
+la sincronizzazione ha scritto la riga (`last_synced_at`), non per
+l'ordine di arrivo. Gli stessi numeri arrivano infatti per due strade —
+la pagina resa dal server, che è in cache e può avere qualche secondo, e
+il JSON, servito dal nodo di frontiera che risponde — e nessuna delle
+due è ordinata rispetto all'altra. Senza quella regola un punteggio
+fresco viene coperto da una pagina vecchia e la riga lampeggia fra i due
+valori fino alla lettura dopo: è esattamente quello che succedeva prima.
+Con la regola, le letture vecchie vengono semplicemente scartate, da
+qualunque strada arrivino — e una correzione (un gol tolto dal VAR) passa
+lo stesso, perché è stata scritta dopo.
+
+La pagina intera viene richiesta di nuovo solo per quello che la
+sovrascrittura non può portare: una partita che comincia e deve comparire
+in lista, una che finisce ed esce dalla pagina live, le formazioni, le
+statistiche e i voti che si riempiono. Mai più di una volta ogni 30-45
+secondi.
+
+Costi: una richiesta ogni 10-15 secondi per scheda aperta, di pochi
+kilobyte; gli endpoint tengono la risposta per 2-3 secondi
+(`lib/football/data/hot.ts`) e chi arriva nel frattempo aspetta quella
+lettura, così mille schede aperte costano al database quanto una.
 
 ### Cosa il database dimentica
 

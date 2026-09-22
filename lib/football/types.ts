@@ -3,6 +3,8 @@
  * supabase/migrations but stay independent of the provider payloads.
  */
 
+import type {LiveFixture} from './live';
+
 export type FixtureState =
     | 'scheduled'
     | 'live'
@@ -232,6 +234,17 @@ export interface PlayerMatchLine {
     keyPasses: number | null;
     yellowCards: number;
     redCards: number;
+}
+
+/**
+ * The half of a match that moves while it is on, and nothing else: what
+ * /api/matches/[id]/live answers and the match page lays over itself
+ * every few seconds.
+ */
+export interface MatchLive {
+    at: string;
+    fixture: LiveFixture & {homeScoreHt: number | null; awayScoreHt: number | null};
+    events: MatchEvent[];
 }
 
 export interface MatchPage {
