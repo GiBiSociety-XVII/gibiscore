@@ -12,8 +12,9 @@ function initials(team: TeamSummary): string {
 }
 
 /**
- * Team badge. Small sizes (lists) skip the image optimizer: the provider
- * serves tiny PNGs already and a scores page can carry hundreds of them.
+ * Team badge, straight from the provider's CDN: its PNGs are small
+ * already, and every badge through the image optimizer is a paid
+ * transformation — fifteen thousand clubs, walked by the crawlers.
  * Without a logo, a black badge with the club's letters: no grey holes in
  * the lists of the minor leagues.
  */
@@ -35,7 +36,7 @@ export function TeamCrest({team, size = 44, className}: {team: TeamSummary; size
             className={cn("flex items-center justify-center shrink-0 overflow-hidden", small ? "" : "rounded-full border-[2.5px] border-foreground bg-muted", className)}
             style={{width: size, height: size}}
         >
-            <Image src={team.logoUrl} alt="" width={size} height={size} className="object-contain" unoptimized={small} loading="lazy" />
+            <Image src={team.logoUrl} alt="" width={size} height={size} className="object-contain" unoptimized loading="lazy" />
         </span>
     );
 }

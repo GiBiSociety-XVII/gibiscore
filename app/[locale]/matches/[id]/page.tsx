@@ -28,10 +28,13 @@ import {roundLabel} from "@/lib/football/data/shared";
 import {LIVE_STATES} from "@/lib/football/types";
 import {getVoteScale} from "@/lib/fantasy/calibration-data";
 import {shownVoto} from "@/lib/fantasy/voto";
+import {NOINDEX} from "@/components/seo/json-ld";
 
-// Refreshed by the live sync whenever the match moves (see sync-live); the timer only catches the rest.
-// The live sync renders the page again whenever the match moves; the timer only catches the rest.
-export const revalidate = 1800;
+// What moves while the match is on is patched in the browser (components/football/match-live.tsx); the
+// live sync renders the page again when its lineups, statistics or ratings change (see sync-live). The
+// timer is only for the rest: a day, so a finished match — of which there are hundreds of thousands, and
+// the crawlers walk them all — is rendered once and then served from the cache.
+export const revalidate = 86400;
 
 /** The guide's stops, in order: each a `data-tour` on the page; those in a closed tab are skipped. */
 const TOUR_STEPS = ['score', 'timeline', 'tabs', 'analysis', 'advice', 'bands', 'lines', 'setpieces', 'comparison', 'absences'] as const;
@@ -52,6 +55,9 @@ export async function generateMetadata({params}: PageProps<"/[locale]/matches/[i
     return {
         title: t('metaTitle', {home: fixture.home.name, away: fixture.away.name}),
         description: t('metaDescription', {home: fixture.home.name, away: fixture.away.name, competition: fixture.competition.name}),
+        // The matches of the minor leagues are thin pages nobody searches for: out of the indexes, so the
+        // crawlers stop walking hundreds of thousands of them, a render each.
+        robots: fixture.competition.featured ? undefined : NOINDEX,
     };
 }
 

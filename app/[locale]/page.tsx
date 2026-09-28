@@ -7,8 +7,9 @@ import {TourLauncher} from "@/components/football/tour-launcher";
 import {WelcomeStrip} from "@/components/football/welcome-strip";
 import {getScores, romeDate} from "@/lib/football/data/scores";
 
-// Today's scores: the front page of the site. Rebuilt every minute.
-export const revalidate = 30;
+// Today's scores: the front page of the site. The rows move in the browser (components/football/live-scores.tsx);
+// the list itself is rebuilt every minute at most.
+export const revalidate = 60;
 
 /** The guide's stops, in order: each a `data-tour` on the page; the ones hidden at this screen size (sidebar, rail, mobile tabs) are skipped. */
 const TOUR_STEPS = ['welcome', 'dates', 'filters', 'list', 'competition', 'match', 'sidebar', 'chips', 'rail', 'sections', 'search', 'mobileTabs'] as const;

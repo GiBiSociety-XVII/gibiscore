@@ -1,4 +1,5 @@
 import 'server-only';
+import {cache} from 'react';
 import {unstable_cache} from 'next/cache';
 import {featuredPriority} from '../competitions';
 import {LIVE_STATES, type CompetitionPage, type CompetitionSummary, type FixtureSummary, type RankedPlayer, type RoundFixtures, type StandingGroup, type TeamSummary} from '../types';
@@ -140,7 +141,7 @@ const cachedSeasonFixtures = unstable_cache(
     {revalidate: 300},
 );
 
-export async function getCompetitionPage(slug: string): Promise<CompetitionPage | null> {
+async function readCompetitionPage(slug: string): Promise<CompetitionPage | null> {
     try {
         const leagueRow = await cachedLeagueBySlug(slug);
         if (!leagueRow) return null;
@@ -281,3 +282,6 @@ export const cachedSeasonStandings = unstable_cache(
     ['season-standings'],
     {revalidate: 300, tags: ['standings']},
 );
+
+/** One read per request: the page's metadata and its body ask for the same competition. */
+export const getCompetitionPage = cache(readCompetitionPage);

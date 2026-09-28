@@ -161,6 +161,8 @@ export async function syncLive(): Promise<SyncRun> {
             for (const id of ids) if (!freshIds.has(id)) detailIds.add(id);
         }
         run.bump('basic_covered_live', basicLive.length);
+        // The route runs its extra passes only while one of these is on.
+        run.bump('featured_inplay', featuredLive.length);
 
         // Featured fixtures our database still marks as live but the feed no longer lists: they just ended.
         const {data: staleRows, error: staleError} = await db

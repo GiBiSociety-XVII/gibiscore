@@ -1,5 +1,6 @@
 import {cachedSeasonStandings} from './competitions';
 import 'server-only';
+import {cache} from 'react';
 import {VOTE_MINUTES} from '@/lib/fantasy/voto';
 import {withRetry} from '@/lib/db/retry';
 import type {EventKind, LineupPlayer, MatchEvent, MatchLive, MatchPage, PlayerMatchLine, SidelinedEntry, TeamLineup, TeamMatchStats} from '../types';
@@ -150,7 +151,7 @@ function toTeamStats(r: TeamStatRow | undefined): TeamMatchStats | null {
     };
 }
 
-export async function getMatchPage(id: number): Promise<MatchPage | null> {
+async function readMatchPage(id: number): Promise<MatchPage | null> {
     try {
         const db = footballDb();
         const data = await withRetry(async () => {
@@ -375,3 +376,6 @@ async function loadForm(db: ReturnType<typeof footballDb>, teamId: number, befor
         return [];
     }
 }
+
+/** One read per request: the page's metadata and its body ask for the same match. */
+export const getMatchPage = cache(readMatchPage);

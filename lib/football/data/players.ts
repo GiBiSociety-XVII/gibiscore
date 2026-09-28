@@ -1,4 +1,5 @@
 import 'server-only';
+import {cache} from 'react';
 import type {PlayerMatchRow, PlayerPage, PlayerSeasonStat, PlayerSeasonTotals} from '../types';
 import {normalizePosition} from './matches';
 import {FIXTURE_SELECT, TEAM_SELECT, footballDb, logReadError, toFixture, toTeam, type FixtureRow, type TeamRow} from './shared';
@@ -38,7 +39,7 @@ interface SeasonStatRow {
     penalties_missed: number | null;
     penalties_saved: number | null;
     team: TeamRow | null;
-    league: {id: number; name: string; slug: string} | null;
+    league: {id: number; name: string; slug: string; tier: string | null} | null;
     season: {name: string} | null;
 }
 
@@ -49,7 +50,7 @@ const MATCH_LINE_SELECT = `team_id,minutes_played,rating,goals,assists,yellow_ca
  * (default: the most recent season with data); the per-season table always
  * shows every season stored.
  */
-export async function getPlayerPage(slug: string, seasonYear?: number): Promise<PlayerPage | null> {
+async function readPlayerPage(slug: string, seasonYear?: number): Promise<PlayerPage | null> {
     try {
         const db = footballDb();
         const PLAYER_SELECT = 'id,name,slug,position,age,image_url,nationality,height_cm,weight_kg,injured';
@@ -69,7 +70,7 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
                 .from('player_season_stats')
                 .select(
                     'season_year,position,appearances,lineups,minutes,rating,goals,assists,goals_conceded,saves,shots_total,shots_on,passes_key,passes_accuracy,' +
-                        `yellow_cards,yellow_red_cards,red_cards,penalties_scored,penalties_missed,penalties_saved,team:teams(${TEAM_SELECT}),league:leagues(id,name,slug),season:seasons(name)`,
+                        `yellow_cards,yellow_red_cards,red_cards,penalties_scored,penalties_missed,penalties_saved,team:teams(${TEAM_SELECT}),league:leagues(id,name,slug,tier),season:seasons(name)`,
                 )
                 .eq('player_id', p.id)
                 .order('season_year', {ascending: false})
@@ -97,7 +98,7 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
                 seasonYear: r.season_year,
                 seasonName: r.season?.name ?? String(r.season_year),
                 team: toTeam(r.team!),
-                competition: {id: r.league!.id, name: r.league!.name, slug: r.league!.slug},
+                competition: {id: r.league!.id, name: r.league!.name, slug: r.league!.slug, featured: r.league!.tier === 'featured'},
                 position: normalizePosition(r.position),
                 appearances: r.appearances ?? 0,
                 lineups: r.lineups ?? 0,
@@ -212,3 +213,6 @@ export async function getPlayerPage(slug: string, seasonYear?: number): Promise<
         return null;
     }
 }
+
+/** One read per request: the page's metadata and its body ask for the same player. */
+export const getPlayerPage = cache(readPlayerPage);

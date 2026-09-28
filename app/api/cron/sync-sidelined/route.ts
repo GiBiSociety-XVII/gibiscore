@@ -6,7 +6,7 @@ import {syncPlayerSidelined} from '@/lib/football/sync/sidelined';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-/** Every 2 hours: the per-player injury and suspension spells of the fantasy leagues' squads (~300 requests). */
+/** Twice a day: the per-player injury and suspension spells of the fantasy leagues' squads (~250 requests a run). */
 export async function GET(request: NextRequest) {
     return cronRoute(async () => {
         const run = await syncPlayerSidelined();

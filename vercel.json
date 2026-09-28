@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/warm",
-      "schedule": "3-59/10 * * * *"
+      "schedule": "3,33 * * * *"
     },
     {
       "path": "/api/cron/sync-odds",
@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/cron/sync-player-seasons",
-      "schedule": "40 * * * *"
+      "schedule": "40 */4 * * *"
     },
     {
       "path": "/api/cron/sync-injuries",
@@ -38,7 +38,7 @@
     },
     {
       "path": "/api/cron/sync-sidelined",
-      "schedule": "50 */2 * * *"
+      "schedule": "50 6,18 * * *"
     },
     {
       "path": "/api/cron/sync-competitions",

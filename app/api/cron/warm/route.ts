@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 /**
- * Every ten minutes: the heavy reads a visitor would otherwise pay for
+ * Every half hour: the heavy reads a visitor would otherwise pay for
  * (the fantasy pool and matchday of Serie A, today's scores) are built
  * here, so the shared data cache is warm after a deploy and stays warm.
- * No provider request: database only.
+ * No provider request: database only. Not more often: each build is
+ * billed, and it warms the cache for a handful of visitors a day.
  */
 export async function GET(request: NextRequest) {
     if (!isAuthorizedCron(request)) return NextResponse.json({error: 'unauthorized'}, {status: 401});

@@ -5,7 +5,8 @@ import {ScoresRail} from "@/components/football/rail";
 import {ScoresView} from "@/components/football/scores-view";
 import {getScores} from "@/lib/football/data/scores";
 
-export const revalidate = 15;
+// The rows move in the browser; the list itself — who is in play — is rebuilt every half minute at most.
+export const revalidate = 30;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('Pages.scores');

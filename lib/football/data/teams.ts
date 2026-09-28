@@ -1,4 +1,5 @@
 import 'server-only';
+import {cache} from 'react';
 import {unstable_cache} from 'next/cache';
 import {LIVE_STATES, type FixtureSummary, type SquadPlayer, type TeamPage, type TeamPlayerSeason, type TeamSeasonStats, type TeamStandingLine, type TeamSummary} from '../types';
 import {normalizePosition} from './matches';
@@ -8,7 +9,7 @@ import {FIXTURE_SELECT, LEAGUE_SELECT, STANDING_SELECT, TEAM_SELECT, footballDb,
 
 const POSITION_ORDER: Record<string, number> = {goalkeeper: 0, defender: 1, midfielder: 2, attacker: 3};
 
-export async function getTeamPage(slug: string): Promise<TeamPage | null> {
+async function readTeamPage(slug: string): Promise<TeamPage | null> {
     try {
         const db = footballDb();
         const {data: teamRow, error: teamError} = await db
@@ -303,3 +304,6 @@ const cachedTeamCalendar = unstable_cache(
 );
 const cachedSeasonStats = unstable_cache((teamId: number) => loadSeasonStats(footballDb(), teamId), ['team-season-stats'], {revalidate: 900});
 const cachedPlayers = unstable_cache((teamId: number) => loadPlayers(footballDb(), teamId), ['team-players'], {revalidate: 3600, tags: ['player-seasons']});
+
+/** One read per request: the page's metadata and its body ask for the same club. */
+export const getTeamPage = cache(readTeamPage);

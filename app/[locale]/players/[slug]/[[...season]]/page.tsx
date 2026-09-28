@@ -16,8 +16,10 @@ import {getPlayerPage} from "@/lib/football/data/players";
 import {PlayerFantasy} from "@/components/fantasy/player-fantasy";
 import {getVoteScale} from "@/lib/fantasy/calibration-data";
 import {shownVoto, meanVoto} from "@/lib/fantasy/voto";
+import {NOINDEX} from "@/components/seo/json-ld";
 
-export const revalidate = 1800;
+// A day: a player's numbers move once a matchday, and the crawlers walk two hundred thousand of these pages.
+export const revalidate = 86400;
 
 function parseSeason(raw: string[] | undefined): number | undefined {
     const value = raw?.[0];
@@ -30,7 +32,9 @@ export async function generateMetadata({params}: PageProps<"/[locale]/players/[s
     const t = await getTranslations('Pages.player');
     const page = await getPlayerPage(slug, parseSeason(season));
     if (!page) return {title: t('notFound')};
-    return {title: page.player.name, description: t('metaDescription', {name: page.player.name})};
+    // A player who never played in a featured league is a thin page nobody searches for: out of the indexes.
+    const featured = page.seasons.some((s) => s.competition.featured);
+    return {title: page.player.name, description: t('metaDescription', {name: page.player.name}), robots: featured ? undefined : NOINDEX};
 }
 
 function Stat({value, label, accent = false}: {value: string | number; label: string; accent?: boolean}) {

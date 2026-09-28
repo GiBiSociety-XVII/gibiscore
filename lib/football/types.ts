@@ -398,7 +398,7 @@ export interface PlayerSeasonStat {
     seasonYear: number;
     seasonName: string;
     team: TeamSummary;
-    competition: {id: number; name: string; slug: string};
+    competition: {id: number; name: string; slug: string; featured: boolean};
     position: string | null;
     appearances: number;
     lineups: number;

@@ -9,7 +9,7 @@ export const maxDuration = 300;
 const SCOPES: PlayerSeasonsScope[] = ['auto', 'current', 'history', 'all'];
 
 /**
- * Hourly: player season statistics of the featured leagues.
+ * Every four hours: player season statistics of the featured leagues.
  * `?scope=current|history|all`, `?year=2024`, `?leagues=serie-a,serie-b`,
  * `?budget=800` (max API requests per run).
  */
@@ -21,9 +21,11 @@ export async function GET(request: NextRequest) {
     const budget = Math.min(Number(q.get('budget')) || 1500, 10000);
     return cronRoute(async () => {
         const run = await syncPlayerSeasons({scope, year: Number.isFinite(year) ? year : undefined, leagues, budget});
-        // The auction list reads squads and season statistics: fresh on the next request.
-        revalidateTag('player-seasons', 'max');
-        revalidateTag('fantasy-pool', 'max');
+        // The auction list reads the season statistics: fresh on the next request, when a season was synced.
+        if ((run.counters.seasons_synced ?? 0) > 0) {
+            revalidateTag('player-seasons', 'max');
+            revalidateTag('fantasy-pool', 'max');
+        }
         return run;
     })(request);
 }

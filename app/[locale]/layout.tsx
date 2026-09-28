@@ -5,7 +5,6 @@ import {hasLocale, NextIntlClientProvider} from "next-intl";
 import {getMessages, getTranslations, setRequestLocale} from "next-intl/server";
 import {notFound} from "next/navigation";
 import {Analytics} from "@vercel/analytics/react";
-import {SpeedInsights} from "@vercel/speed-insights/react";
 import {ogLocales, routing, type AppLocale} from "@/i18n/routing";
 import {AccountFavoritesSync} from "@/components/shell/account-favorites-sync";
 import {IosInstallBanner} from "@/components/shell/ios-install-banner";
@@ -88,7 +87,6 @@ export default async function LocaleLayout({children, params}: LayoutProps<"/[lo
                     <IosInstallBanner />
                 </NextIntlClientProvider>
                 <Analytics />
-                <SpeedInsights />
             </body>
         </html>
     );

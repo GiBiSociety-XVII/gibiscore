@@ -8,14 +8,17 @@ const intl = createMiddleware(routing);
 /**
  * Locale negotiation (with a single locale it only normalises URLs) plus
  * the Supabase session refresh: an expired access token is renewed here,
- * on every page, and the refreshed cookies travel with the response, so
- * server components and the browser client agree on who is signed in.
+ * on every page of someone signed in, and the refreshed cookies travel
+ * with the response, so server components and the browser client agree
+ * on who is signed in. A request without a session cookie — a crawler,
+ * a first visit — has nothing to refresh and costs no call.
  */
 export default async function proxy(request: NextRequest) {
     const response = intl(request);
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) return response;
+    if (!request.cookies.getAll().some((c) => c.name.startsWith('sb-'))) return response;
     const supabase = createServerClient(url, key, {
         cookies: {
             getAll() {
