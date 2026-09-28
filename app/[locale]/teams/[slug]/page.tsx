@@ -1,7 +1,6 @@
 import type {Metadata} from "next";
 import {getFormatter, getTranslations, setRequestLocale} from "next-intl/server";
 import {Link} from "@/i18n/navigation";
-import {Badge} from "@/components/shared/ui/badge";
 import {AbsenceList} from "@/components/football/absences";
 import {cn} from "@/components/shared/ui/cn";
 import {SiteShell, Panel} from "@/components/shell/site-shell";

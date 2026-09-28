@@ -21,9 +21,11 @@ export async function GET(request: NextRequest) {
     const budget = Math.min(Number(q.get('budget')) || 1500, 10000);
     return cronRoute(async () => {
         const run = await syncPlayerSeasons({scope, year: Number.isFinite(year) ? year : undefined, leagues, budget});
-        // The auction list reads squads and season statistics: fresh on the next request.
-        revalidateTag('player-seasons', 'max');
-        revalidateTag('fantasy-pool', 'max');
+        // The auction list reads the season statistics: fresh on the next request, when a season was synced.
+        if ((run.counters.seasons_synced ?? 0) > 0) {
+            revalidateTag('player-seasons', 'max');
+            revalidateTag('fantasy-pool', 'max');
+        }
         return run;
     })(request);
 }

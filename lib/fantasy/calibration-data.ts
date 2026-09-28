@@ -37,10 +37,16 @@ async function buildTypedPairs(league: AuctionLeague): Promise<VotoPair[]> {
     }
     if (typed.length === 0) return [];
     const fixtures = (await fetchAll((a, b) => db.from('fixtures').select('id,season_id,round,home_team_id,away_team_id').in('season_id', seasonIds).order('id').range(a, b), {max: 2000})) as Array<{id: number; season_id: number; round: string | null; home_team_id: number; away_team_id: number}>;
+    // A club's match of a round, by key: tens of thousands of votes against hundreds of fixtures, once each.
+    const fixtureOf = new Map<string, number>();
+    for (const f of fixtures) {
+        fixtureOf.set(`${f.season_id}:${f.round}:${f.home_team_id}`, f.id);
+        fixtureOf.set(`${f.season_id}:${f.round}:${f.away_team_id}`, f.id);
+    }
     const votes: Array<{fixtureId: number; playerId: number; voto: number}> = [];
     for (const {seasonId, row} of typed) {
-        const f = fixtures.find((x) => x.season_id === seasonId && x.round === row.round && (x.home_team_id === row.team_id || x.away_team_id === row.team_id));
-        if (f) votes.push({fixtureId: f.id, playerId: row.player_id, voto: Number(row.voto)});
+        const fixtureId = fixtureOf.get(`${seasonId}:${row.round}:${row.team_id}`);
+        if (fixtureId !== undefined) votes.push({fixtureId, playerId: row.player_id, voto: Number(row.voto)});
     }
     const fixtureIds = [...new Set(votes.map((v) => v.fixtureId))];
     const playerIds = [...new Set(votes.map((v) => v.playerId))];
@@ -66,7 +72,10 @@ async function buildTypedPairs(league: AuctionLeague): Promise<VotoPair[]> {
     return pairs;
 }
 
-const cachedTypedPairs = unstable_cache(buildTypedPairs, ['fantasy-typed-pairs', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 600, tags: ['fantasy-votes']});
+// A day: the votes route drops the tag on every write, so the timer is only a safety net. Ten minutes
+// meant a rebuild — a dozen reads, on a database busy with everything else — behind every page that
+// shows a rating, hundreds of times a day, and it was the site's most frequent timeout.
+const cachedTypedPairs = unstable_cache(buildTypedPairs, ['fantasy-typed-pairs', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local'], {revalidate: 86400, tags: ['fantasy-votes']});
 
 /** The typed votes against the provider's ratings, this season and the last; empty when the read fails, and at build time (not cached then). */
 export async function getTypedPairs(league: AuctionLeague): Promise<VotoPair[]> {

@@ -18,9 +18,12 @@ export async function GET(request: NextRequest) {
     const force = request.nextUrl.searchParams.get('force') === '1';
     return cronRoute(async () => {
         const run = await syncSquads({limit, force});
-        // The auction list reads squads: fresh on the next request.
-        revalidateTag('squads', 'max');
-        revalidateTag('fantasy-pool', 'max');
+        // The auction list reads the featured squads: fresh on the next request when one was asked
+        // for. The minor clubs' rosters, a few hundred a day, are not in it and do not rebuild it.
+        if ((run.counters.clubs ?? 0) - (run.counters.clubs_basic ?? 0) > 0) {
+            revalidateTag('squads', 'max');
+            revalidateTag('fantasy-pool', 'max');
+        }
         return run;
     })(request);
 }
