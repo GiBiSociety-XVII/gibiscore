@@ -18,7 +18,9 @@ import {getCompetitionPage} from "@/lib/football/data/competitions";
 import {getSeasonStudy} from "@/lib/football/data/study";
 import {roundLabel} from "@/lib/football/data/shared";
 
-export const revalidate = 300;
+// The live sync renders a featured competition again when one of its matches moves (see sync-live); the
+// timer is for the twelve hundred others, whose rounds nobody watches live.
+export const revalidate = 900;
 
 export async function generateMetadata({params}: PageProps<"/[locale]/competitions/[slug]">): Promise<Metadata> {
     const {slug} = await params;

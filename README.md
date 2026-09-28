@@ -99,15 +99,15 @@ rose e cessioni restano ferme.
 
 | Job | Frequenza | Richieste | Cosa fa |
 |---|---|---|---|
-| `sync-live` | ogni minuto, tre giri da 20 secondi | 0 se nessuna partita può essere in corso; altrimenti 1 per giro, più 1 ogni 20 partite in evidenza in corso, più 1 ogni 60 partite base coperte in corso | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) per le partite in evidenza una volta al minuto, per quelle base coperte ogni tre minuti, per tutte a fine gara |
+| `sync-live` | ogni minuto; tre giri da 20 secondi solo mentre una partita in evidenza è in corso | 0 se nessuna partita può essere in corso; altrimenti 1 per giro, più 1 ogni 20 partite in evidenza in corso, più 1 ogni 60 partite base coperte in corso | punteggi ed eventi di tutte le partite in corso dal feed live; formazioni, statistiche e voti (per id) per le partite in evidenza una volta al minuto, per quelle base coperte ogni tre minuti, per tutte a fine gara |
 | `sync-fixtures` | ogni ora | 3 | tutte le partite di ieri, oggi e domani (una richiesta per giorno) |
 | `sync-fixtures?window=month` | ogni giorno | 32 | finestra estesa a +30 giorni |
 | `sync-standings` | ogni ora | 0-13 in evidenza, fino a 300 base | classifiche delle stagioni con un risultato da quando la tabella è stata salvata: prima le leghe in evidenza (comunque una volta al giorno), poi quelle base coperte |
 | `sync-injuries` | ogni 30 minuti | 0-13, più le poche leghe base coperte | infortuni e squalifiche delle leghe con una partita nei prossimi 7 giorni (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
 | `sync-competitions` | ogni giorno | 1 + fino a 200 | tutte le leghe e stagioni correnti con la copertura dichiarata, stagioni passate delle leghe in evidenza; squadre di ogni stagione corrente (`season_teams`, con paese, stadio e anno di fondazione) una volta a settimana, prima le leghe in evidenza poi 200 base a giro |
-| `sync-squads` | ogni ora | 0 a mercato chiuso, ~2 per club in evidenza (~520, una volta al giorno) a mercato aperto; 1 per club base, fino a 300 a giro | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, i più vecchi prima; a mercato chiuso solo le rose vecchie di una settimana; poi le rose dei club base vecchie di una settimana (~8.500 club, un giro completo alla settimana); quel che non entra nei 4 minuti passa al giro dopo |
+| `sync-squads` | ogni ora | 0 a mercato chiuso, ~2 per club in evidenza (~520, una volta al giorno) a mercato aperto; 1 per club base, fino a 300 a giro | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, i più vecchi prima; a mercato chiuso solo le rose vecchie di una settimana; poi le rose dei club base vecchie di un mese (~10.000 club, un giro completo al mese: ~350 richieste al giorno); quel che non entra nei 4 minuti passa al giro dopo |
 | `sync-backfill` | ogni ora | 0 se niente manca, fino a ~250 liste + 50 dettaglio | calendario completo di ogni stagione (leghe in evidenza: corrente + `API_FOOTBALL_HISTORY_SEASONS` passate; leghe base: la corrente) e dettaglio (eventi, formazioni, statistiche, voti) delle partite finite mai scaricato, dove il provider lo copre, dalle più recenti, 1.000 partite per giro |
-| `sync-player-seasons` | ogni ora | 0 senza giornate giocate, ~35 per lega-stagione dopo (budget 1.500 a giro) | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`: leghe in evidenza con le stagioni passate (una volta sola), poi le leghe base coperte (~500), solo stagione corrente e senza il payload grezzo |
+| `sync-player-seasons` | ogni 4 ore | 0 senza giornate giocate, ~35 per lega-stagione dopo (budget 1.500 a giro) | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`: leghe in evidenza con le stagioni passate (una volta sola), poi le leghe base coperte (~500), solo stagione corrente e senza il payload grezzo |
 | `sync-lineups` | ogni 5 minuti | 0 senza calci d'inizio vicini, 1 ogni 20 partite | formazioni ufficiali delle partite che iniziano entro 90 minuti (leghe in evidenza e base coperte), salvate come formazioni attese per la giornata del fantacalcio |
 | `sync-odds` | ogni 3 ore | 1 per partita: in evidenza dei prossimi 3 giorni a ogni giro, base coperte dei prossimi 2 giorni una volta al giorno (fino a 600 a giro) | quote pre-partita dei bookmaker (`fixture_odds`); nello stesso giro scrive le giocate del modello per le partite in evidenza e chiude quelle finite |
 | `prune` | ogni notte | 0 | pulizia del database: payload grezzi del provider oltre due stagioni, giri dei job oltre 30 giorni, registro delle notifiche mandate oltre 14 giorni, errori del sito oltre 30 giorni |
@@ -153,10 +153,61 @@ in lista, una che finisce ed esce dalla pagina live, le formazioni, le
 statistiche e i voti che si riempiono. Mai più di una volta ogni 30-45
 secondi.
 
-Costi: una richiesta ogni 10-15 secondi per scheda aperta, di pochi
-kilobyte; gli endpoint tengono la risposta per 2-3 secondi
-(`lib/football/data/hot.ts`) e chi arriva nel frattempo aspetta quella
-lettura, così mille schede aperte costano al database quanto una.
+Costi: una richiesta ogni 10-15 secondi per scheda aperta. La risposta
+di una giornata porta solo quello che si è mosso — le partite in corso e
+le righe scritte dalla sincronizzazione negli ultimi dieci minuti —
+non le millecinquecento partite del giorno: poche centinaia di byte,
+non duecento kilobyte. Una scheda rimasta nascosta più a lungo si fa
+rendere di nuovo al ritorno, invece di fidarsi della risposta dopo. La
+rete di Vercel tiene la risposta 5 secondi e gli endpoint condividono la
+lettura (`lib/football/data/hot.ts`): mille schede aperte costano al
+database, e alle funzioni, quanto una.
+
+### Cosa costa su Vercel, e cosa no
+
+Con poche decine di visite umane al giorno il conto di Vercel era di
+circa 8 dollari al giorno. Non erano le visite: erano le funzioni che
+lavoravano per nessuno.
+
+- **I crawler.** Il sito ha 185.000 pagine partita, 200.000 pagine
+  giocatore e 15.000 pagine squadra, quasi tutte di campionati minori
+  che nessuno cerca, e i crawler le percorrono tutte: centinaia di
+  migliaia di render al giorno, ciascuno un'invocazione, decine di
+  letture del database, una pagina di centinaia di kilobyte trasferita.
+  Erano la quasi totalità di CPU, invocazioni e trasferimento. Adesso
+  le pagine dei campionati minori escono dagli indici (`noindex,
+  nofollow`, da `generateMetadata`), quelle che restano vengono rese
+  una volta e tenute in cache un giorno (il live arriva dal browser, il
+  dettaglio dalla rivalidazione di `sync-live`), e metadata e corpo
+  della pagina condividono una lettura sola (`cache()` di React sui
+  lettori) invece di farla due volte.
+- **La rivalidazione a pioggia.** `sync-live` rivalidava ogni minuto la
+  pagina partita e le due pagine squadra di ogni partita in corso nel
+  mondo — mille e più — e ogni crawler di passaggio le trovava scadute
+  e le faceva rendere. Ora rivalida solo ciò che una pagina ha
+  davvero bisogno di rendere: le partite il cui dettaglio (formazioni,
+  statistiche, voti) è stato scritto in quel minuto, e le competizioni
+  in evidenza in cui un punteggio si è mosso.
+- **Il tempo sveglio.** I tre giri da 20 secondi di `sync-live`
+  tenevano la funzione sveglia quasi tutto il giorno (la memoria si paga
+  sul tempo, non sul lavoro): ora i giri extra ci sono solo mentre una
+  partita in evidenza è in corso. `sync-squads` rifaceva le rose di
+  10.000 club minori ogni settimana a mercato chiuso (1,7 ore di
+  funzione al giorno): ora una volta al mese. `sync-sidelined` da ogni
+  due ore a due volte al giorno, `sync-player-seasons` da ogni ora a
+  ogni quattro, `warm` da ogni dieci minuti a ogni mezz'ora.
+- **Le risposte del live.** `/api/scores` rispondeva con tutte le
+  partite del giorno a ogni lettura: vedi sopra.
+- **Le voci fisse.** Speed Insights (10 $/mese più gli eventi, per
+  trenta pagine viste al giorno) è tolto dal codice: va spento anche
+  nel progetto su Vercel. L'ottimizzatore di immagini non tocca più gli
+  stemmi (una trasformazione a pagamento per stemma, 15.000 stemmi
+  percorsi dai crawler). Il proxy non chiama più Supabase Auth per chi
+  non ha un cookie di sessione: crawler e prime visite.
+
+Un deploy svuota la cache delle pagine: il primo passaggio dei crawler
+dopo un deploy rende di nuovo tutto ciò che trovano. Meno deploy, meno
+render.
 
 ### Cosa il database dimentica
 

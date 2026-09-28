@@ -17,18 +17,20 @@ import {getStandingsBySlug} from "@/lib/football/data/competitions";
 import {getTeamPage} from "@/lib/football/data/teams";
 import {getVoteScale} from "@/lib/fantasy/calibration-data";
 import {GOOD_VOTO, meanVoto} from "@/lib/fantasy/voto";
-import {JsonLd, SITE_URL} from "@/components/seo/json-ld";
+import {JsonLd, NOINDEX, SITE_URL} from "@/components/seo/json-ld";
 
-// Refreshed by the live sync while the club plays; the timer catches the rest.
-// The live sync renders the page again whenever one of the club's matches moves; the timer only catches the rest.
-export const revalidate = 3600;
+// The live sync renders the page again whenever the detail of one of the club's matches moves (see
+// sync-live); the timer is only for the rest: a day, fifteen thousand clubs being walked by the crawlers.
+export const revalidate = 86400;
 
 export async function generateMetadata({params}: PageProps<"/[locale]/teams/[slug]">): Promise<Metadata> {
     const {slug} = await params;
     const t = await getTranslations('Pages.team');
     const page = await getTeamPage(slug);
     if (!page) return {title: t('notFound')};
-    return {title: page.team.name, description: t('metaDescription', {name: page.team.name})};
+    // A club of the minor leagues only is a thin page nobody searches for: out of the indexes.
+    const featured = page.standings.some((s) => s.competition.featured) || page.calendar.some((f) => f.leagueFeatured);
+    return {title: page.team.name, description: t('metaDescription', {name: page.team.name}), robots: featured ? undefined : NOINDEX};
 }
 
 const POSITIONS = ['goalkeeper', 'defender', 'midfielder', 'attacker'] as const;

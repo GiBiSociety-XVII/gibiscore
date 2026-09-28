@@ -21,7 +21,7 @@ export async function GET(_request: NextRequest, {params}: RouteContext<"/api/ma
     try {
         const live = await read(numeric);
         if (!live) return NextResponse.json({error: 'not found'}, {status: 404, headers: {'Cache-Control': 'no-store'}});
-        return NextResponse.json(live, {headers: {'Cache-Control': 'public, max-age=0, s-maxage=3, stale-while-revalidate=5'}});
+        return NextResponse.json(live, {headers: {'Cache-Control': 'public, max-age=0, s-maxage=5, stale-while-revalidate=5'}});
     } catch (error) {
         console.error('[api/matches/live]', error);
         return NextResponse.json({error: 'unavailable'}, {status: 503, headers: {'Cache-Control': 'no-store'}});

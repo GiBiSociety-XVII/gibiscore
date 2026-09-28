@@ -32,19 +32,26 @@ export interface LivePollOptions {
     everyMs: number;
     /** Called after every answer, with what it said: for what the merge cannot carry. */
     onAnswer?: (fixtures: LiveFixture[]) => void;
+    /**
+     * Called when the tab comes back to the front after this long without an
+     * answer: the answers only reach back so far (see /api/scores), so the
+     * page renders itself again instead of trusting the next one.
+     */
+    staleAfterMs?: number;
+    onStale?: () => void;
 }
 
 /** A failed ask (offline, a 503) is tried again this soon, once, then on the next tick. */
 const RETRY_MS = 3_000;
 
-export function useLiveFixtures({url, seed, everyMs, onAnswer}: LivePollOptions): ReadonlyMap<number, LiveFixture> {
+export function useLiveFixtures({url, seed, everyMs, onAnswer, staleAfterMs, onStale}: LivePollOptions): ReadonlyMap<number, LiveFixture> {
     const [polled, setPolled] = useState<ReadonlyMap<number, LiveFixture>>(NOTHING);
 
     // The rows on the page and the caller's hand-back, as they are now: the timer
     // must not start over because the server rendered the page again.
-    const latest = useRef<{ids: Set<number>; onAnswer: LivePollOptions['onAnswer']}>({ids: new Set(), onAnswer: undefined});
+    const latest = useRef<{ids: Set<number>; onAnswer: LivePollOptions['onAnswer']; onStale: LivePollOptions['onStale']; answeredAt: number}>({ids: new Set(), onAnswer: undefined, onStale: undefined, answeredAt: 0});
     useEffect(() => {
-        latest.current = {ids: new Set(seed.map((f) => f.id)), onAnswer};
+        latest.current = {...latest.current, ids: new Set(seed.map((f) => f.id)), onAnswer, onStale};
     });
 
     const take = useCallback((fixtures: LiveFixture[]) => {
@@ -61,6 +68,7 @@ export function useLiveFixtures({url, seed, everyMs, onAnswer}: LivePollOptions)
             }
             return trimmed ?? next;
         });
+        latest.current.answeredAt = Date.now();
         latest.current.onAnswer?.(fixtures);
     }, []);
 
@@ -97,7 +105,11 @@ export function useLiveFixtures({url, seed, everyMs, onAnswer}: LivePollOptions)
             }
         };
         const onVisible = () => {
-            if (document.visibilityState === 'visible') void ask();
+            if (document.visibilityState !== 'visible') return;
+            // Zero: no answer yet, the first ask is on its way.
+            const {answeredAt} = latest.current;
+            if (staleAfterMs !== undefined && answeredAt > 0 && Date.now() - answeredAt > staleAfterMs) latest.current.onStale?.();
+            void ask();
         };
         const id = window.setInterval(() => void ask(), everyMs);
         document.addEventListener('visibilitychange', onVisible);
@@ -109,7 +121,7 @@ export function useLiveFixtures({url, seed, everyMs, onAnswer}: LivePollOptions)
             if (retry !== null) window.clearTimeout(retry);
             document.removeEventListener('visibilitychange', onVisible);
         };
-    }, [url, everyMs, take]);
+    }, [url, everyMs, staleAfterMs, take]);
 
     // The server's rows with every later reading laid over them: the seed can be stale, the answer cannot lose.
     return useMemo(() => {

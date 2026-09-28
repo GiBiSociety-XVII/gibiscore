@@ -16,6 +16,8 @@ const POLL_LIVE_MS = 10_000;
 const POLL_DAY_MS = 15_000;
 /** The whole page is rendered again no more often than this, and only when the list itself must change. */
 const RENDER_AGAIN_MS = 30_000;
+/** Back in front after this long without an answer, the page renders itself again: the answers only carry what moved lately. */
+const STALE_MS = 5 * 60_000;
 
 const isLive = (state: string) => (LIVE_STATES as readonly string[]).includes(state);
 
@@ -69,7 +71,12 @@ export function LiveScores({page, labels, emptyText, favoritesLabel}: {page: Sco
         [live, router, seed],
     );
 
-    const over = useLiveFixtures({url: active ? (live ? '/api/scores?mode=live' : `/api/scores?date=${page.date}`) : null, seed, everyMs: live ? POLL_LIVE_MS : POLL_DAY_MS, onAnswer});
+    const onStale = useCallback(() => {
+        renderedAt.current = Date.now();
+        router.refresh();
+    }, [router]);
+
+    const over = useLiveFixtures({url: active ? (live ? '/api/scores?mode=live' : `/api/scores?date=${page.date}`) : null, seed, everyMs: live ? POLL_LIVE_MS : POLL_DAY_MS, onAnswer, staleAfterMs: STALE_MS, onStale});
 
     const patch = (fixtures: FixtureSummary[]) =>
         fixtures.map((f) => {

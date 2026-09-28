@@ -9,7 +9,7 @@ export const maxDuration = 300;
 const SCOPES: PlayerSeasonsScope[] = ['auto', 'current', 'history', 'all'];
 
 /**
- * Hourly: player season statistics of the featured leagues.
+ * Every four hours: player season statistics of the featured leagues.
  * `?scope=current|history|all`, `?year=2024`, `?leagues=serie-a,serie-b`,
  * `?budget=800` (max API requests per run).
  */

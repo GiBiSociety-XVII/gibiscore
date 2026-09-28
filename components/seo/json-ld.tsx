@@ -12,3 +12,12 @@ export function eventStatus(state: string): string {
     if (state === 'cancelled' || state === 'abandoned') return 'https://schema.org/EventCancelled';
     return 'https://schema.org/EventScheduled';
 }
+
+/**
+ * The robots rule of a page nobody searches for — a match, a player or
+ * a club of the minor leagues. Out of the indexes and not followed, so
+ * the crawlers stop walking hundreds of thousands of them, a full
+ * render each: with a handful of human visitors a day, they were most
+ * of what the functions did.
+ */
+export const NOINDEX = {index: false, follow: false} as const;

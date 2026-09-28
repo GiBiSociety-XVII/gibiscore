@@ -59,8 +59,10 @@ async function currentClubs(db: FootballClient): Promise<Club[]> {
     return [...clubs.values()].sort((a, b) => (a.tier !== b.tier ? (a.tier === 'featured' ? -1 : 1) : (a.squadSyncedAt ?? '').localeCompare(b.squadSyncedAt ?? '') || best(a) - best(b)));
 }
 
-/** Outside the transfer windows a squad is refreshed this often: nobody moves, only a free agent now and then. */
+/** Outside the transfer windows a featured squad is refreshed this often: nobody moves, only a free agent now and then. */
 const QUIET_REFRESH_MS = 7 * 24 * 3_600_000;
+/** A minor club's squad, window or not: ten thousand of them, a request each, and a page a handful of people open. */
+const BASIC_REFRESH_MS = 28 * 24 * 3_600_000;
 /** While a window is open a featured squad is refreshed this often: daily, whatever the hour the cron fires. */
 const WINDOW_REFRESH_MS = 20 * 3_600_000;
 
@@ -73,7 +75,7 @@ const WINDOW_REFRESH_MS = 20 * 3_600_000;
  * join at once, departures leave), every day; outside the windows nobody
  * buys or sells, so a club is asked only when its squad is a week old,
  * and the transfer feed not at all. Basic clubs: the squad alone, when a
- * week old, 300 a run after the featured ones. `force` asks every
+ * month old, 300 a run after the featured ones. `force` asks every
  * featured club now; `limit` caps the clubs per run. Clubs are taken
  * oldest squad first, so a run cut by the deadline is completed by the
  * next one.
@@ -89,7 +91,7 @@ export async function syncSquads(options: {limit?: number; force?: boolean} = {}
         }
         const windowOpen = options.force || inTransferWindow(new Date());
         const olderThan = (c: Club, ms: number) => c.squadSyncedAt === null || Date.now() - Date.parse(c.squadSyncedAt) > ms;
-        const due = (c: Club) => (c.tier === 'featured' ? (options.force ? true : windowOpen ? olderThan(c, WINDOW_REFRESH_MS) : olderThan(c, QUIET_REFRESH_MS)) : olderThan(c, QUIET_REFRESH_MS));
+        const due = (c: Club) => (c.tier === 'featured' ? (options.force ? true : windowOpen ? olderThan(c, WINDOW_REFRESH_MS) : olderThan(c, QUIET_REFRESH_MS)) : olderThan(c, BASIC_REFRESH_MS));
         const all = (await currentClubs(db)).filter(due);
         const basicDue = all.filter((c) => c.tier === 'basic').length;
         if (basicDue > BASIC_MAX_PER_RUN) run.bump('basic_deferred', basicDue - BASIC_MAX_PER_RUN);
