@@ -55,7 +55,9 @@ GiBiScore segue **tutte** le competizioni pubblicate da API-Football (~1.100
 tra campionati e coppe), divise in due livelli:
 
 - **in evidenza** (`tier = featured`): Serie A, Serie B, Coppa Italia,
-  Supercoppa, le tre coppe UEFA e le altre top 5 europee. Dettaglio completo
+  Supercoppa, le tre coppe UEFA, le altre top 5 europee e la UEFA Nations
+  League (la sola competizione per nazionali: senza, nelle soste i
+  pronostici restavano vuoti). Dettaglio completo
   al ritmo più alto: squadre e rose, formazioni, statistiche squadra e
   giocatore a ogni minuto di gioco, infortuni, quote ogni tre ore,
   classifiche a fine giornata, archivio delle stagioni passate, pronostici

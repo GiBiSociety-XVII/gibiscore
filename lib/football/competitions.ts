@@ -15,7 +15,12 @@
  * (comma separated). API-Football ids: Serie A 135, Serie B 136, Coppa
  * Italia 137, Supercoppa 547, Champions League 2, Europa League 3,
  * Conference League 848, Premier League 39, La Liga 140, Bundesliga 78,
- * Ligue 1 61, Eredivisie 88, Primeira Liga 94.
+ * Ligue 1 61, Eredivisie 88, Primeira Liga 94, UEFA Nations League 5.
+ *
+ * The Nations League is the one national-team competition: without it
+ * the predictions page had nothing to say through every international
+ * break, when the clubs stop and the national sides play. Friendlies
+ * are not there on purpose: nothing about them is worth a prediction.
  */
 export interface CompetitionConfig {
     providerId: number;
@@ -34,6 +39,7 @@ export const FEATURED_COMPETITIONS: readonly CompetitionConfig[] = [
     {providerId: 2, slug: 'champions-league', name: 'UEFA Champions League', priority: 40},
     {providerId: 3, slug: 'europa-league', name: 'UEFA Europa League', priority: 50},
     {providerId: 848, slug: 'conference-league', name: 'UEFA Conference League', priority: 60},
+    {providerId: 5, slug: 'uefa-nations-league', name: 'UEFA Nations League', priority: 65},
     {providerId: 39, slug: 'premier-league', name: 'Premier League', priority: 70},
     {providerId: 140, slug: 'la-liga', name: 'La Liga', priority: 80},
     {providerId: 78, slug: 'bundesliga', name: 'Bundesliga', priority: 90},
