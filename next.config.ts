@@ -8,12 +8,10 @@ const nextConfig: NextConfig = {
             ? {exclude: ['error', 'warn']}
             : false,
     },
-    images: {
-        remotePatterns: [
-            // API-Football CDN (team logos, player photos, league badges)
-            {protocol: 'https', hostname: 'media.api-sports.io'},
-        ],
-    },
+    // Badges and photos come straight from the provider's CDN, small already. With no optimizer, the
+    // /_next/image addresses the crawlers learnt — a paid transformation each, long after the pages
+    // stopped using them — answer with an error that costs nothing.
+    images: {unoptimized: true},
 };
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');

@@ -107,7 +107,7 @@ rose e cessioni restano ferme.
 | `sync-standings` | ogni ora | 0-13 in evidenza, fino a 300 base | classifiche delle stagioni con un risultato da quando la tabella è stata salvata: prima le leghe in evidenza (comunque una volta al giorno), poi quelle base coperte |
 | `sync-injuries` | ogni 30 minuti | 0-13, più le poche leghe base coperte | infortuni e squalifiche delle leghe con una partita nei prossimi 7 giorni (una riga per partita saltata: da qui `lib/football/spells.ts` ricava durata e rientro) |
 | `sync-competitions` | ogni giorno | 1 + fino a 200 | tutte le leghe e stagioni correnti con la copertura dichiarata, stagioni passate delle leghe in evidenza; squadre di ogni stagione corrente (`season_teams`, con paese, stadio e anno di fondazione) una volta a settimana, prima le leghe in evidenza poi 200 base a giro |
-| `sync-squads` | ogni ora | 0 a mercato chiuso, ~2 per club in evidenza (~520, una volta al giorno) a mercato aperto; 1 per club base, fino a 300 a giro | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, i più vecchi prima; a mercato chiuso solo le rose vecchie di una settimana; poi le rose dei club base vecchie di un mese (~10.000 club, un giro completo al mese: ~350 richieste al giorno); quel che non entra nei 4 minuti passa al giro dopo |
+| `sync-squads` | ogni ora | 0 a mercato chiuso, ~2 per club in evidenza (~520, una volta al giorno) a mercato aperto; club base solo se `API_FOOTBALL_BASIC_SQUADS_PER_RUN` lo chiede | rose e feed cessioni (arrivi e partenze) di ogni club in evidenza, i più vecchi prima; a mercato chiuso solo le rose vecchie di una settimana; le rose dei ~11.000 club base solo su richiesta, vecchie di un mese; quel che non entra nei 4 minuti passa al giro dopo |
 | `sync-backfill` | ogni ora | 0 se niente manca, fino a ~250 liste + 50 dettaglio | calendario completo di ogni stagione (leghe in evidenza: corrente + `API_FOOTBALL_HISTORY_SEASONS` passate; leghe base: la corrente) e dettaglio (eventi, formazioni, statistiche, voti) delle partite finite mai scaricato, dove il provider lo copre, dalle più recenti, 1.000 partite per giro |
 | `sync-player-seasons` | ogni 4 ore | 0 senza giornate giocate, ~35 per lega-stagione dopo (budget 1.500 a giro) | statistiche stagionali per giocatore (presenze, minuti, voto, gol, assist, tiri, passaggi, contrasti, duelli, dribbling, falli, cartellini, rigori) in `player_season_stats`: leghe in evidenza con le stagioni passate (una volta sola), poi le leghe base coperte (~500), solo stagione corrente e senza il payload grezzo |
 | `sync-lineups` | ogni 5 minuti | 0 senza calci d'inizio vicini, 1 ogni 20 partite | formazioni ufficiali delle partite che iniziano entro 90 minuti (leghe in evidenza e base coperte), salvate come formazioni attese per la giornata del fantacalcio |
@@ -206,6 +206,25 @@ lavoravano per nessuno.
   stemmi (una trasformazione a pagamento per stemma, 15.000 stemmi
   percorsi dai crawler). Il proxy non chiama più Supabase Auth per chi
   non ha un cookie di sessione: crawler e prime visite.
+
+Non è bastato. Nei due giorni dopo il deploy i crawler hanno reso altre
+180.000 pagine giocatore: la cache di un giorno serve solo alla seconda
+visita della stessa pagina, che un crawler quasi mai fa nel giorno, e
+per leggere il `noindex` una pagina va comunque resa. Il conto del
+giorno del deploy (cache azzerata) è stato il più alto di tutti. Quindi
+il taglio netto: **le pagine partita e giocatore sono chiuse ai
+crawler**, in `robots.txt` per chi lo rispetta e in `proxy.ts` per tutti
+gli altri — un crawler che le chiede riceve un 404 al bordo, senza che
+nessuna funzione giri (le anteprime dei link condivisi passano).
+Restano aperte competizioni, squadre, statistiche e pronostici, che
+sono le pagine che qualcuno può cercare. Riaprirle, quando il sito
+avrà un motivo per farlo, è una riga in ciascuno dei due file.
+
+Nella stessa passata: l'ottimizzatore di immagini spento del tutto (i
+crawler continuavano a chiedere gli indirizzi `/_next/image` imparati
+prima, una trasformazione a pagamento ciascuno) e le rose dei club
+minori non più scaricate (novemila club mai scaricati venivano presi
+trecento all'ora, per pagine ormai chiuse).
 
 Un deploy svuota la cache delle pagine: il primo passaggio dei crawler
 dopo un deploy rende di nuovo tutto ciò che trovano. Meno deploy, meno

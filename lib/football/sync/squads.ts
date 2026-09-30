@@ -14,8 +14,13 @@ const DEADLINE_MS = 230_000;
 const CONCURRENCY = 3;
 /** Profiles fetched per club per run for players the database has never seen: bounded, they cost a request each. */
 const MAX_PROFILES_PER_TEAM = 6;
-/** Basic clubs per run at most: ~8,500 of them, a week to go round once, fifty an hour after. */
-const BASIC_MAX_PER_RUN = 300;
+/**
+ * Minor clubs per run: none unless asked (API_FOOTBALL_BASIC_SQUADS_PER_RUN).
+ * Eleven thousand of them, a request each, and their pages are closed to
+ * the crawlers and opened by a handful of people: fetching their rosters
+ * three hundred an hour was a job of four minutes every hour, for nobody.
+ */
+const BASIC_MAX_PER_RUN = Math.max(0, Number(process.env.API_FOOTBALL_BASIC_SQUADS_PER_RUN) || 0);
 
 interface Club {
     id: number;
@@ -74,8 +79,8 @@ const WINDOW_REFRESH_MS = 20 * 3_600_000;
  * window is open, the transfer feed since the season started (arrivals
  * join at once, departures leave), every day; outside the windows nobody
  * buys or sells, so a club is asked only when its squad is a week old,
- * and the transfer feed not at all. Basic clubs: the squad alone, when a
- * month old, 300 a run after the featured ones. `force` asks every
+ * and the transfer feed not at all. Basic clubs: only when asked for
+ * (API_FOOTBALL_BASIC_SQUADS_PER_RUN), the squad alone, when a month old. `force` asks every
  * featured club now; `limit` caps the clubs per run. Clubs are taken
  * oldest squad first, so a run cut by the deadline is completed by the
  * next one.
