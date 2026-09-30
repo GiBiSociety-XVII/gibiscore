@@ -64,6 +64,7 @@ Facoltative, utili con il piano Free durante i test:
 |---|---|---|
 | `API_FOOTBALL_SCOPE` | `featured` | segue solo le leghe in evidenza invece di tutte le ~1.100 |
 | `API_FOOTBALL_FEATURED_LEAGUE_IDS` | `135,2` | cambia la lista delle leghe in evidenza senza toccare il codice |
+| `API_FOOTBALL_BASIC_SQUADS_PER_RUN` | `50` | scarica anche le rose dei club dei campionati minori, tanti club per giro orario (default 0: nessuna) |
 
 Per le notifiche push (preferiti: calcio d'inizio, gol, finale...) serve una
 coppia di chiavi VAPID, generata una volta sola:
