@@ -226,6 +226,25 @@ prima, una trasformazione a pagamento ciascuno) e le rose dei club
 minori non più scaricate (novemila club mai scaricati venivano presi
 trecento all'ora, per pagine ormai chiuse).
 
+Il giorno dopo i log di Supabase dicevano ancora 34.000 richieste
+l'ora: le pagine squadra, lasciate aperte, rese quattromila volte
+l'ora per i crawler, e millesettecento pagine giocatore l'ora da
+crawler che si presentano come browser, che nessuna lista di nomi
+ferma. Da qui le due misure definitive, sempre in `proxy.ts`: le
+pagine squadra chiuse come le altre, e per chi si presenta come
+browser **una prova di browser**: chi apre una pagina partita,
+giocatore o squadra senza il cookie `gs_h` riceve dal bordo una pagina
+di seicento byte che imposta il cookie con uno script e ricarica — per
+una persona un battito di ciglia, una volta al mese; per un client HTTP
+che non esegue script sempre quei seicento byte, e nessuna funzione
+gira mai. Chi è loggato ha già il cookie di sessione, che vale come
+prova. Le anteprime dei link condivisi passano senza prova.
+
+Cosa comporta: partite, giocatori e squadre non sono più su Google, e
+non si aprono con JavaScript o i cookie disattivati. Le pagine che
+restano aperte e indicizzabili sono la home, il live, le competizioni,
+le statistiche, i pronostici, gli infortuni e il fantacalcio.
+
 Un deploy svuota la cache delle pagine: il primo passaggio dei crawler
 dopo un deploy rende di nuovo tutto ciò che trovano. Meno deploy, meno
 render.
