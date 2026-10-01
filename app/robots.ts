@@ -9,16 +9,16 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gibiscore.com';
  * SEO tools, AI training scrapers, and the like. They honour robots.txt;
  * search engines proper stay welcome — on the pages worth searching.
  *
- * The match and player pages are closed to every crawler: 400.000 pages
- * of which nobody searches more than a handful, and walking them was
- * most of what the site's functions did (see proxy.ts, where a crawler
- * that does not honour this is turned away at the edge). Competitions,
- * clubs, rankings and predictions stay open.
+ * The match, player and club pages are closed to every crawler: 400.000
+ * pages of which nobody searches more than a handful, and walking them
+ * was most of what the site's functions did (see proxy.ts, where a
+ * crawler that does not honour this is turned away at the edge).
+ * Competitions, rankings and predictions stay open.
  */
 const BLOCKED_BOTS = ['AhrefsBot', 'SemrushBot', 'MJ12bot', 'DotBot', 'PetalBot', 'Bytespider', 'DataForSeoBot', 'BLEXBot', 'SeekportBot', 'serpstatbot', 'GPTBot', 'CCBot', 'ClaudeBot', 'Amazonbot', 'meta-externalagent', 'ImagesiftBot', 'Barkrowler', 'ZoominfoBot', 'AwarioBot', 'MegaIndex'];
 
 /** What no crawler is served, in every language the site speaks. */
-const CLOSED = ['/api/', '/search', '/admin', ...routing.locales.flatMap((locale) => (locale === routing.defaultLocale ? ['/matches/', '/players/'] : [`/${locale}/matches/`, `/${locale}/players/`]))];
+const CLOSED = ['/api/', '/search', '/admin', ...routing.locales.flatMap((locale) => (locale === routing.defaultLocale ? ['/matches/', '/players/', '/teams/'] : [`/${locale}/matches/`, `/${locale}/players/`, `/${locale}/teams/`]))];
 
 export default function robots(): MetadataRoute.Robots {
     return {
