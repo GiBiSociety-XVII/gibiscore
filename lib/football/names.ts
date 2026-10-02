@@ -64,8 +64,9 @@ export function tidy(value: string): string {
         .trim();
 }
 
-/** The whole treatment for a name that comes alone. */
-export function cleanName(value: string): string {
+/** The whole treatment for a name that comes alone. A name the provider left out is an empty string, not an error. */
+export function cleanName(value: string | null | undefined): string {
+    if (!value) return '';
     return tidy(guessLostBytes(unmangle(decodeEntities(value))));
 }
 

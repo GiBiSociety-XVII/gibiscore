@@ -47,6 +47,10 @@ describe('guessLostBytes', () => {
 });
 
 describe('cleanName', () => {
+    it('takes a name the provider left out as an empty string', () => {
+        expect(cleanName(null)).toBe('');
+        expect(cleanName(undefined)).toBe('');
+    });
     it('does the whole treatment', () => {
         expect(cleanName('M&apos;Bala Nzola')).toBe("M'Bala Nzola");
         expect(cleanName('K. N’Dri')).toBe("K. N'Dri");

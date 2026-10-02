@@ -168,6 +168,12 @@ describe('standings', () => {
         const rows = mapStandings([[row(1, 1, 'Group A')], [row(1, 2, 'Group B')]]);
         expect(rows.map((r) => r.group)).toEqual(['Group A', 'Group B']);
     });
+
+    it('leaves out a line the provider has not computed (no points)', () => {
+        const blank = {...row(3, 7, 'Serie A'), points: null};
+        const rows = mapStandings([[row(1, 505, 'Serie A'), blank]]);
+        expect(rows.map((r) => r.providerTeamId)).toEqual([505]);
+    });
 });
 
 describe('helpers', () => {

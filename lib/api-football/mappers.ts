@@ -373,6 +373,8 @@ export function mapStandings(groups: AfStanding[][] | undefined, mainGroupName?:
     const rows: StandingRowData[] = [];
     for (const group of groups ?? []) {
         for (const s of group) {
+            // A table the provider has not computed (points missing) is no table: left out, not stored as zero.
+            if (s.points === null || s.points === undefined) continue;
             // The main table of a league carries the league name as group
             // (e.g. "Serie A"); we store it as '' so queries can find it
             // without knowing the name. Cup groups keep their name.

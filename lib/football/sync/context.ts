@@ -329,7 +329,8 @@ export async function featuredSeasons(db: FootballClient, historyCount: number, 
 
 export interface MinimalTeam {
     id: number;
-    name: string;
+    /** The provider leaves it out now and then (an injury listed against a side it has no record of). */
+    name: string | null;
     logo?: string | null;
     code?: string | null;
     country?: string | null;
@@ -351,17 +352,19 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
     const richRows = [...unique.values()].filter((t) => t.code !== undefined || t.country !== undefined || t.founded !== undefined);
     const minimalRows = [...unique.values()].filter((t) => !richRows.includes(t) && !existing.has(t.id));
 
+    // A side without a name is still a side: a placeholder, as for the players.
+    const nameOf = (t: MinimalTeam) => (t.name && t.name.trim() !== '' ? cleanName(t.name) : `Squadra ${t.id}`);
     if (richRows.length > 0) {
         const {error} = await db.from('teams').upsert(
             richRows.map((t) => ({
                 provider_id: t.id,
-                name: cleanName(t.name),
+                name: nameOf(t),
                 short_code: t.code ?? null,
                 country: t.country ?? null,
                 logo_url: t.logo ?? null,
                 venue_name: t.venueName ?? null,
                 founded: t.founded ?? null,
-                slug: slugify(cleanName(t.name), t.id),
+                slug: slugify(nameOf(t), t.id),
             })),
             {onConflict: 'provider_id'},
         );
@@ -369,7 +372,7 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
     }
     for (let i = 0; i < minimalRows.length; i += 500) {
         const {error} = await db.from('teams').upsert(
-            minimalRows.slice(i, i + 500).map((t) => ({provider_id: t.id, name: cleanName(t.name), logo_url: t.logo ?? null, slug: slugify(cleanName(t.name), t.id)})),
+            minimalRows.slice(i, i + 500).map((t) => ({provider_id: t.id, name: nameOf(t), logo_url: t.logo ?? null, slug: slugify(nameOf(t), t.id)})),
             {onConflict: 'provider_id', ignoreDuplicates: true},
         );
         if (error) fail('teams.upsert', error);

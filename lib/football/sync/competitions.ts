@@ -162,9 +162,17 @@ export async function syncCompetitions(): Promise<SyncRun> {
             if (rows.length > 0) {
                 const {error} = await db.from('season_teams').upsert(rows, {onConflict: 'season_id,team_id'});
                 if (error) failSync('season_teams.upsert', error);
-                // A club relegated or out of a cup is no longer in the season.
-                const {error: pruneError} = await db.from('season_teams').delete().eq('season_id', s.id).not('team_id', 'in', `(${rows.map((r) => r.team_id).join(',')})`);
-                if (pruneError) failSync('season_teams.delete', pruneError);
+                // A club relegated or out of a cup is no longer in the season. The ones to drop are
+                // worked out here and deleted by id, a few hundred at a time: a season of hundreds
+                // of sides (the friendlies) is too long a list for the address of one request.
+                const {data: listed, error: listedError} = await db.from('season_teams').select('team_id').eq('season_id', s.id).limit(5000);
+                if (listedError) failSync('season_teams.select', listedError);
+                const keep = new Set(rows.map((r) => r.team_id));
+                const gone = ((listed ?? []) as Array<{team_id: number}>).map((r) => r.team_id).filter((id) => !keep.has(id));
+                for (const group of chunk(gone, 200)) {
+                    const {error: pruneError} = await db.from('season_teams').delete().eq('season_id', s.id).in('team_id', group);
+                    if (pruneError) failSync('season_teams.delete', pruneError);
+                }
             }
             // Listed, with or without teams (a cup not drawn yet): asked again in a week.
             const {error: markError} = await db.from('seasons').update({teams_listed_at: new Date().toISOString()}).eq('id', s.id);
