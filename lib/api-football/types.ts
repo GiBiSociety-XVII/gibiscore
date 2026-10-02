@@ -168,7 +168,7 @@ export interface AfFixtureResponse {
 export interface AfStanding {
     rank: number;
     team: {id: number; name: string; logo: string | null};
-    points: number;
+    points: number | null;
     goalsDiff: number;
     group: string;
     form: string | null;
