@@ -25,6 +25,15 @@ Tempo stimato: 20-30 minuti, di cui la maggior parte in attesa dei job.
 4. Nella stessa pagina trovi il **Project URL**
    (`https://hhszficxmvfbbodpupxl.supabase.co`).
 
+### 1.x Email di reset password
+
+In **Authentication → Emails → Templates → Reset password** incolla il
+contenuto di `supabase/templates/recovery.html` e metti come oggetto
+«Il tuo codice per reimpostare la password su GiBiScore». Il modello
+manda un codice di sei cifre (`{{ .Token }}`), che la pagina `/password`
+del sito chiede insieme alla password nuova; non serve nessun URL di
+redirect.
+
 ## 2. API-Football (5 minuti)
 
 1. Registrati su **dashboard.api-football.com** (accesso diretto, non RapidAPI).

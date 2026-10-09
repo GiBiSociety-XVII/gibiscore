@@ -45,6 +45,7 @@
     "exists": "Esiste già un account con questa email: accedi",
     "weak": "La password è troppo debole",
     "rate": "Troppi tentativi: riprova tra qualche minuto",
+    "code": "Codice non valido o scaduto: controlla le cifre o richiedine uno nuovo",
     "generic": "Si è verificato un errore, riprova"
   },
   "profile": {
@@ -103,16 +104,23 @@
   },
   "password": {
     "title": "Password dimenticata",
-    "subtitle": "Scrivi l'email dell'account: ti mandiamo un link per scegliere una password nuova.",
+    "subtitle": "Scrivi l'email dell'account: ti mandiamo un codice per scegliere una password nuova.",
     "email": "Email",
     "emailPlaceholder": "tuo@email.com",
-    "send": "Mandami il link",
+    "send": "Mandami il codice",
     "sending": "Invio in corso...",
-    "sentTitle": "Controlla la posta",
-    "sentText": "Se {email} ha un account, tra poco arriva un'email con il link. Vale per un'ora; guarda anche nello spam.",
+    "codeTitle": "Controlla la posta",
+    "codeSubtitle": "Se {email} ha un account, tra poco arriva un'email con un codice. Scrivilo qui con la nuova password. Guarda anche nello spam.",
+    "code": "Codice di verifica",
+    "codeHint": "Sei cifre, vale un'ora",
+    "codeInvalid": "Il codice è di sei cifre",
+    "noCode": "Non è arrivato?",
+    "resend": "Mandalo di nuovo",
+    "resent": "Codice mandato di nuovo: guarda la posta.",
+    "changeEmail": "Cambia email",
     "remembered": "Te la ricordi?",
     "toSignIn": "Accedi",
-    "footer": "Il link vale un'ora e una volta sola.",
+    "footer": "Il codice vale un'ora e una volta sola.",
     "newTitle": "Nuova password",
     "newSubtitle": "Scegline una che usi solo qui.",
     "newPassword": "Nuova password",
@@ -123,7 +131,7 @@
     "save": "Salva la password",
     "saving": "Salvataggio...",
     "expiredTitle": "Link scaduto",
-    "expiredText": "Il link non è più valido o è già stato usato: richiedine uno nuovo.",
-    "again": "Richiedi un nuovo link"
+    "expiredText": "Il link non è più valido o è già stato usato: richiedi un codice.",
+    "again": "Richiedi un codice"
   }
 }
