@@ -352,9 +352,10 @@ L'email è `supabase/templates/recovery.html`: va incollata una volta nel
 progetto Supabase, **Authentication → Emails → Templates → Reset
 password**, con oggetto «Il tuo codice per reimpostare la password su
 GiBiScore» (il modello usa `{{ .Token }}`, il codice; senza
-`{{ .ConfirmationURL }}` Supabase non manda nessun link). Il lockup che
-l'email mostra è `public/brand/png/gibiscore-lockup.png` (l'esportazione
-ufficiale del marchio, 957×240), servito dal sito. La durata del codice è l'impostazione «Email OTP expiration» di
+`{{ .ConfirmationURL }}` Supabase non manda nessun link). Il lockup in cima
+all'email è disegnato in HTML (tile, «GiBi», «Score» in azzurro), non
+un'immagine: i client di posta bloccano o filtrano le immagini, e
+un'icona rotta non è un marchio. La durata del codice è l'impostazione «Email OTP expiration» di
 Supabase (un'ora, il valore predefinito).
 
 ## Identità
