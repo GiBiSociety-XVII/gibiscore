@@ -339,6 +339,24 @@ e iPad solo con il sito aggiunto alla schermata Home.
   quella sola partita (niente spoiler mentre la si guarda). Il service worker
   è `public/sw.js`: mostra la notifica e al tocco apre la partita.
 
+## Password dimenticata
+
+Come su gibiarena.com: chi ha dimenticato la password scrive l'email su
+`/password`, riceve un **codice di sei cifre** e lo batte nella stessa
+pagina insieme alla password nuova (`components/auth/forgot-password-form.tsx`:
+`resetPasswordForEmail`, poi `verifyOtp` di tipo `recovery` e
+`updateUser`). Niente link da seguire: funziona da qualunque dispositivo
+e da qualunque app di posta. Il codice vale un'ora e una volta sola.
+
+L'email è `supabase/templates/recovery.html`: va incollata una volta nel
+progetto Supabase, **Authentication → Emails → Templates → Reset
+password**, con oggetto «Il tuo codice per reimpostare la password su
+GiBiScore» (il modello usa `{{ .Token }}`, il codice; senza
+`{{ .ConfirmationURL }}` Supabase non manda nessun link). Il lockup che
+l'email mostra è `public/brand/png/gibiscore-lockup.png` (l'esportazione
+ufficiale del marchio, 957×240), servito dal sito. La durata del codice è l'impostazione «Email OTP expiration» di
+Supabase (un'ora, il valore predefinito).
+
 ## Identità
 
 I file del marchio (icone, favicon, lockup di GiBiScore, GiBiArena e

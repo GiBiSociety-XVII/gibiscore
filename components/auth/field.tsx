@@ -1,18 +1,21 @@
 import type {InputHTMLAttributes, ReactNode} from "react";
 import {Input} from "@/components/shared/ui/input";
 
-/** A labelled input with an icon inside, on the left, and an optional hint below. */
-export function Field({id, label, icon, hint, ...props}: {id: string; label: string; icon: ReactNode; hint?: string} & InputHTMLAttributes<HTMLInputElement>) {
+/** A labelled input with an icon inside, on the left, an optional hint below and, on the label's row, an optional link on the right. */
+export function Field({id, label, icon, hint, aside, className, ...props}: {id: string; label: string; icon: ReactNode; hint?: string; aside?: ReactNode} & InputHTMLAttributes<HTMLInputElement>) {
     return (
         <div>
-            <label htmlFor={id} className="block text-sm font-bold text-foreground mb-2">
-                {label}
-            </label>
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+                <label htmlFor={id} className="block text-sm font-bold text-foreground">
+                    {label}
+                </label>
+                {aside}
+            </div>
             <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground [&>svg]:w-5 [&>svg]:h-5" aria-hidden="true">
                     {icon}
                 </span>
-                <Input id={id} className="w-full pl-10" {...props} />
+                <Input id={id} className={className ?? "w-full pl-10"} {...props} />
             </div>
             {hint && <p className="text-xs font-semibold text-muted-foreground mt-1">{hint}</p>}
         </div>

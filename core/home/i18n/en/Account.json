@@ -45,6 +45,7 @@
     "exists": "An account with this email already exists: sign in",
     "weak": "The password is too weak",
     "rate": "Too many attempts: try again in a few minutes",
+    "code": "Invalid or expired code: check the digits or request a new one",
     "generic": "Something went wrong, try again"
   },
   "profile": {
@@ -103,16 +104,23 @@
   },
   "password": {
     "title": "Forgot your password",
-    "subtitle": "Enter the account's email: we send you a link to choose a new password.",
+    "subtitle": "Enter the account's email: we send you a code to choose a new password.",
     "email": "Email",
     "emailPlaceholder": "you@email.com",
-    "send": "Send me the link",
+    "send": "Send me the code",
     "sending": "Sending...",
-    "sentTitle": "Check your inbox",
-    "sentText": "If {email} has an account, an email with the link is on its way. It lasts an hour; check the spam folder too.",
+    "codeTitle": "Check your inbox",
+    "codeSubtitle": "If {email} has an account, an email with a code is on its way. Type it here with the new password. Check the spam folder too.",
+    "code": "Verification code",
+    "codeHint": "Six digits, valid for an hour",
+    "codeInvalid": "The code has six digits",
+    "noCode": "Didn't get it?",
+    "resend": "Send it again",
+    "resent": "Code sent again: check your inbox.",
+    "changeEmail": "Change email",
     "remembered": "Remembered it?",
     "toSignIn": "Sign in",
-    "footer": "The link lasts an hour and works once.",
+    "footer": "The code lasts an hour and works once.",
     "newTitle": "New password",
     "newSubtitle": "Choose one you use only here.",
     "newPassword": "New password",
@@ -123,7 +131,7 @@
     "save": "Save the password",
     "saving": "Saving...",
     "expiredTitle": "Link expired",
-    "expiredText": "The link is no longer valid or was already used: request a new one.",
-    "again": "Request a new link"
+    "expiredText": "The link is no longer valid or was already used: request a code.",
+    "again": "Request a code"
   }
 }
