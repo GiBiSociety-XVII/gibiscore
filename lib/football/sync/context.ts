@@ -336,6 +336,8 @@ export interface MinimalTeam {
     country?: string | null;
     founded?: number | null;
     venueName?: string | null;
+    /** A national side (the provider says so on /teams): never a club, whatever it plays. */
+    national?: boolean | null;
 }
 
 /** Upsert teams from any payload that carries them and return the id map. */
@@ -365,6 +367,7 @@ export async function ensureTeams(db: FootballClient, teams: MinimalTeam[]): Pro
                 venue_name: t.venueName ?? null,
                 founded: t.founded ?? null,
                 slug: slugify(nameOf(t), t.id),
+                ...(typeof t.national === 'boolean' ? {national: t.national} : {}),
             })),
             {onConflict: 'provider_id'},
         );
