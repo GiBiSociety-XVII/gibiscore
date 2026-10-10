@@ -9,6 +9,10 @@ import type {LineupLock} from './store';
  * one row per team, RLS on the user): the roster with the league's
  * settings, the pins and outs of the lineup page and the lineup frozen
  * at kick-off. Read and written from the browser with the anon key.
+ *
+ * A team deleted on a device leaves a tombstone (`deleted_at`) for a
+ * month: the other devices read it and drop their copy instead of
+ * writing it back. A copy saved after the deletion revives the row.
  */
 
 export interface AccountTeam {
@@ -21,6 +25,8 @@ export interface AccountTeam {
     /** The lineups frozen at the kick-off of the rounds gone by, oldest first: the recaps score them. */
     locks: LineupLock[];
     updatedAt: string;
+    /** Set when the team was deleted on a device: the row is a tombstone, its content is stale. */
+    deletedAt: string | null;
 }
 
 const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((id): id is number => typeof id === 'number' && Number.isInteger(id)) : []);
@@ -32,23 +38,24 @@ function parseLock(raw: unknown): LineupLock | null {
 }
 
 export async function listAccountTeams(): Promise<AccountTeam[]> {
-    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,benched,lock,locks,updated_at').order('updated_at', {ascending: false}).limit(50);
+    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,benched,lock,locks,updated_at,deleted_at').order('updated_at', {ascending: false}).limit(80);
     if (error) throw error;
     const rows: AccountTeam[] = [];
     for (const r of data ?? []) {
         const team = normalizeSavedTeam(r.team);
         if (!team) continue;
-        rows.push({id: r.id as string, team, pins: ids(r.pins), outs: ids(r.outs), benched: ids(r.benched), lock: parseLock(r.lock), locks: (Array.isArray(r.locks) ? r.locks : []).map(parseLock).filter((l): l is LineupLock => l !== null), updatedAt: r.updated_at as string});
+        rows.push({id: r.id as string, team, pins: ids(r.pins), outs: ids(r.outs), benched: ids(r.benched), lock: parseLock(r.lock), locks: (Array.isArray(r.locks) ? r.locks : []).map(parseLock).filter((l): l is LineupLock => l !== null), updatedAt: r.updated_at as string, deletedAt: (r.deleted_at as string | null) ?? null});
     }
     return rows;
 }
 
-export async function saveAccountTeam(userId: string, row: Omit<AccountTeam, 'updatedAt'>): Promise<void> {
-    const {error} = await createClient().from('fantasy_teams').upsert({user_id: userId, id: row.id, team: row.team, pins: row.pins, outs: row.outs, benched: row.benched, lock: row.lock, locks: row.locks}, {onConflict: 'user_id,id'});
+export async function saveAccountTeam(userId: string, row: Omit<AccountTeam, 'updatedAt' | 'deletedAt'>): Promise<void> {
+    const {error} = await createClient().from('fantasy_teams').upsert({user_id: userId, id: row.id, team: row.team, pins: row.pins, outs: row.outs, benched: row.benched, lock: row.lock, locks: row.locks, deleted_at: null}, {onConflict: 'user_id,id'});
     if (error) throw error;
 }
 
+/** A tombstone, not a delete: the other devices read it. */
 export async function deleteAccountTeam(id: string): Promise<void> {
-    const {error} = await createClient().from('fantasy_teams').delete().eq('id', id);
+    const {error} = await createClient().from('fantasy_teams').update({deleted_at: new Date().toISOString()}).eq('id', id);
     if (error) throw error;
 }

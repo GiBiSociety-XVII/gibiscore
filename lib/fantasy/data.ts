@@ -244,10 +244,11 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         for (const m of played) note(m.player, m.team, leagueById.get(m.league_id), (teamId) => ({kind: 'line', teamId, appearances: m.appearances ?? 0}));
         for (const m of listedOut) if (m.start_date) note(m.player, m.team, leagueOfSeason.get(m.season_id), (teamId) => ({kind: 'sidelined', teamId, date: m.start_date!}));
         // The squad lists of every other club we follow: whoever sits in one may have left.
+        // A national side is not a club: its call-ups and its matches say nothing about where a player plays.
         const candidateIds = [...evidenceOf.keys()];
         for (const ids of chunk(candidateIds, 300)) {
             const rows = (await fetchAll(
-                (a, b) => db.from('squad_members').select('player_id,team_id,season:seasons!inner(is_current)').in('player_id', ids).eq('seasons.is_current', true).order('player_id').range(a, b),
+                (a, b) => db.from('squad_members').select('player_id,team_id,season:seasons!inner(is_current),team:teams!inner(national)').in('player_id', ids).eq('seasons.is_current', true).eq('teams.national', false).order('player_id').range(a, b),
                 {max: 4000},
             )) as unknown as Array<{player_id: number; team_id: number}>;
             for (const r of rows) if (!teams.has(r.team_id)) evidenceOf.get(r.player_id)?.push({kind: 'squad', teamId: r.team_id});
@@ -259,7 +260,7 @@ async function buildPool(league: AuctionLeague): Promise<AuctionPool> {
         });
         for (const ids of chunk(uncertain, 150)) {
             const rows = (await fetchAll(
-                (a, b) => db.from('lineups').select('player_id,team_id,fixture:fixtures!inner(starting_at)').in('player_id', ids).eq('is_expected', false).gte('fixtures.starting_at', seasonStart).order('player_id').range(a, b),
+                (a, b) => db.from('lineups').select('player_id,team_id,fixture:fixtures!inner(starting_at),team:teams!inner(national)').in('player_id', ids).eq('is_expected', false).eq('teams.national', false).gte('fixtures.starting_at', seasonStart).order('player_id').range(a, b),
                 {max: 6000},
             )) as unknown as Array<{player_id: number; team_id: number; fixture: {starting_at: string} | null}>;
             for (const r of rows) if (r.fixture) evidenceOf.get(r.player_id)?.push({kind: 'played', teamId: r.team_id, date: r.fixture.starting_at.slice(0, 10)});

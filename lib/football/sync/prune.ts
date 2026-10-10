@@ -9,6 +9,9 @@ import {failSync, type FootballClient, type SyncRun} from './context';
  *   by the player-seasons job and read by no page).
  * - the bookkeeping that ages out by the day: job runs, the ledger of
  *   the notifications already sent, the site's error log.
+ * - the tombstones of the fantasy auctions and teams a user deleted:
+ *   kept a month so every device of theirs learns of the deletion
+ *   instead of writing the row back, then dropped for good.
  *
  * The detail of old matches (events, players' lines, team statistics,
  * lineups) is deliberately left alone, in every league and every season:
@@ -27,6 +30,8 @@ const RAW_KEEP_SEASONS = 2;
 const RUNS_KEEP_DAYS = 30;
 const NOTIFIED_KEEP_DAYS = 14;
 const ERRORS_KEEP_DAYS = 30;
+/** A deleted auction or team is forgotten for good after this long. */
+const TOMBSTONES_KEEP_DAYS = 30;
 
 const dayAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
@@ -52,4 +57,6 @@ export async function pruneDatabase(db: FootballClient, run: SyncRun): Promise<v
     await pruneOlderThan(db, run, 'sync_runs', 'started_at', dayAgo(RUNS_KEEP_DAYS), 'runs');
     await pruneOlderThan(db, run, 'notified', 'sent_at', dayAgo(NOTIFIED_KEEP_DAYS), 'notified');
     await pruneOlderThan(db, run, 'error_log', 'at', dayAgo(ERRORS_KEEP_DAYS), 'errors');
+    await pruneOlderThan(db, run, 'fantasy_auctions', 'deleted_at', dayAgo(TOMBSTONES_KEEP_DAYS), 'deleted_auctions');
+    await pruneOlderThan(db, run, 'fantasy_teams', 'deleted_at', dayAgo(TOMBSTONES_KEEP_DAYS), 'deleted_teams');
 }

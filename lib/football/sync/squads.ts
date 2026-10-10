@@ -44,8 +44,10 @@ async function currentClubs(db: FootballClient): Promise<Club[]> {
         (a, b) =>
             db
                 .from('season_teams')
-                .select('team:teams!inner(id,provider_id,name,squad_synced_at,transfers_synced_at),season:seasons!inner(id,year,is_current,league:leagues!inner(provider_id,tier))')
+                .select('team:teams!inner(id,provider_id,name,national,squad_synced_at,transfers_synced_at),season:seasons!inner(id,year,is_current,league:leagues!inner(provider_id,tier))')
                 .eq('seasons.is_current', true)
+                // A national side has no squad to keep: its players belong to their clubs.
+                .eq('teams.national', false)
                 .order('team_id')
                 .range(a, b),
         {max: 30000},
@@ -53,7 +55,8 @@ async function currentClubs(db: FootballClient): Promise<Club[]> {
     const rank = new Map(getFeaturedCompetitions().map((c, i) => [c.providerId, i]));
     const clubs = new Map<number, Club>();
     for (const r of rows) {
-        const team = r.team as unknown as {id: number; provider_id: number; name: string; squad_synced_at: string | null; transfers_synced_at: string | null};
+        const team = r.team as unknown as {id: number; provider_id: number; name: string; national: boolean; squad_synced_at: string | null; transfers_synced_at: string | null};
+        if (team.national) continue;
         const season = r.season as unknown as {id: number; year: number; league: {provider_id: number; tier: 'featured' | 'basic'}};
         const club = clubs.get(team.id) ?? {id: team.id, providerId: team.provider_id, name: team.name, tier: 'basic' as const, squadSyncedAt: team.squad_synced_at, transfersSyncedAt: team.transfers_synced_at, seasons: []};
         club.seasons.push({id: season.id, year: season.year, leagueProviderId: season.league.provider_id});

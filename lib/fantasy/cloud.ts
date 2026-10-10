@@ -11,6 +11,10 @@ export type {SharedAuction};
  * fantasy_auctions, one row per auction, RLS on the user). Read and
  * written straight from the browser with the anon key: the session
  * cookie carries the user, the policies do the rest.
+ *
+ * Deleting leaves a tombstone (`deleted_at`): the row stays a month so
+ * every other device of the user, still linked to it, finds it gone
+ * instead of writing it back as a new one. The nightly prune drops it.
  */
 
 export interface CloudAuction {
@@ -34,20 +38,24 @@ export async function cloudUser(): Promise<CloudUser | null> {
 }
 
 export async function listAuctions(): Promise<CloudAuction[]> {
-    const {data, error} = await createClient().from('fantasy_auctions').select('id,name,league,updated_at,purchases,share_token').order('updated_at', {ascending: false}).limit(50);
+    const {data, error} = await createClient().from('fantasy_auctions').select('id,name,league,updated_at,purchases,share_token').is('deleted_at', null).order('updated_at', {ascending: false}).limit(50);
     if (error) throw error;
     return (data ?? []).map((r) => ({id: r.id as string, name: r.name as string, league: r.league as string, updatedAt: r.updated_at as string, purchasesCount: Array.isArray(r.purchases) ? r.purchases.length : 0, shareToken: (r.share_token as string | null) ?? null}));
 }
 
-/** Creates the auction (no id) or updates it; returns the id. */
-export async function saveAuction(auction: {id: string | null; name: string; config: AuctionConfig; purchases: Purchase[]}, userId: string): Promise<string> {
+/**
+ * Creates the auction (no id) or updates it; returns the id. An id whose
+ * row was deleted (here or on another device) is not written: null comes
+ * back and the caller unlinks, so a deleted auction never returns as a
+ * copy of itself.
+ */
+export async function saveAuction(auction: {id: string | null; name: string; config: AuctionConfig; purchases: Purchase[]}, userId: string): Promise<string | null> {
     const db = createClient();
     const row = {name: auction.name, league: auction.config.league, config: auction.config, purchases: auction.purchases};
     if (auction.id) {
-        const {data, error} = await db.from('fantasy_auctions').update(row).eq('id', auction.id).select('id').maybeSingle();
+        const {data, error} = await db.from('fantasy_auctions').update(row).eq('id', auction.id).is('deleted_at', null).select('id').maybeSingle();
         if (error) throw error;
-        if (data) return data.id as string;
-        // Deleted elsewhere: saved again as a new one.
+        return data ? (data.id as string) : null;
     }
     const {data, error} = await db.from('fantasy_auctions').insert({...row, user_id: userId}).select('id').single();
     if (error) throw error;
@@ -55,7 +63,7 @@ export async function saveAuction(auction: {id: string | null; name: string; con
 }
 
 export async function loadAuction(id: string): Promise<{config: AuctionConfig; purchases: Purchase[]} | null> {
-    const {data, error} = await createClient().from('fantasy_auctions').select('config,purchases').eq('id', id).maybeSingle();
+    const {data, error} = await createClient().from('fantasy_auctions').select('config,purchases').eq('id', id).is('deleted_at', null).maybeSingle();
     if (error) throw error;
     if (!data) return null;
     const config = normalizeConfig(data.config);
@@ -66,8 +74,9 @@ export async function loadAuction(id: string): Promise<{config: AuctionConfig; p
     return {config, purchases};
 }
 
+/** A tombstone, not a delete: the link closes with it. */
 export async function deleteAuction(id: string): Promise<void> {
-    const {error} = await createClient().from('fantasy_auctions').delete().eq('id', id);
+    const {error} = await createClient().from('fantasy_auctions').update({deleted_at: new Date().toISOString(), share_token: null}).eq('id', id);
     if (error) throw error;
 }
 

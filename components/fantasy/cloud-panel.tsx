@@ -70,6 +70,14 @@ function useCloud(config: AuctionConfig | null, purchases: Purchase[]) {
         setError(null);
         try {
             const id = await saveAuction({id: asNew ? null : (link?.id ?? null), name: config.name || t('unnamed'), config, purchases}, user.id);
+            if (id === null) {
+                // Deleted on another device: this copy stays on the device, unlinked, and is not written back.
+                cloudStore.write(null);
+                setSynced({config, purchases});
+                setError(t('gone'));
+                setRefreshKey((k) => k + 1);
+                return;
+            }
             cloudStore.write({id, savedAt: new Date().toISOString()});
             setSynced({config, purchases});
             setRefreshKey((k) => k + 1);
@@ -91,6 +99,17 @@ function useCloud(config: AuctionConfig | null, purchases: Purchase[]) {
         const timer = window.setTimeout(() => void saveRef.current(false), AUTOSAVE_MS);
         return () => window.clearTimeout(timer);
     }, [pending, config, purchases]);
+    // Leaving the page before the wait is over: the change is written now, not forgotten.
+    const pendingRef = useRef(pending);
+    useEffect(() => {
+        pendingRef.current = pending;
+    });
+    useEffect(
+        () => () => {
+            if (pendingRef.current) void saveRef.current(false);
+        },
+        [],
+    );
 
     const load = async (row: CloudAuction) => {
         if (link?.id !== row.id && config && purchases.length > 0 && !link && !window.confirm(t('loadConfirm'))) return;

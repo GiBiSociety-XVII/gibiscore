@@ -155,6 +155,7 @@ export async function syncCompetitions(): Promise<SyncRun> {
                     country: t.team.country ?? null,
                     founded: t.team.founded ?? null,
                     venueName: t.venue?.name ?? null,
+                    national: t.team.national ?? null,
                 })),
             );
             run.bump('teams', teamEntries.length);

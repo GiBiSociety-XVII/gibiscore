@@ -28,13 +28,50 @@ function mergeLocks(a: LineupLock[], b: LineupLock[]): LineupLock[] {
     return [...byRound.values()].sort((x, y) => x.deadline.localeCompare(y.deadline)).slice(-HISTORY_ROUNDS);
 }
 
+/** Per team id, the content the account holds (as pushed or pulled): only what differs is written. Outlives the page: a change made just before moving on is still owed. */
+const known = new Map<string, string>();
+/** The write in flight, if any. A pull waits for it: a team deleted a moment before the page changed must not be read back. */
+let inflight: Promise<void> = Promise.resolve();
+
+/** Writes to the account whatever changed on the device since the account last held it, and tombstones what the device dropped. */
+async function pushChanges(userId: string): Promise<void> {
+    const saved = teamsStore.read();
+    const pins = pinsStore.read();
+    const outs = outsStore.read();
+    const benched = benchedStore.read();
+    const locks = locksStore.read();
+    const history = historyStore.read();
+    const present = new Set(saved.teams.map((t) => t.id));
+    for (const team of saved.teams) {
+        const row = {id: team.id, team, pins: pins[team.id] ?? [], outs: outs[team.id] ?? [], benched: benched[team.id] ?? [], lock: locks[team.id]?.round ? locks[team.id] : null, locks: history[team.id] ?? []};
+        const fp = fingerprint(row.team, row.pins, row.outs, row.benched, row.lock, row.locks);
+        if (known.get(team.id) === fp) continue;
+        await saveAccountTeam(userId, row);
+        known.set(team.id, fp);
+    }
+    for (const id of [...known.keys()]) {
+        if (present.has(id)) continue;
+        await deleteAccountTeam(id);
+        known.delete(id);
+    }
+}
+
+/** The push, one after the other: the result of this one, the chain never broken by a failure. */
+function queuePush(userId: string): Promise<void> {
+    const run = inflight.then(() => pushChanges(userId));
+    inflight = run.catch(() => undefined);
+    return run;
+}
+
 /**
  * Keeps the device's fantasy teams (roster, pins, outs, frozen lineup) in
  * step with the signed-in user's account: on load the account's rows are
  * merged into the device (the newer roster wins, the account's pins,
  * outs and frozen lineup win unless the device's is newer), then every
  * change on the device follows to the account, and a team removed here
- * is removed there. Signed out, nothing happens: the device keeps its own.
+ * is removed there. A team removed on another device is removed here
+ * too (its tombstone says so), unless this device went on editing it
+ * after that. Signed out, nothing happens: the device keeps its own.
  */
 export function useAccountTeams(): {user: CloudUser | null; status: AccountStatus} {
     const [user, setUser] = useState<CloudUser | null | undefined>(undefined);
@@ -45,9 +82,9 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
     const benched = benchedStore.useValue();
     const locks = locksStore.useValue();
     const history = historyStore.useValue();
-    /** Per team id, the content the account holds (as pushed or pulled): only what differs is written. */
-    const known = useRef<Map<string, string>>(new Map());
     const pulled = useRef(false);
+    /** Who to write for when the page is left with a change still owed. */
+    const owed = useRef<string | null>(null);
 
     useEffect(() => {
         let alive = true;
@@ -68,13 +105,14 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
         };
     }, []);
 
-    // Pull once: the account's teams into the device.
+    // Pull once: the account's teams into the device, after any write still on its way.
     useEffect(() => {
         if (!user || pulled.current) return;
         pulled.current = true;
         let alive = true;
         setStatus('pulling');
-        listAccountTeams()
+        inflight
+            .then(() => listAccountTeams())
             .then((rows) => {
                 if (!alive) return;
                 const localTeams = teamsStore.read();
@@ -91,6 +129,21 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
                 const nextHistory = {...localHistory};
                 for (const row of rows) {
                     const mine = byId.get(row.id);
+                    if (row.deletedAt) {
+                        // Deleted on a device. This one drops its copy — unless it edited the team after that: then the copy is the newer word, and the next push revives the row.
+                        if (mine && mine.savedAt > row.deletedAt) {
+                            known.delete(row.id);
+                            continue;
+                        }
+                        byId.delete(row.id);
+                        delete nextPins[row.id];
+                        delete nextOuts[row.id];
+                        delete nextBenched[row.id];
+                        delete nextLocks[row.id];
+                        delete nextHistory[row.id];
+                        known.delete(row.id);
+                        continue;
+                    }
                     if (!mine || mine.savedAt < row.team.savedAt) byId.set(row.id, row.team);
                     nextPins[row.id] = row.pins;
                     nextOuts[row.id] = row.outs;
@@ -99,9 +152,9 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
                     if (row.lock && (!local || local.round !== row.lock.round || local.savedAt < row.lock.savedAt)) nextLocks[row.id] = row.lock;
                     const merged = mergeLocks(localHistory[row.id] ?? [], row.locks);
                     if (merged.length > 0) nextHistory[row.id] = merged;
-                    known.current.set(row.id, fingerprint(row.team, row.pins, row.outs, row.benched, row.lock, merged));
+                    known.set(row.id, fingerprint(row.team, row.pins, row.outs, row.benched, row.lock, merged));
                 }
-                teamsStore.write({...localTeams, teams: [...byId.values()]});
+                teamsStore.write({teams: [...byId.values()], current: localTeams.current !== null && byId.has(localTeams.current) ? localTeams.current : null});
                 pinsStore.write(nextPins);
                 outsStore.write(nextOuts);
                 benchedStore.write(nextBenched);
@@ -121,28 +174,23 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
     // Push what changed, a little after the last change.
     useEffect(() => {
         if (!user || status !== 'synced') return;
-        const timer = window.setTimeout(async () => {
-            try {
-                const present = new Set(saved.teams.map((t) => t.id));
-                for (const team of saved.teams) {
-                    const row = {id: team.id, team, pins: pins[team.id] ?? [], outs: outs[team.id] ?? [], benched: benched[team.id] ?? [], lock: locks[team.id]?.round ? locks[team.id] : null, locks: history[team.id] ?? []};
-                    const fp = fingerprint(row.team, row.pins, row.outs, row.benched, row.lock, row.locks);
-                    if (known.current.get(team.id) === fp) continue;
-                    await saveAccountTeam(user.id, row);
-                    known.current.set(team.id, fp);
-                }
-                for (const id of [...known.current.keys()]) {
-                    if (present.has(id)) continue;
-                    await deleteAccountTeam(id);
-                    known.current.delete(id);
-                }
-            } catch (error) {
+        owed.current = user.id;
+        const timer = window.setTimeout(() => {
+            queuePush(user.id).catch((error: Error) => {
                 console.error('[fantasy] account teams', error);
                 setStatus('error');
-            }
+            });
         }, PUSH_MS);
         return () => window.clearTimeout(timer);
     }, [user, status, saved, pins, outs, benched, locks, history]);
+
+    // Leaving the page before the wait is over: the change is written now, not forgotten.
+    useEffect(
+        () => () => {
+            if (owed.current) void queuePush(owed.current).catch((error: Error) => console.error('[fantasy] account teams', error));
+        },
+        [],
+    );
 
     return {user: user ?? null, status};
 }

@@ -352,9 +352,10 @@ L'email è `supabase/templates/recovery.html`: va incollata una volta nel
 progetto Supabase, **Authentication → Emails → Templates → Reset
 password**, con oggetto «Il tuo codice per reimpostare la password su
 GiBiScore» (il modello usa `{{ .Token }}`, il codice; senza
-`{{ .ConfirmationURL }}` Supabase non manda nessun link). Il lockup che
-l'email mostra è `public/brand/png/gibiscore-lockup.png` (l'esportazione
-ufficiale del marchio, 957×240), servito dal sito. La durata del codice è l'impostazione «Email OTP expiration» di
+`{{ .ConfirmationURL }}` Supabase non manda nessun link). Il lockup in cima
+all'email è disegnato in HTML (tile, «GiBi», «Score» in azzurro), non
+un'immagine: i client di posta bloccano o filtrano le immagini, e
+un'icona rotta non è un marchio. La durata del codice è l'impostazione «Email OTP expiration» di
 Supabase (un'ora, il valore predefinito).
 
 ## Identità
@@ -391,7 +392,7 @@ le notifiche, e il link che aprono, in quella.
 | `/stats` | marcatori, assist e voti migliori di ogni competizione principale |
 | `/injuries` | infortunati e squalificati delle competizioni principali: da quanto sono fuori, partite saltate e rientro indicativo |
 | `/predictions` | pronostici statistici delle prossime partite (probabilità 1-X-2, gol attesi, over, entrambe a segno) |
-| `/fantacalcio` | sezione fantacalcio (pagine dedicate: il fantacalcio non compare nelle pagine generali) |
+| `/fantacalcio` | sezione fantacalcio (pagine dedicate: il fantacalcio non compare nelle pagine generali); con l'account, aste e squadre vivono nel cloud (`fantasy_auctions`, `fantasy_teams`) e ogni dispositivo le allinea; una cancellazione lascia una lapide (`deleted_at`) che gli altri dispositivi leggono invece di riscrivere la riga, eliminata dopo un mese dal `prune`; il listone legge il club di un giocatore da rose e formazioni dei soli club (`teams.national` esclude le nazionali) |
 | `/fantacalcio/asta` | asta: configurazione della lega (campionato, Classic/Mantra, crediti, rosa, punteggi, modificatori) e listone con voti 1-100 (titolarità, bonus, voto, malus, fisico, club), fantamedia stimata, crediti consigliati e tabellone acquisti; impostazioni e acquisti restano nel browser (`lib/fantasy/`); fasce per ruolo e nove strategie d'asta simulate sul listone |
 | `/compare?a=&b=` | due giocatori a confronto sulla stessa stagione, con valori ogni 90 minuti |
 | `/search?q=` | ricerca squadre, giocatori e competizioni (suggerimenti live nella barra) |
