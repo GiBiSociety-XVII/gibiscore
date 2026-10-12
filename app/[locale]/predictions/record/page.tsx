@@ -11,7 +11,7 @@ import {MySchedine} from "@/components/football/my-schedine";
 import {Help} from "@/components/fantasy/help";
 import {TourLauncher} from "@/components/football/tour-launcher";
 import {getModelFit} from "@/lib/football/data/tuning";
-import type {LegKey} from "@/lib/football/markets";
+import {handicapOf, type LegKey} from "@/lib/football/markets";
 
 export const revalidate = 600;
 
@@ -32,7 +32,11 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
     const tm = await getTranslations('Football.markets');
     const format = await getFormatter();
     const [record, fit, schedine] = await Promise.all([getAdviceRecord(), getModelFit(), getSchedineTally()]);
-    const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
+    const legLabel = (key: LegKey) => {
+        const hc = handicapOf(key);
+        if (hc) return tm(hc.side === 'home' ? 'labels.homeHandicap' : 'labels.awayHandicap', {line: hc.line.replace('.', ',')});
+        return key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key;
+    };
     const cell = (label: string, value: string, note?: string) => (
         <div className="flex flex-col items-center justify-center px-2 py-2 border-t border-muted">
             <span className="font-mono text-base font-extrabold tabular-nums">{value}</span>

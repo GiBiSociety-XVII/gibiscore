@@ -34,8 +34,9 @@ interface Due {
  * sync-odds (every three hours)
  *
  * The bookmakers' pre-match prices of the fixtures of the next days: one
- * request per fixture, the four markets the match page reads stored per
- * bookmaker (fixture_odds). The featured fixtures of the next three days
+ * request per fixture, the five markets the site reads (1X2, double
+ * chance, goals, both to score, Asian handicap) stored per bookmaker
+ * (fixture_odds). The featured fixtures of the next three days
  * every run; the basic ones whose league the provider covers for odds
  * (lib/football/coverage.ts), next two days, once a day, up to 600 a
  * run. Every ask is marked on the fixture (odds_synced_at), answered or

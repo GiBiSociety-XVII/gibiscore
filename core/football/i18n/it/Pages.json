@@ -474,7 +474,7 @@
       "kindHint": {
         "single": "Una sola partita, la più probabile.",
         "multiple": "Tutte le selezioni devono vincere: la quota è il prodotto.",
-        "system": "Fisse in ogni colonna, le altre combinate k alla volta: vince se tutte le fisse e almeno k delle altre sono centrate."
+        "system": "Fisse in ogni colonna (la giocata più sicura della partita), le altre combinate k alla volta: vince se tutte le fisse e almeno k delle altre sono centrate."
       },
       "size": "Partite",
       "systemOf": "Colonne da",
@@ -499,7 +499,7 @@
       "disclaimer": "Le selezioni sono le stesse giocate verificate nel bilancio del modello: ogni schedina salvata viene chiusa sui risultati reali. Non è un consiglio di gioco: gioca solo se maggiorenne e con misura.",
       "bankers": "Fisse",
       "bankersAuto": "Automatiche",
-      "bankersHint": "Quante selezioni stanno in ogni colonna. Automatiche: il modello rende fisse le selezioni almeno al 75%, lasciando almeno due selezioni libere.",
+      "bankersHint": "Quante selezioni stanno in ogni colonna. Una fissa è la giocata più sicura della sua partita (un solo esito: per esempio la doppia chance, l'under 3,5 o l'handicap +1,5), non la giocata del rischio scelto; le altre selezioni restano quelle del rischio. Automatiche: fisse le partite con una giocata almeno all'80%, lasciando almeno due selezioni libere.",
       "bankersCount": "{count} fisse",
       "banker": "Fissa",
       "systemOfFree": "selezioni libere: sistema {k} su {n}, vince con almeno {k} libere centrate",

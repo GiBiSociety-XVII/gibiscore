@@ -1,4 +1,4 @@
-import type {BetSuggestion} from './markets';
+import {SUGGESTION_TIERS, type BetSuggestion} from './markets';
 
 /**
  * A betting slip built from the model's slips of the upcoming matches:
@@ -7,6 +7,14 @@ import type {BetSuggestion} from './markets';
  * likely of the tier, so the slip is the one the model believes in
  * most for that risk; the chance of the whole slip is the product of
  * the selections' (independent matches), the odds the product too.
+ *
+ * A system is two things: the bankers, in every column, and the free
+ * selections, combined k at a time. A banker is there to be right, not
+ * to pay, so it is not the tier's slip of its match (a combination
+ * chosen for its price) but the one leg of that match the model is
+ * surest of (an underdog not losing by two, a favourite not losing,
+ * under 3.5): the matches with the surest leg are the bankers, the
+ * tier's slips of the other matches are the free selections.
  * Pure and testable.
  */
 
@@ -33,7 +41,7 @@ export interface SchedinaOptions {
     size: number;
     /** A system: columns of this many of the free selections ("k su N", N the selections that are not bankers); 'auto' picks the k with the best expected return at the bookmakers' prices. */
     system?: number | 'auto';
-    /** A system: how many selections are bankers (in every column); 'auto' makes bankers of the safest ones (BANKER_MIN_PCT), at most size - 2. */
+    /** A system: how many selections are bankers (in every column), each the surest leg of its match; 'auto' makes bankers of the matches with a leg at least BANKER_MIN_PCT likely, at most size - 2. */
     bankers?: number | 'auto';
     /** Rome days allowed; empty = any. */
     days: string[];
@@ -72,13 +80,28 @@ export interface Schedina {
     system?: {of: number; free: number; bankers: number; columns: number; atLeastPct: number};
 }
 
-/** A selection at least this likely is a banker when the bankers are chosen automatically. */
-export const BANKER_MIN_PCT = 75;
+/** A match whose surest leg is at least this likely is a banker when the bankers are chosen automatically. */
+export const BANKER_MIN_PCT = 80;
 
 /** The tier a risk asks for, and the ones it falls back to when a match has none. */
 const TIERS_BY_RISK: Record<SchedinaRisk, Array<BetSuggestion['tier']>> = {low: ['safe'], medium: ['balanced', 'safe'], high: ['bold', 'balanced']};
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
+/** The tier a chance falls in, by the thresholds of the suggestions. */
+const tierOf = (pct: number): BetSuggestion['tier'] => SUGGESTION_TIERS.find((t) => pct >= t.min)?.tier ?? 'bold';
+
+/**
+ * The banker a match offers: its one surest leg, among the legs of its
+ * slips, as a selection of its own (the slip's price is the leg's). A
+ * tie goes to the leg that pays more. Null without a leg.
+ */
+export function bankerOf(c: SchedinaCandidate): SchedinaSelection | null {
+    let best: BetSuggestion['legs'][number] | null = null;
+    for (const slip of c.slips) for (const leg of slip.legs) if (!best || leg.pct > best.pct || (leg.pct === best.pct && (leg.odds ?? 0) > (best.odds ?? 0))) best = leg;
+    if (!best || best.pct <= 0) return null;
+    const pct = Math.round(best.pct);
+    return {fixtureId: c.fixtureId, competition: c.competition, home: c.home, away: c.away, startingAt: c.startingAt, tier: tierOf(pct), slip: {tier: tierOf(pct), legs: [{...best}], pct, fair: round2(100 / pct), odds: best.odds}, banker: true};
+}
 /** Bookmakers take stakes in steps of five cents: down to the step below. */
 export const STAKE_STEP = 0.05;
 export const toStakeStep = (v: number) => Math.max(0, Math.floor(Math.round(v * 100) / 5) * 5) / 100;
@@ -111,6 +134,7 @@ export function buildSchedina(candidates: SchedinaCandidate[], options: Schedina
     const size = Math.max(1, Math.min(10, options.kind === 'single' ? 1 : Math.round(options.size)));
     const tiers = TIERS_BY_RISK[options.risk];
     const picks: SchedinaSelection[] = [];
+    const eligible: SchedinaCandidate[] = [];
     for (const c of candidates) {
         if (c.startingAt <= options.now) continue;
         if (options.days.length > 0 && !options.days.includes(c.day)) continue;
@@ -119,26 +143,37 @@ export function buildSchedina(candidates: SchedinaCandidate[], options: Schedina
         const slip = tier ? c.slips.find((s) => s.tier === tier) : undefined;
         if (!tier || !slip) continue;
         picks.push({fixtureId: c.fixtureId, competition: c.competition, home: c.home, away: c.away, startingAt: c.startingAt, tier, slip, banker: false});
+        eligible.push(c);
     }
     if (picks.length < size) return null;
     // The most likely first; the tier asked for before a fallback; then what pays more.
     const rank = (s: SchedinaSelection) => s.slip.pct + (s.tier === tiers[0] ? 100 : 0);
-    const selections = picks
-        .sort((a, b) => rank(b) - rank(a) || b.slip.fair - a.slip.fair || a.startingAt.localeCompare(b.startingAt))
-        .slice(0, size)
-        .sort((a, b) => a.startingAt.localeCompare(b.startingAt));
+    const byRank = (a: SchedinaSelection, b: SchedinaSelection) => rank(b) - rank(a) || b.slip.fair - a.slip.fair || a.startingAt.localeCompare(b.startingAt);
+    const byKickoff = (a: SchedinaSelection, b: SchedinaSelection) => a.startingAt.localeCompare(b.startingAt);
+    let selections: SchedinaSelection[];
+    let bankers = 0;
+    if (options.kind === 'system' && size >= 2) {
+        // The bankers first: the matches with the surest leg, on that leg; at most size - 2, so the system keeps two free selections to combine. The free ones are the tier's slips of the other matches.
+        const sure = eligible
+            .map(bankerOf)
+            .filter((s): s is SchedinaSelection => s !== null)
+            .sort((a, b) => b.slip.pct - a.slip.pct || (b.slip.odds ?? 0) - (a.slip.odds ?? 0) || a.startingAt.localeCompare(b.startingAt));
+        const wanted = options.bankers === 'auto' || options.bankers === undefined ? sure.filter((s) => s.slip.pct >= BANKER_MIN_PCT).length : Math.round(options.bankers);
+        bankers = Math.max(0, Math.min(size - 2, wanted, sure.length));
+        const fixed = sure.slice(0, bankers);
+        const taken = new Set(fixed.map((s) => s.fixtureId));
+        const free = picks.filter((p) => !taken.has(p.fixtureId)).sort(byRank).slice(0, size - bankers);
+        selections = [...fixed, ...free].sort(byKickoff);
+    } else {
+        selections = picks.sort(byRank).slice(0, size).sort(byKickoff);
+    }
     const probabilities = selections.map((s) => s.slip.pct / 100);
     const pct = Math.round(probabilities.reduce((p, v) => p * v, 1) * 100);
     const fair = round2(selections.reduce((p, s) => p * s.slip.fair, 1));
     const book = selections.every((s) => s.slip.odds !== null) ? round2(selections.reduce((p, s) => p * (s.slip.odds ?? 1), 1)) : null;
     const out: Schedina = {kind: options.kind, risk: options.risk, selections, pct, fair, book, firstKickoff: selections[0].startingAt, lastKickoff: selections[selections.length - 1].startingAt};
     if (options.kind === 'system' && size >= 2) {
-        // Bankers: the safest selections, at most size - 2 so the system keeps two free ones; the free ones combine k at a time.
-        const bySafety = [...selections].sort((a, b) => b.slip.pct - a.slip.pct || a.slip.fair - b.slip.fair);
-        const maxBankers = Math.max(0, size - 2);
-        const wanted = options.bankers === 'auto' || options.bankers === undefined ? bySafety.filter((s) => s.slip.pct >= BANKER_MIN_PCT).length : Math.round(options.bankers);
-        const bankers = Math.max(0, Math.min(maxBankers, wanted));
-        for (const s of bySafety.slice(0, bankers)) s.banker = true;
+        // The free selections combine k at a time; every column carries the bankers.
         const free = size - bankers;
         const of = options.system === 'auto' || options.system === undefined ? autoSystemOf(selections) : Math.max(1, Math.min(free, Math.round(options.system)));
         const freeProbabilities = selections.filter((s) => !s.banker).map((s) => s.slip.pct / 100);

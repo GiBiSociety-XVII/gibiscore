@@ -1,6 +1,6 @@
 import {ImageResponse} from 'next/og';
 import {getSharedSchedina} from '@/lib/football/data/schedina-share';
-import type {LegKey} from '@/lib/football/markets';
+import {handicapOf, type LegKey} from '@/lib/football/markets';
 
 export const alt = 'Schedina GiBiScore';
 export const size = {width: 1200, height: 630};
@@ -12,8 +12,8 @@ const accent = '#3BC9FF';
 
 /** The words of the image per language (the image is drawn outside the translation layer). */
 const WORDS = {
-    it: {btts: 'Gol', noBtts: 'No gol', decimal: ',', kinds: {single: 'Singola', multiple: 'Multipla', system: 'Sistema'}, risks: {low: 'Basso', medium: 'Medio', high: 'Alto'}, selections: 'selezioni', more: '+ altre {n} selezioni', slip: 'SCHEDINA N.', odds: 'QUOTA', chance: 'PROBABILITÀ', stake: 'PUNTATA', payout: 'VINCITA', open: 'APERTA', won: 'VINTA', lost: 'PERSA'},
-    en: {btts: 'BTTS yes', noBtts: 'BTTS no', decimal: '.', kinds: {single: 'Single', multiple: 'Accumulator', system: 'System'}, risks: {low: 'Low', medium: 'Medium', high: 'High'}, selections: 'selections', more: '+ {n} more selections', slip: 'BETTING SLIP NO.', odds: 'ODDS', chance: 'PROBABILITY', stake: 'STAKE', payout: 'PAYOUT', open: 'OPEN', won: 'WON', lost: 'LOST'},
+    it: {btts: 'Gol', noBtts: 'No gol', home: 'Casa', away: 'Ospite', decimal: ',', kinds: {single: 'Singola', multiple: 'Multipla', system: 'Sistema'}, risks: {low: 'Basso', medium: 'Medio', high: 'Alto'}, selections: 'selezioni', more: '+ altre {n} selezioni', slip: 'SCHEDINA N.', odds: 'QUOTA', chance: 'PROBABILITÀ', stake: 'PUNTATA', payout: 'VINCITA', open: 'APERTA', won: 'VINTA', lost: 'PERSA'},
+    en: {btts: 'BTTS yes', noBtts: 'BTTS no', home: 'Home', away: 'Away', decimal: '.', kinds: {single: 'Single', multiple: 'Accumulator', system: 'System'}, risks: {low: 'Low', medium: 'Medium', high: 'High'}, selections: 'selections', more: '+ {n} more selections', slip: 'BETTING SLIP NO.', odds: 'ODDS', chance: 'PROBABILITY', stake: 'STAKE', payout: 'PAYOUT', open: 'OPEN', won: 'WON', lost: 'LOST'},
 } as const;
 type Words = (typeof WORDS)[keyof typeof WORDS];
 
@@ -23,6 +23,8 @@ function legLabel(key: LegKey, w: Words): string {
     if (key === 'noBtts') return w.noBtts;
     if (key.startsWith('over')) return `Over ${key.slice(4, 5)}${w.decimal}${key.slice(5)}`;
     if (key.startsWith('under')) return `Under ${key.slice(5, 6)}${w.decimal}${key.slice(6)}`;
+    const hc = handicapOf(key);
+    if (hc) return `${hc.side === 'home' ? w.home : w.away} ${hc.line.replace('.', w.decimal)}`;
     return key;
 }
 

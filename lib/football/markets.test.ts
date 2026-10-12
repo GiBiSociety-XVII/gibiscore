@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandHeat, bandOf, BANDS, expectedTotals, fairOdds, legOdds, matchMarkets, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts, isValueSlip, slipEdge} from './markets';
+import {teamMarketProfile, bandHeat, bandOf, BANDS, fairOdds, handicapOf, isValueSlip, legOdds, matchMarkets, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, type TeamMatchFacts, expectedTotals} from './markets';
 import {scoreGrid} from './prediction';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
@@ -113,6 +113,18 @@ describe('summarizeOdds', () => {
         expect(s.goals!.over25!.avg).toBe(1.85);
         expect(s.goals!.under15).toBeUndefined();
         expect(s.doubleChance).toBeUndefined();
+        expect(s.handicap).toBeUndefined();
+    });
+    it('folds the handicap lines like the others', () => {
+        const s = summarizeOdds([
+            {bookmaker: 'A', markets: {handicap: {homeMinus15: 2.7, awayMinus15: null, homePlus15: null, awayPlus15: 1.46}}},
+            {bookmaker: 'B', markets: {handicap: {homeMinus15: 2.9, awayMinus15: null, homePlus15: null, awayPlus15: 1.4}}},
+        ])!;
+        expect(s.handicap!.homeMinus15).toEqual({avg: 2.8, best: 2.9, bestBook: 'B', books: 2});
+        expect(s.handicap!.awayMinus15).toBeUndefined();
+        expect(legOdds(s, 'home-15')).toBe(2.8);
+        expect(legOdds(s, 'away+15')).toBeCloseTo(1.43, 2);
+        expect(legOdds(s, 'home+15')).toBeNull();
     });
     it('is null without rows or without any market', () => {
         expect(summarizeOdds([])).toBeNull();
@@ -162,7 +174,7 @@ describe('suggestBets', () => {
             expect(s.fair).toBeCloseTo(100 / s.pct, 1);
             // A slip is never more likely than its least likely leg.
             expect(s.pct).toBeLessThanOrEqual(Math.min(...s.legs.map((l) => l.pct)));
-            const groups = s.legs.map((l) => (['1', 'X', '2', '1X', 'X2', '12'].includes(l.key) ? 'outcome' : l.key.startsWith('over') || l.key.startsWith('under') ? 'goals' : 'btts'));
+            const groups = s.legs.map((l) => (['1', 'X', '2', '1X', 'X2', '12'].includes(l.key) || handicapOf(l.key) ? 'outcome' : l.key.startsWith('over') || l.key.startsWith('under') ? 'goals' : 'btts'));
             expect(new Set(groups).size).toBe(groups.length);
             // The bookmakers' price is the product of the legs' averages.
             expect(s.odds).toBeCloseTo(s.legs.reduce((p, l) => p * (l.odds ?? 1), 1), 1);
@@ -181,6 +193,23 @@ describe('suggestBets', () => {
             expect(keys.includes('X') && keys.includes('12')).toBe(false);
             expect(s.odds).toBeNull();
         }
+    });
+
+    it('offers the handicap lines, and settles them on the margin', () => {
+        // A clear favourite: -1.5 is a bold leg of its own, +1.5 for the underdog a very likely one.
+        const strong: MatchPrediction = {...prediction, lambda: {home: 2.6, away: 0.6}, base: {home: 2.6, away: 0.6}};
+        const slips = suggestBets(strong, null);
+        const keys = slips.flatMap((s) => s.legs.map((l) => l.key));
+        expect(keys.some((k) => handicapOf(k) !== null)).toBe(true);
+        expect(handicapOf('home-15')).toEqual({side: 'home', line: '-1.5'});
+        expect(handicapOf('away+15')).toEqual({side: 'away', line: '+1.5'});
+        expect(handicapOf('1X')).toBeNull();
+        expect(settleLegs(['home-15'], 2, 0)).toBe(true);
+        expect(settleLegs(['home-15'], 1, 0)).toBe(false);
+        expect(settleLegs(['away+15'], 1, 0)).toBe(true);
+        expect(settleLegs(['away+15'], 2, 0)).toBe(false);
+        expect(settleLegs(['away-15', 'over25'], 0, 3)).toBe(true);
+        expect(settleLegs(['home+15'], 0, 2)).toBe(false);
     });
 
     it('reads a leg price from the summary', () => {

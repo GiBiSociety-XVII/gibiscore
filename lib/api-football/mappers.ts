@@ -583,12 +583,14 @@ export interface OddsRow {
     markets: OddsMarkets;
 }
 
-const BET_NAMES = {outcome: 'Match Winner', doubleChance: 'Double Chance', goals: 'Goals Over/Under', btts: 'Both Teams Score'} as const;
+const BET_NAMES = {outcome: 'Match Winner', doubleChance: 'Double Chance', goals: 'Goals Over/Under', btts: 'Both Teams Score', handicap: 'Asian Handicap'} as const;
 
 /**
- * The bookmakers' prices for the four markets the site reads, one row
+ * The bookmakers' prices for the five markets the site reads, one row
  * per bookmaker; a bookmaker without any of them is skipped. Labels are
- * the provider's: "Home"/"Draw"/"Away", "Home/Draw", "Over 2.5", "Yes".
+ * the provider's: "Home"/"Draw"/"Away", "Home/Draw", "Over 2.5", "Yes",
+ * "Home -1.5" (the Asian lines at a goal and a half only: the whole
+ * and quarter lines can push, and a slip has no room for a refund).
  */
 export function mapOdds(response: AfOddsResponse | undefined): OddsRow[] {
     if (!response) return [];
@@ -625,6 +627,11 @@ export function mapOdds(response: AfOddsResponse | undefined): OddsRow[] {
             const yes = price(btts, 'Yes');
             const no = price(btts, 'No');
             if (yes !== null && no !== null) markets.btts = {yes, no};
+        }
+        const handicap = bet(BET_NAMES.handicap);
+        if (handicap) {
+            const hc = {homeMinus15: price(handicap, 'Home -1.5'), awayMinus15: price(handicap, 'Away -1.5'), homePlus15: price(handicap, 'Home +1.5'), awayPlus15: price(handicap, 'Away +1.5')};
+            if (Object.values(hc).some((v) => v !== null)) markets.handicap = hc;
         }
         if (Object.keys(markets).length > 0) rows.push({bookmakerId: b.id, bookmaker: b.name, markets});
     }

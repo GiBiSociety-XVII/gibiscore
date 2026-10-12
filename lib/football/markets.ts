@@ -244,7 +244,11 @@ export interface OddsMarkets {
     doubleChance?: {homeOrDraw: number; drawOrAway: number; homeOrAway: number};
     goals?: {over15: number | null; under15: number | null; over25: number | null; under25: number | null; over35: number | null; under35: number | null};
     btts?: {yes: number; no: number};
+    /** The Asian handicap at a goal and a half: minus, the side wins by two or more; plus, it does not lose by two or more. */
+    handicap?: {homeMinus15: number | null; awayMinus15: number | null; homePlus15: number | null; awayPlus15: number | null};
 }
+
+export type HandicapKey = 'homeMinus15' | 'awayMinus15' | 'homePlus15' | 'awayPlus15';
 
 /** The bookmakers' price of one market: their average, the best one and who gives it, how many offer it. */
 export interface OddsLine {
@@ -259,6 +263,7 @@ export type OddsSummary = {
     doubleChance?: {homeOrDraw: OddsLine; drawOrAway: OddsLine; homeOrAway: OddsLine};
     goals?: Partial<Record<'over15' | 'under15' | 'over25' | 'under25' | 'over35' | 'under35', OddsLine>>;
     btts?: {yes: OddsLine; no: OddsLine};
+    handicap?: Partial<Record<HandicapKey, OddsLine>>;
     /** Bookmakers with at least one market. */
     books: number;
     updatedAt: string | null;
@@ -291,11 +296,23 @@ export function summarizeOdds(rows: Array<{bookmaker: string; markets: OddsMarke
     const yes = fold((m) => m.btts?.yes);
     const no = fold((m) => m.btts?.no);
     if (yes && no) out.btts = {yes, no};
-    return out.outcome || out.doubleChance || out.goals || out.btts ? out : null;
+    const handicap: NonNullable<OddsSummary['handicap']> = {};
+    for (const key of ['homeMinus15', 'awayMinus15', 'homePlus15', 'awayPlus15'] as const) {
+        const line = fold((m) => m.handicap?.[key]);
+        if (line) handicap[key] = line;
+    }
+    if (Object.keys(handicap).length > 0) out.handicap = handicap;
+    return out.outcome || out.doubleChance || out.goals || out.btts || out.handicap ? out : null;
 }
 
-/** A selection of one market, as the betting slips name it. */
-export type LegKey = '1' | 'X' | '2' | '1X' | 'X2' | '12' | 'over15' | 'under15' | 'over25' | 'under25' | 'over35' | 'under35' | 'btts' | 'noBtts';
+/** A selection of one market, as the betting slips name it. The handicap legs are the Asian lines at a goal and a half: `home-15` the home side wins by two or more, `away+15` the away side does not lose by two or more. */
+export type LegKey = '1' | 'X' | '2' | '1X' | 'X2' | '12' | 'over15' | 'under15' | 'over25' | 'under25' | 'over35' | 'under35' | 'btts' | 'noBtts' | 'home-15' | 'away-15' | 'home+15' | 'away+15';
+
+/** A handicap leg read: which side and its line ("-1.5", "+1.5"); null for any other leg. */
+export function handicapOf(key: LegKey): {side: 'home' | 'away'; line: string} | null {
+    const m = /^(home|away)([+-])15$/.exec(key);
+    return m ? {side: m[1] as 'home' | 'away', line: `${m[2]}1.5`} : null;
+}
 
 export interface BetLeg {
     key: LegKey;
@@ -343,6 +360,11 @@ const LEGS: Array<{key: LegKey; group: Group; test: (h: number, a: number) => bo
     {key: '1X', group: 'outcome', test: (h, a) => h >= a},
     {key: 'X2', group: 'outcome', test: (h, a) => h <= a},
     {key: '12', group: 'outcome', test: (h, a) => h !== a},
+    // Handicaps sit with the outcomes: a slip never carries two readings of the same result.
+    {key: 'home-15', group: 'outcome', test: (h, a) => h - a > 1},
+    {key: 'away-15', group: 'outcome', test: (h, a) => a - h > 1},
+    {key: 'home+15', group: 'outcome', test: (h, a) => a - h < 2},
+    {key: 'away+15', group: 'outcome', test: (h, a) => h - a < 2},
     {key: 'over15', group: 'goals', test: (h, a) => h + a > 1},
     {key: 'under15', group: 'goals', test: (h, a) => h + a < 2},
     {key: 'over25', group: 'goals', test: (h, a) => h + a > 2},
@@ -371,6 +393,10 @@ export function legOdds(odds: OddsSummary | null, key: LegKey): number | null {
         case '12': return odds.doubleChance?.homeOrAway.avg ?? null;
         case 'btts': return odds.btts?.yes.avg ?? null;
         case 'noBtts': return odds.btts?.no.avg ?? null;
+        case 'home-15': return odds.handicap?.homeMinus15?.avg ?? null;
+        case 'away-15': return odds.handicap?.awayMinus15?.avg ?? null;
+        case 'home+15': return odds.handicap?.homePlus15?.avg ?? null;
+        case 'away+15': return odds.handicap?.awayPlus15?.avg ?? null;
         default: return odds.goals?.[key]?.avg ?? null;
     }
 }
@@ -378,7 +404,7 @@ export function legOdds(odds: OddsSummary | null, key: LegKey): number | null {
 /**
  * What the model would put on the slip, one suggestion per tier of
  * risk: among every selection and every combination of selections from
- * different markets (outcome, goals, both to score), the one that pays
+ * different markets (outcome or handicap, goals, both to score), the one that pays
  * most while keeping the tier's chance. The chance of a combination is
  * counted on the model's scorelines, so its legs never contradict each
  * other (a slip that cannot happen has no chance at all) and a leg that

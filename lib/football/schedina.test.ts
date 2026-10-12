@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {BetSuggestion} from './markets';
-import {atLeast, autoSystemOf, buildSchedina, combinations, schedinaColumns, schedinaLost, schedinaWon, stakePlan, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type SchedinaCandidate} from './schedina';
+import {atLeast, autoSystemOf, bankerOf, buildSchedina, combinations, schedinaColumns, schedinaLost, schedinaWon, stakePlan, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type SchedinaCandidate} from './schedina';
 
 const slip = (tier: BetSuggestion['tier'], pct: number, odds: number | null = null): BetSuggestion => ({tier, legs: [{key: '1', pct, odds}], pct, fair: Math.round((100 / pct) * 100) / 100, odds});
 const match = (id: number, day: string, hour: string, competitionId: number, slips: BetSuggestion[]): SchedinaCandidate => ({fixtureId: id, competitionId, competition: `L${competitionId}`, home: `H${id}`, away: `A${id}`, startingAt: `${day}T${hour}:00Z`, day, slips});
@@ -43,15 +43,40 @@ describe('buildSchedina', () => {
         expect(s.system!.atLeastPct).toBeGreaterThan(s.pct);
         expect(s.selections.every((x) => !x.banker)).toBe(true);
     });
-    it('makes bankers of the safest selections, in every column, and combines the free ones', () => {
-        // Low risk, four matches: 85, 80, 79 and (fallback none: low has safe only) -> only 1, 2, 4 are safe... use size 3 with bankers auto.
+    it('makes bankers of the matches with the surest leg, in every column, and combines the free ones', () => {
         const s = buildSchedina(candidates, {risk: 'low', kind: 'system', size: 3, system: 1, bankers: 'auto', days: [], competitions: [], now: NOW})!;
-        // 85 and 80 are bankers (>= 75), at most size - 2 = 1: only the safest.
+        // 85 and 80 are sure enough (>= 80), at most size - 2 = 1: only the surest.
         expect(s.selections.filter((x) => x.banker).map((x) => x.fixtureId)).toEqual([1]);
         expect(s.system).toEqual({of: 1, free: 2, bankers: 1, columns: 2, atLeastPct: Math.round(0.85 * atLeast([0.8, 0.79], 1) * 100)});
+        // Medium risk, two bankers asked: the two matches the model is surest of (1 at 85, 2 at 80) are the bankers, on their surest leg; the free selections are the medium picks of the other matches.
         const two = buildSchedina(candidates, {risk: 'medium', kind: 'system', size: 4, system: 1, bankers: 2, days: [], competitions: [], now: NOW})!;
-        expect(two.selections.filter((x) => x.banker).map((x) => x.fixtureId).sort()).toEqual([3, 4]);
+        expect(two.selections.filter((x) => x.banker).map((x) => x.fixtureId).sort()).toEqual([1, 2]);
+        expect(two.selections.filter((x) => !x.banker).map((x) => x.fixtureId).sort()).toEqual([3, 4]);
+        expect(two.selections.find((x) => x.fixtureId === 1)!.slip.pct).toBe(85);
+        expect(two.selections.find((x) => x.fixtureId === 3)!.tier).toBe('balanced');
         expect(two.system!.free).toBe(2);
+        // Never more bankers than size - 2, whatever is asked.
+        const capped = buildSchedina(candidates, {risk: 'medium', kind: 'system', size: 3, system: 1, bankers: 5, days: [], competitions: [], now: NOW})!;
+        expect(capped.system!.bankers).toBe(1);
+    });
+    it('reads a banker as the one surest leg of a match, not the tier\'s combination', () => {
+        // The safe slip is a two-leg combination at 79%; its legs alone are 1X at 88% and under 3.5 at 86%: the banker is 1X, one leg, 88%.
+        const combo: BetSuggestion = {tier: 'safe', legs: [{key: '1X', pct: 88, odds: 1.25}, {key: 'under35', pct: 86, odds: 1.3}], pct: 79, fair: 1.27, odds: 1.63};
+        const bold: BetSuggestion = {tier: 'bold', legs: [{key: 'home-15', pct: 46, odds: 2.4}], pct: 46, fair: 2.17, odds: 2.4};
+        const b = bankerOf(match(9, '2026-09-20', '20:45', 1, [combo, bold]))!;
+        expect(b.banker).toBe(true);
+        expect(b.slip.legs.map((l) => l.key)).toEqual(['1X']);
+        expect(b.slip.pct).toBe(88);
+        expect(b.slip.odds).toBe(1.25);
+        expect(b.slip.fair).toBeCloseTo(1.14, 2);
+        expect(b.tier).toBe('safe');
+        expect(bankerOf(match(10, '2026-09-20', '20:45', 1, []))).toBeNull();
+        // A system takes the banker on that leg, and the free selections from the other matches' slips of the risk.
+        const s = buildSchedina([...candidates, match(9, '2026-09-20', '20:45', 1, [combo, bold])], {risk: 'high', kind: 'system', size: 3, system: 1, bankers: 1, days: [], competitions: [], now: NOW})!;
+        const banker = s.selections.find((x) => x.banker)!;
+        expect(banker.fixtureId).toBe(9);
+        expect(banker.slip.legs.map((l) => l.key)).toEqual(['1X']);
+        expect(s.selections.filter((x) => !x.banker).every((x) => x.tier === 'bold')).toBe(true);
     });
 });
 

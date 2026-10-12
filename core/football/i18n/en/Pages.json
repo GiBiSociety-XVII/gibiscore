@@ -474,7 +474,7 @@
       "kindHint": {
         "single": "One match only, the most likely.",
         "multiple": "Every selection must win: the odds are the product.",
-        "system": "Bankers in every column, the others combined k at a time: it wins if all the bankers and at least k of the others come in."
+        "system": "Bankers in every column (the surest pick of the match), the others combined k at a time: it wins if all the bankers and at least k of the others come in."
       },
       "size": "Matches",
       "systemOf": "Columns of",
@@ -499,7 +499,7 @@
       "disclaimer": "The selections are the same picks checked in the model record: every saved slip is settled on the real results. Not betting advice: bet only if you are of age, and in moderation.",
       "bankers": "Bankers",
       "bankersAuto": "Automatic",
-      "bankersHint": "How many selections sit in every column. Automatic: the model makes bankers of the selections at 75% or more, leaving at least two free selections.",
+      "bankersHint": "How many selections sit in every column. A banker is the surest pick of its match (one outcome: a double chance, under 3.5 or a +1.5 handicap, say), not the pick of the chosen risk; the other selections stay at that risk. Automatic: the matches with a pick at 80% or more become bankers, leaving at least two free selections.",
       "bankersCount": "{count} bankers",
       "banker": "Banker",
       "systemOfFree": "free selections: system {k} of {n}, wins with at least {k} free selections in",

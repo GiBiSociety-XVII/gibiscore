@@ -4,7 +4,7 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {Link} from "@/i18n/navigation";
 import type {MatchMarketData} from "@/lib/football/data/markets";
-import {bandHeat, BANDS, matchMarkets, suggestBets, type BetSuggestion, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
+import {bandHeat, BANDS, handicapOf, matchMarkets, suggestBets, type BetSuggestion, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {TeamSummary} from "@/lib/football/types";
 import {FactorLine, OutcomeBar} from "./prediction";
@@ -110,7 +110,11 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
     const tp = useTranslations('Football.prediction');
     const markets = prediction ? matchMarkets(prediction) : null;
     const slips: BetSuggestion[] = prediction ? suggestBets(prediction, odds) : [];
-    const legLabel = (key: BetSuggestion['legs'][number]['key']) => (key === 'btts' ? t('labels.goal') : key === 'noBtts' ? t('labels.noGoal') : key.startsWith('over') ? t('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? t('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
+    const legLabel = (key: BetSuggestion['legs'][number]['key']) => {
+        const hc = handicapOf(key);
+        if (hc) return t(hc.side === 'home' ? 'labels.homeHandicap' : 'labels.awayHandicap', {line: hc.line.replace('.', ',')});
+        return key === 'btts' ? t('labels.goal') : key === 'noBtts' ? t('labels.noGoal') : key.startsWith('over') ? t('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? t('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key;
+    };
     const h = data?.home ?? null;
     const a = data?.away ?? null;
     const scale = Math.max(1, ...[h, a].flatMap((p) => (p ? [...p.bands.for, ...p.bands.against] : [])));

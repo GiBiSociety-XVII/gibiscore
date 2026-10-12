@@ -247,13 +247,14 @@ describe('mapOdds', () => {
                 {id: 5, name: 'Goals Over/Under', values: [{value: 'Over 2.5', odd: '1.80'}, {value: 'Under 2.5', odd: '2.00'}, {value: 'Over 1.5', odd: '1.25'}, {value: 'Over 4.5', odd: '4.5'}]},
                 {id: 8, name: 'Both Teams Score', values: [{value: 'Yes', odd: '1.70'}, {value: 'No', odd: '2.10'}]},
                 {id: 12, name: 'Double Chance', values: [{value: 'Home/Draw', odd: '1.22'}, {value: 'Home/Away', odd: '1.28'}, {value: 'Draw/Away', odd: '1.95'}]},
+                {id: 4, name: 'Asian Handicap', values: [{value: 'Home -1.5', odd: '2.75'}, {value: 'Away +1.5', odd: '1.45'}, {value: 'Home -1', odd: '2.05'}, {value: 'Away +1', odd: '1.80'}, {value: 'Home -0.75', odd: '1.90'}]},
             ]},
             {id: 6, name: 'Bwin', bets: [{id: 1, name: 'Match Winner', values: [{value: 'Home', odd: '1.90'}, {value: 'Draw', odd: '3.50'}]}]},
             {id: 2, name: 'Empty', bets: [{id: 99, name: 'Corners', values: [{value: 'Over 9.5', odd: '1.9'}]}]},
         ],
     };
 
-    it('keeps the four markets per bookmaker, drops incomplete and unrelated ones', () => {
+    it('keeps the five markets per bookmaker, drops incomplete and unrelated ones', () => {
         const rows = mapOdds(odds);
         expect(rows).toHaveLength(1);
         expect(rows[0].bookmaker).toBe('Bet365');
@@ -261,6 +262,8 @@ describe('mapOdds', () => {
         expect(rows[0].markets.goals).toEqual({over15: 1.25, under15: null, over25: 1.8, under25: 2, over35: null, under35: null});
         expect(rows[0].markets.btts).toEqual({yes: 1.7, no: 2.1});
         expect(rows[0].markets.doubleChance).toEqual({homeOrDraw: 1.22, drawOrAway: 1.95, homeOrAway: 1.28});
+        // The Asian lines at a goal and a half only: whole and quarter lines can push.
+        expect(rows[0].markets.handicap).toEqual({homeMinus15: 2.75, awayMinus15: null, homePlus15: null, awayPlus15: 1.45});
     });
 
     it('is empty without a response', () => {
