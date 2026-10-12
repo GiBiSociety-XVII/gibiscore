@@ -583,14 +583,29 @@ export interface OddsRow {
     markets: OddsMarkets;
 }
 
-const BET_NAMES = {outcome: 'Match Winner', doubleChance: 'Double Chance', goals: 'Goals Over/Under', btts: 'Both Teams Score', handicap: 'Asian Handicap'} as const;
+const BET_NAMES = {
+    outcome: 'Match Winner',
+    doubleChance: 'Double Chance',
+    goals: 'Goals Over/Under',
+    btts: 'Both Teams Score',
+    handicap: 'Asian Handicap',
+    homeGoals: 'Total - Home',
+    awayGoals: 'Total - Away',
+    halfOutcome: 'First Half Winner',
+    halfDoubleChance: 'Double Chance - First Half',
+    halfGoals: 'Goals Over/Under First Half',
+    parity: 'Odd/Even',
+    corners: 'Corners Over Under',
+    cards: 'Cards Over/Under',
+    scores: 'Exact Score',
+} as const;
 
 /**
- * The bookmakers' prices for the five markets the site reads, one row
- * per bookmaker; a bookmaker without any of them is skipped. Labels are
- * the provider's: "Home"/"Draw"/"Away", "Home/Draw", "Over 2.5", "Yes",
- * "Home -1.5" (the Asian lines at a goal and a half only: the whole
- * and quarter lines can push, and a slip has no room for a refund).
+ * The bookmakers' prices for the markets the site reads, one row per
+ * bookmaker; a bookmaker without any of them is skipped. Labels are the
+ * provider's: "Home"/"Draw"/"Away", "Home/Draw", "Over 2.5", "Yes",
+ * "Home -1.5" (the Asian lines at a half only: the whole and quarter
+ * lines can push, and a slip has no room for a refund), "Odd", "2:1".
  */
 export function mapOdds(response: AfOddsResponse | undefined): OddsRow[] {
     if (!response) return [];
@@ -617,21 +632,48 @@ export function mapOdds(response: AfOddsResponse | undefined): OddsRow[] {
             const homeOrAway = price(dc, 'Home/Away');
             if (homeOrDraw !== null && drawOrAway !== null && homeOrAway !== null) markets.doubleChance = {homeOrDraw, drawOrAway, homeOrAway};
         }
-        const goals = bet(BET_NAMES.goals);
-        if (goals) {
-            const g = {over15: price(goals, 'Over 1.5'), under15: price(goals, 'Under 1.5'), over25: price(goals, 'Over 2.5'), under25: price(goals, 'Under 2.5'), over35: price(goals, 'Over 3.5'), under35: price(goals, 'Under 3.5')};
-            if (Object.values(g).some((v) => v !== null)) markets.goals = g;
-        }
+        /** Over/under lines of a market, keyed `over15` style, only when at least one is priced. */
+        const lines = <K extends string>(values: Array<{value: string; odd: string}> | undefined, keys: readonly K[], label: (k: K) => string): Partial<Record<K, number | null>> | undefined => {
+            if (!values) return undefined;
+            const out: Partial<Record<K, number | null>> = {};
+            for (const k of keys) out[k] = price(values, label(k));
+            return Object.values(out).some((v) => v !== null) ? out : undefined;
+        };
+        const ou = (k: string) => `${k.startsWith('over') ? 'Over' : 'Under'} ${k.replace(/^(over|under)(\d+)(\d)$/, '$2.$3')}`;
+        const goals = lines(bet(BET_NAMES.goals), ['over05', 'under05', 'over15', 'under15', 'over25', 'under25', 'over35', 'under35', 'over45', 'under45'] as const, ou);
+        if (goals) markets.goals = goals;
         const btts = bet(BET_NAMES.btts);
         if (btts) {
             const yes = price(btts, 'Yes');
             const no = price(btts, 'No');
             if (yes !== null && no !== null) markets.btts = {yes, no};
         }
-        const handicap = bet(BET_NAMES.handicap);
-        if (handicap) {
-            const hc = {homeMinus15: price(handicap, 'Home -1.5'), awayMinus15: price(handicap, 'Away -1.5'), homePlus15: price(handicap, 'Home +1.5'), awayPlus15: price(handicap, 'Away +1.5')};
-            if (Object.values(hc).some((v) => v !== null)) markets.handicap = hc;
+        const handicap = lines(bet(BET_NAMES.handicap), ['homeMinus15', 'awayMinus15', 'homePlus15', 'awayPlus15', 'homeMinus25', 'awayMinus25', 'homePlus25', 'awayPlus25'] as const, (k) => `${k.startsWith('home') ? 'Home' : 'Away'} ${k.includes('Minus') ? '-' : '+'}${k.endsWith('15') ? '1.5' : '2.5'}`);
+        if (handicap) markets.handicap = handicap;
+        const teamOu = (k: string) => ou(k.replace(/^(home|away)(Over|Under)/, (_m, _s, d: string) => d.toLowerCase()));
+        const homeGoals = lines(bet(BET_NAMES.homeGoals), ['homeOver05', 'homeUnder05', 'homeOver15', 'homeUnder15'] as const, teamOu);
+        const awayGoals = lines(bet(BET_NAMES.awayGoals), ['awayOver05', 'awayUnder05', 'awayOver15', 'awayUnder15'] as const, teamOu);
+        if (homeGoals || awayGoals) markets.teamGoals = {...homeGoals, ...awayGoals};
+        const halfOutcome = lines(bet(BET_NAMES.halfOutcome), ['home', 'draw', 'away'] as const, (k) => k[0].toUpperCase() + k.slice(1));
+        const halfDoubleChance = lines(bet(BET_NAMES.halfDoubleChance), ['homeOrDraw', 'drawOrAway'] as const, (k) => (k === 'homeOrDraw' ? 'Home/Draw' : 'Draw/Away'));
+        if (halfOutcome || halfDoubleChance) markets.halfOutcome = {...halfOutcome, ...halfDoubleChance};
+        const halfGoals = lines(bet(BET_NAMES.halfGoals), ['over05', 'under05', 'over15', 'under15'] as const, ou);
+        if (halfGoals) markets.halfGoals = halfGoals;
+        const parity = lines(bet(BET_NAMES.parity), ['odd', 'even'] as const, (k) => (k === 'odd' ? 'Odd' : 'Even'));
+        if (parity) markets.parity = parity;
+        const corners = lines(bet(BET_NAMES.corners), ['over85', 'under85', 'over95', 'under95', 'over105', 'under105', 'over115', 'under115'] as const, ou);
+        if (corners) markets.corners = corners;
+        const cards = lines(bet(BET_NAMES.cards), ['over35', 'under35', 'over45', 'under45', 'over55', 'under55'] as const, ou);
+        if (cards) markets.cards = cards;
+        const exact = bet(BET_NAMES.scores);
+        if (exact) {
+            const scores: Record<string, number> = {};
+            for (const v of exact) {
+                const m = /^(\d+)\s*[:-]\s*(\d+)$/.exec(v.value.trim());
+                const n = Number(v.odd);
+                if (m && Number.isFinite(n) && n > 1) scores[`${m[1]}-${m[2]}`] = n;
+            }
+            if (Object.keys(scores).length > 0) markets.scores = scores;
         }
         if (Object.keys(markets).length > 0) rows.push({bookmakerId: b.id, bookmaker: b.name, markets});
     }

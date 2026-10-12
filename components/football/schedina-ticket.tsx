@@ -1,10 +1,10 @@
 'use client';
 
 import {Trash2} from "lucide-react";
-import {useFormatter, useTranslations} from "next-intl";
+import {useFormatter, useLocale, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
-import {handicapOf, type LegKey} from "@/lib/football/markets";
+import {legText, type LegKey} from "@/lib/football/markets";
 import {ShareButton} from "./share-button";
 
 export interface TicketSelection {
@@ -49,14 +49,10 @@ export interface Ticket {
     results: Array<boolean | null> | null;
 }
 
-/** The pick of a leg in words, from the markets' labels. */
+/** The pick of a leg in words, in the language of the page. */
 export function useLegLabel() {
-    const tm = useTranslations('Football.markets');
-    return (key: LegKey) => {
-        const hc = handicapOf(key);
-        if (hc) return tm(hc.side === 'home' ? 'labels.homeHandicap' : 'labels.awayHandicap', {line: hc.line.replace('.', ',')});
-        return key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key;
-    };
+    const locale = useLocale();
+    return (key: LegKey) => legText(key, locale);
 }
 
 /** A slip is settled two hours after its last kick-off (advice.ts). */

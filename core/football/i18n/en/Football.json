@@ -298,17 +298,40 @@
     "disclaimer": "These are numbers on the matches played and on the model's probabilities, not betting advice. Odds above the fair odds are not a sure win: they are an outcome the bookmaker pays more than the model thinks it is likely. Bet only if you are of age, and in moderation.",
     "hint": "Poisson model on the expected goals of the two teams (attack and defence against the league, home and away, xG, form), translated into every market. Fair odds = 100 / probability. Bookmakers' odds from the data provider, refreshed every three hours until kick-off.",
     "modelTitle": "Markets according to the model",
-    "modelHint": "The same probabilities as the prediction, translated into every market. The most likely outcome of each group is highlighted. Fair odds = 100 / probability.",
+    "modelHint": "The prediction's own probabilities, read as every market. Each group's pick is lit. Fair odds = 100 / probability.",
     "fair": "odds",
     "fairHint": "Probability {pct}%: odds of {odds} would pay it at even value.",
     "groups": {
       "outcome": "Final outcome",
       "doubleChance": "Double chance",
+      "handicap": "Handicap -1.5 / -2.5",
+      "handicapPlus": "Handicap +1.5 / +2.5",
       "goals": "Over total goals",
       "under": "Under total goals",
+      "multigol": "Goal ranges",
       "btts": "Both teams to score",
-      "scores": "Most likely scores"
+      "homeGoals": "Home team goals",
+      "awayGoals": "Away team goals",
+      "half": "First half",
+      "halfGoals": "First-half goals",
+      "parity": "Odd / Even",
+      "corners": "Corners over",
+      "cornersUnder": "Corners under",
+      "cards": "Cards over",
+      "cardsUnder": "Cards under",
+      "scores": "Exact scores"
     },
+    "familyHints": {
+      "handicap": "Asian handicap: -1.5 wins by two or more, -2.5 by three or more.",
+      "handicapPlus": "Asian handicap: +1.5 does not lose by two or more, +2.5 by three or more.",
+      "multigol": "Total goals of the match within the range, ends included.",
+      "half": "The result at 45': the first half brings about 44% of a match's goals.",
+      "corners": "Expected corners {value}: from both sides' habits (taken and conceded), on a Poisson count softened towards 50%, since corners vary more than goals.",
+      "cards": "Expected yellow cards {value}: from both sides' habits (taken and drawn), softened towards 50% like the corners. Bookmakers count one point per yellow."
+    },
+    "best": "Pick",
+    "bestHint": "The pick of each group: the outcome the bookmakers pay above its fair odds (value, from +3%) or, without value, the likeliest.",
+    "noCounts": "Corners and cards: no statistics for the two sides this season.",
     "labels": {
       "over": "Over {line}",
       "under": "Under {line}",
@@ -365,7 +388,7 @@
     "heatHint": "{pct}% of the goals in the two teams' matches, scored and conceded, come in this quarter of an hour.",
     "advice": {
       "title": "What the model would play",
-      "hint": "Three picks, one per level of risk: among all selections and their combinations across different markets (outcome, total goals, both teams to score) the one that pays most while staying above the level's probability: cautious from 78%, recommended from 62%, bold from 45%. The probability of a combination is computed on the model's exact scores, so the selections never contradict each other and a selection that narrows nothing is left out.",
+      "hint": "Three picks, one per level of risk: among every selection of every market (outcome and handicap, total goals and ranges, both to score and team goals, first half, odd/even, corners, cards) and the combinations across different markets (outcome, goals, who scores) the one that pays most while staying above the level's probability: cautious from 78%, recommended from 62%, bold from 45%. The probability of a combination is computed on the model's exact scores, so the selections never contradict each other and a selection that narrows nothing is left out.",
       "tiers": {
         "safe": "Cautious",
         "balanced": "Recommended",

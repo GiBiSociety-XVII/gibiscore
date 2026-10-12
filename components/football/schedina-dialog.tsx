@@ -2,14 +2,14 @@
 
 import {useEffect, useMemo, useState} from "react";
 import {X, Check, CloudOff} from "lucide-react";
-import {useFormatter, useTranslations} from "next-intl";
+import {useFormatter, useLocale, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Help} from "@/components/fantasy/help";
 import {TourLauncher} from "./tour-launcher";
 import {ShareButton} from "./share-button";
 import {cloudUser} from "@/lib/fantasy/cloud";
-import {handicapOf, type LegKey} from "@/lib/football/markets";
+import {legText, type LegKey} from "@/lib/football/markets";
 import {buildSchedina, stakePlan, STAKE_STEP, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type Schedina, type SchedinaCandidate, type SchedinaKind, type SchedinaRisk, type StakeMode} from "@/lib/football/schedina";
 
 const RISKS: SchedinaRisk[] = ['low', 'medium', 'high'];
@@ -47,11 +47,8 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
         cloudUser().then((u) => { if (alive) setSignedIn(!!u); }).catch(() => { if (alive) setSignedIn(false); });
         return () => { alive = false; };
     }, []);
-    const legLabel = (key: LegKey) => {
-        const hc = handicapOf(key);
-        if (hc) return tm(hc.side === 'home' ? 'labels.homeHandicap' : 'labels.awayHandicap', {line: hc.line.replace('.', ',')});
-        return key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key;
-    };
+    const locale = useLocale();
+    const legLabel = (key: LegKey) => legText(key, locale);
     const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
     const available = useMemo(() => candidates.filter((c) => (pickedDays.length === 0 || pickedDays.includes(c.day)) && (pickedLeagues.length === 0 || pickedLeagues.includes(c.competitionId))).length, [candidates, pickedDays, pickedLeagues]);
     // The ticket valued, once: what the blocks below show and what is saved with the slip.

@@ -248,22 +248,37 @@ describe('mapOdds', () => {
                 {id: 8, name: 'Both Teams Score', values: [{value: 'Yes', odd: '1.70'}, {value: 'No', odd: '2.10'}]},
                 {id: 12, name: 'Double Chance', values: [{value: 'Home/Draw', odd: '1.22'}, {value: 'Home/Away', odd: '1.28'}, {value: 'Draw/Away', odd: '1.95'}]},
                 {id: 4, name: 'Asian Handicap', values: [{value: 'Home -1.5', odd: '2.75'}, {value: 'Away +1.5', odd: '1.45'}, {value: 'Home -1', odd: '2.05'}, {value: 'Away +1', odd: '1.80'}, {value: 'Home -0.75', odd: '1.90'}]},
+                {id: 16, name: 'Total - Home', values: [{value: 'Over 0.5', odd: '1.20'}, {value: 'Over 1.5', odd: '1.95'}, {value: 'Under 1.5', odd: '1.80'}]},
+                {id: 13, name: 'First Half Winner', values: [{value: 'Home', odd: '2.40'}, {value: 'Draw', odd: '2.10'}, {value: 'Away', odd: '4.50'}]},
+                {id: 6, name: 'Goals Over/Under First Half', values: [{value: 'Over 0.5', odd: '1.40'}, {value: 'Under 0.5', odd: '2.80'}]},
+                {id: 21, name: 'Odd/Even', values: [{value: 'Odd', odd: '1.95'}, {value: 'Even', odd: '1.85'}]},
+                {id: 45, name: 'Corners Over Under', values: [{value: 'Over 9.5', odd: '1.85'}, {value: 'Under 9.5', odd: '1.90'}, {value: 'Over 10', odd: '2.00'}]},
+                {id: 80, name: 'Cards Over/Under', values: [{value: 'Over 4.5', odd: '1.75'}, {value: 'Under 4.5', odd: '2.00'}]},
+                {id: 10, name: 'Exact Score', values: [{value: '1:0', odd: '7.00'}, {value: '2:1', odd: '8.50'}, {value: 'Other', odd: '12'}]},
             ]},
             {id: 6, name: 'Bwin', bets: [{id: 1, name: 'Match Winner', values: [{value: 'Home', odd: '1.90'}, {value: 'Draw', odd: '3.50'}]}]},
             {id: 2, name: 'Empty', bets: [{id: 99, name: 'Corners', values: [{value: 'Over 9.5', odd: '1.9'}]}]},
         ],
     };
 
-    it('keeps the five markets per bookmaker, drops incomplete and unrelated ones', () => {
+    it('keeps every market per bookmaker, drops incomplete and unrelated ones', () => {
         const rows = mapOdds(odds);
         expect(rows).toHaveLength(1);
         expect(rows[0].bookmaker).toBe('Bet365');
         expect(rows[0].markets.outcome).toEqual({home: 1.85, draw: 3.6, away: 4.2});
-        expect(rows[0].markets.goals).toEqual({over15: 1.25, under15: null, over25: 1.8, under25: 2, over35: null, under35: null});
+        expect(rows[0].markets.goals).toEqual({over05: null, under05: null, over15: 1.25, under15: null, over25: 1.8, under25: 2, over35: null, under35: null, over45: 4.5, under45: null});
         expect(rows[0].markets.btts).toEqual({yes: 1.7, no: 2.1});
         expect(rows[0].markets.doubleChance).toEqual({homeOrDraw: 1.22, drawOrAway: 1.95, homeOrAway: 1.28});
         // The Asian lines at a goal and a half only: whole and quarter lines can push.
-        expect(rows[0].markets.handicap).toEqual({homeMinus15: 2.75, awayMinus15: null, homePlus15: null, awayPlus15: 1.45});
+        expect(rows[0].markets.handicap).toEqual({homeMinus15: 2.75, awayMinus15: null, homePlus15: null, awayPlus15: 1.45, homeMinus25: null, awayMinus25: null, homePlus25: null, awayPlus25: null});
+        expect(rows[0].markets.teamGoals).toEqual({homeOver05: 1.2, homeUnder05: null, homeOver15: 1.95, homeUnder15: 1.8});
+        expect(rows[0].markets.halfOutcome).toEqual({home: 2.4, draw: 2.1, away: 4.5});
+        expect(rows[0].markets.halfGoals).toEqual({over05: 1.4, under05: 2.8, over15: null, under15: null});
+        expect(rows[0].markets.parity).toEqual({odd: 1.95, even: 1.85});
+        // The whole corner lines are left out: they push.
+        expect(rows[0].markets.corners).toEqual({over85: null, under85: null, over95: 1.85, under95: 1.9, over105: null, under105: null, over115: null, under115: null});
+        expect(rows[0].markets.cards).toEqual({over35: null, under35: null, over45: 1.75, under45: 2, over55: null, under55: null});
+        expect(rows[0].markets.scores).toEqual({'1-0': 7, '2-1': 8.5});
     });
 
     it('is empty without a response', () => {

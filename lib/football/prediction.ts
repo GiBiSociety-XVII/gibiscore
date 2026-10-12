@@ -21,6 +21,11 @@ export interface PredictionFactor {
     values: Record<string, string | number>;
 }
 
+export interface MatchCounts {
+    corners: number | null;
+    yellows: number | null;
+}
+
 export interface MatchPrediction {
     /** Expected goals of each side, tuned (see PredictionTuning). */
     lambda: {home: number; away: number};
@@ -39,6 +44,8 @@ export interface MatchPrediction {
     btts: number;
     /** Most likely scorelines, best first. */
     scores: Array<{home: number; away: number; pct: number}>;
+    /** Corners and yellow cards expected in the match, both sides: each side's habit against what the other allows, the league's rate behind a short record. Null without team statistics. */
+    counts: MatchCounts;
     /** Most likely outcome. */
     pick: '1' | 'X' | '2';
     /** Matches behind the numbers (the smaller of the two teams). */
@@ -146,7 +153,37 @@ function expectedRates(prior: SeasonStudy | null, teamId: number, perTeam: numbe
 
 /** A side with no match yet this season: an empty line, judged on the prior alone. */
 function blank(teamId: number): TeamStudy {
-    return {team: {id: teamId, name: '', slug: '', shortCode: null, logoUrl: null}, played: 0, won: 0, drawn: 0, lost: 0, points: 0, goalsFor: 0, goalsAgainst: 0, xgFor: null, xgAgainst: null, possession: null, shots: null, shotsOnTarget: null, corners: null, withStats: 0, over25Pct: 0, bttsPct: 0, cleanSheets: 0, failedToScore: 0, form: []};
+    return {team: {id: teamId, name: '', slug: '', shortCode: null, logoUrl: null}, played: 0, won: 0, drawn: 0, lost: 0, points: 0, goalsFor: 0, goalsAgainst: 0, xgFor: null, xgAgainst: null, possession: null, shots: null, shotsOnTarget: null, corners: null, cornersAgainst: null, yellows: null, yellowsAgainst: null, withStats: 0, over25Pct: 0, bttsPct: 0, cleanSheets: 0, failedToScore: 0, form: []};
+}
+
+/**
+ * What a match should bring in corners and yellow cards: each side's own
+ * rate (taken and conceded) against the other's, summed, every rate
+ * pulled towards last season's or the league's per-match rate when the
+ * side has few matches with statistics. Null when the league has none.
+ */
+export function expectedCounts(study: SeasonStudy, prior: SeasonStudy | null, home: TeamStudy, away: TeamStudy): MatchCounts {
+    const priorOf = (id: number) => prior?.teams.find((t) => t.team.id === id) ?? null;
+    const ph = priorOf(home.team.id);
+    const pa = priorOf(away.team.id);
+    // Taken by one side and conceded by the other, averaged, for each side: the two halves of the match summed.
+    const pair = (league: number | null, priorLeague: number | null, taken: (t: TeamStudy) => number | null, conceded: (t: TeamStudy) => number | null): number | null => {
+        const perMatch = league ?? priorLeague;
+        if (perMatch === null) return null;
+        const perSide = perMatch / 2;
+        const rate = (t: TeamStudy, p: TeamStudy | null, pick: (t: TeamStudy) => number | null): number => {
+            const base = (p ? pick(p) : null) ?? perSide;
+            const own = pick(t);
+            return own === null || t.withStats === 0 ? base : (own * t.withStats + base * PRIOR) / (t.withStats + PRIOR);
+        };
+        const homeSide = (rate(home, ph, taken) + rate(away, pa, conceded)) / 2;
+        const awaySide = (rate(away, pa, taken) + rate(home, ph, conceded)) / 2;
+        return Math.round((homeSide + awaySide) * 10) / 10;
+    };
+    return {
+        corners: pair(study.cornersPerMatch, prior?.cornersPerMatch ?? null, (t) => t.corners, (t) => t.cornersAgainst),
+        yellows: pair(study.yellowsPerMatch, prior?.yellowsPerMatch ?? null, (t) => t.yellows, (t) => t.yellowsAgainst),
+    };
 }
 
 /** Goals per match of home (or away) sides: this season's split, with last season's weighing beside it. */
@@ -238,7 +275,7 @@ export function predictMatch(season: SeasonStudy | null, homeId: number, awayId:
     factors.push({key: 'homeAdvantage', side: leagueHome > leagueAway ? 'home' : 'none', values: {homeWins: study.homeWinPct, draws: study.drawPct, awayWins: study.awayWinPct}});
     if (sample < 6) factors.push({key: 'sample', side: 'none', values: {matches: sample}});
 
-    return fromLambdas(base, tuning, sample, factors);
+    return fromLambdas(base, tuning, sample, factors, expectedCounts(study, prior, home, away));
 }
 
 /**
@@ -246,7 +283,7 @@ export function predictMatch(season: SeasonStudy | null, homeId: number, awayId:
  * scorelines counted, every market and the likely scores read off them.
  * predictMatch ends here; `retune` starts here again with other knobs.
  */
-export function fromLambdas(base: {home: number; away: number}, tuning: PredictionTuning, sample: number, factors: PredictionFactor[]): MatchPrediction {
+export function fromLambdas(base: {home: number; away: number}, tuning: PredictionTuning, sample: number, factors: PredictionFactor[], counts: MatchCounts = {corners: null, yellows: null}): MatchPrediction {
     const lambda = tuneLambdas(base, tuning);
     const grid = scoreGrid(lambda.home, lambda.away, tuning.rho);
     let pHome = 0;
@@ -287,6 +324,7 @@ export function fromLambdas(base: {home: number; away: number}, tuning: Predicti
             .map((s) => ({...s, pct: Math.round(s.pct * 1000) / 10}))
             .sort((a, b) => b.pct - a.pct)
             .slice(0, 5),
+        counts,
         pick,
         sample,
         confidence: sample >= 12 ? 'high' : sample >= 6 ? 'medium' : 'low',
@@ -296,5 +334,5 @@ export function fromLambdas(base: {home: number; away: number}, tuning: Predicti
 
 /** The same prediction with other knobs: the study's expected goals kept, the tuning redone. */
 export function retune(prediction: MatchPrediction, tuning: PredictionTuning): MatchPrediction {
-    return fromLambdas(prediction.base, tuning, prediction.sample, prediction.factors);
+    return fromLambdas(prediction.base, tuning, prediction.sample, prediction.factors, prediction.counts);
 }

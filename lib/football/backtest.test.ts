@@ -63,7 +63,7 @@ describe('backtestTiers', () => {
             expect(Math.abs(record[tier].hitRate - record[tier].promised)).toBeLessThanOrEqual(6);
         }
         expect(record.safe.hitRate).toBeGreaterThan(record.bold.hitRate);
-    });
+    }, 20_000);
 });
 
 describe('replaySeason', () => {

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {teamMarketProfile, bandHeat, bandOf, BANDS, fairOdds, handicapOf, isValueSlip, legOdds, matchMarkets, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, type TeamMatchFacts, expectedTotals} from './markets';
+import {bandHeat, bandOf, BANDS, bestOf, expectedTotals, fairOdds, handicapOf, isValueSlip, legChances, legGroup, legOdds, legText, MARKET_FAMILIES, poissonOver, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
 import {scoreGrid} from './prediction';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
@@ -70,17 +70,72 @@ describe('teamMarketProfile', () => {
     });
 });
 
-describe('matchMarkets', () => {
-    const prediction: MatchPrediction = {lambda: {home: 1.6, away: 1.1}, base: {home: 1.6, away: 1.1}, rho: -0.08, home: 48, draw: 26, away: 26, over15: 74, over25: 52, over35: 30, btts: 55, scores: [], pick: '1', sample: 10, confidence: 'medium', factors: []};
+describe('legChances', () => {
+    const prediction: MatchPrediction = {lambda: {home: 1.6, away: 1.1}, base: {home: 1.6, away: 1.1}, rho: -0.08, home: 48, draw: 26, away: 26, over15: 74, over25: 52, over35: 30, btts: 55, scores: [], counts: {corners: null, yellows: null}, pick: '1', sample: 10, confidence: 'medium', factors: []};
 
-    it('turns the prediction into every market with its fair odds', () => {
-        const m = matchMarkets(prediction);
-        expect(m.outcome.home).toEqual({pct: 48, fair: 2.08});
-        expect(m.doubleChance.homeOrDraw).toEqual({pct: 74, fair: 1.35});
-        expect(m.doubleChance.homeOrAway.pct).toBe(74);
-        expect(m.goals.under25).toEqual({pct: 48, fair: 2.08});
-        expect(m.goals.over15.pct + m.goals.under15.pct).toBe(100);
-        expect(m.btts.no.pct).toBe(45);
+    it('reads every market off the scorelines, the first half off a shorter match, the counts off the expectation', () => {
+        const m = legChances(prediction);
+        const pct = (k: Parameters<typeof m.get>[0]) => m.get(k)!;
+        // The outcomes are the prediction's own (its literal is rounded).
+        expect(pct('1')).toBeCloseTo(prediction.home, -1);
+        expect(pct('1X')).toBeCloseTo(pct('1') + pct('X'), 6);
+        expect(pct('12')).toBeCloseTo(100 - pct('X'), 6);
+        expect(pct('under25')).toBeCloseTo(100 - pct('over25'), 6);
+        expect(pct('over15') + pct('under15')).toBeCloseTo(100, 6);
+        expect(pct('noBtts')).toBeCloseTo(100 - pct('btts'), 6);
+        expect(pct('goals1-3')).toBeCloseTo(pct('over05') - pct('over35'), 6);
+        expect(pct('homeOver05') + pct('homeUnder05')).toBeCloseTo(100, 6);
+        expect(pct('home-15')).toBeLessThan(pct('1'));
+        expect(pct('home-25')).toBeLessThan(pct('home-15'));
+        expect(pct('away+15')).toBeGreaterThan(pct('X2'));
+        expect(pct('odd') + pct('even')).toBeCloseTo(100, 6);
+        // The first half: fewer goals than the match, a draw likelier.
+        expect(pct('htOver05')).toBeLessThan(pct('over05'));
+        expect(pct('htX')).toBeGreaterThan(pct('X'));
+        expect(pct('ht1') + pct('htX') + pct('ht2')).toBeCloseTo(100, 6);
+        // No corners or cards without an expectation.
+        expect(m.has('cornersOver95')).toBe(false);
+        expect(m.has('cardsOver45')).toBe(false);
+        const counted = legChances({...prediction, counts: {corners: 10.2, yellows: 4.1}});
+        expect(counted.get('cornersOver95')! + counted.get('cornersUnder95')!).toBeCloseTo(100, 6);
+        expect(counted.get('cornersOver85')!).toBeGreaterThan(counted.get('cornersOver115')!);
+        expect(counted.get('cardsUnder55')!).toBeGreaterThan(50);
+        // Every family lists legs the site knows, and every leg has a group.
+        for (const f of MARKET_FAMILIES) for (const k of f.keys) expect(legGroup(k)).toBeDefined();
+    });
+
+    it('counts a Poisson tail', () => {
+        expect(poissonOver(2, 0.5)).toBeCloseTo(1 - Math.exp(-2), 6);
+        expect(poissonOver(10, 9.5)).toBeGreaterThan(0.4);
+        expect(poissonOver(10, 9.5)).toBeLessThan(0.6);
+        expect(poissonOver(10, 11.5)).toBeLessThan(poissonOver(10, 9.5));
+    });
+
+    it('picks the cell of a family the bookmakers pay above fair, else the likeliest', () => {
+        const m = legChances(prediction);
+        expect(bestOf(['1', 'X', '2'], m, null)).toBe('1');
+        // X at 26% is fair at 3.85: a bookmaker paying 4.2 makes it the value pick.
+        const odds = summarizeOdds([{bookmaker: 'A', markets: {outcome: {home: 1.9, draw: 4.2, away: 3.4}}}]);
+        expect(bestOf(['1', 'X', '2'], m, odds)).toBe('X');
+        expect(bestOf(['cornersOver95'], m, null)).toBeNull();
+    });
+
+    it('names every leg in both languages', () => {
+        expect(legText('over25', 'it')).toBe('Over 2,5');
+        expect(legText('over25', 'en')).toBe('Over 2.5');
+        expect(legText('home-15', 'it')).toBe('Casa -1,5');
+        expect(legText('away+25', 'en')).toBe('Away +2.5');
+        expect(legText('goals2-4', 'it')).toBe('Multigol 2-4');
+        expect(legText('homeOver05', 'it')).toBe('Casa segna');
+        expect(legText('awayUnder05', 'en')).toBe('Away no goal');
+        expect(legText('homeOver15', 'it')).toBe('Casa over 1,5');
+        expect(legText('ht1X', 'it')).toBe('1° tempo 1X');
+        expect(legText('htOver05', 'en')).toBe('1st half over 0.5');
+        expect(legText('odd', 'it')).toBe('Dispari');
+        expect(legText('cornersOver95', 'it')).toBe('Angoli over 9,5');
+        expect(legText('cardsUnder45', 'en')).toBe('Cards under 4.5');
+        expect(legText('1X', 'it')).toBe('1X');
+        for (const f of MARKET_FAMILIES) for (const k of f.keys) expect(legText(k, 'it')).not.toBe(k.length > 2 ? k : '');
     });
 
     it('has no fair odds for an impossible market', () => {
@@ -122,6 +177,15 @@ describe('summarizeOdds', () => {
         ])!;
         expect(s.handicap!.homeMinus15).toEqual({avg: 2.8, best: 2.9, bestBook: 'B', books: 2});
         expect(s.handicap!.awayMinus15).toBeUndefined();
+        const more = summarizeOdds([{bookmaker: 'A', markets: {corners: {over95: 1.9, under95: 1.9}, cards: {over45: 1.7}, halfOutcome: {home: 2.5, draw: 2.1, away: 4}, parity: {odd: 1.9, even: 1.9}, teamGoals: {homeOver15: 2}, scores: {'1-0': 7}}}])!;
+        expect(legOdds(more, 'cornersOver95')).toBe(1.9);
+        expect(legOdds(more, 'cardsOver45')).toBe(1.7);
+        expect(legOdds(more, 'ht1')).toBe(2.5);
+        expect(legOdds(more, 'ht1X')).toBeNull();
+        expect(legOdds(more, 'even')).toBe(1.9);
+        expect(legOdds(more, 'homeOver15')).toBe(2);
+        expect(more.scores!['1-0'].avg).toBe(7);
+        expect(legOdds(more, 'goals2-4')).toBeNull();
         expect(legOdds(s, 'home-15')).toBe(2.8);
         expect(legOdds(s, 'away+15')).toBeCloseTo(1.43, 2);
         expect(legOdds(s, 'home+15')).toBeNull();
@@ -162,7 +226,7 @@ describe('scoreGrid', () => {
 });
 
 describe('suggestBets', () => {
-    const prediction: MatchPrediction = {lambda: {home: 1.9, away: 0.8}, base: {home: 1.9, away: 0.8}, rho: -0.08, home: 60, draw: 23, away: 17, over15: 74, over25: 50, over35: 27, btts: 44, scores: [], pick: '1', sample: 12, confidence: 'high', factors: []};
+    const prediction: MatchPrediction = {lambda: {home: 1.9, away: 0.8}, base: {home: 1.9, away: 0.8}, rho: -0.08, home: 60, draw: 23, away: 17, over15: 74, over25: 50, over35: 27, btts: 44, scores: [], counts: {corners: null, yellows: null}, pick: '1', sample: 12, confidence: 'high', factors: []};
     const odds = summarizeOdds([{bookmaker: 'A', markets: {outcome: {home: 1.7, draw: 3.8, away: 5.0}, doubleChance: {homeOrDraw: 1.2, drawOrAway: 2.1, homeOrAway: 1.25}, goals: {over15: 1.3, under15: 3.4, over25: 1.9, under25: 1.9, over35: 3.2, under35: 1.33}, btts: {yes: 1.9, no: 1.85}}}]);
 
     it('gives one slip per tier, each within its chance, legs from different markets', () => {
@@ -174,10 +238,13 @@ describe('suggestBets', () => {
             expect(s.fair).toBeCloseTo(100 / s.pct, 1);
             // A slip is never more likely than its least likely leg.
             expect(s.pct).toBeLessThanOrEqual(Math.min(...s.legs.map((l) => l.pct)));
-            const groups = s.legs.map((l) => (['1', 'X', '2', '1X', 'X2', '12'].includes(l.key) || handicapOf(l.key) ? 'outcome' : l.key.startsWith('over') || l.key.startsWith('under') ? 'goals' : 'btts'));
+            const groups = s.legs.map((l) => legGroup(l.key));
             expect(new Set(groups).size).toBe(groups.length);
-            // The bookmakers' price is the product of the legs' averages.
-            expect(s.odds).toBeCloseTo(s.legs.reduce((p, l) => p * (l.odds ?? 1), 1), 1);
+            // The first half, the parity, the corners and the cards are played alone.
+            if (s.legs.length > 1) expect(groups.every((g) => g === 'outcome' || g === 'goals' || g === 'btts')).toBe(true);
+            // The bookmakers' price is the product of the legs' averages, when every leg has one.
+            if (s.legs.every((l) => l.odds !== null)) expect(s.odds).toBeCloseTo(s.legs.reduce((p, l) => p * (l.odds ?? 1), 1), 1);
+            else expect(s.odds).toBeNull();
         }
         // Tiers pay more as they risk more.
         for (let i = 1; i < slips.length; i += 1) expect(slips[i].fair).toBeGreaterThan(slips[i - 1].fair);
@@ -204,12 +271,37 @@ describe('suggestBets', () => {
         expect(handicapOf('home-15')).toEqual({side: 'home', line: '-1.5'});
         expect(handicapOf('away+15')).toEqual({side: 'away', line: '+1.5'});
         expect(handicapOf('1X')).toBeNull();
-        expect(settleLegs(['home-15'], 2, 0)).toBe(true);
-        expect(settleLegs(['home-15'], 1, 0)).toBe(false);
-        expect(settleLegs(['away+15'], 1, 0)).toBe(true);
-        expect(settleLegs(['away+15'], 2, 0)).toBe(false);
-        expect(settleLegs(['away-15', 'over25'], 0, 3)).toBe(true);
-        expect(settleLegs(['home+15'], 0, 2)).toBe(false);
+        expect(settleLegs(['home-15'], {home: 2, away: 0})).toBe(true);
+        expect(settleLegs(['home-15'], {home: 1, away: 0})).toBe(false);
+        expect(settleLegs(['away+15'], {home: 1, away: 0})).toBe(true);
+        expect(settleLegs(['away+15'], {home: 2, away: 0})).toBe(false);
+        expect(settleLegs(['away-15', 'over25'], {home: 0, away: 3})).toBe(true);
+        expect(settleLegs(['home+15'], {home: 0, away: 2})).toBe(false);
+        expect(settleLegs(['home-25'], {home: 3, away: 0})).toBe(true);
+        expect(settleLegs(['away+25'], {home: 2, away: 0})).toBe(true);
+    });
+
+    it('settles every market on its own fact, and waits for the facts not in yet', () => {
+        const facts = {home: 2, away: 1, htHome: 1, htAway: 1, corners: 11, yellows: 3};
+        expect(settleLegs(['goals2-4'], facts)).toBe(true);
+        expect(settleLegs(['goals3-5'], facts)).toBe(true);
+        expect(settleLegs(['goals1-2'], facts)).toBe(false);
+        expect(settleLegs(['homeOver15', 'awayOver05'], facts)).toBe(true);
+        expect(settleLegs(['awayUnder05'], facts)).toBe(false);
+        expect(settleLegs(['odd'], facts)).toBe(true);
+        expect(settleLegs(['htX'], facts)).toBe(true);
+        expect(settleLegs(['ht1'], facts)).toBe(false);
+        expect(settleLegs(['htOver15'], facts)).toBe(true);
+        expect(settleLegs(['cornersOver105'], facts)).toBe(true);
+        expect(settleLegs(['cornersOver115'], facts)).toBe(false);
+        expect(settleLegs(['cardsUnder35'], facts)).toBe(true);
+        // The half-time score or the statistics not in: open, unless another leg already lost.
+        expect(settleLegs(['htX'], {home: 2, away: 1})).toBeNull();
+        expect(settleLegs(['cornersOver95'], {home: 2, away: 1, corners: null})).toBeNull();
+        expect(settleLegs(['cornersOver95', 'over35'], {home: 2, away: 1})).toBe(false);
+        // Details synced without the statistic: a count no over beats.
+        expect(settleLegs(['cornersOver85'], {home: 2, away: 1, corners: -1})).toBe(false);
+        expect(settleLegs([], facts)).toBe(false);
     });
 
     it('reads a leg price from the summary', () => {

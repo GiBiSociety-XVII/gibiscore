@@ -1,12 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import type {SeasonStudy, SplitRow, TeamStudy} from './data/study';
-import {attackBaseline, predictMatch} from './prediction';
+import {attackBaseline, expectedCounts, predictMatch} from './prediction';
 
 const team = (id: number, name: string): TeamStudy['team'] => ({id, name, slug: name.toLowerCase(), shortCode: null, logoUrl: null});
 
 function profile(id: number, name: string, played: number, gf: number, ga: number, form: TeamStudy['form'] = []): TeamStudy {
     const won = Math.round(played * 0.4);
-    return {team: team(id, name), played, won, drawn: Math.round(played * 0.3), lost: played - won - Math.round(played * 0.3), points: 0, goalsFor: gf, goalsAgainst: ga, xgFor: null, xgAgainst: null, possession: null, shots: null, shotsOnTarget: null, corners: null, withStats: 0, over25Pct: 50, bttsPct: 50, cleanSheets: 0, failedToScore: 0, form};
+    return {team: team(id, name), played, won, drawn: Math.round(played * 0.3), lost: played - won - Math.round(played * 0.3), points: 0, goalsFor: gf, goalsAgainst: ga, xgFor: null, xgAgainst: null, possession: null, shots: null, shotsOnTarget: null, corners: null, cornersAgainst: null, yellows: null, yellowsAgainst: null, withStats: 0, over25Pct: 50, bttsPct: 50, cleanSheets: 0, failedToScore: 0, form};
 }
 
 const split = (id: number, name: string, played: number, gf: number, ga: number): SplitRow => ({team: team(id, name), played, won: 0, drawn: 0, lost: 0, goalsFor: gf, goalsAgainst: ga, points: 0});
@@ -21,6 +21,8 @@ const study: SeasonStudy = {
     over25Pct: 55,
     bttsPct: 50,
     avgXg: null,
+    cornersPerMatch: null,
+    yellowsPerMatch: null,
     teams: [profile(1, 'Strong', 10, 25, 6, ['W', 'W', 'W', 'D', 'W']), profile(2, 'Weak', 10, 7, 22, ['L', 'L', 'D', 'L', 'L']), profile(3, 'Mid', 10, 14, 14)],
     home: [split(1, 'Strong', 5, 14, 2), split(2, 'Weak', 5, 4, 10), split(3, 'Mid', 5, 8, 6)],
     away: [split(1, 'Strong', 5, 11, 4), split(2, 'Weak', 5, 3, 12), split(3, 'Mid', 5, 6, 8)],
@@ -96,5 +98,27 @@ describe('predictMatch', () => {
         // A side without a match yet: judged on the prior alone.
         expect(promoted.sample).toBe(0);
         expect(attackBaseline(current, 1, study)!).toBeGreaterThan(attackBaseline(current, 2, study)! + 0.5);
+    });
+});
+
+describe('expectedCounts', () => {
+    const withStats = (t: TeamStudy, corners: number, cornersAgainst: number, yellows: number, yellowsAgainst: number, n: number): TeamStudy => ({...t, corners, cornersAgainst, yellows, yellowsAgainst, withStats: n});
+    const league: SeasonStudy = {...study, cornersPerMatch: 10, yellowsPerMatch: 4.4};
+    it('sums what each side takes against what the other allows, pulled towards the league with few matches', () => {
+        const home = withStats(study.teams[0], 7, 3, 1.5, 2.5, 10);
+        const away = withStats(study.teams[1], 3, 7, 3, 1.5, 10);
+        const c = expectedCounts(league, null, home, away);
+        // Home takes 7, away concedes 7: the home side's corners sit near 7 (shrunk a little towards 5); the away side's near 3: about 10 in all.
+        expect(c.corners).toBeGreaterThan(9);
+        expect(c.corners).toBeLessThan(10.5);
+        expect(c.yellows).toBeGreaterThan(4);
+        expect(c.yellows).toBeLessThan(5);
+        // No statistics at all: the league's rate.
+        expect(expectedCounts(league, null, study.teams[0], study.teams[1])).toEqual({corners: 10, yellows: 4.4});
+    });
+    it('is null when the league has no statistics, and a prediction carries it', () => {
+        expect(expectedCounts(study, null, study.teams[0], study.teams[1])).toEqual({corners: null, yellows: null});
+        expect(predictMatch(study, 1, 2)!.counts).toEqual({corners: null, yellows: null});
+        expect(predictMatch(league, 1, 2)!.counts.corners).toBe(10);
     });
 });

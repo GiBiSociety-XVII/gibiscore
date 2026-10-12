@@ -4,7 +4,7 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {Link} from "@/i18n/navigation";
 import type {MatchMarketData} from "@/lib/football/data/markets";
-import {bandHeat, BANDS, handicapOf, matchMarkets, suggestBets, type BetSuggestion, type MarketLine, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
+import {bandHeat, BANDS, bestOf, fairOdds, legChances, legLine, legText, MARKET_FAMILIES, suggestBets, type BetSuggestion, type LegKey, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {TeamSummary} from "@/lib/football/types";
 import {FactorLine, OutcomeBar} from "./prediction";
@@ -12,24 +12,29 @@ import {FactorLine, OutcomeBar} from "./prediction";
 const fmtOdds = (v: number | null | undefined) => (v === null || v === undefined ? '–' : v.toFixed(2));
 
 /**
- * One market: its cells side by side, the likeliest one lit; under each
- * chance the fair odds and, when stored, the bookmakers' average, green
- * when they pay more than the fair price.
+ * One family of markets: its cells side by side, the family's pick lit
+ * (the cell the bookmakers pay above its fair price, else the likeliest);
+ * under each chance the fair odds and, when stored, the bookmakers'
+ * average, green when they pay more than the fair price.
  */
-function MarketGroup({title, cells}: {title: string; cells: Array<{label: string; line: MarketLine; odds?: OddsLine}>}) {
+function MarketGroup({title, hint, cells, best}: {title: string; hint?: string; cells: Array<{key: LegKey; label: string; pct: number; odds?: OddsLine}>; best: LegKey | null}) {
     const t = useTranslations('Football.markets');
-    const best = Math.max(...cells.map((c) => c.line.pct));
     return (
         <div className="flex flex-col gap-1 min-w-0">
-            <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{title}</span>
-            <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))`}}>
+            <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">
+                {title}
+                {hint && <Help text={hint} />}
+            </span>
+            <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${cells.length === 6 ? 3 : Math.min(cells.length, 5)}, minmax(0, 1fr))`}}>
                 {cells.map((c) => {
-                    const value = !!c.odds && c.line.fair !== null && c.odds.avg > c.line.fair;
+                    const fair = fairOdds(c.pct);
+                    const value = !!c.odds && fair !== null && c.odds.avg > fair;
                     return (
-                        <div key={c.label} className={cn("flex flex-col items-center justify-center rounded border-2 border-foreground px-1 py-1.5", c.line.pct === best ? "bg-accent" : "bg-card")} title={c.odds ? t('oddsHint', {pct: c.line.pct, fair: fmtOdds(c.line.fair), avg: fmtOdds(c.odds.avg), best: fmtOdds(c.odds.best), book: c.odds.bestBook, books: c.odds.books}) : t('fairHint', {pct: c.line.pct, odds: fmtOdds(c.line.fair)})}>
-                            <span className="text-[11px] font-extrabold leading-none">{c.label}</span>
-                            <span className="font-mono text-base font-extrabold tabular-nums leading-tight">{c.line.pct}%</span>
-                            <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground leading-none">{t('fair')} {fmtOdds(c.line.fair)}</span>
+                        <div key={c.key} className={cn("relative flex flex-col items-center justify-center rounded border-2 border-foreground px-1 py-1.5", c.key === best ? "bg-accent" : "bg-card")} title={c.odds ? t('oddsHint', {pct: c.pct, fair: fmtOdds(fair), avg: fmtOdds(c.odds.avg), best: fmtOdds(c.odds.best), book: c.odds.bestBook, books: c.odds.books}) : t('fairHint', {pct: c.pct, odds: fmtOdds(fair)})}>
+                            {c.key === best && <span className="absolute -top-2 right-1 px-1 rounded border border-foreground bg-foreground text-background text-[8px] font-black uppercase tracking-wide leading-tight">{t('best')}</span>}
+                            <span className="text-[11px] font-extrabold leading-none text-center">{c.label}</span>
+                            <span className="font-mono text-base font-extrabold tabular-nums leading-tight">{c.pct}%</span>
+                            <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground leading-none">{t('fair')} {fmtOdds(fair)}</span>
                             {c.odds && <span className={cn("font-mono text-[10px] font-extrabold tabular-nums leading-none mt-0.5", value ? "text-emerald-800" : "text-foreground")}>{t('book')} {fmtOdds(c.odds.avg)}</span>}
                         </div>
                     );
@@ -98,8 +103,11 @@ function GoalBands({profile, team, scale, heat}: {profile: TeamMarketProfile | n
 
 /**
  * The markets tab of a match: the prediction (outcome bar, expected
- * goals, the reasons) and what the model gives every market, with the
- * odds that would pay it fairly and the bookmakers' own beside; when
+ * goals, the reasons) and what the model gives every market, family by
+ * family (result and handicaps, goals and ranges, who scores, first
+ * half, odd/even, corners, cards, exact scores), each with the odds
+ * that would pay it fairly, the bookmakers' own beside and the
+ * family's pick lit; then the three slips the model would play; when
  * the two sides score and concede; how their matches go over the goal
  * lines; corners and cards. A reading of the numbers, not advice on
  * what to play.
@@ -108,13 +116,18 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
     const t = useTranslations('Football.markets');
     const locale = useLocale();
     const tp = useTranslations('Football.prediction');
-    const markets = prediction ? matchMarkets(prediction) : null;
-    const slips: BetSuggestion[] = prediction ? suggestBets(prediction, odds) : [];
-    const legLabel = (key: BetSuggestion['legs'][number]['key']) => {
-        const hc = handicapOf(key);
-        if (hc) return t(hc.side === 'home' ? 'labels.homeHandicap' : 'labels.awayHandicap', {line: hc.line.replace('.', ',')});
-        return key === 'btts' ? t('labels.goal') : key === 'noBtts' ? t('labels.noGoal') : key.startsWith('over') ? t('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? t('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key;
+    const chances = prediction ? legChances(prediction) : null;
+    // Every family with a chance to show, its cells and its pick; corners and cards drop out without the sides' statistics.
+    const families = chances
+        ? MARKET_FAMILIES.map((f) => ({id: f.id, best: bestOf(f.keys, chances, odds), cells: f.keys.filter((k) => chances.has(k)).map((k) => ({key: k, label: legText(k, locale), pct: Math.round(chances.get(k)!), odds: legLine(odds, k)}))})).filter((f) => f.cells.length > 0)
+        : [];
+    const familyHint = (id: string): string | undefined => {
+        if (id === 'corners') return prediction?.counts.corners !== null && prediction?.counts.corners !== undefined ? t('familyHints.corners', {value: prediction.counts.corners.toFixed(1)}) : undefined;
+        if (id === 'cards') return prediction?.counts.yellows !== null && prediction?.counts.yellows !== undefined ? t('familyHints.cards', {value: prediction.counts.yellows.toFixed(1)}) : undefined;
+        return ['handicap', 'handicapPlus', 'multigol', 'half'].includes(id) ? t(`familyHints.${id}`) : undefined;
     };
+    const slips: BetSuggestion[] = prediction ? suggestBets(prediction, odds) : [];
+    const legLabel = (key: LegKey) => legText(key, locale);
     const h = data?.home ?? null;
     const a = data?.away ?? null;
     const scale = Math.max(1, ...[h, a].flatMap((p) => (p ? [...p.bands.for, ...p.bands.against] : [])));
@@ -165,11 +178,13 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
     );
 
     const updated = odds?.updatedAt ? new Date(odds.updatedAt) : null;
+    const expectedCorners = prediction?.counts.corners ?? data?.expected.corners ?? null;
+    const expectedYellows = prediction?.counts.yellows ?? data?.expected.yellows ?? null;
     return (
         <div className="flex flex-col gap-3">
             <div data-tour="analysis"><Panel title={title} action={<span className="flex items-center gap-2">{prediction && <span className="text-[11px] font-bold text-muted-foreground">{tp(`confidence.${prediction.confidence}`)}</span>}{help(t('hint'))}</span>}>
                 <p className="px-3 py-2 text-[12px] font-semibold leading-snug border-b border-muted">{t('intro')}</p>
-                {prediction && markets ? (
+                {prediction && chances ? (
                     <>
                         <div className="px-3 pt-2.5 pb-2">
                             <div className="flex justify-between text-[11px] font-extrabold mb-1">
@@ -182,20 +197,25 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                             </div>
                         </div>
                         <div className="px-3 py-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 border-t border-muted">
-                            <MarketGroup title={t('groups.outcome')} cells={[{label: '1', line: markets.outcome.home, odds: odds?.outcome?.home}, {label: 'X', line: markets.outcome.draw, odds: odds?.outcome?.draw}, {label: '2', line: markets.outcome.away, odds: odds?.outcome?.away}]} />
-                            <MarketGroup title={t('groups.doubleChance')} cells={[{label: '1X', line: markets.doubleChance.homeOrDraw, odds: odds?.doubleChance?.homeOrDraw}, {label: 'X2', line: markets.doubleChance.drawOrAway, odds: odds?.doubleChance?.drawOrAway}, {label: '12', line: markets.doubleChance.homeOrAway, odds: odds?.doubleChance?.homeOrAway}]} />
-                            <MarketGroup title={t('groups.goals')} cells={[{label: t('labels.over', {line: '1,5'}), line: markets.goals.over15, odds: odds?.goals?.over15}, {label: t('labels.over', {line: '2,5'}), line: markets.goals.over25, odds: odds?.goals?.over25}, {label: t('labels.over', {line: '3,5'}), line: markets.goals.over35, odds: odds?.goals?.over35}]} />
-                            <MarketGroup title={t('groups.under')} cells={[{label: t('labels.under', {line: '1,5'}), line: markets.goals.under15, odds: odds?.goals?.under15}, {label: t('labels.under', {line: '2,5'}), line: markets.goals.under25, odds: odds?.goals?.under25}, {label: t('labels.under', {line: '3,5'}), line: markets.goals.under35, odds: odds?.goals?.under35}]} />
-                            <MarketGroup title={t('groups.btts')} cells={[{label: t('labels.goal'), line: markets.btts.yes, odds: odds?.btts?.yes}, {label: t('labels.noGoal'), line: markets.btts.no, odds: odds?.btts?.no}]} />
-                            <div className="flex flex-col gap-1 min-w-0">
+                            <p className="sm:col-span-2 -mb-1 text-[11px] font-semibold text-muted-foreground leading-snug flex items-center gap-1">{t('modelHint')}{help(t('bestHint'))}</p>
+                            {families.map((f) => <MarketGroup key={f.id} title={t(`groups.${f.id}`)} hint={familyHint(f.id)} cells={f.cells} best={f.best} />)}
+                            {prediction.counts.corners === null && <p className="sm:col-span-2 text-[11px] font-semibold text-muted-foreground leading-snug">{t('noCounts')}</p>}
+                            <div className="flex flex-col gap-1 min-w-0 sm:col-span-2">
                                 <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('groups.scores')}</span>
                                 <ul className="flex flex-wrap gap-1">
-                                    {prediction.scores.slice(0, 5).map((s, i) => (
-                                        <li key={`${s.home}-${s.away}`} className={cn("inline-flex items-center gap-1.5 px-2 h-8 rounded border-2 border-foreground font-mono text-[12px] font-extrabold tabular-nums", i === 0 ? "bg-accent" : "bg-card")}>
-                                            {s.home}-{s.away}
-                                            <span className="text-[10px] text-muted-foreground">{s.pct.toFixed(1)}%</span>
-                                        </li>
-                                    ))}
+                                    {prediction.scores.slice(0, 5).map((sc, i) => {
+                                        const book = odds?.scores?.[`${sc.home}-${sc.away}`];
+                                        const fair = fairOdds(sc.pct);
+                                        return (
+                                            <li key={`${sc.home}-${sc.away}`} className={cn("inline-flex items-center gap-1.5 px-2 h-9 rounded border-2 border-foreground font-mono text-[12px] font-extrabold tabular-nums", i === 0 ? "bg-accent" : "bg-card")} title={book ? t('oddsHint', {pct: sc.pct, fair: fmtOdds(fair), avg: fmtOdds(book.avg), best: fmtOdds(book.best), book: book.bestBook, books: book.books}) : t('fairHint', {pct: sc.pct, odds: fmtOdds(fair)})}>
+                                                {sc.home}-{sc.away}
+                                                <span className="flex flex-col leading-none text-[10px] text-muted-foreground">
+                                                    <span>{sc.pct.toFixed(1)}%</span>
+                                                    <span>{t('fair')} {fmtOdds(fair)}{book && <span className={cn("ml-1", fair !== null && book.avg > fair ? "text-emerald-800" : "text-foreground")}>{t('book')} {fmtOdds(book.avg)}</span>}</span>
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             </div>
                         </div>
@@ -261,11 +281,11 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                     <div data-tour="setpieces"><Panel title={t('setPiecesTitle')} action={help(t('setPiecesHint'))}>
                         {heads}
                         {table(setPieces)}
-                        {(data.expected.corners !== null || data.expected.yellows !== null) && (
+                        {(expectedCorners !== null || expectedYellows !== null) && (
                             <p className="px-3 py-1.5 border-t border-muted text-[12px] font-semibold leading-snug">
-                                {data.expected.corners !== null && <span>{t('expectedCorners', {value: data.expected.corners.toFixed(1)})}</span>}
-                                {data.expected.corners !== null && data.expected.yellows !== null && ' · '}
-                                {data.expected.yellows !== null && <span>{t('expectedYellows', {value: data.expected.yellows.toFixed(1)})}</span>}
+                                {expectedCorners !== null && <span>{t('expectedCorners', {value: expectedCorners.toFixed(1)})}</span>}
+                                {expectedCorners !== null && expectedYellows !== null && ' · '}
+                                {expectedYellows !== null && <span>{t('expectedYellows', {value: expectedYellows.toFixed(1)})}</span>}
                             </p>
                         )}
                     </Panel></div>

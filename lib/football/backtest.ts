@@ -115,10 +115,13 @@ export function backtestTiers(samples: ReplaySample[], tuning: PredictionTuning)
     for (const s of samples) {
         const prediction = retune(s.prediction, tuning);
         for (const slip of suggestBets(prediction, null)) {
+            // A replay knows the final score only: a slip on the first half or the counts is left out of the tally.
+            const hit = settleLegs(slip.legs.map((l) => l.key), {home: s.homeScore, away: s.awayScore});
+            if (hit === null) continue;
             const a = acc[slip.tier];
             a.slips += 1;
             a.pct += slip.pct;
-            if (settleLegs(slip.legs.map((l) => l.key), s.homeScore, s.awayScore)) a.hits += 1;
+            if (hit) a.hits += 1;
         }
     }
     const out = {} as Record<BetSuggestion['tier'], TierRecord>;

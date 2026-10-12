@@ -298,17 +298,40 @@
     "disclaimer": "Sono numeri sulle partite giocate e sulle probabilità del modello, non un consiglio di gioco. Una quota più alta della quota equa non è una vincita sicura: è un esito che il bookmaker paga più di quanto il modello lo ritenga probabile. Gioca solo se maggiorenne e con misura.",
     "hint": "Modello di Poisson sui gol attesi delle due squadre (attacco e difesa rispetto al campionato, casa e trasferta, xG, forma), tradotto in ogni mercato. Quota equa = 100 / probabilità. Quote dei bookmaker dal fornitore dati, aggiornate ogni tre ore fino al calcio d'inizio.",
     "modelTitle": "Mercati secondo il modello",
-    "modelHint": "Le stesse probabilità del pronostico, tradotte in ogni mercato. Evidenziato l'esito più probabile di ogni gruppo. Quota equa = 100 / probabilità.",
+    "modelHint": "Le stesse probabilità del pronostico, tradotte in ogni mercato. In evidenza la scelta di ogni gruppo. Quota equa = 100 / probabilità.",
     "fair": "quota",
     "fairHint": "Probabilità {pct}%: una quota di {odds} la pagherebbe alla pari.",
     "groups": {
       "outcome": "Esito finale",
       "doubleChance": "Doppia chance",
+      "handicap": "Handicap -1,5 / -2,5",
+      "handicapPlus": "Handicap +1,5 / +2,5",
       "goals": "Over gol totali",
       "under": "Under gol totali",
+      "multigol": "Multigol",
       "btts": "Gol / No gol",
-      "scores": "Risultati più probabili"
+      "homeGoals": "Gol squadra di casa",
+      "awayGoals": "Gol squadra ospite",
+      "half": "Primo tempo",
+      "halfGoals": "Gol primo tempo",
+      "parity": "Pari / Dispari",
+      "corners": "Calci d'angolo over",
+      "cornersUnder": "Calci d'angolo under",
+      "cards": "Cartellini over",
+      "cardsUnder": "Cartellini under",
+      "scores": "Risultati esatti"
     },
+    "familyHints": {
+      "handicap": "Handicap asiatico: -1,5 vince con due o più gol di scarto, -2,5 con tre o più.",
+      "handicapPlus": "Handicap asiatico: +1,5 non perde con due o più gol di scarto, +2,5 con tre o più.",
+      "multigol": "Gol totali della partita dentro l'intervallo, estremi compresi.",
+      "half": "Risultato al 45': il primo tempo porta circa il 44% dei gol di una partita.",
+      "corners": "Angoli attesi {value}: dalle abitudini delle due squadre (fatti e concessi), su una distribuzione di Poisson smussata verso il 50%, perché gli angoli variano più dei gol.",
+      "cards": "Cartellini gialli attesi {value}: dalle abitudini delle due squadre (presi e provocati), smussati verso il 50% come gli angoli. I bookmaker contano un punto per giallo."
+    },
+    "best": "Scelta",
+    "bestHint": "La scelta di ogni gruppo: l'esito che i bookmaker pagano più della quota equa (valore, dal +3%) o, senza valore, il più probabile.",
+    "noCounts": "Angoli e cartellini: nessuna statistica delle due squadre in questa stagione.",
     "labels": {
       "over": "Over {line}",
       "under": "Under {line}",
@@ -365,7 +388,7 @@
     "heatHint": "{pct}% dei gol nelle partite delle due squadre, fatti e subiti, arriva in questo quarto d'ora.",
     "advice": {
       "title": "Cosa giocherebbe il modello",
-      "hint": "Tre giocate, una per livello di rischio: tra tutte le selezioni e le loro combinazioni su mercati diversi (esito, gol totali, gol/no gol) quella che paga di più restando sopra la probabilità del livello: prudente dal 78%, consigliata dal 62%, audace dal 45%. La probabilità di una combinazione è calcolata sui risultati esatti del modello, quindi le selezioni non si contraddicono mai e una selezione che non restringe nulla viene lasciata fuori.",
+      "hint": "Tre giocate, una per livello di rischio: tra tutte le selezioni di ogni mercato (esito e handicap, gol totali e multigol, gol/no gol e gol di squadra, primo tempo, pari/dispari, angoli, cartellini) e le combinazioni su mercati diversi (esito, gol, chi segna) quella che paga di più restando sopra la probabilità del livello: prudente dal 78%, consigliata dal 62%, audace dal 45%. La probabilità di una combinazione è calcolata sui risultati esatti del modello, quindi le selezioni non si contraddicono mai e una selezione che non restringe nulla viene lasciata fuori. Primo tempo, pari/dispari, angoli e cartellini si giocano da soli.",
       "tiers": {
         "safe": "Prudente",
         "balanced": "Consigliata",
