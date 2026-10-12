@@ -501,7 +501,7 @@
       "disclaimer": "The selections are the same picks checked in the model record: every saved slip is settled on the real results. Not betting advice: bet only if you are of age, and in moderation.",
       "bankers": "Bankers",
       "bankersAuto": "Automatic",
-      "bankersHint": "How many selections sit in every column. A banker is the surest pick of its match (one outcome: a double chance, under 3.5 or a +1.5 handicap, say), not the pick of the chosen risk; the other selections stay at that risk. Automatic: the matches with a pick at 80% or more become bankers, leaving at least two free selections.",
+      "bankersHint": "How many selections sit in every column. A banker is the surest pick of its match (one outcome: a double chance, under 3.5 or a +1.5 handicap, say), not the pick of the chosen risk; the other selections stay at that risk. Among a match's sure picks (from 80%) the banker is the one that pays most: an over 0.5 at 1.03 is a risk for nothing. Automatic: the matches with a pick at 80% or more, at most a third of the selections at low risk, a quarter at medium, a fifth at high, and always at least two free selections: the system is its free selections, the bankers only carry them.",
       "bankersCount": "{count} bankers",
       "banker": "Banker",
       "systemOfFree": "free selections: system {k} of {n}, wins with at least {k} free selections in",

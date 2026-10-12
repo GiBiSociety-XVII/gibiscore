@@ -145,7 +145,7 @@ export function SchedinaTicket({ticket, shareToken, onDelete, deleting = false}:
             )}
             <div className="grid grid-cols-4 border-t border-dashed border-foreground/40">
                 {cell(t('ticket.odds'), `${priced ? '' : '≈'}${odds.toFixed(2)}`)}
-                {cell(ts('chance'), `${ticket.pct}%`)}
+                {cell(ts('chance'), ticket.pct === 0 ? '<1%' : `${ticket.pct}%`)}
                 {cell(t('ticket.stake'), ticket.stake !== null ? `${ticket.stake.toFixed(2)} €` : '–')}
                 {cell(t('ticket.payout'), ticket.payout !== null ? `${priced ? '' : '≈'}${ticket.payout.toFixed(2)} €` : '–')}
             </div>

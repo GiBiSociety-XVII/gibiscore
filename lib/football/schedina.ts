@@ -41,7 +41,7 @@ export interface SchedinaOptions {
     size: number;
     /** A system: columns of this many of the free selections ("k su N", N the selections that are not bankers); 'auto' picks the k with the best expected return at the bookmakers' prices. */
     system?: number | 'auto';
-    /** A system: how many selections are bankers (in every column), each the surest leg of its match; 'auto' makes bankers of the matches with a leg at least BANKER_MIN_PCT likely, at most size - 2. */
+    /** A system: how many selections are bankers (in every column), each the best-paying sure leg of its match; 'auto' makes bankers of the matches with a leg at least BANKER_MIN_PCT likely, up to BANKER_SHARE of the selections by risk and never beyond size - 2. */
     bankers?: number | 'auto';
     /** Rome days allowed; empty = any. */
     days: string[];
@@ -80,8 +80,10 @@ export interface Schedina {
     system?: {of: number; free: number; bankers: number; columns: number; atLeastPct: number};
 }
 
-/** A match whose surest leg is at least this likely is a banker when the bankers are chosen automatically. */
+/** A leg at least this likely can be a banker. */
 export const BANKER_MIN_PCT = 80;
+/** Bankers chosen automatically: this share of the selections at most, by risk (a system is its free selections; the bankers only carry them). */
+export const BANKER_SHARE: Record<SchedinaRisk, number> = {low: 1 / 3, medium: 1 / 4, high: 1 / 5};
 
 /** The tier a risk asks for, and the ones it falls back to when a match has none. */
 const TIERS_BY_RISK: Record<SchedinaRisk, Array<BetSuggestion['tier']>> = {low: ['safe'], medium: ['balanced', 'safe'], high: ['bold', 'balanced']};
@@ -91,14 +93,18 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 const tierOf = (pct: number): BetSuggestion['tier'] => SUGGESTION_TIERS.find((t) => pct >= t.min)?.tier ?? 'bold';
 
 /**
- * The banker a match offers: its one surest leg, among the legs of its
- * slips, as a selection of its own (the slip's price is the leg's). A
- * tie goes to the leg that pays more. Null without a leg.
+ * The banker a match offers, as a selection of its own (the slip's
+ * price is the leg's): of the legs of its slips that are sure enough
+ * (BANKER_MIN_PCT), the one that pays most — a banker is there to be
+ * right, but "over 0.5" at 1.03 carries a risk for nothing; without a
+ * sure leg, the surest one there is. Null without a leg.
  */
 export function bankerOf(c: SchedinaCandidate): SchedinaSelection | null {
-    let best: BetSuggestion['legs'][number] | null = null;
-    for (const slip of c.slips) for (const leg of slip.legs) if (!best || leg.pct > best.pct || (leg.pct === best.pct && (leg.odds ?? 0) > (best.odds ?? 0))) best = leg;
-    if (!best || best.pct <= 0) return null;
+    const legs = c.slips.flatMap((s) => s.legs).filter((l) => l.pct > 0);
+    const price = (l: BetSuggestion['legs'][number]) => l.odds ?? 100 / l.pct;
+    const sure = legs.filter((l) => l.pct >= BANKER_MIN_PCT).sort((a, b) => price(b) - price(a) || b.pct - a.pct);
+    const best = sure[0] ?? legs.sort((a, b) => b.pct - a.pct || price(b) - price(a))[0] ?? null;
+    if (!best) return null;
     const pct = Math.round(best.pct);
     return {fixtureId: c.fixtureId, competition: c.competition, home: c.home, away: c.away, startingAt: c.startingAt, tier: tierOf(pct), slip: {tier: tierOf(pct), legs: [{...best}], pct, fair: round2(100 / pct), odds: best.odds}, banker: true};
 }
@@ -158,7 +164,7 @@ export function buildSchedina(candidates: SchedinaCandidate[], options: Schedina
             .map(bankerOf)
             .filter((s): s is SchedinaSelection => s !== null)
             .sort((a, b) => b.slip.pct - a.slip.pct || (b.slip.odds ?? 0) - (a.slip.odds ?? 0) || a.startingAt.localeCompare(b.startingAt));
-        const wanted = options.bankers === 'auto' || options.bankers === undefined ? sure.filter((s) => s.slip.pct >= BANKER_MIN_PCT).length : Math.round(options.bankers);
+        const wanted = options.bankers === 'auto' || options.bankers === undefined ? Math.min(sure.filter((s) => s.slip.pct >= BANKER_MIN_PCT).length, Math.ceil(size * BANKER_SHARE[options.risk])) : Math.round(options.bankers);
         bankers = Math.max(0, Math.min(size - 2, wanted, sure.length));
         const fixed = sure.slice(0, bankers);
         const taken = new Set(fixed.map((s) => s.fixtureId));

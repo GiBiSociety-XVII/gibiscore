@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandHeat, bandOf, BANDS, bestOf, calibrate, expectedReturn, expectedTotals, fairOdds, handicapOf, isValueSlip, legChances, legGroup, legOdds, legText, MARKET_FAMILIES, poissonOver, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {bandHeat, bandOf, BANDS, bestOf, calibrate, correlationOf, expectedReturn, expectedTotals, fairOdds, handicapOf, isValueSlip, legChances, legGroup, legOdds, legText, MARKET_FAMILIES, poissonOver, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
 import {scoreGrid} from './prediction';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
@@ -242,9 +242,12 @@ describe('suggestBets', () => {
             expect(new Set(groups).size).toBe(groups.length);
             // The first half, the parity, the corners and the cards are played alone.
             if (s.legs.length > 1) expect(groups.every((g) => g === 'outcome' || g === 'goals' || g === 'btts')).toBe(true);
-            // The bookmakers' price is the product of the legs' averages, when every leg has one.
-            if (s.legs.every((l) => l.odds !== null)) expect(s.odds).toBeCloseTo(s.legs.reduce((p, l) => p * (l.odds ?? 1), 1), 1);
-            else expect(s.odds).toBeNull();
+            // The bookmakers' price, when every leg has one: the product of the legs' averages for one leg, less than it for a combination of legs that come together (never more).
+            if (s.legs.every((l) => l.odds !== null)) {
+                const product = s.legs.reduce((p, l) => p * (l.odds ?? 1), 1);
+                if (s.legs.length === 1) expect(s.odds).toBeCloseTo(product, 1);
+                else expect(s.odds!).toBeLessThanOrEqual(product + 0.01);
+            } else expect(s.odds).toBeNull();
         }
         // Tiers pay more as they risk more.
         for (let i = 1; i < slips.length; i += 1) expect(slips[i].fair).toBeGreaterThan(slips[i - 1].fair);
@@ -329,6 +332,17 @@ describe('suggestBets', () => {
             for (const l of s.legs) expect(l.pct).toBe(Math.round(calibrate(chances.get(l.key)!, cal)));
             expect(s.pct).toBeLessThanOrEqual(Math.min(...s.legs.map((l) => l.pct)));
         }
+    });
+
+    it('prices a combination below the product of its legs, by how much likelier they are together', () => {
+        // Over 2.5 and both to score: 53% and 51% apart, 40% together (two coins would give 27%).
+        const combo = {pct: 40, legs: [{key: 'over25' as const, pct: 53, odds: 1.9}, {key: 'btts' as const, pct: 51, odds: 1.9}]};
+        expect(correlationOf(combo)).toBeCloseTo(0.4 / (0.53 * 0.51), 3);
+        expect(correlationOf({pct: 50, legs: [{key: '1', pct: 50, odds: 2}]})).toBe(1);
+        // The engine prices such a slip at the product over that ratio: around 2.4, not 3.6.
+        const odds = summarizeOdds([{bookmaker: 'A', markets: {goals: {over25: 1.9, under25: 1.9}, btts: {yes: 1.9, no: 1.85}}}]);
+        const priced = suggestBets({...prediction, lambda: {home: 1.7, away: 1.4}}, odds).find((s) => s.legs.length > 1 && s.odds !== null);
+        if (priced) expect(priced.odds!).toBeLessThan(priced.legs.reduce((p, l) => p * l.odds!, 1));
     });
 
     it('ranks a tier by expected return when the bookmakers price it, by fair payout otherwise', () => {

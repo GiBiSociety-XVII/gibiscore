@@ -176,7 +176,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                             </ul>
                             <div data-tour="schedina-summary" className="grid grid-cols-2 sm:grid-cols-4 border-t-2 border-foreground">
                                 {[
-                                    [t('chance'), `${result.pct}%`],
+                                    [t('chance'), result.pct === 0 ? '<1%' : `${result.pct}%`],
                                     [tm('fair'), result.fair.toFixed(2)],
                                     [tm('book'), result.book === null ? '–' : `${result.selections.length > 1 ? '≈' : ''}${result.book.toFixed(2)}`],
                                     [t('settles'), settles ? format.dateTime(settles, {weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '–'],

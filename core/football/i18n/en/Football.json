@@ -394,7 +394,7 @@
         "balanced": "Recommended",
         "bold": "Bold"
       },
-      "note": "Probability of the whole pick according to the model; fair odds = 100 / probability; \"book\" is the bookmakers' average odds, for a combination the product of the averages (≈, indicative: not every bookmaker accepts several selections on the same match). Not betting advice: bet only if you are of age, and in moderation.",
+      "note": "Probability of the whole pick according to the model; fair odds = 100 / probability; \"book\" is the bookmakers' average odds, for a combination the product of the averages divided by how much likelier the model finds the legs together than apart (≈, indicative: the bookmaker's own price for the combination is what counts, and not all accept several selections on the same match). Not betting advice: bet only if you are of age, and in moderation.",
       "record": "See the record of the suggested picks"
     }
   },

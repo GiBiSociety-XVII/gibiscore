@@ -561,7 +561,7 @@ export interface BetSuggestion {
     /** Chance of the whole slip, percent: every leg together, on the model's scorelines. */
     pct: number;
     fair: number;
-    /** The bookmakers' price: the leg's average alone, the product of the averages for a slip of several (indicative). */
+    /** The bookmakers' price: the leg's average alone; for a slip of several, the product of the averages divided by how much likelier the model finds the legs together than apart (indicative: a bookmaker's own price for the pair is what counts). */
     odds: number | null;
 }
 
@@ -577,7 +577,7 @@ export function slipEdge(slip: Pick<BetSuggestion, 'pct' | 'odds'>): number | nu
 /** Whether the slip is worth flagging as value. */
 export const isValueSlip = (slip: Pick<BetSuggestion, 'pct' | 'odds'>): boolean => (slipEdge(slip) ?? -1) >= VALUE_MIN_EDGE;
 
-/** The chance a slip of each tier must keep, in percent. */
+/** The chance a slip of each tier must keep, in percent; a tier's band runs up to the safer tier's threshold. */
 export const SUGGESTION_TIERS: Array<{tier: BetSuggestion['tier']; min: number}> = [
     {tier: 'safe', min: 78},
     {tier: 'balanced', min: 62},
@@ -608,10 +608,23 @@ const MARKET_MARGIN = 0.06;
 /** How much the model's chance weighs against the bookmakers' implied one when a slip is ranked by its expected return. */
 const MODEL_WEIGHT = 0.6;
 
+/**
+ * How much likelier the legs of a slip are together than apart, on the
+ * model: the slip's chance over the product of its legs' (1 for one
+ * leg). Over 2.5 and both to score, say, come together far more often
+ * than two coins would, and a bookmaker's price for the pair knows it.
+ */
+export function correlationOf(slip: Pick<BetSuggestion, 'pct' | 'legs'>): number {
+    if (slip.legs.length < 2) return 1;
+    const apart = slip.legs.reduce((p, l) => p * (l.pct / 100), 1);
+    return apart > 0 ? Math.max(1, slip.pct / 100 / apart) : 1;
+}
+
 /** The expected return of a unit stake on the slip, the chance a blend of the model's and the bookmakers' implied one; null without a price on every leg. */
 export function expectedReturn(slip: Pick<BetSuggestion, 'pct' | 'legs' | 'odds'>): number | null {
     if (slip.odds === null || slip.legs.some((l) => l.odds === null || !(l.odds > 1))) return null;
-    const implied = slip.legs.reduce((p, l) => p * (1 / l.odds! / (1 + MARKET_MARGIN)), 1);
+    // The implied chance of the legs together: their implied chances apart, times how much likelier the model finds them together.
+    const implied = slip.legs.reduce((p, l) => p * (1 / l.odds! / (1 + MARKET_MARGIN)), 1) * correlationOf(slip);
     const chance = MODEL_WEIGHT * (slip.pct / 100) + (1 - MODEL_WEIGHT) * implied;
     return Math.round(chance * slip.odds * 1000) / 1000;
 }
@@ -724,7 +737,9 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
         const legs: BetLeg[] = s.legs.map((l) => ({key: l.key, pct: Math.round(calibrate(own.get(l.key)!, prediction.calibration)), odds: legOdds(odds, l.key)}));
         const prices = legs.map((l) => l.odds);
         const pct = Math.round(calibrate(s.pct, prediction.calibration));
-        return {id: s.legs.map((l) => l.key).join('+'), tier: 'bold', legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round(prices.reduce((x, p) => x * p, 1) * 100) / 100 : null};
+        // The price of a combination: the legs' prices multiplied, then divided by how much likelier they are together (the raw chances, like the prices).
+        const together = s.legs.length > 1 ? Math.max(1, s.pct / 100 / s.legs.reduce((x, l) => x * (own.get(l.key)! / 100), 1)) : 1;
+        return {id: s.legs.map((l) => l.key).join('+'), tier: 'bold', legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round((prices.reduce((x, p) => x * p, 1) / together) * 100) / 100 : null};
     });
     // A longer slip needs to pay a little more per leg.
     const length = (s: BetSuggestion) => 1 - LEG_COST * (s.legs.length - 1);
@@ -734,8 +749,10 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
     const rank = (a: BetSuggestion, b: BetSuggestion) => score(b) - score(a) || (a.odds === null || b.odds === null ? (100 / b.pct) * length(b) - (100 / a.pct) * length(a) : b.pct - a.pct);
     const out: BetSuggestion[] = [];
     const taken = new Set<string>();
-    for (const {tier, min} of SUGGESTION_TIERS) {
-        const best = candidates.filter((s) => s.pct >= min && !taken.has(s.id)).sort(rank)[0];
+    for (const [i, {tier, min}] of SUGGESTION_TIERS.entries()) {
+        // Each tier keeps its band: from its own threshold up to the safer tier's, so a bold slip is a bold one even when a near-certain one would return more.
+        const max = i > 0 ? SUGGESTION_TIERS[i - 1].min : 101;
+        const best = candidates.filter((s) => s.pct >= min && s.pct < max && !taken.has(s.id)).sort(rank)[0];
         if (!best) continue;
         taken.add(best.id);
         const {id, ...slip} = best;
