@@ -30,6 +30,8 @@ function mergeLocks(a: LineupLock[], b: LineupLock[]): LineupLock[] {
 
 /** Per team id, the content the account holds (as pushed or pulled): only what differs is written. Outlives the page: a change made just before moving on is still owed. */
 const known = new Map<string, string>();
+/** Whose account `known` describes: another user signing in on the same page starts from nothing. */
+let knownFor: string | null = null;
 /** The write in flight, if any. A pull waits for it: a team deleted a moment before the page changed must not be read back. */
 let inflight: Promise<void> = Promise.resolve();
 
@@ -109,6 +111,10 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
     useEffect(() => {
         if (!user || pulled.current) return;
         pulled.current = true;
+        if (knownFor !== user.id) {
+            known.clear();
+            knownFor = user.id;
+        }
         let alive = true;
         setStatus('pulling');
         inflight
@@ -131,7 +137,7 @@ export function useAccountTeams(): {user: CloudUser | null; status: AccountStatu
                     const mine = byId.get(row.id);
                     if (row.deletedAt) {
                         // Deleted on a device. This one drops its copy — unless it edited the team after that: then the copy is the newer word, and the next push revives the row.
-                        if (mine && mine.savedAt > row.deletedAt) {
+                        if (mine && Date.parse(mine.savedAt) > Date.parse(row.deletedAt)) {
                             known.delete(row.id);
                             continue;
                         }

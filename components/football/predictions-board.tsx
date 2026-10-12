@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import {useMemo, useState} from "react";
-import {useFormatter, useTranslations} from "next-intl";
+import {useFormatter, useLocale, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
-import {isValueSlip, slipEdge, type BetSuggestion, type LegKey} from "@/lib/football/markets";
+import {isValueSlip, legText, slipEdge, type BetSuggestion, type LegKey} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {CompetitionSummary, FixtureSummary} from "@/lib/football/types";
 import {Flag} from "./flag";
@@ -48,7 +48,8 @@ export function PredictionsBoard({blocks, today, tomorrow}: {blocks: BoardBlock[
     // Everything the slip generator needs, from the blocks already on the page.
     const candidates: SchedinaCandidate[] = useMemo(() => blocks.flatMap((b) => b.fixtures.filter((f) => f.fixture.state === 'scheduled' && f.slips.length > 0).map((f) => ({fixtureId: f.fixture.id, competitionId: b.competition.id, competition: b.competition.name, home: f.fixture.home.name, away: f.fixture.away.name, startingAt: f.fixture.startingAt, day: f.day, slips: f.slips}))), [blocks]);
     const dayOptions = useMemo(() => [...new Set(candidates.map((c) => c.day))].sort().map((d) => ({day: d, label: d === today ? t('filters.today') : d === tomorrow ? t('filters.tomorrow') : format.dateTime(new Date(`${d}T12:00:00Z`), {weekday: 'short', day: 'numeric', month: 'numeric'})})), [candidates, today, tomorrow, format, t]);
-    const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
+    const locale = useLocale();
+    const legLabel = (key: LegKey) => legText(key, locale);
     const inDay = (d: string) => (day === 'all' ? true : day === 'today' ? d === today : day === 'tomorrow' ? d === tomorrow : d === today || d === tomorrow);
     const shown = useMemo(
         () => blocks.map((b) => ({...b, fixtures: b.fixtures.filter((f) => inDay(f.day) && (!valueOnly || f.slips.some(isValueSlip)))})).filter((b) => b.fixtures.length > 0 && (league === 'all' || b.competition.id === league)),

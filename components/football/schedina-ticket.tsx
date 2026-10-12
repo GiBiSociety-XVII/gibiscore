@@ -1,10 +1,10 @@
 'use client';
 
 import {Trash2} from "lucide-react";
-import {useFormatter, useTranslations} from "next-intl";
+import {useFormatter, useLocale, useTranslations} from "next-intl";
 import {Link} from "@/i18n/navigation";
 import {cn} from "@/components/shared/ui/cn";
-import type {LegKey} from "@/lib/football/markets";
+import {legText, type LegKey} from "@/lib/football/markets";
 import {ShareButton} from "./share-button";
 
 export interface TicketSelection {
@@ -49,10 +49,10 @@ export interface Ticket {
     results: Array<boolean | null> | null;
 }
 
-/** The pick of a leg in words, from the markets' labels. */
+/** The pick of a leg in words, in the language of the page. */
 export function useLegLabel() {
-    const tm = useTranslations('Football.markets');
-    return (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
+    const locale = useLocale();
+    return (key: LegKey) => legText(key, locale);
 }
 
 /** A slip is settled two hours after its last kick-off (advice.ts). */
@@ -145,7 +145,7 @@ export function SchedinaTicket({ticket, shareToken, onDelete, deleting = false}:
             )}
             <div className="grid grid-cols-4 border-t border-dashed border-foreground/40">
                 {cell(t('ticket.odds'), `${priced ? '' : '≈'}${odds.toFixed(2)}`)}
-                {cell(ts('chance'), `${ticket.pct}%`)}
+                {cell(ts('chance'), ticket.pct === 0 ? '<1%' : `${ticket.pct}%`)}
                 {cell(t('ticket.stake'), ticket.stake !== null ? `${ticket.stake.toFixed(2)} €` : '–')}
                 {cell(t('ticket.payout'), ticket.payout !== null ? `${priced ? '' : '≈'}${ticket.payout.toFixed(2)} €` : '–')}
             </div>

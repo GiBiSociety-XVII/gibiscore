@@ -1,5 +1,5 @@
-import {settleLegs, suggestBets, SUGGESTION_TIERS, type BetSuggestion} from './markets';
-import {DEFAULT_TUNING, predictMatch, retune, scoreGrid, tuneLambdas, type MatchPrediction, type PredictionTuning} from './prediction';
+import {legChances, settleLegs, suggestBets, SUGGESTION_TIERS, type BetSuggestion} from './markets';
+import {DEFAULT_TUNING, predictMatch, retune, scoreGrid, tuneLambdas, type CalibrationBand, type MatchPrediction, type PredictionTuning} from './prediction';
 import {buildStudy, type SeasonStudy, type StudyRow} from './study';
 
 /**
@@ -59,7 +59,8 @@ export function logLoss(samples: ReplaySample[], tuning: PredictionTuning): numb
 }
 
 /** The ranges the fit searches, one knob at a time; a twentieth first, then hundredths around the best. */
-const RANGES: Record<keyof PredictionTuning, [number, number]> = {goalScale: [0.8, 1.2], homeEdge: [0.85, 1.15], rho: [-0.2, 0.05]};
+type Knob = 'goalScale' | 'homeEdge' | 'rho';
+const RANGES: Record<Knob, [number, number]> = {goalScale: [0.8, 1.2], homeEdge: [0.85, 1.15], rho: [-0.2, 0.05]};
 /** Samples below this: the archive says too little, the untuned model stays. */
 export const FIT_MIN_SAMPLES = 300;
 
@@ -83,7 +84,7 @@ export function fitTuning(samples: ReplaySample[]): TuningFit {
     let bestLoss = before;
     // Coarse over the whole range first, then fine around the best.
     for (const [pass, step] of [[0, 0.05], [1, 0.01], [2, 0.01]] as const) {
-        for (const key of Object.keys(RANGES) as Array<keyof PredictionTuning>) {
+        for (const key of Object.keys(RANGES) as Knob[]) {
             const [lo, hi] = RANGES[key];
             const from = pass === 0 ? lo : Math.max(lo, best[key] - 0.05);
             const to = pass === 0 ? hi : Math.min(hi, best[key] + 0.05);
@@ -98,6 +99,36 @@ export function fitTuning(samples: ReplaySample[]): TuningFit {
         }
     }
     return {tuning: best, samples: samples.length, before, after: bestLoss};
+}
+
+/** The bands of promised chance the calibration is measured in: a slip below 35% is never proposed, so a leg below it is not read. */
+const CALIBRATION_BANDS: Array<[number, number]> = [[35, 45], [45, 55], [55, 65], [65, 75], [75, 85], [85, 101]];
+
+/**
+ * The model's chances against what came: every leg it rates on the
+ * replays (not only the slips it would have picked, which are the
+ * best-paying of their band and would flatter nothing but the
+ * picking), by band of the chance given, the share that came true.
+ * Measured without a calibration in force (the raw model), so the
+ * correction never feeds on itself. The first half and the counts,
+ * which a replay cannot settle, are left out.
+ */
+export function backtestCalibration(samples: ReplaySample[], tuning: PredictionTuning): CalibrationBand[] {
+    const raw: PredictionTuning = {goalScale: tuning.goalScale, homeEdge: tuning.homeEdge, rho: tuning.rho};
+    const acc = CALIBRATION_BANDS.map(([from, to]) => ({from, to, slips: 0, promised: 0, hits: 0}));
+    for (const s of samples) {
+        const prediction = retune(s.prediction, raw);
+        for (const [key, pct] of legChances(prediction)) {
+            const hit = settleLegs([key], {home: s.homeScore, away: s.awayScore});
+            if (hit === null) continue;
+            const band = acc.find((b) => pct >= b.from && pct < b.to);
+            if (!band) continue;
+            band.slips += 1;
+            band.promised += pct;
+            if (hit) band.hits += 1;
+        }
+    }
+    return acc.map((b) => ({from: b.from, to: b.to, slips: b.slips, promised: b.slips > 0 ? Math.round((b.promised / b.slips) * 10) / 10 : 0, hit: b.slips > 0 ? Math.round((b.hits / b.slips) * 1000) / 10 : 0}));
 }
 
 export interface TierRecord {
@@ -115,10 +146,13 @@ export function backtestTiers(samples: ReplaySample[], tuning: PredictionTuning)
     for (const s of samples) {
         const prediction = retune(s.prediction, tuning);
         for (const slip of suggestBets(prediction, null)) {
+            // A replay knows the final score only: a slip on the first half or the counts is left out of the tally.
+            const hit = settleLegs(slip.legs.map((l) => l.key), {home: s.homeScore, away: s.awayScore});
+            if (hit === null) continue;
             const a = acc[slip.tier];
             a.slips += 1;
             a.pct += slip.pct;
-            if (settleLegs(slip.legs.map((l) => l.key), s.homeScore, s.awayScore)) a.hits += 1;
+            if (hit) a.hits += 1;
         }
     }
     const out = {} as Record<BetSuggestion['tier'], TierRecord>;

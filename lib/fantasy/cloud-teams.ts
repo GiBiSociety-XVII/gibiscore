@@ -38,7 +38,7 @@ function parseLock(raw: unknown): LineupLock | null {
 }
 
 export async function listAccountTeams(): Promise<AccountTeam[]> {
-    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,benched,lock,locks,updated_at,deleted_at').order('updated_at', {ascending: false}).limit(80);
+    const {data, error} = await createClient().from('fantasy_teams').select('id,team,pins,outs,benched,lock,locks,updated_at,deleted_at').order('deleted_at', {ascending: true, nullsFirst: true}).order('updated_at', {ascending: false}).limit(80);
     if (error) throw error;
     const rows: AccountTeam[] = [];
     for (const r of data ?? []) {

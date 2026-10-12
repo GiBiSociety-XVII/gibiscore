@@ -24,6 +24,10 @@ export interface TeamStudy {
     shots: number | null;
     shotsOnTarget: number | null;
     corners: number | null;
+    /** Corners conceded, yellow cards taken and drawn per match; null when no team statistics are stored. */
+    cornersAgainst: number | null;
+    yellows: number | null;
+    yellowsAgainst: number | null;
     withStats: number;
     over25Pct: number;
     bttsPct: number;
@@ -54,6 +58,9 @@ export interface SeasonStudy {
     over25Pct: number;
     bttsPct: number;
     avgXg: number | null;
+    /** Corners and yellow cards of both sides per match, over the matches with statistics; null without any. */
+    cornersPerMatch: number | null;
+    yellowsPerMatch: number | null;
     teams: TeamStudy[];
     home: SplitRow[];
     away: SplitRow[];
@@ -68,7 +75,7 @@ export interface StudyRow {
     away_score: number | null;
     home: TeamRow | null;
     away: TeamRow | null;
-    stats: Array<{team_id: number; possession: number | null; shots_total: number | null; shots_on_target: number | null; corners: number | null; xg: number | string | null}> | null;
+    stats: Array<{team_id: number; possession: number | null; shots_total: number | null; shots_on_target: number | null; corners: number | null; yellow_cards: number | null; xg: number | string | null}> | null;
 }
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
@@ -83,11 +90,11 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
     const played = rows.filter((r) => r.home_score !== null && r.away_score !== null && r.home && r.away);
     if (played.length === 0) return null;
 
-    type Acc = TeamStudy & {xgF: number[]; xgA: number[]; poss: number[]; sh: number[]; shOn: number[]; co: number[]; over: number; btts: number};
+    type Acc = TeamStudy & {xgF: number[]; xgA: number[]; poss: number[]; sh: number[]; shOn: number[]; co: number[]; coA: number[]; ye: number[]; yeA: number[]; over: number; btts: number};
     const teams = new Map<number, Acc>();
     const home = new Map<number, SplitRow>();
     const away = new Map<number, SplitRow>();
-    const acc = (team: TeamSummary): Acc => teams.get(team.id) ?? {team, played: 0, won: 0, drawn: 0, lost: 0, points: 0, goalsFor: 0, goalsAgainst: 0, xgFor: null, xgAgainst: null, possession: null, shots: null, shotsOnTarget: null, corners: null, withStats: 0, over25Pct: 0, bttsPct: 0, cleanSheets: 0, failedToScore: 0, form: [], xgF: [], xgA: [], poss: [], sh: [], shOn: [], co: [], over: 0, btts: 0};
+    const acc = (team: TeamSummary): Acc => teams.get(team.id) ?? {team, played: 0, won: 0, drawn: 0, lost: 0, points: 0, goalsFor: 0, goalsAgainst: 0, xgFor: null, xgAgainst: null, possession: null, shots: null, shotsOnTarget: null, corners: null, cornersAgainst: null, yellows: null, yellowsAgainst: null, withStats: 0, over25Pct: 0, bttsPct: 0, cleanSheets: 0, failedToScore: 0, form: [], xgF: [], xgA: [], poss: [], sh: [], shOn: [], co: [], coA: [], ye: [], yeA: [], over: 0, btts: 0};
     const split = (map: Map<number, SplitRow>, team: TeamSummary): SplitRow => map.get(team.id) ?? {team, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0};
 
     let homeWins = 0;
@@ -97,6 +104,8 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
     let btts = 0;
     let goals = 0;
     const xgAll: number[] = [];
+    const cornersAll: number[] = [];
+    const yellowsAll: number[] = [];
 
     for (const r of played) {
         const hs = r.home_score!;
@@ -133,12 +142,19 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
                 if (mineStats.shots_total !== null) t.sh.push(mineStats.shots_total);
                 if (mineStats.shots_on_target !== null) t.shOn.push(mineStats.shots_on_target);
                 if (mineStats.corners !== null) t.co.push(mineStats.corners);
+                if (mineStats.yellow_cards !== null) t.ye.push(mineStats.yellow_cards);
                 if (mineStats.xg !== null) {
                     t.xgF.push(Number(mineStats.xg));
                     if (isHome) xgAll.push(Number(mineStats.xg));
                 }
             }
             if (theirStats?.xg !== null && theirStats?.xg !== undefined) t.xgA.push(Number(theirStats.xg));
+            if (theirStats?.corners !== null && theirStats?.corners !== undefined) t.coA.push(theirStats.corners);
+            if (theirStats?.yellow_cards !== null && theirStats?.yellow_cards !== undefined) t.yeA.push(theirStats.yellow_cards);
+            if (isHome && mineStats && theirStats) {
+                if (mineStats.corners !== null && theirStats.corners !== null) cornersAll.push(mineStats.corners + theirStats.corners);
+                if (mineStats.yellow_cards !== null && theirStats.yellow_cards !== null) yellowsAll.push(mineStats.yellow_cards + theirStats.yellow_cards);
+            }
             teams.set(team.id, t);
 
             const s = split(isHome ? home : away, team);
@@ -154,7 +170,7 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
     }
 
     const finish = (t: Acc): TeamStudy => {
-        const {xgF, xgA, poss, sh, shOn, co, over: o, btts: b, ...rest} = t;
+        const {xgF, xgA, poss, sh, shOn, co, coA, ye, yeA, over: o, btts: b, ...rest} = t;
         return {
             ...rest,
             xgFor: avg(xgF),
@@ -163,6 +179,9 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
             shots: avg(sh, 1),
             shotsOnTarget: avg(shOn, 1),
             corners: avg(co, 1),
+            cornersAgainst: avg(coA, 1),
+            yellows: avg(ye, 1),
+            yellowsAgainst: avg(yeA, 1),
             over25Pct: pct(o, t.played),
             bttsPct: pct(b, t.played),
             form: t.form.slice(-5),
@@ -180,6 +199,8 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
         over25Pct: pct(over, played.length),
         bttsPct: pct(btts, played.length),
         avgXg: avg(xgAll),
+        cornersPerMatch: avg(cornersAll, 1),
+        yellowsPerMatch: avg(yellowsAll, 1),
         teams: [...teams.values()].map(finish).sort((a, b) => b.points - a.points || b.goalsFor - b.goalsAgainst - (a.goalsFor - a.goalsAgainst)),
         home: sortSplit([...home.values()]),
         away: sortSplit([...away.values()]),

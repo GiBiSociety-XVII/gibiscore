@@ -391,13 +391,13 @@ le notifiche, e il link che aprono, in quella.
 | `/competitions` | competizioni principali e tutti i paesi (`?q=` filtra) |
 | `/stats` | marcatori, assist e voti migliori di ogni competizione principale |
 | `/injuries` | infortunati e squalificati delle competizioni principali: da quanto sono fuori, partite saltate e rientro indicativo |
-| `/predictions` | pronostici statistici delle prossime partite (probabilità 1-X-2, gol attesi, over, entrambe a segno) |
+| `/predictions` | pronostici statistici delle prossime partite (probabilità 1-X-2, gol attesi, over, entrambe a segno) e le tre giocate del modello per partita (prudente, consigliata, audace) scelte tra ogni mercato: esito e handicap asiatico ±1,5/±2,5, over/under da 0,5 a 4,5 e multigol, gol/no gol e gol di squadra, primo tempo, pari/dispari, calci d'angolo e cartellini (su una Poisson dei conteggi attesi dalle statistiche di stagione); generatore di schedine (singola, multipla, sistema con fisse = la giocata più sicura della partita) con saldo automatico anche delle partite dopo una schedina già persa |
 | `/fantacalcio` | sezione fantacalcio (pagine dedicate: il fantacalcio non compare nelle pagine generali); con l'account, aste e squadre vivono nel cloud (`fantasy_auctions`, `fantasy_teams`) e ogni dispositivo le allinea; una cancellazione lascia una lapide (`deleted_at`) che gli altri dispositivi leggono invece di riscrivere la riga, eliminata dopo un mese dal `prune`; il listone legge il club di un giocatore da rose e formazioni dei soli club (`teams.national` esclude le nazionali) |
 | `/fantacalcio/asta` | asta: configurazione della lega (campionato, Classic/Mantra, crediti, rosa, punteggi, modificatori) e listone con voti 1-100 (titolarità, bonus, voto, malus, fisico, club), fantamedia stimata, crediti consigliati e tabellone acquisti; impostazioni e acquisti restano nel browser (`lib/fantasy/`); fasce per ruolo e nove strategie d'asta simulate sul listone |
 | `/compare?a=&b=` | due giocatori a confronto sulla stessa stagione, con valori ogni 90 minuti |
 | `/search?q=` | ricerca squadre, giocatori e competizioni (suggerimenti live nella barra) |
 | `/competitions/serie-a` | partite per giornata, classifica, squadre, statistiche (gol, xG, over 2,5, casa/trasferta), marcatori e assist per stagione |
-| `/matches/123` | tabellino: cronaca, formazioni, statistiche, voti; classifica e precedenti a lato |
+| `/matches/123` | tabellino: cronaca, formazioni, statistiche, voti; classifica e precedenti a lato; scheda mercati con ogni famiglia (esito, doppia chance, handicap, over/under, multigol, gol/no gol, gol squadra, primo tempo, pari/dispari, angoli, cartellini, risultati esatti), probabilità del modello, quota equa, quote dei bookmaker e la scelta di ogni gruppo |
 | `/teams/inter-505` | partite, rosa, posizioni in classifica |
 | `/players/n-gonzalez-1234` (`/2024` per una stagione) | totali, statistiche per stagione, partita per partita |
 

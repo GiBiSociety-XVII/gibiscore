@@ -11,7 +11,7 @@ import {MySchedine} from "@/components/football/my-schedine";
 import {Help} from "@/components/fantasy/help";
 import {TourLauncher} from "@/components/football/tour-launcher";
 import {getModelFit} from "@/lib/football/data/tuning";
-import type {LegKey} from "@/lib/football/markets";
+import {legText, type LegKey} from "@/lib/football/markets";
 
 export const revalidate = 600;
 
@@ -32,7 +32,7 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
     const tm = await getTranslations('Football.markets');
     const format = await getFormatter();
     const [record, fit, schedine] = await Promise.all([getAdviceRecord(), getModelFit(), getSchedineTally()]);
-    const legLabel = (key: LegKey) => (key === 'btts' ? tm('labels.goal') : key === 'noBtts' ? tm('labels.noGoal') : key.startsWith('over') ? tm('labels.over', {line: `${key.slice(4, 5)},${key.slice(5)}`}) : key.startsWith('under') ? tm('labels.under', {line: `${key.slice(5, 6)},${key.slice(6)}`}) : key);
+    const legLabel = (key: LegKey) => legText(key, locale);
     const cell = (label: string, value: string, note?: string) => (
         <div className="flex flex-col items-center justify-center px-2 py-2 border-t border-muted">
             <span className="font-mono text-base font-extrabold tabular-nums">{value}</span>
@@ -105,6 +105,14 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                             {cell(t('rho'), fit.tuning.rho.toFixed(2))}
                             {cell(t('logLoss'), `${fit.before.toFixed(3)} → ${fit.after.toFixed(3)}`)}
                         </div>
+                        {fit.tuning.calibration && fit.tuning.calibration.some((b) => b.slips > 0) && (
+                            <div data-tour="calibration" className="border-t border-muted">
+                                <div className="px-3 h-7 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide border-b border-muted bg-muted/40">{t('calibration')}<Help boxed text={t('calibrationHint')} /></div>
+                                <div className="grid grid-cols-3 sm:grid-cols-6">
+                                    {fit.tuning.calibration.filter((b) => b.slips > 0).map((b) => cell(`${b.from}-${Math.min(99, b.to - 1)}%`, `${b.promised.toFixed(0)}% → ${b.hit.toFixed(0)}%`, t('slips', {count: b.slips})))}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </Panel></div>
