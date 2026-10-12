@@ -14,7 +14,8 @@ import {localize, type Localized} from '@/lib/notifications/events';
  * last snapshot wins) and settled once the match is over: on the final
  * score, the half-time score, the corners and the cards, whichever the
  * legs read (a leg on the statistics waits for the details sync; if
- * the details come without its statistic, it is lost). What the pages
+ * the details come without its statistic, or nothing comes for three
+ * days, it is lost). What the pages
  * show as the model's track record comes from here, never from a
  * prediction redone after the fact.
  */
@@ -25,22 +26,33 @@ interface FactsRow {
     away_score: number | null;
     home_score_ht: number | null;
     away_score_ht: number | null;
+    starting_at: string;
     details_synced_at: string | null;
     stats: Array<{corners: number | null; yellow_cards: number | null}> | null;
 }
 
-const FACTS_SELECT = 'state,home_score,away_score,home_score_ht,away_score_ht,details_synced_at,stats:fixture_team_stats(corners,yellow_cards)';
+const FACTS_SELECT = 'state,starting_at,home_score,away_score,home_score_ht,away_score_ht,details_synced_at,stats:fixture_team_stats(corners,yellow_cards)';
+/** A fact not in this long after kick-off is not coming: the leg that waits for it is lost. */
+const FACTS_WAIT_MS = 3 * 86_400_000;
 
-/** The facts a finished match offers its legs; null while the score is not in. A count is null until the details are synced, and -1 (a count no line is over, every under beats) when they came without it. */
+/**
+ * The facts a finished match offers its legs; null while the score is
+ * not in. A count is null (the leg waits) until the details are synced;
+ * when they came without it, or nothing came for three days, it is NaN:
+ * no line is over or under an unknown, the leg is lost. The half-time
+ * score the same way.
+ */
 function factsOf(f: FactsRow): MatchFacts | null {
     if (f.state !== 'finished' || f.home_score === null || f.away_score === null) return null;
+    const overdue = Date.now() - Date.parse(f.starting_at) > FACTS_WAIT_MS;
     const total = (pick: (s: {corners: number | null; yellow_cards: number | null}) => number | null): number | null => {
-        if (!f.details_synced_at) return null;
+        if (!f.details_synced_at) return overdue ? Number.NaN : null;
         const values = (f.stats ?? []).map(pick);
-        if (values.length === 0 || values.some((v) => v === null)) return -1;
+        if (values.length === 0 || values.some((v) => v === null)) return Number.NaN;
         return (values as number[]).reduce((sum, v) => sum + v, 0);
     };
-    return {home: f.home_score, away: f.away_score, htHome: f.home_score_ht, htAway: f.away_score_ht, corners: total((s) => s.corners), yellows: total((s) => s.yellow_cards)};
+    const half = (v: number | null) => (v === null && overdue ? Number.NaN : v);
+    return {home: f.home_score, away: f.away_score, htHome: half(f.home_score_ht), htAway: half(f.away_score_ht), corners: total((s) => s.corners), yellows: total((s) => s.yellow_cards)};
 }
 
 export interface AdviceFixture {
@@ -79,7 +91,7 @@ export async function snapshotAdvice(db: FootballClient, run: SyncRun, fixtures:
                 pct: slip.pct,
                 fair: slip.fair,
                 odds: slip.odds,
-                prediction: {home: prediction.home, draw: prediction.draw, away: prediction.away, over25: prediction.over25, btts: prediction.btts, lambda: prediction.lambda, tuning},
+                prediction: {home: prediction.home, draw: prediction.draw, away: prediction.away, over25: prediction.over25, btts: prediction.btts, lambda: prediction.lambda, tuning: {goalScale: tuning.goalScale, homeEdge: tuning.homeEdge, rho: tuning.rho}},
                 advised_at: now,
                 hit: null,
                 settled_at: null,
@@ -123,10 +135,10 @@ export async function settleAdvice(db: FootballClient, run: SyncRun): Promise<vo
  * were right, not only that one was wrong.
  */
 export async function settleSchedine(db: FootballClient, run: SyncRun): Promise<void> {
-    // Every open slip whose first match has started, and every lost one with matches still to judge (its last kick-off in the past week): each finished selection is judged as it ends.
+    // Every open slip whose first match has started, and every lost one whose last match may still be judged (its kick-off less than the facts' wait ago): each finished selection is judged as it ends.
     const started = new Date(Date.now() - 90 * 60_000).toISOString();
-    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const {data, error} = await db.from('schedine').select('id,user_id,kind,system_of,selections,results,hit,payout').lte('first_kickoff', started).or(`hit.is.null,and(hit.eq.false,last_kickoff.gte.${weekAgo})`).limit(500);
+    const judgeable = new Date(Date.now() - FACTS_WAIT_MS - 3 * 3_600_000).toISOString();
+    const {data, error} = await db.from('schedine').select('id,user_id,kind,system_of,selections,results,hit,payout').lte('first_kickoff', started).or(`hit.is.null,and(hit.eq.false,last_kickoff.gte.${judgeable})`).limit(500);
     if (error) failSync('schedine.select', error);
     const open = ((data ?? []) as Array<{id: number; user_id: string; kind: SchedinaKind; system_of: number | null; selections: Array<{fixtureId: number; banker?: boolean; legs: Array<{key: LegKey}>}>; results: Array<boolean | null> | null; hit: boolean | null; payout: number | string | null}>).filter((s) => s.hit === null || (s.results ?? []).length < s.selections.length || (s.results ?? []).some((r) => r === null));
     if (open.length === 0) return;

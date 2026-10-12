@@ -12,13 +12,14 @@ function rng(seed: number) {
     };
 }
 
-/** Samples whose scores come from the model itself under a hidden tuning. */
-function synthetic(n: number, hidden: PredictionTuning, seed = 3): ReplaySample[] {
+/** Samples whose scores come from the model itself under a hidden tuning; `noise` jitters the true expected goals the model does not see (0.8: by up to ±40%), so the model is surer than it should be. */
+function synthetic(n: number, hidden: PredictionTuning, seed = 3, noise = 0): ReplaySample[] {
     const next = rng(seed);
     const out: ReplaySample[] = [];
     for (let i = 0; i < n; i += 1) {
         const base = {home: 0.8 + next() * 1.6, away: 0.6 + next() * 1.2};
-        const lambda = tuneLambdas(base, hidden);
+        const tuned = tuneLambdas(base, hidden);
+        const lambda = {home: tuned.home * (1 + (next() - 0.5) * noise), away: tuned.away * (1 + (next() - 0.5) * noise)};
         const grid = scoreGrid(lambda.home, lambda.away, hidden.rho);
         let u = next();
         let hs = 0;
@@ -67,17 +68,17 @@ describe('backtestTiers', () => {
 });
 
 describe('backtestCalibration', () => {
-    it('finds the raw model honest on scores drawn from itself, and overconfident on scores drawn from a flatter one', () => {
-        const honest = backtestCalibration(synthetic(3000, DEFAULT_TUNING, 7), DEFAULT_TUNING);
-        for (const b of honest.filter((x) => x.slips >= 100)) expect(Math.abs(b.hit - b.promised)).toBeLessThanOrEqual(7);
-        expect(honest.some((b) => b.slips >= 100)).toBe(true);
-        // Scores from a model with more goals and no home edge: the raw model's safe picks (unders, home double chances) come true less often than promised.
-        const flatter = backtestCalibration(synthetic(3000, {goalScale: 1.35, homeEdge: 0.85, rho: DEFAULT_TUNING.rho}, 11), DEFAULT_TUNING);
-        const top = flatter.filter((b) => b.from >= 75 && b.slips >= 100);
+    it('finds the raw model honest on scores drawn from itself, and overconfident when the truth is noisier than it knows', () => {
+        const honest = backtestCalibration(synthetic(2000, DEFAULT_TUNING, 7), DEFAULT_TUNING);
+        for (const b of honest.filter((x) => x.slips >= 100)) expect(Math.abs(b.hit - b.promised)).toBeLessThanOrEqual(5);
+        expect(honest.filter((b) => b.slips >= 100).length).toBeGreaterThanOrEqual(4);
+        // The true expected goals jitter by up to ±40% around what the model sees: its surest legs come true less often than promised, its longest shots more.
+        const noisy = backtestCalibration(synthetic(2000, DEFAULT_TUNING, 11, 0.8), DEFAULT_TUNING);
+        const top = noisy.filter((b) => b.from >= 75 && b.slips >= 100);
         expect(top.length).toBeGreaterThan(0);
-        expect(top.some((b) => b.hit < b.promised - 2)).toBe(true);
+        expect(top.every((b) => b.hit < b.promised)).toBe(true);
         // Measured without a calibration in force: the same whatever the tuning carries.
-        expect(backtestCalibration(synthetic(300, DEFAULT_TUNING, 7), {...DEFAULT_TUNING, calibration: honest})).toEqual(backtestCalibration(synthetic(300, DEFAULT_TUNING, 7), DEFAULT_TUNING));
+        expect(backtestCalibration(synthetic(200, DEFAULT_TUNING, 7), {...DEFAULT_TUNING, calibration: honest})).toEqual(backtestCalibration(synthetic(200, DEFAULT_TUNING, 7), DEFAULT_TUNING));
     }, 30_000);
 });
 

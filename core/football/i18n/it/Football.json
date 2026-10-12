@@ -336,10 +336,7 @@
       "over": "Over {line}",
       "under": "Under {line}",
       "goal": "Gol",
-      "noGoal": "No gol",
-      "homeHandicap": "Casa {line}",
-      "awayHandicap": "Ospite {line}",
-      "handicapHint": "Handicap asiatico a un gol e mezzo: -1,5 vince con due o più gol di scarto, +1,5 non perde con due o più gol di scarto."
+      "noGoal": "No gol"
     },
     "bandsTitle": "Quando arrivano i gol",
     "bandsHint": "Gol fatti e subiti in ogni quarto d'ora nelle partite della competizione (stagione in corso e scorsa). Il recupero conta con il tempo che chiude. Lo sfondo azzurro segna solo i quarti d'ora sopra la media (16,7%) sommando le due squadre: dove questa partita dovrebbe muoversi.",

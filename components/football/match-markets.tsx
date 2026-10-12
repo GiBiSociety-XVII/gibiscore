@@ -4,7 +4,7 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {Link} from "@/i18n/navigation";
 import type {MatchMarketData} from "@/lib/football/data/markets";
-import {bandHeat, BANDS, bestOf, fairOdds, legChances, legLine, legText, MARKET_FAMILIES, suggestBets, type BetSuggestion, type LegKey, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
+import {bandHeat, BANDS, bestOf, calibrate, fairOdds, legChances, legLine, legText, MARKET_FAMILIES, suggestBets, type BetSuggestion, type LegKey, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {TeamSummary} from "@/lib/football/types";
 import {FactorLine, OutcomeBar} from "./prediction";
@@ -116,7 +116,8 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
     const t = useTranslations('Football.markets');
     const locale = useLocale();
     const tp = useTranslations('Football.prediction');
-    const chances = prediction ? legChances(prediction) : null;
+    // Every leg's chance, calibrated like the slips' below: the same number wherever a selection shows.
+    const chances = prediction ? new Map([...legChances(prediction)].map(([k, v]) => [k, calibrate(v, prediction.calibration)])) : null;
     // Every family with a chance to show, its cells and its pick; corners and cards drop out without the sides' statistics.
     const families = chances
         ? MARKET_FAMILIES.map((f) => ({id: f.id, best: bestOf(f.keys, chances, odds), cells: f.keys.filter((k) => chances.has(k)).map((k) => ({key: k, label: legText(k, locale), pct: Math.round(chances.get(k)!), odds: legLine(odds, k)}))})).filter((f) => f.cells.length > 0)

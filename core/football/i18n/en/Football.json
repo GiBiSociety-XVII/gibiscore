@@ -336,10 +336,7 @@
       "over": "Over {line}",
       "under": "Under {line}",
       "goal": "BTTS yes",
-      "noGoal": "BTTS no",
-      "homeHandicap": "Home {line}",
-      "awayHandicap": "Away {line}",
-      "handicapHint": "Asian handicap at a goal and a half: -1.5 wins by two or more, +1.5 does not lose by two or more."
+      "noGoal": "BTTS no"
     },
     "bandsTitle": "When the goals come",
     "bandsHint": "Goals scored and conceded in every quarter of an hour in the competition's matches (current and last season). Stoppage time counts with the half it closes. The blue background marks only the quarters above the average (16.7%) adding the two teams: where this match should move.",

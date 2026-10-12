@@ -1,4 +1,4 @@
-import {settleLegs, suggestBets, SUGGESTION_TIERS, type BetSuggestion} from './markets';
+import {legChances, settleLegs, suggestBets, SUGGESTION_TIERS, type BetSuggestion} from './markets';
 import {DEFAULT_TUNING, predictMatch, retune, scoreGrid, tuneLambdas, type CalibrationBand, type MatchPrediction, type PredictionTuning} from './prediction';
 import {buildStudy, type SeasonStudy, type StudyRow} from './study';
 
@@ -101,28 +101,30 @@ export function fitTuning(samples: ReplaySample[]): TuningFit {
     return {tuning: best, samples: samples.length, before, after: bestLoss};
 }
 
-/** The bands of promised chance the calibration is measured in: a slip below 35% is never proposed. */
+/** The bands of promised chance the calibration is measured in: a slip below 35% is never proposed, so a leg below it is not read. */
 const CALIBRATION_BANDS: Array<[number, number]> = [[35, 45], [45, 55], [55, 65], [65, 75], [75, 85], [85, 101]];
 
 /**
- * The model's chances against what came: every slip it would have
- * proposed on the replays, by band of the chance promised, the share
- * that won. Measured without a calibration in force (the raw model),
- * so the correction never feeds on itself. A slip on the first half or
- * the counts, which a replay cannot settle, is left out.
+ * The model's chances against what came: every leg it rates on the
+ * replays (not only the slips it would have picked, which are the
+ * best-paying of their band and would flatter nothing but the
+ * picking), by band of the chance given, the share that came true.
+ * Measured without a calibration in force (the raw model), so the
+ * correction never feeds on itself. The first half and the counts,
+ * which a replay cannot settle, are left out.
  */
 export function backtestCalibration(samples: ReplaySample[], tuning: PredictionTuning): CalibrationBand[] {
     const raw: PredictionTuning = {goalScale: tuning.goalScale, homeEdge: tuning.homeEdge, rho: tuning.rho};
     const acc = CALIBRATION_BANDS.map(([from, to]) => ({from, to, slips: 0, promised: 0, hits: 0}));
     for (const s of samples) {
         const prediction = retune(s.prediction, raw);
-        for (const slip of suggestBets(prediction, null)) {
-            const hit = settleLegs(slip.legs.map((l) => l.key), {home: s.homeScore, away: s.awayScore});
+        for (const [key, pct] of legChances(prediction)) {
+            const hit = settleLegs([key], {home: s.homeScore, away: s.awayScore});
             if (hit === null) continue;
-            const band = acc.find((b) => slip.pct >= b.from && slip.pct < b.to);
+            const band = acc.find((b) => pct >= b.from && pct < b.to);
             if (!band) continue;
             band.slips += 1;
-            band.promised += slip.pct;
+            band.promised += pct;
             if (hit) band.hits += 1;
         }
     }

@@ -101,9 +101,9 @@ const tierOf = (pct: number): BetSuggestion['tier'] => SUGGESTION_TIERS.find((t)
  */
 export function bankerOf(c: SchedinaCandidate): SchedinaSelection | null {
     const legs = c.slips.flatMap((s) => s.legs).filter((l) => l.pct > 0);
-    const price = (l: BetSuggestion['legs'][number]) => l.odds ?? 100 / l.pct;
-    const sure = legs.filter((l) => l.pct >= BANKER_MIN_PCT).sort((a, b) => price(b) - price(a) || b.pct - a.pct);
-    const best = sure[0] ?? legs.sort((a, b) => b.pct - a.pct || price(b) - price(a))[0] ?? null;
+    // What pays most at fair odds, the one measure every leg has (a book price carries a margin, and not every leg has one); the book breaks a tie.
+    const sure = legs.filter((l) => l.pct >= BANKER_MIN_PCT).sort((a, b) => a.pct - b.pct || (b.odds ?? 0) - (a.odds ?? 0));
+    const best = sure[0] ?? legs.sort((a, b) => b.pct - a.pct || (b.odds ?? 0) - (a.odds ?? 0))[0] ?? null;
     if (!best) return null;
     const pct = Math.round(best.pct);
     return {fixtureId: c.fixtureId, competition: c.competition, home: c.home, away: c.away, startingAt: c.startingAt, tier: tierOf(pct), slip: {tier: tierOf(pct), legs: [{...best}], pct, fair: round2(100 / pct), odds: best.odds}, banker: true};

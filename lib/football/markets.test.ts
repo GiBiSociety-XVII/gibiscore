@@ -304,8 +304,10 @@ describe('suggestBets', () => {
         expect(settleLegs(['htX'], {home: 2, away: 1})).toBeNull();
         expect(settleLegs(['cornersOver95'], {home: 2, away: 1, corners: null})).toBeNull();
         expect(settleLegs(['cornersOver95', 'over35'], {home: 2, away: 1})).toBe(false);
-        // Details synced without the statistic: a count no over beats.
-        expect(settleLegs(['cornersOver85'], {home: 2, away: 1, corners: -1})).toBe(false);
+        // The statistic not coming (NaN): neither an over nor an under of it wins.
+        expect(settleLegs(['cornersOver85'], {home: 2, away: 1, corners: Number.NaN})).toBe(false);
+        expect(settleLegs(['cornersUnder115'], {home: 2, away: 1, corners: Number.NaN})).toBe(false);
+        expect(settleLegs(['htX'], {home: 1, away: 1, htHome: Number.NaN, htAway: Number.NaN})).toBe(false);
         expect(settleLegs([], facts)).toBe(false);
     });
 

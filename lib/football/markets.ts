@@ -372,7 +372,7 @@ export function handicapOf(key: LegKey): {side: 'home' | 'away'; line: string} |
     return m ? {side: m[1] as 'home' | 'away', line: `${m[2]}${m[3][0]}.5`} : null;
 }
 
-/** What settles a leg: the final score, the half-time score, the corners and the cards of the match; null when not known (yet). */
+/** What settles a leg: the final score, the half-time score, the corners and the cards of the match; null when not known yet, NaN when it is not coming (the leg that reads it is lost). */
 export interface MatchFacts {
     home: number;
     away: number;
@@ -629,8 +629,8 @@ export function expectedReturn(slip: Pick<BetSuggestion, 'pct' | 'legs' | 'odds'
     return Math.round(chance * slip.odds * 1000) / 1000;
 }
 
-/** A leg below this chance is not worth a slip, whatever it pays. */
-const LEG_MIN_PCT = 35;
+/** A leg or a combination below this raw chance is not worth a slip, whatever it pays: the lowest tier's threshold, less what the calibration may lift. */
+const LEG_MIN_PCT = Math.floor(SUGGESTION_TIERS[SUGGESTION_TIERS.length - 1].min / CALIBRATION_FACTOR.max);
 /** A leg must cut the slip's chance by this much, or it adds nothing but words. */
 const LEG_CUT_PCT = 3;
 /** A slip of one leg more must pay this much more to be preferred over a shorter one of the same tier. */
@@ -686,15 +686,14 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
     // The scorelines flat, and every combinable leg as a mask over them: a slip's chance is one pass over the cells.
     const cells = grid.flat();
     const own = legChances(prediction);
-    const lowestTier = SUGGESTION_TIERS[SUGGESTION_TIERS.length - 1].min;
     interface Masked {
         leg: LegDef;
         mask: Uint8Array;
     }
     const masked = new Map<LegGroup, Masked[]>();
     for (const l of LEGS) {
-        // A leg below the lowest tier cannot lift a combination above it (a slip is never likelier than its least likely leg).
-        if (!l.test || !COMBINABLE.includes(l.group) || (own.get(l.key) ?? 0) < lowestTier) continue;
+        // A leg below the floor cannot lift a combination above it (a slip is never likelier than its least likely leg).
+        if (!l.test || !COMBINABLE.includes(l.group) || (own.get(l.key) ?? 0) < LEG_MIN_PCT) continue;
         const mask = new Uint8Array(cells.length);
         for (let h = 0; h < grid.length; h += 1) for (let a = 0; a < grid[h].length; a += 1) if (l.test(h, a)) mask[h * grid[h].length + a] = 1;
         masked.set(l.group, [...(masked.get(l.group) ?? []), {leg: l, mask}]);
@@ -718,7 +717,7 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
     }
     const consider = (legs: Masked[]) => {
         const pct = chance(legs);
-        if (pct < lowestTier) return;
+        if (pct < LEG_MIN_PCT) return;
         // Every leg must narrow the slip: without it the chance would be higher by a margin.
         if (legs.some((l) => pct > chance(legs.filter((x) => x !== l)) - LEG_CUT_PCT)) return;
         slips.push({legs: legs.map((l) => l.leg), pct});
@@ -727,8 +726,8 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
     for (const o of byGroup('outcome')) for (const b of byGroup('btts')) consider([o, b]);
     for (const g of byGroup('goals')) for (const b of byGroup('btts')) consider([g, b]);
     for (const o of byGroup('outcome')) for (const g of byGroup('goals')) {
-        // The pair must already make a tier for the triple to: a third leg only narrows.
-        if (chance([o, g]) < lowestTier) continue;
+        // The pair must already clear the floor for the triple to: a third leg only narrows.
+        if (chance([o, g]) < LEG_MIN_PCT) continue;
         for (const b of byGroup('btts')) consider([o, g, b]);
     }
 
@@ -737,8 +736,8 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
         const legs: BetLeg[] = s.legs.map((l) => ({key: l.key, pct: Math.round(calibrate(own.get(l.key)!, prediction.calibration)), odds: legOdds(odds, l.key)}));
         const prices = legs.map((l) => l.odds);
         const pct = Math.round(calibrate(s.pct, prediction.calibration));
-        // The price of a combination: the legs' prices multiplied, then divided by how much likelier they are together (the raw chances, like the prices).
-        const together = s.legs.length > 1 ? Math.max(1, s.pct / 100 / s.legs.reduce((x, l) => x * (own.get(l.key)! / 100), 1)) : 1;
+        // The price of a combination: the legs' prices multiplied, then divided by how much likelier they are together (the same ratio the expected return uses).
+        const together = correlationOf({pct, legs});
         return {id: s.legs.map((l) => l.key).join('+'), tier: 'bold', legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round((prices.reduce((x, p) => x * p, 1) / together) * 100) / 100 : null};
     });
     // A longer slip needs to pay a little more per leg.
