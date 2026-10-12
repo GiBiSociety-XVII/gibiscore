@@ -342,6 +342,10 @@ describe('suggestBets', () => {
         const safe = slips.find((s) => s.tier === 'safe')!;
         expect(safe.odds).not.toBeNull();
         expect(safe.legs.every((l) => l.odds !== null)).toBe(true);
+        // A price below the model's view is no reason to prefer the slip: a stingy 1X loses to the unpriced markets, which compete as if priced at fair odds less the margin.
+        const stingy = summarizeOdds([{bookmaker: 'A', markets: {doubleChance: {homeOrDraw: 1.05, drawOrAway: 2.1, homeOrAway: 1.25}}}]);
+        const safeStingy = suggestBets(prediction, stingy).find((s) => s.tier === 'safe')!;
+        expect(safeStingy.legs.map((l) => l.key)).not.toEqual(['1X']);
         // Expected return blends the model's chance with the implied one: a fair price returns less than one.
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2}], odds: 2})!).toBeLessThan(1);
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2.6}], odds: 2.6})!).toBeGreaterThan(1);

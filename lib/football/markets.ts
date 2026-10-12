@@ -660,11 +660,13 @@ export function bestOf(keys: LegKey[], chances: Map<LegKey, number>, odds: OddsS
  * own chance. Empty without a prediction.
  *
  * Every chance is first corrected by the calibration (what came of the
- * chances promised before). With the bookmakers' prices in, the slip
- * of a tier is the priced one with the best expected return, the
- * chance a blend of the model's and the one implied by the prices
- * (the market knows things the model does not); without prices, the
- * one that pays most at fair odds.
+ * chances promised before). The slip of a tier is the one with the
+ * best expected return: at the bookmakers' price where there is one,
+ * the chance a blend of the model's and the one implied by the price
+ * (the market knows things the model does not); at fair odds less the
+ * usual margin where there is none, so a priced slip wins only with
+ * real value and the markets nobody prices (the goal ranges, the new
+ * ones until the odds come) still compete. On a tie, what pays most.
  */
 export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | null): BetSuggestion[] {
     const grid = scoreGrid(prediction.lambda.home, prediction.lambda.away, prediction.rho);
@@ -726,13 +728,14 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
     });
     // A longer slip needs to pay a little more per leg.
     const length = (s: BetSuggestion) => 1 - LEG_COST * (s.legs.length - 1);
+    // A slip nobody prices is taken as priced at its fair odds less the usual margin: a priced one beats it only with real value, and loses to it when the bookmakers rate it below the model.
+    const score = (s: BetSuggestion) => (expectedReturn(s) ?? 1 - MARKET_MARGIN) * length(s);
+    // On a tie, what pays most at fair odds (the slips without a price all tie): a likelier slip between two priced alike.
+    const rank = (a: BetSuggestion, b: BetSuggestion) => score(b) - score(a) || (a.odds === null || b.odds === null ? (100 / b.pct) * length(b) - (100 / a.pct) * length(a) : b.pct - a.pct);
     const out: BetSuggestion[] = [];
     const taken = new Set<string>();
     for (const {tier, min} of SUGGESTION_TIERS) {
-        const fit = candidates.filter((s) => s.pct >= min && !taken.has(s.id));
-        // Priced: the best expected return; a likelier slip on a tie. Unpriced: what pays most at fair odds.
-        const priced = fit.filter((s) => expectedReturn(s) !== null).sort((a, b) => expectedReturn(b)! * length(b) - expectedReturn(a)! * length(a) || b.pct - a.pct);
-        const best = priced[0] ?? fit.sort((a, b) => (100 / b.pct) * length(b) - (100 / a.pct) * length(a))[0];
+        const best = candidates.filter((s) => s.pct >= min && !taken.has(s.id)).sort(rank)[0];
         if (!best) continue;
         taken.add(best.id);
         const {id, ...slip} = best;
