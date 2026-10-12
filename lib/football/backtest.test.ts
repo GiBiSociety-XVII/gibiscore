@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {backtestTiers, fitTuning, logLoss, replaySeason, type ReplaySample} from './backtest';
+import {backtestCalibration, backtestTiers, fitTuning, logLoss, replaySeason, type ReplaySample} from './backtest';
 import {DEFAULT_TUNING, fromLambdas, scoreGrid, tuneLambdas, type PredictionTuning} from './prediction';
 import {buildStudy, type StudyRow} from './study';
 
@@ -64,6 +64,21 @@ describe('backtestTiers', () => {
         }
         expect(record.safe.hitRate).toBeGreaterThan(record.bold.hitRate);
     }, 20_000);
+});
+
+describe('backtestCalibration', () => {
+    it('finds the raw model honest on scores drawn from itself, and overconfident on scores drawn from a flatter one', () => {
+        const honest = backtestCalibration(synthetic(3000, DEFAULT_TUNING, 7), DEFAULT_TUNING);
+        for (const b of honest.filter((x) => x.slips >= 100)) expect(Math.abs(b.hit - b.promised)).toBeLessThanOrEqual(7);
+        expect(honest.some((b) => b.slips >= 100)).toBe(true);
+        // Scores from a model with more goals and no home edge: the raw model's safe picks (unders, home double chances) come true less often than promised.
+        const flatter = backtestCalibration(synthetic(3000, {goalScale: 1.35, homeEdge: 0.85, rho: DEFAULT_TUNING.rho}, 11), DEFAULT_TUNING);
+        const top = flatter.filter((b) => b.from >= 75 && b.slips >= 100);
+        expect(top.length).toBeGreaterThan(0);
+        expect(top.some((b) => b.hit < b.promised - 2)).toBe(true);
+        // Measured without a calibration in force: the same whatever the tuning carries.
+        expect(backtestCalibration(synthetic(300, DEFAULT_TUNING, 7), {...DEFAULT_TUNING, calibration: honest})).toEqual(backtestCalibration(synthetic(300, DEFAULT_TUNING, 7), DEFAULT_TUNING));
+    }, 30_000);
 });
 
 describe('replaySeason', () => {

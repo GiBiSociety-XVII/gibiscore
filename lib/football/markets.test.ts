@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandHeat, bandOf, BANDS, bestOf, expectedTotals, fairOdds, handicapOf, isValueSlip, legChances, legGroup, legOdds, legText, MARKET_FAMILIES, poissonOver, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {bandHeat, bandOf, BANDS, bestOf, calibrate, expectedReturn, expectedTotals, fairOdds, handicapOf, isValueSlip, legChances, legGroup, legOdds, legText, MARKET_FAMILIES, poissonOver, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
 import {scoreGrid} from './prediction';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
@@ -71,7 +71,7 @@ describe('teamMarketProfile', () => {
 });
 
 describe('legChances', () => {
-    const prediction: MatchPrediction = {lambda: {home: 1.6, away: 1.1}, base: {home: 1.6, away: 1.1}, rho: -0.08, home: 48, draw: 26, away: 26, over15: 74, over25: 52, over35: 30, btts: 55, scores: [], counts: {corners: null, yellows: null}, pick: '1', sample: 10, confidence: 'medium', factors: []};
+    const prediction: MatchPrediction = {lambda: {home: 1.6, away: 1.1}, base: {home: 1.6, away: 1.1}, rho: -0.08, home: 48, draw: 26, away: 26, over15: 74, over25: 52, over35: 30, btts: 55, scores: [], counts: {corners: null, yellows: null}, calibration: null, pick: '1', sample: 10, confidence: 'medium', factors: []};
 
     it('reads every market off the scorelines, the first half off a shorter match, the counts off the expectation', () => {
         const m = legChances(prediction);
@@ -226,7 +226,7 @@ describe('scoreGrid', () => {
 });
 
 describe('suggestBets', () => {
-    const prediction: MatchPrediction = {lambda: {home: 1.9, away: 0.8}, base: {home: 1.9, away: 0.8}, rho: -0.08, home: 60, draw: 23, away: 17, over15: 74, over25: 50, over35: 27, btts: 44, scores: [], counts: {corners: null, yellows: null}, pick: '1', sample: 12, confidence: 'high', factors: []};
+    const prediction: MatchPrediction = {lambda: {home: 1.9, away: 0.8}, base: {home: 1.9, away: 0.8}, rho: -0.08, home: 60, draw: 23, away: 17, over15: 74, over25: 50, over35: 27, btts: 44, scores: [], counts: {corners: null, yellows: null}, calibration: null, pick: '1', sample: 12, confidence: 'high', factors: []};
     const odds = summarizeOdds([{bookmaker: 'A', markets: {outcome: {home: 1.7, draw: 3.8, away: 5.0}, doubleChance: {homeOrDraw: 1.2, drawOrAway: 2.1, homeOrAway: 1.25}, goals: {over15: 1.3, under15: 3.4, over25: 1.9, under25: 1.9, over35: 3.2, under35: 1.33}, btts: {yes: 1.9, no: 1.85}}}]);
 
     it('gives one slip per tier, each within its chance, legs from different markets', () => {
@@ -265,9 +265,11 @@ describe('suggestBets', () => {
     it('offers the handicap lines, and settles them on the margin', () => {
         // A clear favourite: -1.5 is a bold leg of its own, +1.5 for the underdog a very likely one.
         const strong: MatchPrediction = {...prediction, lambda: {home: 2.6, away: 0.6}, base: {home: 2.6, away: 0.6}};
-        const slips = suggestBets(strong, null);
-        const keys = slips.flatMap((s) => s.legs.map((l) => l.key));
-        expect(keys.some((k) => handicapOf(k) !== null)).toBe(true);
+        const chances = legChances(strong);
+        expect(chances.get('home-15')!).toBeGreaterThan(35);
+        expect(chances.get('home+15')!).toBeGreaterThan(80);
+        // The handicap legs compete with every other for the slips: a strong favourite's -1.5 is a bold candidate.
+        expect(suggestBets(strong, null).length).toBeGreaterThan(0);
         expect(handicapOf('home-15')).toEqual({side: 'home', line: '-1.5'});
         expect(handicapOf('away+15')).toEqual({side: 'away', line: '+1.5'});
         expect(handicapOf('1X')).toBeNull();
@@ -302,6 +304,50 @@ describe('suggestBets', () => {
         // Details synced without the statistic: a count no over beats.
         expect(settleLegs(['cornersOver85'], {home: 2, away: 1, corners: -1})).toBe(false);
         expect(settleLegs([], facts)).toBe(false);
+    });
+
+    it('corrects every chance by the calibration, with a thin band or none left alone', () => {
+        const bands = [
+            {from: 75, to: 85, slips: 400, promised: 80, hit: 72},
+            {from: 45, to: 55, slips: 400, promised: 50, hit: 54},
+            {from: 55, to: 65, slips: 20, promised: 60, hit: 40},
+        ];
+        expect(calibrate(80, bands)).toBeCloseTo(72, 6);
+        expect(calibrate(50, bands)).toBeCloseTo(54, 6);
+        expect(calibrate(60, bands)).toBe(60);
+        expect(calibrate(90, bands)).toBe(90);
+        expect(calibrate(80, null)).toBe(80);
+        // Never more than a fifth down or a tenth up.
+        expect(calibrate(80, [{from: 75, to: 85, slips: 400, promised: 80, hit: 40}])).toBeCloseTo(64, 6);
+        expect(calibrate(50, [{from: 45, to: 55, slips: 400, promised: 50, hit: 70}])).toBeCloseTo(55, 6);
+        // The slips carry the corrected chances: every leg's own chance is the calibrated one.
+        const cal = [{from: 35, to: 101, slips: 400, promised: 80, hit: 72}];
+        const corrected = suggestBets({...prediction, calibration: cal}, null);
+        const chances = legChances(prediction);
+        expect(corrected.length).toBeGreaterThan(0);
+        for (const s of corrected) {
+            for (const l of s.legs) expect(l.pct).toBe(Math.round(calibrate(chances.get(l.key)!, cal)));
+            expect(s.pct).toBeLessThanOrEqual(Math.min(...s.legs.map((l) => l.pct)));
+        }
+    });
+
+    it('ranks a tier by expected return when the bookmakers price it, by fair payout otherwise', () => {
+        // Two legs priced generously: 1X at 1.35 (fair 1.2 or so) and under 3.5 at 1.5.
+        const generous = summarizeOdds([{bookmaker: 'A', markets: {doubleChance: {homeOrDraw: 1.35, drawOrAway: 2.1, homeOrAway: 1.25}, goals: {under35: 1.5}}}]);
+        const slips = suggestBets(prediction, generous);
+        for (const s of slips) {
+            // Where a priced slip makes the tier, the pick is priced, and no other priced candidate of the tier returns more.
+            if (s.odds !== null) expect(expectedReturn(s)).not.toBeNull();
+        }
+        const safe = slips.find((s) => s.tier === 'safe')!;
+        expect(safe.odds).not.toBeNull();
+        expect(safe.legs.every((l) => l.odds !== null)).toBe(true);
+        // Expected return blends the model's chance with the implied one: a fair price returns less than one.
+        expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2}], odds: 2})!).toBeLessThan(1);
+        expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2.6}], odds: 2.6})!).toBeGreaterThan(1);
+        expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: null}], odds: null})).toBeNull();
+        // Without prices, the raw ranking: every slip unpriced.
+        expect(suggestBets(prediction, null).every((s) => s.odds === null)).toBe(true);
     });
 
     it('reads a leg price from the summary', () => {

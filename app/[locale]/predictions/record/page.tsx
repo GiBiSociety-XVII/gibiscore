@@ -105,6 +105,14 @@ export default async function AdviceRecordPage({params}: PageProps<"/[locale]/pr
                             {cell(t('rho'), fit.tuning.rho.toFixed(2))}
                             {cell(t('logLoss'), `${fit.before.toFixed(3)} → ${fit.after.toFixed(3)}`)}
                         </div>
+                        {fit.tuning.calibration && fit.tuning.calibration.some((b) => b.slips > 0) && (
+                            <div data-tour="calibration" className="border-t border-muted">
+                                <div className="px-3 h-7 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide border-b border-muted bg-muted/40">{t('calibration')}<Help boxed text={t('calibrationHint')} /></div>
+                                <div className="grid grid-cols-3 sm:grid-cols-6">
+                                    {fit.tuning.calibration.filter((b) => b.slips > 0).map((b) => cell(`${b.from}-${Math.min(99, b.to - 1)}%`, `${b.promised.toFixed(0)}% → ${b.hit.toFixed(0)}%`, t('slips', {count: b.slips})))}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </Panel></div>

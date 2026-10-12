@@ -1,4 +1,4 @@
-import {scoreGrid, type MatchPrediction} from './prediction';
+import {scoreGrid, type CalibrationBand, type MatchPrediction} from './prediction';
 
 /**
  * The reading of a match the way the betting markets frame it: when the
@@ -584,6 +584,38 @@ export const SUGGESTION_TIERS: Array<{tier: BetSuggestion['tier']; min: number}>
     {tier: 'bold', min: 45},
 ];
 
+/** A band of the calibration counts once it holds this many settled slips. */
+const CALIBRATION_MIN_SLIPS = 100;
+/** How far the calibration may move a chance: a tenth up, a fifth down. */
+const CALIBRATION_FACTOR = {min: 0.8, max: 1.1};
+
+/**
+ * A chance the model promises, corrected by what came of the chances
+ * it promised before: in the band this one falls in, the share of
+ * slips that came true over the share promised (fit-model, on the
+ * replays of past seasons). Untouched without a band or with a thin
+ * one; moved at most a tenth up or a fifth down.
+ */
+export function calibrate(pct: number, calibration: CalibrationBand[] | null | undefined): number {
+    const band = calibration?.find((b) => pct >= b.from && pct < b.to && b.slips >= CALIBRATION_MIN_SLIPS && b.promised > 0);
+    if (!band) return pct;
+    const factor = Math.max(CALIBRATION_FACTOR.min, Math.min(CALIBRATION_FACTOR.max, band.hit / band.promised));
+    return Math.max(1, Math.min(99, pct * factor));
+}
+
+/** The bookmakers' prices carry a margin: an implied chance is the inverse price, this much smaller. */
+const MARKET_MARGIN = 0.06;
+/** How much the model's chance weighs against the bookmakers' implied one when a slip is ranked by its expected return. */
+const MODEL_WEIGHT = 0.6;
+
+/** The expected return of a unit stake on the slip, the chance a blend of the model's and the bookmakers' implied one; null without a price on every leg. */
+export function expectedReturn(slip: Pick<BetSuggestion, 'pct' | 'legs' | 'odds'>): number | null {
+    if (slip.odds === null || slip.legs.some((l) => l.odds === null || !(l.odds > 1))) return null;
+    const implied = slip.legs.reduce((p, l) => p * (1 / l.odds! / (1 + MARKET_MARGIN)), 1);
+    const chance = MODEL_WEIGHT * (slip.pct / 100) + (1 - MODEL_WEIGHT) * implied;
+    return Math.round(chance * slip.odds * 1000) / 1000;
+}
+
 /** A leg below this chance is not worth a slip, whatever it pays. */
 const LEG_MIN_PCT = 35;
 /** A leg must cut the slip's chance by this much, or it adds nothing but words. */
@@ -626,6 +658,13 @@ export function bestOf(keys: LegKey[], chances: Map<LegKey, number>, odds: OddsS
  * all) and a leg that does not narrow the slip is left out. The first
  * half, the parity, the corners and the cards stand alone, each on its
  * own chance. Empty without a prediction.
+ *
+ * Every chance is first corrected by the calibration (what came of the
+ * chances promised before). With the bookmakers' prices in, the slip
+ * of a tier is the priced one with the best expected return, the
+ * chance a blend of the model's and the one implied by the prices
+ * (the market knows things the model does not); without prices, the
+ * one that pays most at fair odds.
  */
 export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | null): BetSuggestion[] {
     const grid = scoreGrid(prediction.lambda.home, prediction.lambda.away, prediction.rho);
@@ -678,18 +717,27 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
         for (const b of byGroup('btts')) consider([o, g, b]);
     }
 
+    // Every candidate as a slip: its chance calibrated, its price when every leg has one.
+    const candidates: Array<BetSuggestion & {id: string}> = slips.map((s) => {
+        const legs: BetLeg[] = s.legs.map((l) => ({key: l.key, pct: Math.round(calibrate(own.get(l.key)!, prediction.calibration)), odds: legOdds(odds, l.key)}));
+        const prices = legs.map((l) => l.odds);
+        const pct = Math.round(calibrate(s.pct, prediction.calibration));
+        return {id: s.legs.map((l) => l.key).join('+'), tier: 'bold', legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round(prices.reduce((x, p) => x * p, 1) * 100) / 100 : null};
+    });
+    // A longer slip needs to pay a little more per leg.
+    const length = (s: BetSuggestion) => 1 - LEG_COST * (s.legs.length - 1);
     const out: BetSuggestion[] = [];
     const taken = new Set<string>();
     for (const {tier, min} of SUGGESTION_TIERS) {
-        // The slip that pays most while keeping the tier's chance; a longer slip needs to pay a little more per leg.
-        const worth = (s: {legs: LegDef[]; pct: number}) => (100 / s.pct) * (1 - LEG_COST * (s.legs.length - 1));
-        const best = slips.filter((s) => s.pct >= min && !taken.has(s.legs.map((l) => l.key).join('+'))).sort((a, b) => worth(b) - worth(a))[0];
+        const fit = candidates.filter((s) => s.pct >= min && !taken.has(s.id));
+        // Priced: the best expected return; a likelier slip on a tie. Unpriced: what pays most at fair odds.
+        const priced = fit.filter((s) => expectedReturn(s) !== null).sort((a, b) => expectedReturn(b)! * length(b) - expectedReturn(a)! * length(a) || b.pct - a.pct);
+        const best = priced[0] ?? fit.sort((a, b) => (100 / b.pct) * length(b) - (100 / a.pct) * length(a))[0];
         if (!best) continue;
-        taken.add(best.legs.map((l) => l.key).join('+'));
-        const legs: BetLeg[] = best.legs.map((l) => ({key: l.key, pct: Math.round(own.get(l.key)!), odds: legOdds(odds, l.key)}));
-        const prices = legs.map((l) => l.odds);
-        const pct = Math.round(best.pct);
-        out.push({tier, legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round(prices.reduce((s, p) => s * p, 1) * 100) / 100 : null});
+        taken.add(best.id);
+        const {id, ...slip} = best;
+        void id;
+        out.push({...slip, tier});
     }
     return out;
 }

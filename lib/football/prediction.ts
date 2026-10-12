@@ -46,6 +46,8 @@ export interface MatchPrediction {
     scores: Array<{home: number; away: number; pct: number}>;
     /** Corners and yellow cards expected in the match, both sides: each side's habit against what the other allows, the league's rate behind a short record. Null without team statistics. */
     counts: MatchCounts;
+    /** How the chances the model promises compare with what came, by band (the tuning's): the slips' chances are corrected by it. Null before a fit. */
+    calibration: CalibrationBand[] | null;
     /** Most likely outcome. */
     pick: '1' | 'X' | '2';
     /** Matches behind the numbers (the smaller of the two teams). */
@@ -72,6 +74,17 @@ const RHO = -0.08;
  * low-score correlation. The study's data is never touched: only what
  * the model makes of it. The defaults are the untuned model.
  */
+/** One band of the calibration: of the slips the model promised a chance in [from, to), the share that came true on the replays. */
+export interface CalibrationBand {
+    from: number;
+    to: number;
+    slips: number;
+    /** Average chance promised, percent. */
+    promised: number;
+    /** Share that came true, percent. */
+    hit: number;
+}
+
 export interface PredictionTuning {
     /** Both sides' expected goals times this: above one the model was scoring too few. */
     goalScale: number;
@@ -79,6 +92,8 @@ export interface PredictionTuning {
     homeEdge: number;
     /** Dixon-Coles rho: negative values push the draw at low scores. */
     rho: number;
+    /** Fitted by fit-model on the replays: the model's own chances against what came, by band. Absent until a fit. */
+    calibration?: CalibrationBand[];
 }
 
 export const DEFAULT_TUNING: PredictionTuning = {goalScale: 1, homeEdge: 1, rho: RHO};
@@ -325,6 +340,7 @@ export function fromLambdas(base: {home: number; away: number}, tuning: Predicti
             .sort((a, b) => b.pct - a.pct)
             .slice(0, 5),
         counts,
+        calibration: tuning.calibration ?? null,
         pick,
         sample,
         confidence: sample >= 12 ? 'high' : sample >= 6 ? 'medium' : 'low',

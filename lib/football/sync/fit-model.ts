@@ -1,6 +1,6 @@
 import 'server-only';
 import {revalidateTag} from 'next/cache';
-import {backtestTiers, fitTuning, replaySeason, type ReplaySample} from '@/lib/football/backtest';
+import {backtestCalibration, backtestTiers, fitTuning, replaySeason, type ReplaySample} from '@/lib/football/backtest';
 import {loadStudyRows} from '@/lib/football/data/study';
 import {MODEL_TUNING_TAG, type ModelFit} from '@/lib/football/data/tuning';
 import {buildStudy} from '@/lib/football/study';
@@ -11,9 +11,11 @@ import {currentSeasons, failSync, finishRun, footballClient, startRun, type Sync
  *
  * The prediction model tuned on the archive: the current and the
  * previous season of every featured league replayed match by match
- * (backtest.ts), the tuning fitted to the scores that came, the slips
- * the tuned model would have proposed settled. Stored in model_tuning
- * for every prediction to read. No provider request: database only.
+ * (backtest.ts), the tuning fitted to the scores that came, then the
+ * model's chances measured against what came (the calibration, by band
+ * of chance promised) and the slips the tuned, calibrated model would
+ * have proposed settled. Stored in model_tuning for every prediction to
+ * read. No provider request: database only.
  */
 export async function fitPredictionModel(): Promise<SyncRun> {
     const db = footballClient();
@@ -41,13 +43,15 @@ export async function fitPredictionModel(): Promise<SyncRun> {
         }
         run.bump('samples', samples.length);
         const fit = fitTuning(samples);
-        const tiers = backtestTiers(samples, fit.tuning);
-        const value: ModelFit = {tuning: fit.tuning, fittedAt: new Date().toISOString(), samples: fit.samples, seasons: seasons.filter((s) => s.matches > 0), before: Math.round(fit.before * 10000) / 10000, after: Math.round(fit.after * 10000) / 10000, tiers};
+        const calibration = backtestCalibration(samples, fit.tuning);
+        const tuning = {...fit.tuning, calibration};
+        const tiers = backtestTiers(samples, tuning);
+        const value: ModelFit = {tuning, fittedAt: new Date().toISOString(), samples: fit.samples, seasons: seasons.filter((s) => s.matches > 0), before: Math.round(fit.before * 10000) / 10000, after: Math.round(fit.after * 10000) / 10000, tiers};
         const {error: saveError} = await db.from('model_tuning').upsert({key: 'prediction', value, updated_at: new Date().toISOString()}, {onConflict: 'key'});
         if (saveError) failSync('model_tuning.upsert', saveError);
         revalidateTag(MODEL_TUNING_TAG, 'max');
         run.bump('fitted');
-        run.warn(`tuning goals x${fit.tuning.goalScale}, home x${fit.tuning.homeEdge}, rho ${fit.tuning.rho}: log-loss ${value.before} -> ${value.after} on ${fit.samples} matches`);
+        run.warn(`tuning goals x${fit.tuning.goalScale}, home x${fit.tuning.homeEdge}, rho ${fit.tuning.rho}: log-loss ${value.before} -> ${value.after} on ${fit.samples} matches; calibration ${calibration.map((b) => `${b.from}-${b.to}: ${b.promised}->${b.hit} (${b.slips})`).join(', ')}`);
         await finishRun(db, run, 'ok');
         return run;
     } catch (error) {
