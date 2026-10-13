@@ -609,8 +609,20 @@ export function calibrate(pct: number, calibration: CalibrationBand[] | null | u
 
 /** The bookmakers' prices carry a margin: an implied chance is the inverse price, this much smaller. */
 const MARKET_MARGIN = 0.06;
-/** How much the model's chance weighs against the bookmakers' implied one when a slip is ranked by its expected return. */
-const MODEL_WEIGHT = 0.6;
+/**
+ * How much the model's chance weighs against the bookmakers' implied one
+ * when a slip is ranked by its expected return: by the confidence of
+ * the prediction, that is by how many matches of this competition the
+ * two sides have behind them. A side with two matches in a cup (a
+ * qualifier against a minnow, say) is read mostly through the market.
+ */
+const MODEL_WEIGHT: Record<MatchPrediction['confidence'], number> = {high: 0.6, medium: 0.35, low: 0.15};
+/**
+ * A model chance beyond this many times the market's is not value, it
+ * is the model being wrong: a priced market is rarely off by half. Such
+ * a slip is read at the market's chance, so it earns no edge.
+ */
+const DISAGREEMENT_MAX = 2;
 
 /**
  * How much likelier the legs of a slip are together than apart, on the
@@ -624,12 +636,14 @@ export function correlationOf(slip: Pick<BetSuggestion, 'pct' | 'legs'>): number
     return apart > 0 ? Math.max(1, slip.pct / 100 / apart) : 1;
 }
 
-/** The expected return of a unit stake on the slip, the chance a blend of the model's and the one the slip's price implies (a margin per leg removed); null without a price on every leg. */
-export function expectedReturn(slip: Pick<BetSuggestion, 'pct' | 'legs' | 'odds'>): number | null {
+/** The expected return of a unit stake on the slip, the chance a blend of the model's and the one the slip's price implies (a margin per leg removed), the model weighing by the prediction's confidence; null without a price on every leg. */
+export function expectedReturn(slip: Pick<BetSuggestion, 'pct' | 'legs' | 'odds'>, confidence: MatchPrediction['confidence'] = 'high'): number | null {
     if (slip.odds === null || !(slip.odds > 1) || slip.legs.some((l) => l.odds === null || !(l.odds > 1))) return null;
     // The slip's own price already carries the legs' correlation (a combination is priced at the product over it).
     const implied = 1 / slip.odds / (1 + MARKET_MARGIN) ** slip.legs.length;
-    const chance = MODEL_WEIGHT * (slip.pct / 100) + (1 - MODEL_WEIGHT) * implied;
+    const model = slip.pct / 100;
+    const weight = MODEL_WEIGHT[confidence];
+    const chance = model > implied * DISAGREEMENT_MAX ? implied : weight * model + (1 - weight) * implied;
     return Math.round(chance * slip.odds * 1000) / 1000;
 }
 
@@ -656,10 +670,15 @@ export function legLine(odds: OddsSummary | null, key: LegKey): OddsLine | undef
  * fair price by the most when one is priced that way (value), else the
  * likeliest; null when the family has no chance to read.
  */
-export function bestOf(keys: LegKey[], chances: Map<LegKey, number>, odds: OddsSummary | null): LegKey | null {
+export function bestOf(keys: LegKey[], chances: Map<LegKey, number>, odds: OddsSummary | null, confidence: MatchPrediction['confidence'] = 'high'): LegKey | null {
     const cells = keys.filter((k) => chances.has(k));
     if (cells.length === 0) return null;
-    const edge = (k: LegKey) => slipEdge({pct: Math.round(chances.get(k)!), odds: legOdds(odds, k)});
+    // The edge as the ranking reads it: the model's chance blended with the market's, by confidence, and no edge where the two disagree beyond belief.
+    const edge = (k: LegKey): number | null => {
+        const price = legOdds(odds, k);
+        const r = expectedReturn({pct: Math.round(chances.get(k)!), legs: [{key: k, pct: Math.round(chances.get(k)!), odds: price}], odds: price}, confidence);
+        return r === null ? null : Math.round((r - 1) * 1000) / 1000;
+    };
     const valued = cells.filter((k) => (edge(k) ?? -1) >= VALUE_MIN_EDGE).sort((a, b) => edge(b)! - edge(a)!);
     if (valued.length > 0) return valued[0];
     return cells.sort((a, b) => chances.get(b)! - chances.get(a)!)[0];
@@ -748,7 +767,7 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
     // A longer slip needs to pay a little more per leg.
     const length = (s: BetSuggestion) => 1 - LEG_COST * (s.legs.length - 1);
     // A slip nobody prices is taken as priced at its fair odds less the usual margin: a priced one beats it only with real value, and loses to it when the bookmakers rate it below the model.
-    const score = (s: BetSuggestion) => (expectedReturn(s) ?? 1 - MARKET_MARGIN) * length(s);
+    const score = (s: BetSuggestion) => (expectedReturn(s, prediction.confidence) ?? 1 - MARKET_MARGIN) * length(s);
     // On a tie, what pays most at fair odds (the slips without a price all tie): a likelier slip between two priced alike.
     const rank = (a: BetSuggestion, b: BetSuggestion) => score(b) - score(a) || (a.odds === null || b.odds === null ? (100 / b.pct) * length(b) - (100 / a.pct) * length(a) : b.pct - a.pct);
     const out: BetSuggestion[] = [];
