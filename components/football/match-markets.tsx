@@ -119,8 +119,8 @@ export function MatchMarkets({data, prediction, finished = false, odds, home, aw
     // Every leg's chance, calibrated like the slips' below: the same number wherever a selection shows.
     const chances = prediction ? new Map([...legChances(prediction)].map(([k, v]) => [k, calibrateLeg(k, v, prediction.calibration)])) : null;
     // Every family with a chance to show, its cells and its pick; corners and cards drop out without the sides' statistics.
-    const families = chances
-        ? MARKET_FAMILIES.map((f) => ({id: f.id, best: bestOf(f.keys, chances, odds), cells: f.keys.filter((k) => chances.has(k)).map((k) => ({key: k, label: legText(k, locale), pct: Math.round(chances.get(k)!), odds: legLine(odds, k)}))})).filter((f) => f.cells.length > 0)
+    const families = prediction && chances
+        ? MARKET_FAMILIES.map((f) => ({id: f.id, best: bestOf(f.keys, chances, odds, prediction.confidence), cells: f.keys.filter((k) => chances.has(k)).map((k) => ({key: k, label: legText(k, locale), pct: Math.round(chances.get(k)!), odds: legLine(odds, k)}))})).filter((f) => f.cells.length > 0)
         : [];
     const familyHint = (id: string): string | undefined => {
         if (id === 'corners') return prediction?.counts.corners !== null && prediction?.counts.corners !== undefined ? t('familyHints.corners', {value: prediction.counts.corners.toFixed(1)}) : undefined;

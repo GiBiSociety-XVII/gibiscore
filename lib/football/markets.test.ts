@@ -371,6 +371,14 @@ describe('suggestBets', () => {
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2}], odds: 2})!).toBeLessThan(1);
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2.6}], odds: 2.6})!).toBeGreaterThan(1);
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: null}], odds: null})).toBeNull();
+        // The model weighs less the less it knows: the same slip returns less at low confidence when the model is the keen one.
+        const keen = {pct: 60, legs: [{key: '1' as const, pct: 60, odds: 2}], odds: 2};
+        expect(expectedReturn(keen, 'low')!).toBeLessThan(expectedReturn(keen, 'medium')!);
+        expect(expectedReturn(keen, 'medium')!).toBeLessThan(expectedReturn(keen, 'high')!);
+        // A model chance beyond twice the market's is no value at all: read at the market's chance, under one.
+        expect(expectedReturn({pct: 64, legs: [{key: '1', pct: 64, odds: 9.12}], odds: 9.12})!).toBeLessThan(1);
+        // The family's pick: '1' at 64% paying 9.12 is no value (the market says 10%), so a draw paid a little above its fair price is the pick, not the model's favourite.
+        expect(bestOf(['1', 'X', '2'], new Map([['1', 64], ['X', 20], ['2', 16]]), summarizeOdds([{bookmaker: 'A', markets: {outcome: {home: 9.12, draw: 6, away: 1.33}}}]))).toBe('X');
         // A combination's return reads its own price, which carries the correlation: the same slip priced lower returns less.
         const combo = {pct: 40, legs: [{key: 'over25' as const, pct: 53, odds: 1.9}, {key: 'btts' as const, pct: 51, odds: 1.9}]};
         expect(expectedReturn({...combo, odds: 2.4})!).toBeLessThan(expectedReturn({...combo, odds: 3.6})!);
