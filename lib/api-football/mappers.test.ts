@@ -247,7 +247,7 @@ describe('mapOdds', () => {
                 {id: 5, name: 'Goals Over/Under', values: [{value: 'Over 2.5', odd: '1.80'}, {value: 'Under 2.5', odd: '2.00'}, {value: 'Over 1.5', odd: '1.25'}, {value: 'Over 4.5', odd: '4.5'}]},
                 {id: 8, name: 'Both Teams Score', values: [{value: 'Yes', odd: '1.70'}, {value: 'No', odd: '2.10'}]},
                 {id: 12, name: 'Double Chance', values: [{value: 'Home/Draw', odd: '1.22'}, {value: 'Home/Away', odd: '1.28'}, {value: 'Draw/Away', odd: '1.95'}]},
-                {id: 4, name: 'Asian Handicap', values: [{value: 'Home -1.5', odd: '2.75'}, {value: 'Away +1.5', odd: '1.45'}, {value: 'Home -1', odd: '2.05'}, {value: 'Away +1', odd: '1.80'}, {value: 'Home -0.75', odd: '1.90'}]},
+                {id: 4, name: 'Asian Handicap', values: [{value: 'Home -1.5', odd: '2.75'}, {value: 'Away -1.5', odd: '1.45'}, {value: 'Home +1.5', odd: '1.10'}, {value: 'Away +1.5', odd: '6.50'}, {value: 'Home -1', odd: '2.05'}, {value: 'Away +1', odd: '1.80'}, {value: 'Home -0.75', odd: '1.90'}]},
                 {id: 16, name: 'Total - Home', values: [{value: 'Over 0.5', odd: '1.20'}, {value: 'Over 1.5', odd: '1.95'}, {value: 'Under 1.5', odd: '1.80'}]},
                 {id: 13, name: 'First Half Winner', values: [{value: 'Home', odd: '2.40'}, {value: 'Draw', odd: '2.10'}, {value: 'Away', odd: '4.50'}]},
                 {id: 6, name: 'Goals Over/Under First Half', values: [{value: 'Over 0.5', odd: '1.40'}, {value: 'Under 0.5', odd: '2.80'}]},
@@ -269,8 +269,8 @@ describe('mapOdds', () => {
         expect(rows[0].markets.goals).toEqual({over05: null, under05: null, over15: 1.25, under15: null, over25: 1.8, under25: 2, over35: null, under35: null, over45: 4.5, under45: null});
         expect(rows[0].markets.btts).toEqual({yes: 1.7, no: 2.1});
         expect(rows[0].markets.doubleChance).toEqual({homeOrDraw: 1.22, drawOrAway: 1.95, homeOrAway: 1.28});
-        // The Asian lines at a goal and a half only: whole and quarter lines can push.
-        expect(rows[0].markets.handicap).toEqual({homeMinus15: 2.75, awayMinus15: null, homePlus15: null, awayPlus15: 1.45, homeMinus25: null, awayMinus25: null, homePlus25: null, awayPlus25: null});
+        // The Asian lines at a half only (whole and quarter lines can push); the away values carry the home side's line: "Away -1.5" is the away side at +1.5.
+        expect(rows[0].markets.handicap).toEqual({homeMinus15: 2.75, awayMinus15: 6.5, homePlus15: 1.1, awayPlus15: 1.45, homeMinus25: null, awayMinus25: null, homePlus25: null, awayPlus25: null});
         expect(rows[0].markets.teamGoals).toEqual({homeOver05: 1.2, homeUnder05: null, homeOver15: 1.95, homeUnder15: 1.8});
         expect(rows[0].markets.halfOutcome).toEqual({home: 2.4, draw: 2.1, away: 4.5});
         expect(rows[0].markets.halfGoals).toEqual({over05: 1.4, under05: 2.8, over15: null, under15: null});
