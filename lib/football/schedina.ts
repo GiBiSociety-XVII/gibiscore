@@ -142,7 +142,7 @@ export function buildSchedina(candidates: SchedinaCandidate[], options: Schedina
     const picks: SchedinaSelection[] = [];
     const eligible: SchedinaCandidate[] = [];
     for (const c of candidates) {
-        if (c.startingAt <= options.now) continue;
+        if (Date.parse(c.startingAt) <= Date.parse(options.now)) continue;
         if (options.days.length > 0 && !options.days.includes(c.day)) continue;
         if (options.competitions.length > 0 && !options.competitions.includes(c.competitionId)) continue;
         const tier = tiers.find((t) => c.slips.some((s) => s.tier === t));
@@ -306,7 +306,9 @@ export function systemGroups(selections: SchedinaSelection[]): SystemGroup[] {
     const out: SystemGroup[] = [];
     for (let k = Math.max(1, n); k >= 1; k -= 1) {
         const columns = schedinaColumns(selections, n === 0 ? null : k);
-        out.push({k, n, columns, atLeastPct: Math.round(bankersChance * (n === 0 ? 1 : atLeast(free.map((s) => s.slip.pct / 100), k)) * 100), edge: columns.reduce((sum, c) => sum + c.probability * c.odds, 0) / columns.length - 1, priced: columns.every((c) => c.priced)});
+        const priced = columns.every((c) => c.priced);
+        // Without a price a line has no edge: the fair odds are rounded, and the rounding is not a reason to stake.
+        out.push({k, n, columns, atLeastPct: Math.round(bankersChance * (n === 0 ? 1 : atLeast(free.map((s) => s.slip.pct / 100), k)) * 100), edge: priced ? columns.reduce((sum, c) => sum + c.probability * c.odds, 0) / columns.length - 1 : 0, priced});
         if (n === 0) break;
     }
     return out;
@@ -397,4 +399,36 @@ export function stakePlan(selections: SchedinaSelection[], groups: SystemGroup[]
         }
     }
     return {lines, total, expectedReturn, expectedProfit: round2(expectedReturn - total), maxPayout: round2(lines.reduce((sum, l) => sum + l.linePayout, 0)), profitChance: Math.round(profitChance * 100), priced: lines.every((l) => l.priced)};
+}
+
+/**
+ * What a settled slip pays, from what was staked and which selections
+ * came in: a single or an accumulator pays its payout when every
+ * selection won, nothing otherwise; a system pays every column of
+ * every line whose selections all won, at the selections' prices (the
+ * fair odds where no bookmaker priced one), the bankers in every
+ * column. Zero without a stake.
+ */
+export function settledReturn(kind: SchedinaKind, selections: Array<{banker?: boolean; odds?: number | null; pct: number}>, results: Array<boolean | null>, payout: number | null, lines: Array<{k: number; stake: number}> | null): number {
+    const won = (i: number) => results[i] === true;
+    if (kind !== 'system') return payout !== null && selections.every((_s, i) => won(i)) ? payout : 0;
+    if (!lines || lines.length === 0) return 0;
+    const price = (i: number) => selections[i].odds ?? (selections[i].pct > 0 ? 100 / selections[i].pct : 1);
+    const bankers = selections.map((s, i) => (s.banker ? i : -1)).filter((i) => i >= 0);
+    if (!bankers.every(won)) return 0;
+    const bankersPrice = bankers.reduce((p, i) => p * price(i), 1);
+    const free = selections.map((s, i) => (s.banker ? -1 : i)).filter((i) => i >= 0);
+    let total = 0;
+    for (const line of lines) {
+        if (!(line.stake > 0) || line.k < 1 || line.k > free.length) continue;
+        const walk = (start: number, chosen: number[]) => {
+            if (chosen.length === line.k) {
+                if (chosen.every(won)) total += line.stake * bankersPrice * chosen.reduce((p, i) => p * price(i), 1);
+                return;
+            }
+            for (let i = start; i < free.length; i += 1) walk(i + 1, [...chosen, free[i]]);
+        };
+        walk(0, []);
+    }
+    return Math.round(total * 100) / 100;
 }

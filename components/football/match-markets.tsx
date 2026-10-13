@@ -4,7 +4,7 @@ import {cn} from "@/components/shared/ui/cn";
 import {Panel} from "@/components/shell/panel";
 import {Link} from "@/i18n/navigation";
 import type {MatchMarketData} from "@/lib/football/data/markets";
-import {bandHeat, BANDS, bestOf, calibrate, fairOdds, legChances, legLine, legText, MARKET_FAMILIES, suggestBets, type BetSuggestion, type LegKey, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
+import {bandHeat, BANDS, bestOf, calibrateLeg, fairOdds, legChances, legLine, legText, MARKET_FAMILIES, suggestBets, type BetSuggestion, type LegKey, type OddsLine, type OddsSummary, type TeamMarketProfile} from "@/lib/football/markets";
 import type {MatchPrediction} from "@/lib/football/prediction";
 import type {TeamSummary} from "@/lib/football/types";
 import {FactorLine, OutcomeBar} from "./prediction";
@@ -112,12 +112,12 @@ function GoalBands({profile, team, scale, heat}: {profile: TeamMarketProfile | n
  * lines; corners and cards. A reading of the numbers, not advice on
  * what to play.
  */
-export function MatchMarkets({data, prediction, odds, home, away, title}: {data: MatchMarketData | null; prediction: MatchPrediction | null; odds: OddsSummary | null; home: TeamSummary; away: TeamSummary; title: string}) {
+export function MatchMarkets({data, prediction, finished = false, odds, home, away, title}: {data: MatchMarketData | null; prediction: MatchPrediction | null; /** The match is over: a prediction made now would know the result; the slips proposed before kick-off live in the record. */ finished?: boolean; odds: OddsSummary | null; home: TeamSummary; away: TeamSummary; title: string}) {
     const t = useTranslations('Football.markets');
     const locale = useLocale();
     const tp = useTranslations('Football.prediction');
     // Every leg's chance, calibrated like the slips' below: the same number wherever a selection shows.
-    const chances = prediction ? new Map([...legChances(prediction)].map(([k, v]) => [k, calibrate(v, prediction.calibration)])) : null;
+    const chances = prediction ? new Map([...legChances(prediction)].map(([k, v]) => [k, calibrateLeg(k, v, prediction.calibration)])) : null;
     // Every family with a chance to show, its cells and its pick; corners and cards drop out without the sides' statistics.
     const families = chances
         ? MARKET_FAMILIES.map((f) => ({id: f.id, best: bestOf(f.keys, chances, odds), cells: f.keys.filter((k) => chances.has(k)).map((k) => ({key: k, label: legText(k, locale), pct: Math.round(chances.get(k)!), odds: legLine(odds, k)}))})).filter((f) => f.cells.length > 0)
@@ -253,7 +253,7 @@ export function MatchMarkets({data, prediction, odds, home, away, title}: {data:
                         )}
                     </>
                 ) : (
-                    <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground">{tp('empty')}</p>
+                    <p className="px-3 py-2 text-[12px] font-semibold text-muted-foreground">{finished ? <>{t('finished')} <Link href="/predictions/record" className="font-extrabold text-foreground hover:underline decoration-accent decoration-[2px] underline-offset-2">{t('advice.record')}</Link></> : tp('empty')}</p>
                 )}
                 <p className="px-3 py-2 border-t border-muted text-[11px] font-semibold text-muted-foreground leading-snug">{t('disclaimer')}</p>
             </Panel></div>

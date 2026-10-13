@@ -292,6 +292,7 @@ CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-competitions           
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-squads                         # rose e cessioni dei club in evidenza (~520, in due giri)
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-fixtures?window=month"        # partite da ieri a +30 giorni (32)
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-standings                      # classifiche in evidenza (~13)
+CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-odds?force=1"               # quote dei bookmaker di tutte le partite in evidenza dei prossimi 3 giorni, anche se chieste da poco, e giocate del modello riscritte (~1 richiesta a partita)
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron sync-injuries                       # infortuni (~13)
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-backfill?limit=1000"          # calendario completo + dettaglio delle partite gia' giocate (~100 richieste a giro)
 CRON_SECRET=... BASE_URL=https://<deploy> pnpm cron "sync-player-seasons?scope=current&budget=600"  # statistiche stagionali dei giocatori (~450 richieste)

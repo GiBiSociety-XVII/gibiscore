@@ -1,4 +1,6 @@
 import 'server-only';
+import {revalidatePath} from 'next/cache';
+import {everyLocalePath} from '@/lib/auth/next';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {mapOdds} from '@/lib/api-football/mappers';
 import type {AfOddsResponse} from '@/lib/api-football/types';
@@ -42,12 +44,13 @@ interface Due {
  * (lib/football/coverage.ts), next two days, once a day, up to 600 a
  * run. Every ask is marked on the fixture (odds_synced_at), answered or
  * not. Routine class: it waits when the day's quota runs low. `days`
- * widens the featured window.
+ * widens the featured window; `force` asks every featured fixture of
+ * the window again, whatever the last ask.
  *
  * The same pass writes down the model's slips for the featured fixtures
  * and settles the slips of the matches since finished (advice.ts).
  */
-export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> {
+export async function syncOdds(options: {days?: number; force?: boolean} = {}): Promise<SyncRun> {
     const db = footballClient();
     const run = await startRun(db, 'sync-odds');
     try {
@@ -72,7 +75,8 @@ export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> 
             {max: 8000},
         )) as unknown as Due[];
         const askedAgo = (f: Due) => (f.odds_synced_at ? now - Date.parse(f.odds_synced_at) : Number.POSITIVE_INFINITY);
-        const featured = rows.filter((f) => f.league.tier === 'featured' && Date.parse(f.starting_at) <= now + days * 24 * HOUR && askedAgo(f) > FEATURED_EVERY_MS);
+        // `force`: every featured fixture of the window again, however recently asked (after a change in what is read from the provider).
+        const featured = rows.filter((f) => f.league.tier === 'featured' && Date.parse(f.starting_at) <= now + days * 24 * HOUR && (options.force || askedAgo(f) > FEATURED_EVERY_MS));
         const basic = rows
             .filter((f) => f.league.tier === 'basic' && provides('basic', f.league.season_coverage, 'odds') && Date.parse(f.starting_at) <= now + BASIC_WINDOW_DAYS * 24 * HOUR && askedAgo(f) > BASIC_EVERY_MS)
             .sort((a, b) => (a.odds_synced_at ?? '').localeCompare(b.odds_synced_at ?? '') || a.starting_at.localeCompare(b.starting_at));
@@ -110,6 +114,12 @@ export async function syncOdds(options: {days?: number} = {}): Promise<SyncRun> 
             if (markError) failSync('fixtures.update', markError);
         }
         await snapshotAdvice(db, run, featured.filter((f) => f.season_id !== null).map((f) => ({id: f.id, seasonId: f.season_id!, homeId: f.home_team_id, awayId: f.away_team_id})));
+        // The match pages show the prices and the slips: rendered again now, not when their day-long cache runs out.
+        try {
+            for (const f of featured) for (const path of everyLocalePath(`/matches/${f.id}`)) revalidatePath(path);
+        } catch {
+            // Outside a request (a script, a test): nothing to refresh.
+        }
         await finishRun(db, run, 'ok');
         return run;
     } catch (error) {

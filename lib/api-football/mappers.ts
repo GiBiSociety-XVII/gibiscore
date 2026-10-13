@@ -605,12 +605,15 @@ const BET_NAMES = {
  * bookmaker; a bookmaker without any of them is skipped. Labels are the
  * provider's: "Home"/"Draw"/"Away", "Home/Draw", "Over 2.5", "Yes",
  * "Home -1.5" (the Asian lines at a half only: the whole and quarter
- * lines can push, and a slip has no room for a refund), "Odd", "2:1".
+ * lines can push, and a slip has no room for a refund; the away values
+ * carry the home side's line, see below), "Odd", "2:1".
  */
 export function mapOdds(response: AfOddsResponse | undefined): OddsRow[] {
     if (!response) return [];
+    // A label read loosely: case, spacing and a decimal comma do not matter.
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/(\d),(\d)/g, '$1.$2');
     const price = (values: Array<{value: string; odd: string}> | undefined, label: string): number | null => {
-        const v = values?.find((x) => x.value.trim().toLowerCase() === label.toLowerCase());
+        const v = values?.find((x) => norm(x.value) === norm(label));
         const n = v ? Number(v.odd) : NaN;
         return Number.isFinite(n) && n > 1 ? n : null;
     };
@@ -648,8 +651,18 @@ export function mapOdds(response: AfOddsResponse | undefined): OddsRow[] {
             const no = price(btts, 'No');
             if (yes !== null && no !== null) markets.btts = {yes, no};
         }
-        const handicap = lines(bet(BET_NAMES.handicap), ['homeMinus15', 'awayMinus15', 'homePlus15', 'awayPlus15', 'homeMinus25', 'awayMinus25', 'homePlus25', 'awayPlus25'] as const, (k) => `${k.startsWith('home') ? 'Home' : 'Away'} ${k.includes('Minus') ? '-' : '+'}${k.endsWith('15') ? '1.5' : '2.5'}`);
-        if (handicap) markets.handicap = handicap;
+        // The provider writes the line as applied to the home side on both values: "Home -1.5" is the home side winning by two, "Away -1.5" the away side covering that same line, which is the away side at +1.5. So an away key reads the opposite sign.
+        const handicap = lines(bet(BET_NAMES.handicap), ['homeMinus15', 'awayMinus15', 'homePlus15', 'awayPlus15', 'homeMinus25', 'awayMinus25', 'homePlus25', 'awayPlus25'] as const, (k) => `${k.startsWith('home') ? 'Home' : 'Away'} ${k.includes('Minus') === k.startsWith('home') ? '-' : '+'}${k.endsWith('15') ? '1.5' : '2.5'}`);
+        if (handicap) {
+            // The two values of a line are the two sides of one bet: their implied chances sum to about one (plus the margin). If instead the home side's minus and the away side's minus sum to one, this bookmaker labels the away side with its own line: its away keys are read the other way round.
+            const implied = (a: number | null | undefined, b: number | null | undefined) => (a && b ? 1 / a + 1 / b : null);
+            const asRead = implied(handicap.homeMinus15, handicap.awayPlus15) ?? implied(handicap.homeMinus25, handicap.awayPlus25);
+            const other = implied(handicap.homeMinus15, handicap.awayMinus15) ?? implied(handicap.homeMinus25, handicap.awayMinus25);
+            const fair = (v: number | null) => v !== null && v >= 0.98 && v <= 1.25;
+            if (!fair(asRead) && fair(other)) {
+                markets.handicap = {...handicap, awayMinus15: handicap.awayPlus15, awayPlus15: handicap.awayMinus15, awayMinus25: handicap.awayPlus25, awayPlus25: handicap.awayMinus25};
+            } else markets.handicap = handicap;
+        }
         const teamOu = (k: string) => ou(k.replace(/^(home|away)(Over|Under)/, (_m, _s, d: string) => d.toLowerCase()));
         const homeGoals = lines(bet(BET_NAMES.homeGoals), ['homeOver05', 'homeUnder05', 'homeOver15', 'homeUnder15'] as const, teamOu);
         const awayGoals = lines(bet(BET_NAMES.awayGoals), ['awayOver05', 'awayUnder05', 'awayOver15', 'awayUnder15'] as const, teamOu);

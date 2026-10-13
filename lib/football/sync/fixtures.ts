@@ -322,6 +322,9 @@ export async function upsertFixtures(db: FootballClient, run: SyncRun, fixtures:
             away_score: f.goals?.away ?? null,
             home_score_ht: f.score?.halftime?.home ?? null,
             away_score_ht: f.score?.halftime?.away ?? null,
+            // The ninety-minute score when the match went on: what the markets settle on.
+            home_score_ft: f.score?.extratime?.home !== null && f.score?.extratime?.home !== undefined ? (f.score?.fulltime?.home ?? null) : null,
+            away_score_ft: f.score?.extratime?.away !== null && f.score?.extratime?.away !== undefined ? (f.score?.fulltime?.away ?? null) : null,
             venue_name: f.fixture.venue?.name ?? null,
             referee: f.fixture.referee ?? null,
             last_synced_at: new Date().toISOString(),

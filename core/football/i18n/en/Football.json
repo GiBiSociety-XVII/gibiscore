@@ -295,6 +295,7 @@
   },
   "markets": {
     "intro": "The site's prediction and every market read the way bookmakers read them: the model's probability, the odds that would pay it at even value and the bookmakers' average odds; then the pick the model would place at every level of risk. Below, when the two teams score and concede, and how often they go over the lines for goals, corners and cards.",
+    "finished": "Match over: a prediction made now would know the result. The picks proposed before kick-off are in the record.",
     "disclaimer": "These are numbers on the matches played and on the model's probabilities, not betting advice. Odds above the fair odds are not a sure win: they are an outcome the bookmaker pays more than the model thinks it is likely. Bet only if you are of age, and in moderation.",
     "hint": "Poisson model on the expected goals of the two teams (attack and defence against the league, home and away, xG, form), translated into every market. Fair odds = 100 / probability. Bookmakers' odds from the data provider, refreshed every three hours until kick-off.",
     "modelTitle": "Markets according to the model",

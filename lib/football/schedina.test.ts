@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {BetSuggestion} from './markets';
-import {atLeast, autoSystemOf, bankerOf, buildSchedina, combinations, schedinaColumns, schedinaLost, schedinaWon, stakePlan, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type SchedinaCandidate} from './schedina';
+import {atLeast, autoSystemOf, bankerOf, buildSchedina, combinations, settledReturn, schedinaColumns, schedinaLost, schedinaWon, stakePlan, suggestedStakes, systemGroups, ticketPlan, toStakeStep, type SchedinaCandidate} from './schedina';
 
 const slip = (tier: BetSuggestion['tier'], pct: number, odds: number | null = null): BetSuggestion => ({tier, legs: [{key: '1', pct, odds}], pct, fair: Math.round((100 / pct) * 100) / 100, odds});
 const match = (id: number, day: string, hour: string, competitionId: number, slips: BetSuggestion[]): SchedinaCandidate => ({fixtureId: id, competitionId, competition: `L${competitionId}`, home: `H${id}`, away: `A${id}`, startingAt: `${day}T${hour}:00Z`, day, slips});
@@ -209,5 +209,29 @@ describe('schedinaLost', () => {
         expect(schedinaLost('system', [true, false, null, null], 2, [true, false, false, false])).toBe(false);
         expect(schedinaLost('system', [false, false, null], 1, undefined)).toBe(false);
         expect(schedinaLost('system', [false, false, false], 1, undefined)).toBe(true);
+    });
+});
+
+describe('settledReturn', () => {
+    it('pays a single or an accumulator its payout when every selection won, nothing otherwise', () => {
+        const sel = [{pct: 60, odds: 1.6}, {pct: 50, odds: 2}];
+        expect(settledReturn('multiple', sel, [true, true], 32, null)).toBe(32);
+        expect(settledReturn('multiple', sel, [true, false], 32, null)).toBe(0);
+        expect(settledReturn('single', [sel[0]], [true], 16, null)).toBe(16);
+        expect(settledReturn('multiple', sel, [true, true], null, null)).toBe(0);
+    });
+    it('pays a system every column of every line whose selections won, the bankers in each', () => {
+        // One banker (1.2) and three free selections (2, 1.5, 3); line 2 of 3 at 1 € a column, line 3 of 3 at 2 €.
+        const sel = [{banker: true, pct: 85, odds: 1.2}, {pct: 50, odds: 2}, {pct: 66, odds: 1.5}, {pct: 33, odds: 3}];
+        const lines = [{k: 2, stake: 1}, {k: 3, stake: 2}];
+        // The first two free selections won: one column of the 2-of-3 line pays 1 × 1.2 × 2 × 1.5 = 3.6; the 3-of-3 line pays nothing.
+        expect(settledReturn('system', sel, [true, true, true, false], 99, lines)).toBeCloseTo(3.6, 2);
+        // Everything won: three columns of 2 (3.6 + 7.2 + 5.4) and the 3-of-3 column at 2 € (2 × 1.2 × 9 = 21.6).
+        expect(settledReturn('system', sel, [true, true, true, true], 99, lines)).toBeCloseTo(3.6 + 7.2 + 5.4 + 21.6, 2);
+        // The banker lost: nothing.
+        expect(settledReturn('system', sel, [false, true, true, true], 99, lines)).toBe(0);
+        // No price on a selection: its fair odds stand in.
+        expect(settledReturn('system', [{banker: false, pct: 50, odds: null}, {banker: false, pct: 50, odds: 2}], [true, true], 9, [{k: 2, stake: 1}])).toBeCloseTo(4, 2);
+        expect(settledReturn('system', sel, [true, true, true, true], 99, null)).toBe(0);
     });
 });

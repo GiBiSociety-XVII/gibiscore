@@ -113,10 +113,11 @@ function poisson(lambda: number, k: number): number {
 }
 
 function tau(h: number, a: number, lh: number, la: number, rho: number): number {
-    if (h === 0 && a === 0) return 1 - lh * la * rho;
-    if (h === 0 && a === 1) return 1 + lh * rho;
-    if (h === 1 && a === 0) return 1 + la * rho;
-    if (h === 1 && a === 1) return 1 - rho;
+    // Never below zero: a lopsided tie with a strong correlation would otherwise take a scoreline's chance negative.
+    if (h === 0 && a === 0) return Math.max(0, 1 - lh * la * rho);
+    if (h === 0 && a === 1) return Math.max(0, 1 + lh * rho);
+    if (h === 1 && a === 0) return Math.max(0, 1 + la * rho);
+    if (h === 1 && a === 1) return Math.max(0, 1 - rho);
     return 1;
 }
 

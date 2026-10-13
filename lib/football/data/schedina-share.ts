@@ -1,9 +1,10 @@
 import 'server-only';
+import {cache} from 'react';
 import type {Ticket} from '@/components/football/schedina-ticket';
 import {footballDb, logReadError} from './shared';
 
 /** A shared slip by its token, as the ticket shows it; null when the token is unknown. Nothing about the owner. */
-export async function getSharedSchedina(token: string): Promise<Ticket | null> {
+export const getSharedSchedina = cache(async function getSharedSchedina(token: string): Promise<Ticket | null> {
     if (!/^[a-f0-9]{16,64}$/.test(token)) return null;
     try {
         const {data, error} = await footballDb().rpc('schedina_by_token', {token});
@@ -34,4 +35,4 @@ export async function getSharedSchedina(token: string): Promise<Ticket | null> {
         logReadError(`getSharedSchedina`, error);
         return null;
     }
-}
+});

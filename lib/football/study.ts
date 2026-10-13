@@ -24,7 +24,7 @@ export interface TeamStudy {
     shots: number | null;
     shotsOnTarget: number | null;
     corners: number | null;
-    /** Corners conceded, yellow cards taken and drawn per match; null when no team statistics are stored. */
+    /** Corners conceded, cards taken and drawn per match (a yellow or a red, one each, as the cards markets count them); null when no team statistics are stored. */
     cornersAgainst: number | null;
     yellows: number | null;
     yellowsAgainst: number | null;
@@ -58,7 +58,7 @@ export interface SeasonStudy {
     over25Pct: number;
     bttsPct: number;
     avgXg: number | null;
-    /** Corners and yellow cards of both sides per match, over the matches with statistics; null without any. */
+    /** Corners and cards (yellow and red) of both sides per match, over the matches with statistics; null without any. */
     cornersPerMatch: number | null;
     yellowsPerMatch: number | null;
     teams: TeamStudy[];
@@ -75,7 +75,7 @@ export interface StudyRow {
     away_score: number | null;
     home: TeamRow | null;
     away: TeamRow | null;
-    stats: Array<{team_id: number; possession: number | null; shots_total: number | null; shots_on_target: number | null; corners: number | null; yellow_cards: number | null; xg: number | string | null}> | null;
+    stats: Array<{team_id: number; possession: number | null; shots_total: number | null; shots_on_target: number | null; corners: number | null; yellow_cards: number | null; red_cards?: number | null; xg: number | string | null}> | null;
 }
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
@@ -142,7 +142,7 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
                 if (mineStats.shots_total !== null) t.sh.push(mineStats.shots_total);
                 if (mineStats.shots_on_target !== null) t.shOn.push(mineStats.shots_on_target);
                 if (mineStats.corners !== null) t.co.push(mineStats.corners);
-                if (mineStats.yellow_cards !== null) t.ye.push(mineStats.yellow_cards);
+                if (mineStats.yellow_cards !== null) t.ye.push(mineStats.yellow_cards + (mineStats.red_cards ?? 0));
                 if (mineStats.xg !== null) {
                     t.xgF.push(Number(mineStats.xg));
                     if (isHome) xgAll.push(Number(mineStats.xg));
@@ -150,10 +150,10 @@ export function buildStudy(seasonId: number, rows: StudyRow[]): SeasonStudy | nu
             }
             if (theirStats?.xg !== null && theirStats?.xg !== undefined) t.xgA.push(Number(theirStats.xg));
             if (theirStats?.corners !== null && theirStats?.corners !== undefined) t.coA.push(theirStats.corners);
-            if (theirStats?.yellow_cards !== null && theirStats?.yellow_cards !== undefined) t.yeA.push(theirStats.yellow_cards);
+            if (theirStats?.yellow_cards !== null && theirStats?.yellow_cards !== undefined) t.yeA.push(theirStats.yellow_cards + (theirStats.red_cards ?? 0));
             if (isHome && mineStats && theirStats) {
                 if (mineStats.corners !== null && theirStats.corners !== null) cornersAll.push(mineStats.corners + theirStats.corners);
-                if (mineStats.yellow_cards !== null && theirStats.yellow_cards !== null) yellowsAll.push(mineStats.yellow_cards + theirStats.yellow_cards);
+                if (mineStats.yellow_cards !== null && theirStats.yellow_cards !== null) yellowsAll.push(mineStats.yellow_cards + (mineStats.red_cards ?? 0) + theirStats.yellow_cards + (theirStats.red_cards ?? 0));
             }
             teams.set(team.id, t);
 

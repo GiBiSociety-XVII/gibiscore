@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {MatchPrediction} from './prediction';
-import {bandHeat, bandOf, BANDS, bestOf, calibrate, correlationOf, expectedReturn, expectedTotals, fairOdds, handicapOf, isValueSlip, legChances, legGroup, legOdds, legText, MARKET_FAMILIES, poissonOver, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
+import {bandHeat, bandOf, BANDS, bestOf, calibrate, calibrateLeg, correlationOf, expectedReturn, expectedTotals, fairOdds, handicapOf, isValueSlip, legChances, legGroup, legOdds, legText, MARKET_FAMILIES, poissonOver, settleLegs, slipEdge, suggestBets, SUGGESTION_TIERS, summarizeOdds, teamMarketProfile, type TeamMatchFacts} from './markets';
 import {scoreGrid} from './prediction';
 
 const match = (over: Partial<TeamMatchFacts>): TeamMatchFacts => ({home: true, goalsFor: 0, goalsAgainst: 0, minutesFor: [], minutesAgainst: [], withEvents: true, cornersFor: null, cornersAgainst: null, yellowFor: null, yellowAgainst: null, ...over});
@@ -322,6 +322,11 @@ describe('suggestBets', () => {
         expect(calibrate(60, bands)).toBe(60);
         expect(calibrate(90, bands)).toBe(90);
         expect(calibrate(80, null)).toBe(80);
+        // Only the groups a replay can measure are corrected: the first half, the corners and the cards keep the model's chance.
+        const wide = [{from: 35, to: 101, slips: 400, promised: 80, hit: 72}];
+        expect(calibrateLeg('1X', 80, wide)).toBeCloseTo(72, 6);
+        expect(calibrateLeg('htOver05', 80, wide)).toBe(80);
+        expect(calibrateLeg('cornersOver85', 80, wide)).toBe(80);
         // Never more than a fifth down or a tenth up.
         expect(calibrate(80, [{from: 75, to: 85, slips: 400, promised: 80, hit: 40}])).toBeCloseTo(64, 6);
         expect(calibrate(50, [{from: 45, to: 55, slips: 400, promised: 50, hit: 70}])).toBeCloseTo(55, 6);
@@ -331,7 +336,7 @@ describe('suggestBets', () => {
         const chances = legChances(prediction);
         expect(corrected.length).toBeGreaterThan(0);
         for (const s of corrected) {
-            for (const l of s.legs) expect(l.pct).toBe(Math.round(calibrate(chances.get(l.key)!, cal)));
+            for (const l of s.legs) expect(l.pct).toBe(Math.round(calibrateLeg(l.key, chances.get(l.key)!, cal)));
             expect(s.pct).toBeLessThanOrEqual(Math.min(...s.legs.map((l) => l.pct)));
         }
     });
@@ -366,6 +371,12 @@ describe('suggestBets', () => {
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2}], odds: 2})!).toBeLessThan(1);
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: 2.6}], odds: 2.6})!).toBeGreaterThan(1);
         expect(expectedReturn({pct: 50, legs: [{key: '1', pct: 50, odds: null}], odds: null})).toBeNull();
+        // A combination's return reads its own price, which carries the correlation: the same slip priced lower returns less.
+        const combo = {pct: 40, legs: [{key: 'over25' as const, pct: 53, odds: 1.9}, {key: 'btts' as const, pct: 51, odds: 1.9}]};
+        expect(expectedReturn({...combo, odds: 2.4})!).toBeLessThan(expectedReturn({...combo, odds: 3.6})!);
+        // Value is flagged on a single leg only: a combination's price is a reading, not a bookmaker's.
+        expect(isValueSlip({pct: 60, odds: 2, legs: [{key: '1', pct: 60, odds: 2}]})).toBe(true);
+        expect(isValueSlip({pct: 60, odds: 2, legs: [{key: '1', pct: 80, odds: 1.2}, {key: 'over15', pct: 75, odds: 1.3}]})).toBe(false);
         // Without prices, the raw ranking: every slip unpriced.
         expect(suggestBets(prediction, null).every((s) => s.odds === null)).toBe(true);
     });
@@ -382,8 +393,8 @@ describe('slipEdge', () => {
         expect(slipEdge({pct: 50, odds: 2.2})).toBe(0.1);
         expect(slipEdge({pct: 50, odds: 1.9})).toBe(-0.05);
         expect(slipEdge({pct: 50, odds: null})).toBeNull();
-        expect(isValueSlip({pct: 50, odds: 2.06})).toBe(true);
-        expect(isValueSlip({pct: 50, odds: 2.04})).toBe(false);
-        expect(isValueSlip({pct: 50, odds: null})).toBe(false);
+        expect(isValueSlip({pct: 50, odds: 2.06, legs: [{key: '1', pct: 50, odds: 2.06}]})).toBe(true);
+        expect(isValueSlip({pct: 50, odds: 2.04, legs: [{key: '1', pct: 50, odds: 2.04}]})).toBe(false);
+        expect(isValueSlip({pct: 50, odds: null, legs: [{key: '1', pct: 50, odds: null}]})).toBe(false);
     });
 });
