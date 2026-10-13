@@ -3,7 +3,7 @@ import {getPriorStudy, getSeasonStudy} from '@/lib/football/data/study';
 import {getPredictionTuning} from '@/lib/football/data/tuning';
 import {settleLegs, suggestBets, summarizeOdds, type LegKey, type MatchFacts, type OddsMarkets} from '@/lib/football/markets';
 import {predictMatch} from '@/lib/football/prediction';
-import {schedinaLost, schedinaWon, type SchedinaKind} from '@/lib/football/schedina';
+import {schedinaLost, schedinaWon, settledReturn, type SchedinaKind} from '@/lib/football/schedina';
 import {chunk, failSync, type FootballClient, type SyncRun} from './context';
 import {notifyUsers} from '@/lib/notifications/dispatch';
 import {localize, type Localized} from '@/lib/notifications/events';
@@ -27,11 +27,14 @@ interface FactsRow {
     home_score_ht: number | null;
     away_score_ht: number | null;
     starting_at: string;
+    /** The ninety-minute score when extra time was played; null otherwise. */
+    home_score_ft: number | null;
+    away_score_ft: number | null;
     details_synced_at: string | null;
-    stats: Array<{corners: number | null; yellow_cards: number | null}> | null;
+    stats: Array<{corners: number | null; yellow_cards: number | null; red_cards: number | null}> | null;
 }
 
-const FACTS_SELECT = 'state,starting_at,home_score,away_score,home_score_ht,away_score_ht,details_synced_at,stats:fixture_team_stats(corners,yellow_cards)';
+const FACTS_SELECT = 'state,starting_at,home_score,away_score,home_score_ft,away_score_ft,home_score_ht,away_score_ht,details_synced_at,stats:fixture_team_stats(corners,yellow_cards,red_cards)';
 /** A fact not in this long after kick-off is not coming: the leg that waits for it is lost. */
 const FACTS_WAIT_MS = 3 * 86_400_000;
 
@@ -45,14 +48,16 @@ const FACTS_WAIT_MS = 3 * 86_400_000;
 function factsOf(f: FactsRow): MatchFacts | null {
     if (f.state !== 'finished' || f.home_score === null || f.away_score === null) return null;
     const overdue = Date.now() - Date.parse(f.starting_at) > FACTS_WAIT_MS;
-    const total = (pick: (s: {corners: number | null; yellow_cards: number | null}) => number | null): number | null => {
+    // Both sides' statistics, or nothing: one side's count is not the match's.
+    const total = (pick: (s: {corners: number | null; yellow_cards: number | null; red_cards: number | null}) => number | null): number | null => {
         if (!f.details_synced_at) return overdue ? Number.NaN : null;
         const values = (f.stats ?? []).map(pick);
-        if (values.length === 0 || values.some((v) => v === null)) return Number.NaN;
+        if (values.length !== 2 || values.some((v) => v === null)) return Number.NaN;
         return (values as number[]).reduce((sum, v) => sum + v, 0);
     };
     const half = (v: number | null) => (v === null && overdue ? Number.NaN : v);
-    return {home: f.home_score, away: f.away_score, htHome: half(f.home_score_ht), htAway: half(f.away_score_ht), corners: total((s) => s.corners), yellows: total((s) => s.yellow_cards)};
+    // The markets settle on ninety minutes: the score before extra time when there was any.
+    return {home: f.home_score_ft ?? f.home_score, away: f.away_score_ft ?? f.away_score, htHome: half(f.home_score_ht), htAway: half(f.away_score_ht), corners: total((s) => s.corners), yellows: total((s) => (s.yellow_cards === null ? null : s.yellow_cards + (s.red_cards ?? 0)))};
 }
 
 export interface AdviceFixture {
@@ -72,10 +77,12 @@ export async function snapshotAdvice(db: FootballClient, run: SyncRun, fixtures:
         studies.set(seasonId, await getSeasonStudy(seasonId));
         priors.set(seasonId, await getPriorStudy(seasonId));
     }
-    const {data: oddsRows, error: oddsError} = await db.from('fixture_odds').select('fixture_id,bookmaker,markets').in('fixture_id', fixtures.map((f) => f.id)).limit(5000);
-    if (oddsError) failSync('fixture_odds.select', oddsError);
     const oddsByFixture = new Map<number, Array<{bookmaker: string; markets: OddsMarkets}>>();
-    for (const r of (oddsRows ?? []) as Array<{fixture_id: number; bookmaker: string; markets: OddsMarkets}>) oddsByFixture.set(r.fixture_id, [...(oddsByFixture.get(r.fixture_id) ?? []), r]);
+    for (const ids of chunk(fixtures.map((f) => f.id), 100)) {
+        const {data: oddsRows, error: oddsError} = await db.from('fixture_odds').select('fixture_id,bookmaker,markets').in('fixture_id', ids).limit(5000);
+        if (oddsError) failSync('fixture_odds.select', oddsError);
+        for (const r of (oddsRows ?? []) as Array<{fixture_id: number; bookmaker: string; markets: OddsMarkets}>) oddsByFixture.set(r.fixture_id, [...(oddsByFixture.get(r.fixture_id) ?? []), r]);
+    }
 
     const rows: Array<Record<string, unknown>> = [];
     const now = new Date().toISOString();
@@ -102,11 +109,34 @@ export async function snapshotAdvice(db: FootballClient, run: SyncRun, fixtures:
         const {error} = await db.from('fixture_advice').upsert(group, {onConflict: 'fixture_id,tier'});
         if (error) failSync('fixture_advice.upsert', error);
     }
+    // A tier the new snapshot no longer proposes is withdrawn: the record holds what was proposed last, not a leftover.
+    const tiersOf = new Map<number, string[]>();
+    for (const r of rows) tiersOf.set(r.fixture_id as number, [...(tiersOf.get(r.fixture_id as number) ?? []), r.tier as string]);
+    for (const f of fixtures) {
+        const kept = tiersOf.get(f.id) ?? [];
+        if (kept.length === 3) continue;
+        const {error} = kept.length === 0 ? await db.from('fixture_advice').delete().eq('fixture_id', f.id).is('hit', null) : await db.from('fixture_advice').delete().eq('fixture_id', f.id).is('hit', null).not('tier', 'in', `(${kept.join(',')})`);
+        if (error) failSync('fixture_advice.delete', error);
+    }
     run.bump('advice', rows.length);
 }
 
-/** Every slip of a finished match not settled yet: won or lost on the final score. */
+/** Every slip of a finished match not settled yet: won or lost on the facts. A slip of a match that will not be played, or that finished without a score, is withdrawn. */
 export async function settleAdvice(db: FootballClient, run: SyncRun): Promise<void> {
+    const {data: dead, error: deadError} = await db
+        .from('fixture_advice')
+        .select('fixture_id,fixture:fixtures!inner(state,starting_at,home_score)')
+        .is('hit', null)
+        .in('fixtures.state', ['cancelled', 'abandoned', 'postponed', 'finished'])
+        .limit(2000);
+    if (deadError) failSync('fixture_advice.select', deadError);
+    const overdue = Date.now() - FACTS_WAIT_MS;
+    const voidIds = [...new Set(((dead ?? []) as unknown as Array<{fixture_id: number; fixture: {state: string; starting_at: string; home_score: number | null}}>).filter((r) => r.fixture.state === 'cancelled' || r.fixture.state === 'abandoned' || ((r.fixture.state === 'postponed' || r.fixture.home_score === null) && Date.parse(r.fixture.starting_at) < overdue)).map((r) => r.fixture_id))];
+    for (const ids of chunk(voidIds, 200)) {
+        const {error} = await db.from('fixture_advice').delete().in('fixture_id', ids).is('hit', null);
+        if (error) failSync('fixture_advice.delete', error);
+    }
+    if (voidIds.length > 0) run.bump('voided', voidIds.length);
     const {data, error} = await db
         .from('fixture_advice')
         .select(`fixture_id,tier,legs,fixture:fixtures!inner(${FACTS_SELECT})`)
@@ -135,22 +165,26 @@ export async function settleAdvice(db: FootballClient, run: SyncRun): Promise<vo
  * were right, not only that one was wrong.
  */
 export async function settleSchedine(db: FootballClient, run: SyncRun): Promise<void> {
-    // Every open slip whose first match has started, and every lost one whose last match may still be judged (its kick-off less than the facts' wait ago): each finished selection is judged as it ends.
+    // Every open slip whose first match has started (within the last two months: older ones are stuck on a match that will never be judged), and every lost one whose last match may still be judged (its kick-off less than the facts' wait, plus a day, ago): each finished selection is judged as it ends. Oldest first, so a backlog never starves the rest.
     const started = new Date(Date.now() - 90 * 60_000).toISOString();
-    const judgeable = new Date(Date.now() - FACTS_WAIT_MS - 3 * 3_600_000).toISOString();
-    const {data, error} = await db.from('schedine').select('id,user_id,kind,system_of,selections,results,hit,payout').lte('first_kickoff', started).or(`hit.is.null,and(hit.eq.false,last_kickoff.gte.${judgeable})`).limit(500);
+    const oldest = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const judgeable = new Date(Date.now() - FACTS_WAIT_MS - 86_400_000).toISOString();
+    const {data, error} = await db.from('schedine').select('id,user_id,kind,system_of,selections,results,hit,payout,lines').lte('first_kickoff', started).or(`and(hit.is.null,first_kickoff.gte.${oldest}),and(hit.eq.false,last_kickoff.gte.${judgeable})`).order('first_kickoff').limit(500);
     if (error) failSync('schedine.select', error);
-    const open = ((data ?? []) as Array<{id: number; user_id: string; kind: SchedinaKind; system_of: number | null; selections: Array<{fixtureId: number; banker?: boolean; legs: Array<{key: LegKey}>}>; results: Array<boolean | null> | null; hit: boolean | null; payout: number | string | null}>).filter((s) => s.hit === null || (s.results ?? []).length < s.selections.length || (s.results ?? []).some((r) => r === null));
+    const open = ((data ?? []) as Array<{id: number; user_id: string; kind: SchedinaKind; system_of: number | null; selections: Array<{fixtureId: number; banker?: boolean; legs: Array<{key: LegKey}>; pct: number; odds?: number | null}>; results: Array<boolean | null> | null; hit: boolean | null; payout: number | string | null; lines: Array<{k: number; stake: number}> | null}>).filter((s) => s.hit === null || (s.results ?? []).length < s.selections.length || (s.results ?? []).some((r) => r === null));
     if (open.length === 0) return;
     const ids = [...new Set(open.flatMap((s) => s.selections.map((x) => x.fixtureId)))];
     const {data: fixtures, error: fixturesError} = await db.from('fixtures').select(`id,${FACTS_SELECT}`).in('id', ids);
     if (fixturesError) failSync('fixtures.select', fixturesError);
     const byId = new Map(((fixtures ?? []) as unknown as Array<FactsRow & {id: number}>).map((f) => [f.id, f]));
+    // A match that will not be played (cancelled, abandoned, postponed with no new date in sight) is void: the bookmakers' way, it leaves the slip, which is judged on the others.
+    const isVoid = (f: (FactsRow & {id: number}) | undefined) => !!f && (f.state === 'cancelled' || f.state === 'abandoned' || (f.state === 'postponed' && Date.now() - Date.parse(f.starting_at) > FACTS_WAIT_MS));
     let settled = 0;
     const told: Array<{userId: string; text: Localized; url: string; tag: string}> = [];
-    const tell = (s: (typeof open)[number], won: boolean, hits: number) => {
-        const payout = s.payout !== null ? Number(s.payout) : null;
-        const prize = won && payout ? ` · ${payout.toFixed(2)} €` : '';
+    const tell = (s: (typeof open)[number], won: boolean, hits: number, results: Array<boolean | null>) => {
+        // What the slip really pays: a system may win on some columns only.
+        const payout = won ? settledReturn(s.kind, s.selections, results, s.payout !== null ? Number(s.payout) : null, s.lines) : 0;
+        const prize = won && payout > 0 ? ` · ${payout.toFixed(2)} €` : '';
         told.push({
             userId: s.user_id,
             text: localize((_w, locale) =>
@@ -169,9 +203,20 @@ export async function settleSchedine(db: FootballClient, run: SyncRun): Promise<
             const facts = f ? factsOf(f) : null;
             return facts ? settleLegs(x.legs.map((l) => l.key), facts) : null;
         });
-        const bankers = s.selections.map((x) => x.banker === true);
+        const voids = s.selections.map((x) => isVoid(byId.get(x.fixtureId)));
+        const judged = results.filter((_r, i) => !voids[i]);
+        const bankers = s.selections.filter((_x, i) => !voids[i]).map((x) => x.banker === true);
         const hits = results.filter((r) => r === true).length;
-        const complete = results.every((r) => r !== null);
+        const complete = judged.every((r) => r !== null);
+        // A slip of void matches only: nothing to judge, nothing won.
+        if (judged.length === 0) {
+            if (s.hit === null) {
+                const {error: updateError} = await db.from('schedine').update({results, hits: 0, hit: false, settled_at: new Date().toISOString()}).eq('id', s.id);
+                if (updateError) failSync('schedine.update', updateError);
+                settled += 1;
+            }
+            continue;
+        }
         if (s.hit === false) {
             // Lost already and told so: only the tally of the matches since moves.
             if (JSON.stringify(results) !== JSON.stringify(s.results ?? [])) {
@@ -181,17 +226,17 @@ export async function settleSchedine(db: FootballClient, run: SyncRun): Promise<
             continue;
         }
         if (complete) {
-            const won = schedinaWon(s.kind, results.map((r) => r === true), s.system_of, bankers);
+            const won = schedinaWon(s.kind, judged.map((r) => r === true), s.system_of, bankers);
             const {error: updateError} = await db.from('schedine').update({results, hits, hit: won, settled_at: new Date().toISOString()}).eq('id', s.id);
             if (updateError) failSync('schedine.update', updateError);
             settled += 1;
-            tell(s, won, hits);
-        } else if (schedinaLost(s.kind, results, s.system_of, bankers)) {
+            tell(s, won, hits, results);
+        } else if (schedinaLost(s.kind, judged, s.system_of, bankers)) {
             // Lost already: no need to wait for the matches still to play.
             const {error: updateError} = await db.from('schedine').update({results, hits, hit: false, settled_at: new Date().toISOString()}).eq('id', s.id);
             if (updateError) failSync('schedine.update', updateError);
             settled += 1;
-            tell(s, false, hits);
+            tell(s, false, hits, results);
         } else if (JSON.stringify(results) !== JSON.stringify(s.results ?? [])) {
             const {error: updateError} = await db.from('schedine').update({results, hits}).eq('id', s.id);
             if (updateError) failSync('schedine.update', updateError);

@@ -70,6 +70,7 @@ export function SchedinaTicket({ticket, shareToken, onDelete, deleting = false}:
     const format = useFormatter();
     const legLabel = useLegLabel();
     const status = ticket.hit === null ? 'open' : ticket.hit ? 'won' : 'lost';
+    const bankers = ticket.selections.filter((s) => s.banker).length;
     const priced = ticket.book !== null;
     const odds = ticket.book ?? ticket.fair;
     const settles = new Date(Date.parse(ticket.lastKickoff) + SETTLE_AFTER_MS);
@@ -96,7 +97,7 @@ export function SchedinaTicket({ticket, shareToken, onDelete, deleting = false}:
                 <span className="font-mono text-[10px] font-bold shrink-0">{format.dateTime(new Date(ticket.createdAt), {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>
             </header>
             <div className="px-3 py-1.5 flex items-center gap-1.5 flex-wrap border-b border-dashed border-foreground/40">
-                <span className="inline-flex items-center h-5 px-1.5 rounded border-2 border-foreground bg-accent text-[10px] font-extrabold uppercase tracking-wide">{ts(`kinds.${ticket.kind}`)}{ticket.systemOf ? ` ${ticket.systemOf}/${ticket.size}` : ''}</span>
+                <span className="inline-flex items-center h-5 px-1.5 rounded border-2 border-foreground bg-accent text-[10px] font-extrabold uppercase tracking-wide">{ts(`kinds.${ticket.kind}`)}{ticket.systemOf ? ` ${ticket.systemOf}/${ticket.selections.filter((s) => !s.banker).length}${bankers > 0 ? ` + ${bankers}` : ''}` : ''}</span>
                 <span className="inline-flex items-center h-5 px-1.5 rounded border-2 border-foreground bg-card text-[10px] font-extrabold uppercase tracking-wide">{ts(`risks.${ticket.risk}`)}</span>
                 <span className="ml-auto font-mono text-[10px] font-bold text-muted-foreground">{ts('selections', {count: ticket.size})}</span>
             </div>
@@ -147,7 +148,7 @@ export function SchedinaTicket({ticket, shareToken, onDelete, deleting = false}:
                 {cell(t('ticket.odds'), `${priced ? '' : '≈'}${odds.toFixed(2)}`)}
                 {cell(ts('chance'), ticket.pct === 0 ? '<1%' : `${ticket.pct}%`)}
                 {cell(t('ticket.stake'), ticket.stake !== null ? `${ticket.stake.toFixed(2)} €` : '–')}
-                {cell(t('ticket.payout'), ticket.payout !== null ? `${priced ? '' : '≈'}${ticket.payout.toFixed(2)} €` : '–')}
+                {cell(t(ticket.kind === 'system' ? 'ticket.payoutMax' : 'ticket.payout'), ticket.payout !== null ? `${priced ? '' : '≈'}${ticket.payout.toFixed(2)} €` : '–')}
             </div>
             <footer className="px-3 py-1.5 border-t-2 border-foreground bg-card flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                 <span className="truncate">

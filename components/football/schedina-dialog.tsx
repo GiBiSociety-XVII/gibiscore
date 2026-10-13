@@ -50,7 +50,9 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
     const locale = useLocale();
     const legLabel = (key: LegKey) => legText(key, locale);
     const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-    const available = useMemo(() => candidates.filter((c) => (pickedDays.length === 0 || pickedDays.includes(c.day)) && (pickedLeagues.length === 0 || pickedLeagues.includes(c.competitionId))).length, [candidates, pickedDays, pickedLeagues]);
+    // The moment the dialog opened: what has kicked off since is not counted as available (the generator checks again).
+    const [openedAt] = useState(() => Date.now());
+    const available = useMemo(() => candidates.filter((c) => Date.parse(c.startingAt) > openedAt && (pickedDays.length === 0 || pickedDays.includes(c.day)) && (pickedLeagues.length === 0 || pickedLeagues.includes(c.competitionId))).length, [candidates, openedAt, pickedDays, pickedLeagues]);
     // The ticket valued, once: what the blocks below show and what is saved with the slip.
     const systemPlan = useMemo(() => {
         if (!result || result.kind !== 'system') return null;
@@ -106,7 +108,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                             {kind !== 'single' && (
                                 <label className="inline-flex items-center gap-1.5 ml-2 text-[12px] font-bold">
                                     {t('size')}
-                                    <input type="number" min={2} max={10} value={size} onChange={(e) => setSize(Math.max(2, Math.min(10, Number(e.target.value) || 2)))} className="bb-input h-8 w-16 px-2 font-mono text-[13px] font-extrabold text-center" />
+                                    <input type="number" min={2} max={10} value={size} onChange={(e) => { const n = Math.max(2, Math.min(10, Number(e.target.value) || 2)); setSize(n); if (typeof bankers === 'number' && bankers > n - 2) setBankers(Math.max(0, n - 2)); if (typeof system === 'number' && system > n - 1) setSystem(Math.max(1, n - 1)); }} className="bb-input h-8 w-16 px-2 font-mono text-[13px] font-extrabold text-center" />
                                 </label>
                             )}
                             {kind === 'system' && (
@@ -196,7 +198,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                         <div className="px-3 py-2 flex flex-wrap items-center gap-2">
                                             <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('stake')}</span>
                                             <label className="inline-flex items-center gap-1 text-[12px] font-bold">
-                                                <input type="number" min={0} step={STAKE_STEP} value={stake} onChange={(e) => setStake(toStakeStep(Number(e.target.value) || 0))} className="bb-input h-8 w-24 px-2 font-mono text-[13px] font-extrabold text-right" aria-label={t('stake')} />
+                                                <input type="number" min={0} max={999999} step={STAKE_STEP} value={stake} onChange={(e) => setStake(toStakeStep(Math.min(999_999, Number(e.target.value) || 0)))} className="bb-input h-8 w-24 px-2 font-mono text-[13px] font-extrabold text-right" aria-label={t('stake')} />
                                                 <span>€</span>
                                             </label>
                                         </div>
@@ -225,7 +227,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                         <div className="px-3 py-2 flex flex-wrap items-center gap-2">
                                             <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{t('stake')}</span>
                                             <label className="inline-flex items-center gap-1 text-[12px] font-bold">
-                                                <input type="number" min={1} step={1} value={stake} onChange={(e) => { setStake(Math.max(0, Number(e.target.value) || 0)); setLineStakes(null); }} className="bb-input h-8 w-24 px-2 font-mono text-[13px] font-extrabold text-right" aria-label={t('stake')} />
+                                                <input type="number" min={1} max={999999} step={1} value={stake} onChange={(e) => { setStake(Math.max(0, Math.min(999_999, Number(e.target.value) || 0))); setLineStakes(null); }} className="bb-input h-8 w-24 px-2 font-mono text-[13px] font-extrabold text-right" aria-label={t('stake')} />
                                                 <span>€</span>
                                             </label>
                                             <div className="flex gap-1">
@@ -279,7 +281,7 @@ export function SchedinaDialog({candidates, days, competitions, onClose}: {candi
                                 );
                             })()}
                             <div data-tour="schedina-save" className="px-3 py-2 border-t border-muted flex items-center gap-2 flex-wrap">
-                                <button type="button" onClick={persist} disabled={signedIn === false || save === 'saving' || save === 'saved'} className={cn("bb-btn h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5 disabled:opacity-50", save === 'saved' ? "bg-card" : "bg-accent")}>
+                                <button type="button" onClick={persist} disabled={signedIn === false || save === 'saving' || save === 'saved' || (systemPlan !== null && systemPlan.plan.total === 0)} className={cn("bb-btn h-8 px-3 text-[12px] font-extrabold inline-flex items-center gap-1.5 disabled:opacity-50", save === 'saved' ? "bg-card" : "bg-accent")}>
                                     {save === 'saved' ? <><Check className="w-3.5 h-3.5" aria-hidden="true" />{t('saved')}</> : save === 'saving' ? t('saving') : t('save')}
                                 </button>
                                 {signedIn === false && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700"><CloudOff className="w-3.5 h-3.5" aria-hidden="true" />{t('signIn')}</span>}

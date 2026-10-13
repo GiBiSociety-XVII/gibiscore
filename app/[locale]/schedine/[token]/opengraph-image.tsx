@@ -49,7 +49,7 @@ export default async function Image({params}: {params: Promise<{token: string; l
                         <span style={{fontSize: 20}}>GIBISCORE.COM</span>
                     </div>
                     <div style={{display: 'flex', alignItems: 'center', gap: 12, padding: '14px 28px', borderBottom: `2px dashed ${ink}66`}}>
-                        <span style={{background: accent, border: `3px solid ${ink}`, borderRadius: 8, padding: '4px 12px', fontSize: 20, fontWeight: 800}}>{w.kinds[ticket.kind as keyof Words['kinds']] ?? ticket.kind}{ticket.systemOf ? ` ${ticket.systemOf}/${ticket.size}` : ''}</span>
+                        <span style={{background: accent, border: `3px solid ${ink}`, borderRadius: 8, padding: '4px 12px', fontSize: 20, fontWeight: 800}}>{w.kinds[ticket.kind as keyof Words['kinds']] ?? ticket.kind}{ticket.systemOf ? ` ${ticket.systemOf}/${ticket.selections.filter((x) => !x.banker).length}` : ''}</span>
                         <span style={{border: `3px solid ${ink}`, borderRadius: 8, padding: '4px 12px', fontSize: 20, fontWeight: 800}}>{w.risks[ticket.risk as keyof Words['risks']] ?? ticket.risk}</span>
                         <span style={{marginLeft: 'auto', fontSize: 20, color: '#6B6976', fontFamily: 'monospace'}}>{ticket.size} {w.selections}</span>
                     </div>
@@ -75,7 +75,7 @@ export default async function Image({params}: {params: Promise<{token: string; l
                     </div>
                     <div style={{display: 'flex', borderTop: `2px dashed ${ink}66`, padding: '12px 28px'}}>
                         {cell(w.odds, `${ticket.book === null ? '~' : ''}${odds.toFixed(2)}`)}
-                        {cell(w.chance, `${ticket.pct}%`)}
+                        {cell(w.chance, ticket.pct === 0 ? '<1%' : `${ticket.pct}%`)}
                         {cell(w.stake, ticket.stake !== null ? `${ticket.stake.toFixed(2)} EUR` : '-')}
                         {cell(w.payout, ticket.payout !== null ? `${ticket.book === null ? '~' : ''}${ticket.payout.toFixed(2)} EUR` : '-')}
                     </div>

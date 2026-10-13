@@ -1,4 +1,6 @@
 import 'server-only';
+import {revalidatePath} from 'next/cache';
+import {everyLocalePath} from '@/lib/auth/next';
 import {apiFootballGet} from '@/lib/api-football/client';
 import {mapOdds} from '@/lib/api-football/mappers';
 import type {AfOddsResponse} from '@/lib/api-football/types';
@@ -112,6 +114,12 @@ export async function syncOdds(options: {days?: number; force?: boolean} = {}): 
             if (markError) failSync('fixtures.update', markError);
         }
         await snapshotAdvice(db, run, featured.filter((f) => f.season_id !== null).map((f) => ({id: f.id, seasonId: f.season_id!, homeId: f.home_team_id, awayId: f.away_team_id})));
+        // The match pages show the prices and the slips: rendered again now, not when their day-long cache runs out.
+        try {
+            for (const f of featured) for (const path of everyLocalePath(`/matches/${f.id}`)) revalidatePath(path);
+        } catch {
+            // Outside a request (a script, a test): nothing to refresh.
+        }
         await finishRun(db, run, 'ok');
         return run;
     } catch (error) {

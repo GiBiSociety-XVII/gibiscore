@@ -155,7 +155,7 @@ export default async function MatchPage({params}: PageProps<"/[locale]/matches/[
         label: t('tabs.markets'),
         content: (
             <div className="flex flex-col gap-3">
-                <MatchMarkets data={markets} prediction={prediction} odds={odds} home={fixture.home} away={fixture.away} title={t('markets')} />
+                <MatchMarkets data={markets} prediction={fixture.state === 'finished' ? null : prediction} finished={fixture.state === 'finished'} odds={odds} home={fixture.home} away={fixture.away} title={t('markets')} />
                 <MatchStudy study={study} homeId={fixture.home.id} awayId={fixture.away.id} />
             </div>
         ),

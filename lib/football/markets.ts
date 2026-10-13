@@ -574,8 +574,8 @@ export function slipEdge(slip: Pick<BetSuggestion, 'pct' | 'odds'>): number | nu
     return Math.round(((slip.pct / 100) * slip.odds - 1) * 1000) / 1000;
 }
 
-/** Whether the slip is worth flagging as value. */
-export const isValueSlip = (slip: Pick<BetSuggestion, 'pct' | 'odds'>): boolean => (slipEdge(slip) ?? -1) >= VALUE_MIN_EDGE;
+/** Whether the slip is worth flagging as value: one leg only, since a combination's price is a reading of the legs' prices, not a bookmaker's. */
+export const isValueSlip = (slip: Pick<BetSuggestion, 'pct' | 'odds' | 'legs'>): boolean => slip.legs.length === 1 && (slipEdge(slip) ?? -1) >= VALUE_MIN_EDGE;
 
 /** The chance a slip of each tier must keep, in percent; a tier's band runs up to the safer tier's threshold. */
 export const SUGGESTION_TIERS: Array<{tier: BetSuggestion['tier']; min: number}> = [
@@ -584,8 +584,12 @@ export const SUGGESTION_TIERS: Array<{tier: BetSuggestion['tier']; min: number}>
     {tier: 'bold', min: 45},
 ];
 
-/** A band of the calibration counts once it holds this many settled slips. */
-const CALIBRATION_MIN_SLIPS = 100;
+/** A band of the calibration counts once it holds this many readings (every leg of every replayed match is one: a few dozen matches' worth). */
+const CALIBRATION_MIN_SLIPS = 300;
+/** The groups the calibration is measured on (a replay settles them on the final score): the others keep the model's own chance. */
+const CALIBRATED_GROUPS: LegGroup[] = ['outcome', 'goals', 'btts', 'parity'];
+/** A leg's chance corrected by the calibration when its group was measured, untouched otherwise. */
+export const calibrateLeg = (key: LegKey, pct: number, calibration: CalibrationBand[] | null | undefined): number => (CALIBRATED_GROUPS.includes(legGroup(key) ?? 'half') ? calibrate(pct, calibration) : pct);
 /** How far the calibration may move a chance: a tenth up, a fifth down. */
 const CALIBRATION_FACTOR = {min: 0.8, max: 1.1};
 
@@ -620,11 +624,11 @@ export function correlationOf(slip: Pick<BetSuggestion, 'pct' | 'legs'>): number
     return apart > 0 ? Math.max(1, slip.pct / 100 / apart) : 1;
 }
 
-/** The expected return of a unit stake on the slip, the chance a blend of the model's and the bookmakers' implied one; null without a price on every leg. */
+/** The expected return of a unit stake on the slip, the chance a blend of the model's and the one the slip's price implies (a margin per leg removed); null without a price on every leg. */
 export function expectedReturn(slip: Pick<BetSuggestion, 'pct' | 'legs' | 'odds'>): number | null {
-    if (slip.odds === null || slip.legs.some((l) => l.odds === null || !(l.odds > 1))) return null;
-    // The implied chance of the legs together: their implied chances apart, times how much likelier the model finds them together.
-    const implied = slip.legs.reduce((p, l) => p * (1 / l.odds! / (1 + MARKET_MARGIN)), 1) * correlationOf(slip);
+    if (slip.odds === null || !(slip.odds > 1) || slip.legs.some((l) => l.odds === null || !(l.odds > 1))) return null;
+    // The slip's own price already carries the legs' correlation (a combination is priced at the product over it).
+    const implied = 1 / slip.odds / (1 + MARKET_MARGIN) ** slip.legs.length;
     const chance = MODEL_WEIGHT * (slip.pct / 100) + (1 - MODEL_WEIGHT) * implied;
     return Math.round(chance * slip.odds * 1000) / 1000;
 }
@@ -733,11 +737,12 @@ export function suggestBets(prediction: MatchPrediction, odds: OddsSummary | nul
 
     // Every candidate as a slip: its chance calibrated, its price when every leg has one.
     const candidates: Array<BetSuggestion & {id: string}> = slips.map((s) => {
-        const legs: BetLeg[] = s.legs.map((l) => ({key: l.key, pct: Math.round(calibrate(own.get(l.key)!, prediction.calibration)), odds: legOdds(odds, l.key)}));
+        const legs: BetLeg[] = s.legs.map((l) => ({key: l.key, pct: Math.round(calibrateLeg(l.key, own.get(l.key)!, prediction.calibration)), odds: legOdds(odds, l.key)}));
         const prices = legs.map((l) => l.odds);
-        const pct = Math.round(calibrate(s.pct, prediction.calibration));
-        // The price of a combination: the legs' prices multiplied, then divided by how much likelier they are together (the same ratio the expected return uses).
-        const together = correlationOf({pct, legs});
+        // A combination is of calibrated groups only: its chance is calibrated like its legs'.
+        const pct = Math.round(s.legs.length > 1 || CALIBRATED_GROUPS.includes(s.legs[0].group) ? calibrate(s.pct, prediction.calibration) : s.pct);
+        // The price of a combination: the legs' prices multiplied, then divided by how much likelier they are together, on the raw chances (the calibration moves bands apart and would read as correlation).
+        const together = correlationOf({pct: s.pct, legs: s.legs.map((l) => ({key: l.key, pct: own.get(l.key)!, odds: null}))});
         return {id: s.legs.map((l) => l.key).join('+'), tier: 'bold', legs, pct, fair: fairOdds(pct) ?? 0, odds: prices.every((p): p is number => p !== null) ? Math.round((prices.reduce((x, p) => x * p, 1) / together) * 100) / 100 : null};
     });
     // A longer slip needs to pay a little more per leg.

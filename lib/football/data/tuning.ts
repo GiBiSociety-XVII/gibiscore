@@ -27,7 +27,13 @@ export const getModelFit = unstable_cache(
             const {data, error} = await footballDb().from('model_tuning').select('value').eq('key', 'prediction').maybeSingle();
             if (error) throw error;
             const value = data?.value as ModelFit | undefined;
-            return value && value.tuning ? value : null;
+            // Only a sound fit: the three knobs finite, the calibration an array (or absent). Anything else is as good as no fit.
+            const t = value?.tuning;
+            if (!t || ![t.goalScale, t.homeEdge, t.rho].every((v) => typeof v === 'number' && Number.isFinite(v)) || (t.calibration !== undefined && !Array.isArray(t.calibration))) {
+                if (value) logReadError('getModelFit', new Error('unsound fit stored, ignored'));
+                return null;
+            }
+            return value;
         } catch (error) {
             logReadError('getModelFit', error);
             return null;

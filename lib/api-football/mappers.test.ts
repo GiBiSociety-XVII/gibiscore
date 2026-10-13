@@ -281,6 +281,15 @@ describe('mapOdds', () => {
         expect(rows[0].markets.scores).toEqual({'1-0': 7, '2-1': 8.5});
     });
 
+    it('reads a bookmaker that labels the away side with its own line the other way round', () => {
+        // Here "Away +1.5" really is the away side at +1.5 (1.45): read as the home-side convention it would sum to nothing sensible with "Home -1.5".
+        const own = {...odds, bookmakers: [{id: 1, name: 'Own', bets: [{id: 4, name: 'Asian Handicap', values: [{value: 'Home -1.5', odd: '2.75'}, {value: 'Away +1.5', odd: '1.45'}, {value: 'Home +1.5', odd: '1.10'}, {value: 'Away -1.5', odd: '6.50'}]}]}]};
+        expect(mapOdds(own)[0].markets.handicap).toEqual({homeMinus15: 2.75, awayMinus15: 6.5, homePlus15: 1.1, awayPlus15: 1.45, homeMinus25: null, awayMinus25: null, homePlus25: null, awayPlus25: null});
+        // A decimal comma and odd spacing in a label still match.
+        const comma = {...odds, bookmakers: [{id: 2, name: 'Comma', bets: [{id: 5, name: 'Goals Over/Under', values: [{value: 'Over  2,5', odd: '1.80'}, {value: 'Under 2,5', odd: '2.00'}]}]}]};
+        expect(mapOdds(comma)[0].markets.goals!.over25).toBe(1.8);
+    });
+
     it('is empty without a response', () => {
         expect(mapOdds(undefined)).toEqual([]);
     });
