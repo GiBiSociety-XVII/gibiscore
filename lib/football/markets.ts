@@ -619,10 +619,10 @@ const MARKET_MARGIN = 0.06;
 const MODEL_WEIGHT: Record<MatchPrediction['confidence'], number> = {high: 0.6, medium: 0.35, low: 0.15};
 /**
  * A model chance beyond this many times the market's is not value, it
- * is the model being wrong: a priced market is rarely off by half. Such
- * a slip is read at the market's chance, so it earns no edge.
+ * is the model being wrong: a priced market is rarely off by a third.
+ * Such a slip is read at the market's chance, so it earns no edge.
  */
-const DISAGREEMENT_MAX = 2;
+const DISAGREEMENT_MAX = 1.5;
 
 /**
  * How much likelier the legs of a slip are together than apart, on the
