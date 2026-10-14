@@ -70,6 +70,7 @@ export function MobileMenu({onClose}: {onClose: () => void}) {
                     ) : (
                         <Link href={{pathname: '/signin', query: {next: '/account'}}} onClick={onClose} className={link}><span className="inline-flex items-center gap-2"><UserRound className="w-4 h-4" aria-hidden="true" />{t('login')}</span></Link>
                     )}
+                    {!signedIn && <Link href={{pathname: '/signup', query: {next: '/account'}}} onClick={onClose} className={cn(link, "bg-accent col-span-2")}><span className="inline-flex items-center gap-2"><UserRound className="w-4 h-4" aria-hidden="true" />{t('register')}</span></Link>}
                 </div>
                 {sections.map(({key, title, Icon, overview, items}) => (
                     <section key={key} className="bb-surface overflow-hidden">
