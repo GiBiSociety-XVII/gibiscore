@@ -8,16 +8,6 @@ import {AdminLogoLink} from "@/components/admin/admin-logo-link";
 const pill = "inline-flex items-center gap-2 h-11 px-4 rounded-xl border-[2.5px] border-foreground bg-card text-[15px] font-bold shadow-[4px_4px_0_rgb(var(--foreground))] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_rgb(var(--foreground))] transition-all whitespace-nowrap";
 const link = "text-[15px] text-muted-foreground hover:text-foreground hover:underline underline-offset-4 decoration-2 transition-colors";
 
-function InstagramIcon() {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-            <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-            <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-        </svg>
-    );
-}
-
 function romeDay(offset: number): string {
     const d = new Date(Date.now() + offset * 86_400_000);
     return new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Rome'}).format(d);
@@ -35,7 +25,7 @@ function Column({title, children}: {title: string; children: React.ReactNode}) {
     );
 }
 
-/** Footer in the gibiarena.com layout: lockup and contact pills, four columns, GiBiSociety line. */
+/** Footer in the gibiarena.com layout: lockup and contact pill, four columns, the GiBiSociety line with the sister sites. */
 export default function Footer() {
     const t = useTranslations('Common.footer');
     const year = new Date().getFullYear();
@@ -50,7 +40,6 @@ export default function Footer() {
                     </Link>
                     <div className="flex flex-wrap gap-3">
                         <a href={`mailto:${t('email')}`} className={pill}><Mail className="w-4 h-4" />{t('email')}</a>
-                        <a href="https://instagram.com/gibiarena" target="_blank" rel="noopener noreferrer" className={pill}><InstagramIcon />{t('instagram')}</a>
                     </div>
                 </div>
 
@@ -59,6 +48,7 @@ export default function Footer() {
                     <a href="https://gibiarena.com/privacy" className={link}>{t('columns.info.privacy')}</a>
                     <a href="https://gibiarena.com/terms" className={link}>{t('columns.info.terms')}</a>
                     <a href="https://gibiarena.com" className={link}>{t('columns.info.gibiarena')}</a>
+                    <a href="https://gibifut.com" className={link}>{t('columns.info.gibifut')}</a>
                     <span className="text-[15px] text-muted-foreground">{t('columns.info.data')}</span>
                 </div>
                 <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-6 mb-10">
@@ -88,6 +78,7 @@ export default function Footer() {
                         <a href="https://gibiarena.com/privacy" className={link}>{t('columns.info.privacy')}</a>
                         <a href="https://gibiarena.com/terms" className={link}>{t('columns.info.terms')}</a>
                         <a href="https://gibiarena.com" className={link}>{t('columns.info.gibiarena')}</a>
+                        <a href="https://gibifut.com" className={link}>{t('columns.info.gibifut')}</a>
                         <span className="text-[15px] text-muted-foreground">{t('columns.info.data')}</span>
                     </Column>
                 </div>
@@ -104,6 +95,11 @@ export default function Footer() {
                         <a href="https://gibiarena.com" className="inline-flex items-center gap-2 hover:text-foreground transition-colors">
                             <BrandIcon site="gibiarena" size={26} />
                             {t('discover')} <b className="font-extrabold text-foreground">GiBi<span className="text-brand-arena-text">Arena</span></b>
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                        </a>
+                        <a href="https://gibifut.com" className="inline-flex items-center gap-2 hover:text-foreground transition-colors">
+                            <BrandIcon site="gibifut" size={26} />
+                            {t('discover')} <b className="font-extrabold text-foreground">GiBi<span className="text-brand-fut-text">FUT</span></b>
                             <ArrowUpRight className="w-3.5 h-3.5" />
                         </a>
                     </div>

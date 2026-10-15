@@ -13,7 +13,6 @@
   },
   "footer": {
     "email": "service@gibiscore.com",
-    "instagram": "@gibiarena",
     "columns": {
       "scores": {
         "title": "Risultati",
@@ -42,13 +41,15 @@
         "privacy": "Informativa Privacy",
         "terms": "Termini di Servizio",
         "data": "Dati forniti da API-Football",
-        "gibiarena": "GiBiArena"
+        "gibiarena": "GiBiArena",
+        "gibifut": "GiBiFUT"
       }
     },
     "productOf": "Un prodotto di",
     "society": "GiBiSociety",
     "discover": "Scopri anche",
     "arena": "GiBiArena",
+    "fut": "GiBiFUT",
     "copyright": "GiBiSociety · Tutti i diritti riservati.",
     "legal": "Pronostici e schedine sono statistiche del modello, non consigli di gioco. Gioca solo se maggiorenne e con misura."
   },
