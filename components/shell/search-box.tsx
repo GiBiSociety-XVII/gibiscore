@@ -90,7 +90,7 @@ export function SearchBox() {
             }}
             className="relative ml-auto"
         >
-            <div className="flex items-center gap-2 h-10 md:h-12 px-3 md:px-4 w-11 md:w-[240px] lg:w-11 xl:w-[150px] 2xl:w-[220px] rounded-xl border-[2.5px] border-foreground bg-card text-muted-foreground shadow-[4px_4px_0_rgb(var(--foreground))] focus-within:text-foreground focus-within:shadow-[2px_2px_0_rgb(var(--foreground))] focus-within:translate-x-[2px] focus-within:translate-y-[2px] transition-all">
+            <div className="flex items-center gap-2 h-10 md:h-12 px-3 md:px-4 w-11 md:w-[240px] lg:w-11 xl:w-[130px] 2xl:w-[180px] 3xl:w-[200px] rounded-xl border-[2.5px] border-foreground bg-card text-muted-foreground shadow-[4px_4px_0_rgb(var(--foreground))] focus-within:text-foreground focus-within:shadow-[2px_2px_0_rgb(var(--foreground))] focus-within:translate-x-[2px] focus-within:translate-y-[2px] transition-all">
                 <Search className="w-4 h-4 shrink-0 text-foreground" />
                 <input
                     type="search"
