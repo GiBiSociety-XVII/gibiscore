@@ -12,7 +12,7 @@ COLORI
   GiBiArena        #B6FF3C   accento    #4E7A00  testo su fondo chiaro
   GiBiScore        #3BC9FF   accento    #0A72A8  testo su fondo chiaro
   GiBiSociety      #FF7A45   accento    #C2410C  testo su fondo chiaro
-  GiBiFUT          #FFC83C   accento    #8A6200  testo su fondo chiaro   (glifo: card con stella; qui solo icon e icon-accent)
+  GiBiFUT          #A974FF   accento    #6D28D9  testo su fondo chiaro   (glifo: card giocatore)
 
 FILE — svg/
   gibi<sito>-icon.svg           icona primaria (tile nero, GB bianco, glifo accento)
