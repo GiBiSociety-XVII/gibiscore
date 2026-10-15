@@ -8,9 +8,12 @@ import {cn} from "@/components/shared/ui/cn";
  */
 export type GibiSite = 'gibiscore' | 'gibiarena' | 'gibisociety' | 'gibifut';
 
-/** Primary icon (black tile). `accent` switches to the full-accent tile for tiny sizes. */
-export function BrandIcon({site = 'gibiscore', size = 32, accent = false, className, alt = ''}: {site?: GibiSite; size?: number; accent?: boolean; className?: string; alt?: string}) {
-    const variant = accent || size < 32 ? 'icon-accent' : 'icon';
+/**
+ * Primary icon (black tile). Below 32 px the full-accent tile is used unless
+ * `accent` says otherwise; `accent` set explicitly always wins.
+ */
+export function BrandIcon({site = 'gibiscore', size = 32, accent, className, alt = ''}: {site?: GibiSite; size?: number; accent?: boolean; className?: string; alt?: string}) {
+    const variant = (accent ?? size < 32) ? 'icon-accent' : 'icon';
     return <img src={`/brand/svg/${site}-${variant}.svg`} alt={alt} width={size} height={size} className={cn("shrink-0 select-none", className)} draggable={false} />;
 }
 
