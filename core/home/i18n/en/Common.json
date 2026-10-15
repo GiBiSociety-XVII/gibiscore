@@ -13,7 +13,6 @@
   },
   "footer": {
     "email": "service@gibiscore.com",
-    "instagram": "@gibiarena",
     "columns": {
       "scores": {
         "title": "Scores",
@@ -42,13 +41,15 @@
         "privacy": "Privacy Policy",
         "terms": "Terms of Service",
         "data": "Data provided by API-Football",
-        "gibiarena": "GiBiArena"
+        "gibiarena": "GiBiArena",
+        "gibifut": "GiBiFUT"
       }
     },
     "productOf": "A product of",
     "society": "GiBiSociety",
     "discover": "Also discover",
     "arena": "GiBiArena",
+    "fut": "GiBiFUT",
     "copyright": "GiBiSociety · All rights reserved.",
     "legal": "Predictions and betting slips are statistics of the model, not betting advice. Bet only if you are of age, and in moderation."
   },

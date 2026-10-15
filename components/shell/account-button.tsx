@@ -1,10 +1,10 @@
 'use client';
 
-import {LogOut, Sparkles, UserRound} from "lucide-react";
-import {useEffect, useRef, useState} from "react";
+import {LogOut, Settings, Sparkles, User} from "lucide-react";
+import {useEffect, useState} from "react";
 import {useTranslations} from "next-intl";
 import {Link, usePathname, useRouter} from "@/i18n/navigation";
-import {cn} from "@/components/shared/ui/cn";
+import {buttonClasses} from "@/components/shared/ui/button";
 import {createClient} from "@/lib/db/client";
 
 interface Who {
@@ -13,18 +13,27 @@ interface Who {
 }
 
 /**
- * The account in the app bar. Signed out: the icon goes to sign in and
- * comes back here. Signed in: the icon opens a small menu with who you
- * are, the way to the profile page and the auction, and the way out.
+ * The account in the app bar, the way GiBiArena has it. Signed out:
+ * two buttons, sign in and sign up, on wide screens (sign in alone on
+ * a tablet, the mobile menu carries both on a phone). Signed in: a square avatar button that
+ * opens a small menu with who you are, the profile, the auction and
+ * the way out. While the session is being read, a quiet placeholder.
  */
 export function AccountButton() {
     const t = useTranslations('AppBar');
     const ta = useTranslations('Account');
     const path = usePathname();
     const router = useRouter();
-    const [who, setWho] = useState<Who | null>(null);
+    // Unknown until the session is read; signed out at once when the project's keys are not there (a build, a preview).
+    const [who, setWho] = useState<Who | null | undefined>(() => {
+        try {
+            createClient();
+            return undefined;
+        } catch {
+            return null;
+        }
+    });
     const [open, setOpen] = useState(false);
-    const box = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const read = (user: {email?: string; user_metadata?: Record<string, unknown>} | null | undefined) => {
@@ -32,26 +41,20 @@ export function AccountButton() {
             const name = user.user_metadata?.username;
             return {email: user.email ?? null, name: typeof name === 'string' && name.trim() ? name.trim() : null};
         };
-        // Without the project's keys (a build, a preview) there is no session: the icon just goes to sign in.
+        // Without the project's keys (a build, a preview) there is no session: the buttons just go to sign in.
         let supabase: ReturnType<typeof createClient>;
         try {
             supabase = createClient();
         } catch {
             return;
         }
-        supabase.auth.getSession().then(({data}) => setWho(read(data.session?.user))).catch(() => undefined);
+        supabase.auth
+            .getSession()
+            .then(({data}) => setWho(read(data.session?.user)))
+            .catch(() => setWho(null));
         const {data} = supabase.auth.onAuthStateChange((_event, session) => setWho(read(session?.user)));
         return () => data.subscription.unsubscribe();
     }, []);
-
-    useEffect(() => {
-        if (!open) return;
-        const onClick = (e: MouseEvent) => {
-            if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-        };
-        document.addEventListener('mousedown', onClick);
-        return () => document.removeEventListener('mousedown', onClick);
-    }, [open]);
 
     const signOut = async () => {
         await createClient().auth.signOut();
@@ -60,32 +63,53 @@ export function AccountButton() {
         router.refresh();
     };
 
-    const icon = cn("inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg border-2 transition-colors", path.startsWith('/sign') || open || who ? "border-foreground bg-accent/40" : "border-transparent text-foreground/70 hover:text-foreground hover:bg-muted");
+    if (who === undefined) return <div className="hidden lg:block w-10 h-10 rounded-[10px] border-2 border-foreground bg-muted animate-pulse" aria-hidden="true" />;
+
     if (!who) {
         return (
-            <Link href={{pathname: '/signin', query: {next: path}}} aria-label={t('login')} title={t('login')} aria-current={path.startsWith('/sign') ? 'page' : undefined} className={icon}>
-                <UserRound className="w-5 h-5" aria-hidden="true" />
-            </Link>
+            <div className="hidden md:flex items-center gap-2 shrink-0">
+                <Link href={{pathname: '/signin', query: {next: path}}} className={buttonClasses('secondary', 'sm', 'whitespace-nowrap')}>
+                    {t('login')}
+                </Link>
+                {/* Sign up only where the bar has the room: on a narrower screen sign in leads there too. */}
+                <Link href={{pathname: '/signup', query: {next: path}}} className={buttonClasses('primary', 'sm', 'hidden xl:inline-flex whitespace-nowrap')}>
+                    {t('register')}
+                </Link>
+            </div>
         );
     }
+
     return (
-        <div ref={box} className="relative shrink-0">
-            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu" aria-label={who.name ?? who.email ?? ta('title')} title={who.name ?? who.email ?? ta('title')} className={icon}>
-                <UserRound className="w-5 h-5" aria-hidden="true" />
+        <div className="relative shrink-0">
+            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu" aria-label={who.name ?? who.email ?? ta('title')} title={who.name ?? who.email ?? ta('title')} className="w-10 h-10 rounded-[10px] border-2 border-foreground bg-accent flex items-center justify-center text-accent-foreground font-extrabold cursor-pointer">
+                <User className="w-5 h-5" aria-hidden="true" />
             </button>
             {open && (
-                <div role="menu" className="absolute right-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] z-50 bb-surface bg-background shadow-[6px_6px_0_rgb(var(--foreground))] p-3 flex flex-col gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-9 h-9 rounded-lg border-2 border-foreground bg-accent flex items-center justify-center shrink-0"><UserRound className="w-4 h-4" aria-hidden="true" /></span>
-                        <span className="flex flex-col leading-tight min-w-0">
-                            <span className="text-[13px] font-extrabold truncate">{who.name ?? ta('title')}</span>
-                            {who.email && <span className="text-[11px] font-semibold text-muted-foreground truncate">{who.email}</span>}
-                        </span>
+                <>
+                    <div role="menu" className="absolute right-0 mt-2 w-48 bb-surface bg-card overflow-hidden z-50">
+                        <div className="p-4 border-b-2 border-foreground">
+                            <p className="text-sm font-bold text-foreground truncate">{who.name ?? ta('title')}</p>
+                            {who.email && <p className="text-xs text-muted-foreground truncate">{who.email}</p>}
+                        </div>
+                        <div className="p-2 space-y-1">
+                            <Link href="/account" role="menuitem" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-[10px] transition-colors cursor-pointer">
+                                <Settings className="w-4 h-4" aria-hidden="true" />
+                                {ta('profile.menu')}
+                            </Link>
+                            <Link href="/fantacalcio/asta" role="menuitem" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-[10px] transition-colors cursor-pointer">
+                                <Sparkles className="w-4 h-4" aria-hidden="true" />
+                                {ta('toAuction')}
+                            </Link>
+                        </div>
+                        <div className="p-2 border-t-2 border-foreground">
+                            <button type="button" role="menuitem" onClick={signOut} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-[10px] transition-colors cursor-pointer">
+                                <LogOut className="w-4 h-4" aria-hidden="true" />
+                                {ta('signOut')}
+                            </button>
+                        </div>
                     </div>
-                    <Link href="/account" role="menuitem" onClick={() => setOpen(false)} className="bb-btn bg-accent h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><UserRound className="w-3.5 h-3.5" aria-hidden="true" />{ta('profile.menu')}</Link>
-                    <Link href="/fantacalcio/asta" role="menuitem" onClick={() => setOpen(false)} className="bb-btn bg-card h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><Sparkles className="w-3.5 h-3.5" aria-hidden="true" />{ta('toAuction')}</Link>
-                    <button type="button" role="menuitem" onClick={signOut} className="bb-btn bg-card h-9 px-3 text-[12px] font-extrabold inline-flex items-center justify-center gap-1.5"><LogOut className="w-3.5 h-3.5" aria-hidden="true" />{ta('signOut')}</button>
-                </div>
+                    <div className="fixed inset-0 z-40 cursor-pointer" onClick={() => setOpen(false)} aria-hidden="true" />
+                </>
             )}
         </div>
     );

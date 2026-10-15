@@ -6,11 +6,14 @@ import {cn} from "@/components/shared/ui/cn";
  * curves, one glyph and one accent per site. Never rotated, stretched or
  * shadowed; below 32 px the full-accent variant is used.
  */
-export type GibiSite = 'gibiscore' | 'gibiarena' | 'gibisociety';
+export type GibiSite = 'gibiscore' | 'gibiarena' | 'gibisociety' | 'gibifut';
 
-/** Primary icon (black tile). `accent` switches to the full-accent tile for tiny sizes. */
-export function BrandIcon({site = 'gibiscore', size = 32, accent = false, className, alt = ''}: {site?: GibiSite; size?: number; accent?: boolean; className?: string; alt?: string}) {
-    const variant = accent || size < 32 ? 'icon-accent' : 'icon';
+/**
+ * Primary icon (black tile). Below 32 px the full-accent tile is used unless
+ * `accent` says otherwise; `accent` set explicitly always wins.
+ */
+export function BrandIcon({site = 'gibiscore', size = 32, accent, className, alt = ''}: {site?: GibiSite; size?: number; accent?: boolean; className?: string; alt?: string}) {
+    const variant = (accent ?? size < 32) ? 'icon-accent' : 'icon';
     return <img src={`/brand/svg/${site}-${variant}.svg`} alt={alt} width={size} height={size} className={cn("shrink-0 select-none", className)} draggable={false} />;
 }
 
@@ -20,7 +23,7 @@ export function BrandIcon({site = 'gibiscore', size = 32, accent = false, classN
  */
 export function BrandLockup({site = 'gibiscore', height = 30, dark = false, className, alt}: {site?: GibiSite; height?: number; dark?: boolean; className?: string; alt?: string}) {
     const width = Math.round((height * 925) / 232);
-    const label = alt ?? (site === 'gibiscore' ? 'GiBiScore' : site === 'gibiarena' ? 'GiBiArena' : 'GiBiSociety');
+    const label = alt ?? (site === 'gibiscore' ? 'GiBiScore' : site === 'gibiarena' ? 'GiBiArena' : site === 'gibifut' ? 'GiBiFUT' : 'GiBiSociety');
     return <img src={`/brand/svg/${site}-lockup${dark ? '-dark' : ''}.svg`} alt={label} width={width} height={height} className={cn("shrink-0 select-none", className)} draggable={false} />;
 }
 

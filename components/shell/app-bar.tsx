@@ -26,16 +26,16 @@ export default function AppBar() {
     return (
         <header className="sticky top-0 z-50 w-full bg-background border-b-[2.5px] border-foreground">
             <div className="w-full max-w-[1600px] mx-auto px-3 md:px-6">
-                <div className="flex h-16 md:h-20 items-center gap-3 md:gap-6">
+                <div className="flex h-16 md:h-20 items-center gap-3">
                     <Link href="/" className="flex items-center shrink-0" aria-label="GiBiScore">
-                        <BrandLockup height={48} className="hidden sm:block h-10 md:h-12 w-auto" />
+                        <BrandLockup height={48} className="hidden sm:block h-10 2xl:h-12 w-auto" />
                         <BrandIcon size={40} className="sm:hidden" alt="GiBiScore" />
                     </Link>
 
-                    <nav data-tour="sections" aria-label={t('sectionsLabel')} className="hidden md:flex items-center gap-2">
+                    <nav data-tour="sections" aria-label={t('sectionsLabel')} className="hidden lg:flex items-center gap-1 xl:gap-2">
                         <NavMegaMenu
                             label={t('nav.scores')}
-                            icon={<CalendarDays className="w-5 h-5" />}
+                            icon={<CalendarDays className="hidden 2xl:block w-5 h-5" />}
                             overviewHref="/"
                             overviewLabel={m('scores.overview')}
                             columns={scoresColumns}
@@ -45,7 +45,7 @@ export default function AppBar() {
                             href="/live"
                             aria-current={liveActive ? 'page' : undefined}
                             className={cn(
-                                "inline-flex items-center h-9 md:h-10 px-2.5 md:px-3.5 rounded-lg text-[14px] md:text-[17px] font-bold whitespace-nowrap transition-colors",
+                                "inline-flex items-center h-10 px-2 xl:px-2.5 2xl:px-3.5 rounded-lg text-[14px] xl:text-[15px] 2xl:text-[17px] font-bold whitespace-nowrap transition-colors",
                                 liveActive ? "text-foreground bg-accent/40 border-2 border-foreground" : "text-foreground/70 hover:text-foreground hover:bg-muted",
                             )}
                         >
@@ -54,7 +54,7 @@ export default function AppBar() {
                         </Link>
                         <NavMegaMenu
                             label={t('nav.competitions')}
-                            icon={<Trophy className="w-5 h-5" />}
+                            icon={<Trophy className="hidden 2xl:block w-5 h-5" />}
                             overviewHref="/competitions"
                             overviewLabel={m('competitions.overview')}
                             columns={competitionColumns}
@@ -64,16 +64,16 @@ export default function AppBar() {
                             href="/predictions"
                             aria-current={predictionsActive ? 'page' : undefined}
                             className={cn(
-                                "inline-flex items-center gap-1.5 h-9 md:h-10 px-2.5 md:px-3.5 rounded-lg text-[14px] md:text-[17px] font-bold whitespace-nowrap transition-colors",
+                                "inline-flex items-center gap-1.5 h-10 px-2 xl:px-2.5 2xl:px-3.5 rounded-lg text-[14px] xl:text-[15px] 2xl:text-[17px] font-bold whitespace-nowrap transition-colors",
                                 predictionsActive ? "text-foreground bg-accent/40 border-2 border-foreground" : "text-foreground/70 hover:text-foreground hover:bg-muted",
                             )}
                         >
-                            <TrendingUp className="w-5 h-5" aria-hidden="true" />
+                            <TrendingUp className="hidden 2xl:block w-5 h-5" aria-hidden="true" />
                             {t('nav.predictions')}
                         </Link>
                         <NavMegaMenu
                             label={t('nav.stats')}
-                            icon={<BarChart3 className="w-5 h-5" />}
+                            icon={<BarChart3 className="hidden 2xl:block w-5 h-5" />}
                             overviewHref="/stats"
                             overviewLabel={m('stats.overview')}
                             columns={statsColumns}
@@ -83,11 +83,11 @@ export default function AppBar() {
                             href="/fantacalcio"
                             aria-current={fantaActive ? 'page' : undefined}
                             className={cn(
-                                "inline-flex items-center gap-1.5 h-9 md:h-10 px-2.5 md:px-3.5 rounded-lg text-[14px] md:text-[17px] font-bold whitespace-nowrap transition-colors",
+                                "inline-flex items-center gap-1.5 h-10 px-2 xl:px-2.5 2xl:px-3.5 rounded-lg text-[14px] xl:text-[15px] 2xl:text-[17px] font-bold whitespace-nowrap transition-colors",
                                 fantaActive ? "text-foreground bg-accent/40 border-2 border-foreground" : "text-foreground/70 hover:text-foreground hover:bg-muted",
                             )}
                         >
-                            <Sparkles className="w-5 h-5" aria-hidden="true" />
+                            <Sparkles className="hidden 2xl:block w-5 h-5" aria-hidden="true" />
                             {tf('nav')}
                         </Link>
                     </nav>
