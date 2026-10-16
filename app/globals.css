@@ -35,6 +35,8 @@ body {
 }
 
 @theme inline {
+  /* The widest desktop tier: the app bar shows icons and full-size text only here. */
+  --breakpoint-3xl: 106.25rem; /* 1700 px, in rem like the built-in ones so the media queries sort in order */
   --color-background: rgb(var(--background));
   --color-foreground: rgb(var(--foreground));
   --color-card: rgb(var(--card));

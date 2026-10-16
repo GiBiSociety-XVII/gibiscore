@@ -47,7 +47,7 @@ export function NavMegaMenu({label, icon, overviewHref, overviewLabel, columns, 
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
                 className={cn(
-                    "inline-flex items-center gap-1.5 h-10 px-2 xl:px-2.5 2xl:px-3.5 rounded-lg text-[14px] xl:text-[15px] 2xl:text-[17px] font-bold whitespace-nowrap transition-colors",
+                    "inline-flex items-center gap-1.5 h-10 px-2 2xl:px-3 rounded-lg text-[14px] xl:text-[15px] 2xl:text-[16px] 3xl:text-[17px] font-bold whitespace-nowrap transition-colors",
                     active ? "text-foreground bg-accent/40 border-2 border-foreground" : "text-foreground/70 hover:text-foreground",
                     open && !active && "bg-muted text-foreground",
                 )}
